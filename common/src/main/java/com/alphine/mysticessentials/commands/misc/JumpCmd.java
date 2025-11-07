@@ -20,7 +20,7 @@ public class JumpCmd {
 
     public void register(CommandDispatcher<CommandSourceStack> d){
         d.register(net.minecraft.commands.Commands.literal("jump")
-                .requires(src -> Perms.has(src, PermNodes.GOD_USE, 2))
+                .requires(src -> Perms.has(src, PermNodes.JUMP_USE, 2))
                 .executes(ctx -> {
                     ServerPlayer p = ctx.getSource().getPlayerOrException();
                     double range = 100.0;
