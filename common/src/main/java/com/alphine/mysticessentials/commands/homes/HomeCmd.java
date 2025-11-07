@@ -28,13 +28,26 @@ public class HomeCmd {
         this.store=s; this.cooldowns=c; this.warmups=w; this.pdata=pdata;
     }
 
-    private static final SuggestionProvider<CommandSourceStack> HOME_SUGGEST = (ctx, b) -> {
-        try {
-            var p = ctx.getSource().getPlayerOrException();
-            for (var n : com.alphine.mysticessentials.MysticEssentialsCommon.get().homes.names(p.getUUID())) b.suggest(n);
-        } catch (Exception ignored) {}
-        return b.buildFuture();
-    };
+    // Suggest based on the effective target player in context (self or explicit second arg)
+    private SuggestionProvider<CommandSourceStack> homeSuggest() {
+        return (ctx, b) -> {
+            try {
+                Player target;
+                if (ctx.getNodes().size() >= 2) { // name then maybe player
+                    // If a "player" argument exists, use its parsed value, else default to self.
+                    if (ctx.getNodes().stream().anyMatch(n -> "player".equals(n.getNode().getName()))) {
+                        target = EntityArgument.getPlayer(ctx, "player");
+                    } else {
+                        target = ctx.getSource().getPlayerOrException();
+                    }
+                } else {
+                    target = ctx.getSource().getPlayerOrException();
+                }
+                for (var n : store.names(target.getUUID())) b.suggest(n);
+            } catch (Exception ignored) {}
+            return b.buildFuture();
+        };
+    }
 
     private static boolean featureOn(){
         var c = MEConfig.INSTANCE; return c == null || c.features == null || c.features.enableHomesWarpsTP;
