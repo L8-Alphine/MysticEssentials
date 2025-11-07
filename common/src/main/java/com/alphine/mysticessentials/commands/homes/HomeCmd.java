@@ -2,6 +2,7 @@ package com.alphine.mysticessentials.commands.homes;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
 import com.alphine.mysticessentials.config.MEConfig;
 import com.alphine.mysticessentials.storage.HomesStore;
@@ -12,10 +13,12 @@ import com.alphine.mysticessentials.perm.PermNodes;
 import com.alphine.mysticessentials.perm.Perms;
 import com.alphine.mysticessentials.perm.Bypass;
 import net.minecraft.commands.*;
+import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.*;
 import net.minecraft.server.level.*;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 
 public class HomeCmd {
@@ -86,35 +89,26 @@ public class HomeCmd {
         }
         var h = opt.get();
 
-                            long now = System.currentTimeMillis();
-                            if (!Bypass.cooldown(ctx.getSource()) && cooldowns.getDefaultSeconds("home") > 0
-                                    && !cooldowns.checkAndStampDefault(p.getUUID(), "home", now)) {
-                                long rem = cooldowns.remaining(p.getUUID(), "home", now);
-                                p.displayClientMessage(Component.literal("§cCooldown: §e"+rem+"s"), false);
-                                return 0;
-                            }
+        long now = System.currentTimeMillis();
+        if (!Bypass.cooldown(ctx.getSource()) && cooldowns.getDefaultSeconds("home") > 0
+                && !cooldowns.checkAndStampDefault(actor.getUUID(), "home", now)) {
+            long rem = cooldowns.remaining(actor.getUUID(), "home", now);
+            actor.displayClientMessage(Component.literal("§cCooldown: §e"+rem+"s"), false);
+            return 0;
+        }
 
-                            int warmSec = MEConfig.INSTANCE != null ? MEConfig.INSTANCE.getWarmup("home") : 0;
-                            Runnable tp = () -> {
-                                ResourceLocation id = ResourceLocation.tryParse(h.dim); // "namespace:path"
-                                if (id == null) {
-                                    p.displayClientMessage(Component.literal("§cBad dimension id: " + h.dim), false);
-                                    return;
-                                }
-                                ResourceKey<Level> key = ResourceKey.create(Registries.DIMENSION, id);
-                                ServerLevel level = p.getServer().getLevel(key);
-                                if (level == null) {
-                                    p.displayClientMessage(Component.literal("§cWorld missing: " + h.dim), false);
-                                    return;
-                                }
-                                Teleports.pushBackAndTeleport(p, level, h.x, h.y, h.z, h.yaw, h.pitch, pdata);
-                            };
+        int warmSec = MEConfig.INSTANCE != null ? MEConfig.INSTANCE.getWarmup("home") : 0;
+        Runnable tp = () -> {
+            ResourceLocation id = ResourceLocation.tryParse(h.dim);
+            if (id == null) { actor.displayClientMessage(Component.literal("§cBad dimension id: " + h.dim), false); return; }
+            ResourceKey<Level> key = ResourceKey.create(Registries.DIMENSION, id);
+            ServerLevel level = actor.getServer().getLevel(key);
+            if (level == null) { actor.displayClientMessage(Component.literal("§cWorld missing: " + h.dim), false); return; }
+            Teleports.pushBackAndTeleport(actor, level, h.x, h.y, h.z, h.yaw, h.pitch, pdata);
+        };
 
-                            if (Bypass.warmup(ctx.getSource())) tp.run();
-                            else warmups.startOrBypass(ctx.getSource().getServer(), p, warmSec, tp);
-                            return 1;
-                        })
-                )
-        );
+        if (Bypass.warmup(ctx.getSource())) tp.run();
+        else warmups.startOrBypass(ctx.getSource().getServer(), actor, warmSec, tp);
+        return 1;
     }
 }
