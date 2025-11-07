@@ -4,7 +4,6 @@ import com.alphine.mysticessentials.MysticEssentialsCommon;
 import com.alphine.mysticessentials.fabric.platform.FabricModInfoService;
 import com.alphine.mysticessentials.inv.InvseeSessions;
 import com.alphine.mysticessentials.storage.PlayerDataStore;
-import com.alphine.mysticessentials.util.DurationUtil;
 import com.alphine.mysticessentials.util.Teleports;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
@@ -17,68 +16,71 @@ import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.Level;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+
 public class MysticEssentialsFabric implements ModInitializer {
 
     private int afkTickAccum = 0;
-    private final java.util.Map<java.util.UUID, net.minecraft.world.phys.Vec3> afkLastPos = new java.util.HashMap<>();
-    private final java.util.Map<java.util.UUID, float[]> afkLastRot = new java.util.HashMap<>();
+    private final Map<UUID, net.minecraft.world.phys.Vec3> afkLastPos = new HashMap<>();
+    private final Map<UUID, float[]> afkLastRot = new HashMap<>();
 
     @Override
     public void onInitialize() {
-        // mod info service
+        // Mod info service
         MysticEssentialsCommon.get().setModInfoService(new FabricModInfoService());
-        // lifecycle
+
+        // Lifecycle
         ServerLifecycleEvents.SERVER_STARTING.register(MysticEssentialsCommon.get()::serverStarting);
         ServerLifecycleEvents.SERVER_STOPPING.register(server -> MysticEssentialsCommon.get().serverStopping());
 
-        // commands
+        // Commands
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, env) ->
                 MysticEssentialsCommon.get().registerCommands(dispatcher)
         );
 
-        // god mode: block damage & death
-        ServerLivingEntityEvents.ALLOW_DAMAGE.register((entity, source, amount) -> {
-            if (entity instanceof ServerPlayer p && MysticEssentialsCommon.get().god.isGod(p.getUUID())) return false;
-            return true;
-        });
-        ServerLivingEntityEvents.ALLOW_DEATH.register((entity, damageSource, damageAmount) -> {
-            if (entity instanceof ServerPlayer p && MysticEssentialsCommon.get().god.isGod(p.getUUID())) return false;
-            return true;
-        });
+        // God mode: block damage & death
+        ServerLivingEntityEvents.ALLOW_DAMAGE.register((entity, source, amount) ->
+                !(entity instanceof ServerPlayer p) || !MysticEssentialsCommon.get().god.isGod(p.getUUID())
+        );
+        ServerLivingEntityEvents.ALLOW_DEATH.register((entity, damageSource, damageAmount) ->
+                !(entity instanceof ServerPlayer p) || !MysticEssentialsCommon.get().god.isGod(p.getUUID())
+        );
 
-        // last location on disconnect + stop any invsee tracking
+        // Last location on disconnect + stop any invsee tracking
         ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
             ServerPlayer p = handler.player;
-            var pdata = MysticEssentialsCommon.get().pdata;
-            MysticEssentialsCommon.get().onPlayerQuit(p);
+            var common = MysticEssentialsCommon.get();
+            common.onPlayerQuit(p);
+
             var l = new PlayerDataStore.LastLoc();
             l.dim = p.serverLevel().dimension().location().toString();
             l.x = p.getX(); l.y = p.getY(); l.z = p.getZ();
             l.yaw = p.getYRot(); l.pitch = p.getXRot();
             l.when = System.currentTimeMillis();
-            pdata.setLast(p.getUUID(), l);
+            common.pdata.setLast(p.getUUID(), l);
+
             InvseeSessions.close(p);
         });
 
-        // last death
+        // Last death
         ServerLivingEntityEvents.AFTER_DEATH.register((entity, source) -> {
             if (entity instanceof ServerPlayer p) {
-                var pdata = MysticEssentialsCommon.get().pdata;
                 var l = new PlayerDataStore.LastLoc();
                 l.dim = p.serverLevel().dimension().location().toString();
                 l.x = p.getX(); l.y = p.getY(); l.z = p.getZ();
                 l.yaw = p.getYRot(); l.pitch = p.getXRot();
                 l.when = System.currentTimeMillis();
-                pdata.setDeath(p.getUUID(), l);
+                MysticEssentialsCommon.get().pdata.setDeath(p.getUUID(), l);
             }
         });
 
-        // once per second AFK tick
+        // Once-per-second AFK tick
         ServerTickEvents.END_SERVER_TICK.register(server -> {
             if (++afkTickAccum >= 20) {
                 afkTickAccum = 0;
@@ -86,9 +88,10 @@ public class MysticEssentialsFabric implements ModInitializer {
             }
         });
 
-        // per-world tick: keep your freeze/invsee close AND add AFK movement detection
+        // Per-world tick: AFK movement + freeze + invsee guard
         ServerTickEvents.END_WORLD_TICK.register(world -> {
-            var punish = MysticEssentialsCommon.get().punish;
+            var common = MysticEssentialsCommon.get();
+            var punish = common.punish;
 
             for (ServerPlayer sp : world.players()) {
                 // --- AFK movement/rotation activity ---
@@ -102,29 +105,27 @@ public class MysticEssentialsFabric implements ModInitializer {
                 boolean rotated = lastRot == null || Math.abs(lastRot[0] - yRot) > 0.1f || Math.abs(lastRot[1] - xRot) > 0.1f;
 
                 if (moved || rotated) {
-                    MysticEssentialsCommon.get().onPlayerMove(sp);
+                    common.onPlayerMove(sp);
                     afkLastPos.put(id, curPos);
                     afkLastRot.put(id, new float[]{yRot, xRot});
                 }
 
-                // --- existing freeze + invsee logic ---
+                // --- Freeze: cancel movement (Fabric: no hurtMarked touch) ---
                 if (punish.isFrozen(sp.getUUID())) {
                     sp.setDeltaMovement(0, 0, 0);
-                    sp.hurtMarked = true;
                 }
+
+                // If they closed out of any container (back to inventory), ensure invsee is closed
                 if (sp.containerMenu == sp.inventoryMenu) {
-                    com.alphine.mysticessentials.inv.InvseeSessions.close(sp);
+                    InvseeSessions.close(sp);
                 }
             }
         });
 
+        // Close invsee when any screen handler closes (and background ticking)
+        ServerTickEvents.END_SERVER_TICK.register(InvseeSessions::tick);
 
-        // close invsee when any screen handler closes
-        ServerTickEvents.END_SERVER_TICK.register(
-                com.alphine.mysticessentials.inv.InvseeSessions::tick
-        );
-
-        // enforce jails on world change
+        // Enforce jails on world change
         ServerEntityWorldChangeEvents.AFTER_PLAYER_CHANGE_WORLD.register((player, origin, destination) -> {
             var common = MysticEssentialsCommon.get();
             var ps = common.punish;
@@ -145,17 +146,16 @@ public class MysticEssentialsFabric implements ModInitializer {
             }
         });
 
-        // chat mute
+        // Chat mute (sender is already a ServerPlayer)
         ServerMessageEvents.ALLOW_CHAT_MESSAGE.register((message, sender, params) -> {
-            if (!(sender instanceof ServerPlayer p)) return true;
-
+            ServerPlayer p = sender;
             var ps = MysticEssentialsCommon.get().punish;
+
             var om = ps.getMute(p.getUUID());
             if (om.isEmpty()) {
                 // mark AFK activity only when message is allowed
                 MysticEssentialsCommon.get().onPlayerChat(p);
 
-                // PlayerChatMessage -> raw text
                 String raw = (message.unsignedContent() != null)
                         ? message.unsignedContent().getString()
                         : message.signedContent();
@@ -169,7 +169,8 @@ public class MysticEssentialsFabric implements ModInitializer {
                 long rem = m.until == null ? -1 : (m.until - System.currentTimeMillis());
                 p.displayClientMessage(
                         net.minecraft.network.chat.Component.literal(
-                                "§cYou are muted" + (rem > 0 ? " §7(" + com.alphine.mysticessentials.util.DurationUtil.fmtRemaining(rem) + ")" : "§7 (permanent)") + "."),
+                                "§cYou are muted" + (rem > 0 ? " §7(" +
+                                        com.alphine.mysticessentials.util.DurationUtil.fmtRemaining(rem) + ")" : " §7(permanent)") + "."),
                         false
                 );
                 return false;
@@ -184,7 +185,7 @@ public class MysticEssentialsFabric implements ModInitializer {
             }
         });
 
-        // kick on join if banned (uuid/ip)
+        // Kick on join if banned (uuid/ip)
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
             ServerPlayer p = handler.player;
             var ps = MysticEssentialsCommon.get().punish;
@@ -208,15 +209,5 @@ public class MysticEssentialsFabric implements ModInitializer {
                 } else ps.unbanIp(ip);
             }
         });
-    }
-
-    private static void freezeTick(MinecraftServer server) {
-        var punish = MysticEssentialsCommon.get().punish;
-        for (ServerPlayer sp : server.getPlayerList().getPlayers()) {
-            if (punish.isFrozen(sp.getUUID())) {
-                sp.setDeltaMovement(0, 0, 0);
-                // no direct 'hurtMarked' on Fabric without an access widener; zeroing velocity each tick is enough
-            }
-        }
     }
 }
