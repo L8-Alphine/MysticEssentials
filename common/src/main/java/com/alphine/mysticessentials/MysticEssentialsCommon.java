@@ -45,25 +45,26 @@ public final class MysticEssentialsCommon {
     private MysticEssentialsCommon() {}
 
     public void serverStarting(MinecraftServer server) {
-        // serverDir is already a Path
         Path serverDir = server.getServerDirectory();
-
-        // <server root>/config/mysticessentials
         Path cfgDir = serverDir.resolve("config").resolve(MOD_ID).normalize();
 
-        cfg = MEConfig.load(cfgDir);
-        homes = new HomesStore(cfgDir);
+        cfg   = MEConfig.load(cfgDir);
+
+        pdata = new PlayerDataStore(cfgDir);   // unified store FIRST
+        homes = new HomesStore(pdata);         // wrapper uses pdata
         warps = new WarpsStore(cfgDir);
         spawn = new SpawnStore(cfgDir);
-        pdata = new PlayerDataStore(cfgDir);
+
         afkPools = new AfkPoolsStore(cfgDir);
         cfg.afk.pools.clear();
         cfg.afk.pools.putAll(afkPools.viewAll());
         afk = new AfkService(cfg, pdata);
+
         punish = new PunishStore(cfgDir);
         audit  = new AuditLogStore(cfgDir);
+
         kits        = new KitStore(cfgDir);
-        kitsPlayers = new KitPlayerStore(cfgDir);
+        kitsPlayers = new KitPlayerStore(pdata);  // wrapper uses pdata
     }
 
     public void registerCommands(CommandDispatcher<CommandSourceStack> d) {
