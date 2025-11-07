@@ -1,7 +1,5 @@
 package com.alphine.mysticessentials.commands.afk;
 
-import com.alphine.mysticessentials.perm.Perms;
-import com.alphine.mysticessentials.perm.PermNodes;
 import com.alphine.mysticessentials.util.AfkService;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
