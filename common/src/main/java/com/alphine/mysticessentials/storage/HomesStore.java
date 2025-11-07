@@ -1,89 +1,61 @@
 package com.alphine.mysticessentials.storage;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-
-import java.io.Reader;
-import java.io.Writer;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.*;
 
-/**
- * Per-player homes stored in /config/mysticessentials/homes.json
- * Layout: { "<uuid>": { "<homeName>": Home } }
- */
-public class HomesStore {
+public final class HomesStore {
+
+    /** Keep the old API type name, but it's just a DTO we convert to/from PlayerDataStore.Home */
     public static final class Home {
         public String name;
-        public String dim;   // e.g. "minecraft:overworld"
+        public String dim;
         public double x, y, z;
         public float yaw, pitch;
     }
 
-    private final Map<UUID, Map<String, Home>> data = new HashMap<>();
-    private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
-    private final Path file;
+    private final PlayerDataStore store;
 
-    public HomesStore(Path cfgDir) {
-        this.file = cfgDir.resolve("homes.json");
-        load();
+    public HomesStore(PlayerDataStore store) {
+        this.store = store;
+    }
+
+    // --- compatibility no-ops so existing callsites compile ---
+    public void load() {}
+    public void save() {}
+
+    private static PlayerDataStore.Home toPD(Home h) {
+        PlayerDataStore.Home p = new PlayerDataStore.Home();
+        p.name = h.name;
+        p.dim  = h.dim;
+        p.x = h.x; p.y = h.y; p.z = h.z;
+        p.yaw = h.yaw; p.pitch = h.pitch;
+        return p;
+    }
+    private static Home fromPD(PlayerDataStore.Home p) {
+        Home h = new Home();
+        h.name = p.name;
+        h.dim  = p.dim;
+        h.x = p.x; h.y = p.y; h.z = p.z;
+        h.yaw = p.yaw; h.pitch = p.pitch;
+        return h;
     }
 
     public synchronized void set(UUID id, Home h) {
-        data.computeIfAbsent(id, k -> new HashMap<>()).put(h.name.toLowerCase(Locale.ROOT), h);
-        save();
+        store.setHome(id, toPD(h));
     }
 
     public synchronized Optional<Home> get(UUID id, String name) {
-        var m = data.get(id);
-        if (m == null) return Optional.empty();
-        return Optional.ofNullable(m.get(name.toLowerCase(Locale.ROOT)));
+        return store.getHome(id, name).map(HomesStore::fromPD);
     }
 
     public synchronized boolean delete(UUID id, String name) {
-        var m = data.get(id);
-        if (m == null) return false;
-        boolean ok = m.remove(name.toLowerCase(Locale.ROOT)) != null;
-        if (ok) save();
-        return ok;
+        return store.delHome(id, name);
     }
 
     public synchronized Collection<Home> all(UUID id) {
-        var m = data.get(id);
-        return m == null ? List.of() : List.copyOf(m.values());
+        return store.allHomes(id).stream().map(HomesStore::fromPD).toList();
     }
 
     public synchronized Set<String> names(UUID id) {
-        var m = data.get(id);
-        return m == null ? Set.of() : Set.copyOf(m.keySet());
-    }
-
-    public synchronized void load() {
-        try {
-            Files.createDirectories(file.getParent());
-            if (!Files.exists(file)) {
-                save(); // create empty
-                return;
-            }
-            try (Reader r = Files.newBufferedReader(file)) {
-                var type = new com.google.gson.reflect.TypeToken<Map<String, Map<String, Home>>>() {}.getType();
-                Map<String, Map<String, Home>> raw = gson.fromJson(r, type);
-                data.clear();
-                if (raw != null) {
-                    for (var e : raw.entrySet()) {
-                        data.put(UUID.fromString(e.getKey()), new HashMap<>(e.getValue()));
-                    }
-                }
-            }
-        } catch (Exception ignored) {}
-    }
-
-    public synchronized void save() {
-        try (Writer w = Files.newBufferedWriter(file)) {
-            Map<String, Map<String, Home>> out = new LinkedHashMap<>();
-            for (var e : data.entrySet()) out.put(e.getKey().toString(), e.getValue());
-            gson.toJson(out, w);
-        } catch (Exception ignored) {}
+        return store.homeNames(id);
     }
 }
