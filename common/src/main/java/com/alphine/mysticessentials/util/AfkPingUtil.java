@@ -20,6 +20,8 @@ public final class AfkPingUtil {
         var common = MysticEssentialsCommon.get();
         var afk = common.afk;
 
+        if (afk == null) return;
+
         // iterate online players and look for whole-word name hits (case-insensitive)
         for (ServerPlayer target : server.getPlayerList().getPlayers()) {
             if (target.getUUID().equals(sender.getUUID())) continue;
