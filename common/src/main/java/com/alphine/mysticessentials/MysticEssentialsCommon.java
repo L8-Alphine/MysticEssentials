@@ -45,26 +45,37 @@ public final class MysticEssentialsCommon {
     private MysticEssentialsCommon() {}
 
     public void serverStarting(MinecraftServer server) {
-        Path serverDir = server.getServerDirectory();
-        Path cfgDir = serverDir.resolve("config").resolve(MOD_ID).normalize();
+        Path cfgDir = server.getServerDirectory()
+                .resolve("config").resolve(MOD_ID).normalize();
+        ensureCoreServices(cfgDir);
 
-        cfg   = MEConfig.load(cfgDir);
-
-        pdata = new PlayerDataStore(cfgDir);   // unified store FIRST
-        homes = new HomesStore(pdata);         // wrapper uses pdata
-        warps = new WarpsStore(cfgDir);
-        spawn = new SpawnStore(cfgDir);
-
-        afkPools = new AfkPoolsStore(cfgDir);
+        // Re-mirror store -> config and notify AFK service
         cfg.afk.pools.clear();
         cfg.afk.pools.putAll(afkPools.viewAll());
-        afk = new AfkService(cfg, pdata);
+        afk.reloadPools();
+    }
 
-        punish = new PunishStore(cfgDir);
-        audit  = new AuditLogStore(cfgDir);
+    public void ensureCoreServices(Path cfgDir) {
+        if (cfg == null) {
+            cfg = MEConfig.load(cfgDir);
+            if (MEConfig.INSTANCE == null) MEConfig.INSTANCE = cfg;
+        }
+        if (pdata == null)      pdata = new PlayerDataStore(cfgDir);
+        if (homes == null)      homes = new HomesStore(pdata);
+        if (warps == null)      warps = new WarpsStore(cfgDir);
+        if (spawn == null)      spawn = new SpawnStore(cfgDir);
+        if (afkPools == null)   afkPools = new AfkPoolsStore(cfgDir);
 
-        kits        = new KitStore(cfgDir);
-        kitsPlayers = new KitPlayerStore(pdata);  // wrapper uses pdata
+        // mirror pools -> config only if empty (prevents duplicates if called twice)
+        if (cfg.afk != null && cfg.afk.pools != null && cfg.afk.pools.isEmpty()) {
+            cfg.afk.pools.putAll(afkPools.viewAll());
+        }
+
+        if (afk == null)        afk = new AfkService(cfg, pdata);
+        if (punish == null)     punish = new PunishStore(cfgDir);
+        if (audit == null)      audit  = new AuditLogStore(cfgDir);
+        if (kits == null)       kits   = new KitStore(cfgDir);
+        if (kitsPlayers == null) kitsPlayers = new KitPlayerStore(pdata);
     }
 
     public void registerCommands(CommandDispatcher<CommandSourceStack> d) {

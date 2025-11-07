@@ -13,6 +13,7 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.message.v1.ServerMessageEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
+import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
@@ -20,6 +21,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.Level;
 
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -40,9 +42,13 @@ public class MysticEssentialsFabric implements ModInitializer {
         ServerLifecycleEvents.SERVER_STOPPING.register(server -> MysticEssentialsCommon.get().serverStopping());
 
         // Commands
-        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, env) ->
-                MysticEssentialsCommon.get().registerCommands(dispatcher)
-        );
+        CommandRegistrationCallback.EVENT.register((dispatcher, regAccess, env) -> {
+            var common = MysticEssentialsCommon.get();
+            Path cfgDir = FabricLoader.getInstance().getConfigDir()
+                    .resolve(MysticEssentialsCommon.MOD_ID).normalize();
+            common.ensureCoreServices(cfgDir);
+            common.registerCommands(dispatcher);
+        });
 
         // God mode: block damage & death
         ServerLivingEntityEvents.ALLOW_DAMAGE.register((entity, source, amount) ->

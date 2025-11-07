@@ -13,6 +13,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.Level;
 import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.loading.FMLPaths;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.ServerChatEvent;
@@ -26,6 +27,7 @@ import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -63,8 +65,12 @@ public class MysticEssentialsNeoForge {
         MysticEssentialsCommon.get().serverStarting(e.getServer());
     }
 
-    private void onRegisterCommands(RegisterCommandsEvent e) {
-        MysticEssentialsCommon.get().registerCommands(e.getDispatcher());
+    public void onRegisterCommands(RegisterCommandsEvent e) {
+        var common = MysticEssentialsCommon.get();
+        Path cfgDir = FMLPaths.CONFIGDIR.get()
+                .resolve(MysticEssentialsCommon.MOD_ID).normalize();
+        common.ensureCoreServices(cfgDir);
+        common.registerCommands(e.getDispatcher());
     }
 
     private void onServerStopping(ServerStoppingEvent e) {
