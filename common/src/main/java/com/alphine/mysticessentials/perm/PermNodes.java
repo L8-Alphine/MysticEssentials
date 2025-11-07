@@ -3,6 +3,8 @@ package com.alphine.mysticessentials.perm;
 import java.util.Locale;
 
 public final class PermNodes {
+    public static final String JUMP_USE = "messentials.jump.use";
+
     private PermNodes() { }
 
     // ========= Homes =========
@@ -10,6 +12,8 @@ public final class PermNodes {
     public static final String HOME_USE   = "messentials.home.use";
     public static final String HOME_DEL   = "messentials.home.del";
     public static final String HOME_LIST  = "messentials.home.list";
+    public static final String HOME_OTHERS= "messentials.home.others"; // /home <home> <player>
+    public static final String HOME_MULTIPLE = "messentials.home.multiple"; // allows multiple homes with append (e.g., +.group, +.5)
 
     // ========= Warps / Spawn =========
     public static final String WARP_USE   = "messentials.warp.use";
