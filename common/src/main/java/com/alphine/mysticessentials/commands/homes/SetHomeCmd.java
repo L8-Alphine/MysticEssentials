@@ -16,7 +16,7 @@ public class SetHomeCmd {
 
     public void register(CommandDispatcher<CommandSourceStack> d) {
         d.register(Commands.literal("sethome")
-                .requires(src -> Perms.has(src, PermNodes.HOME_SET, 2))
+                .requires(src -> Perms.has(src, PermNodes.HOME_SET, 0))
                 .then(Commands.argument("name", StringArgumentType.word())
                         .executes(ctx -> {
                             ServerPlayer p = ctx.getSource().getPlayerOrException();
