@@ -55,18 +55,36 @@ public class HomeCmd {
 
     public void register(CommandDispatcher<CommandSourceStack> d) {
         d.register(Commands.literal("home")
-                .requires(src -> Perms.has(src, PermNodes.HOME_USE, 2))
+                .requires(src -> Perms.has(src, PermNodes.HOME_USE, 0))
                 .then(Commands.argument("name", StringArgumentType.word())
-                        .suggests(HOME_SUGGEST)
-                        .executes(ctx -> {
-                            if (!featureOn()) { ctx.getSource().sendFailure(Component.literal("§cTeleport features are disabled by config.")); return 0; }
+                        .suggests(homeSuggest())
+                        .executes(ctx -> tpToHome(ctx, ctx.getSource().getPlayerOrException(), StringArgumentType.getString(ctx, "name")))
+                        .then(Commands.argument("player", EntityArgument.player())
+                                .requires(src -> Perms.has(src, PermNodes.HOME_OTHERS, 2)) // require staff for others' homes
+                                .suggests(homeSuggest())
+                                .executes(ctx -> {
+                                    ServerPlayer executor = ctx.getSource().getPlayerOrException();
+                                    ServerPlayer target = EntityArgument.getPlayer(ctx, "player");
+                                    String name = StringArgumentType.getString(ctx, "name");
+                                    return tpToHome(ctx, target, name);
+                                })
+                        )
+                )
+        );
+    }
 
-                            ServerPlayer p = ctx.getSource().getPlayerOrException();
-                            String name = StringArgumentType.getString(ctx, "name");
+    private int tpToHome(CommandContext<CommandSourceStack> ctx, ServerPlayer target, String name) {
+        if (!featureOn()) { ctx.getSource().sendFailure(Component.literal("§cTeleport features are disabled by config.")); return 0; }
 
-                            var opt = store.get(p.getUUID(), name);
-                            if (opt.isEmpty()) { p.displayClientMessage(Component.literal("§cNo home named §e"+name), false); return 0; }
-                            var h = opt.get();
+        ServerPlayer actor;
+        try { actor = ctx.getSource().getPlayerOrException(); } catch (Exception e) { return 0; }
+
+        var opt = store.get(target.getUUID(), name);
+        if (opt.isEmpty()) {
+            actor.displayClientMessage(Component.literal("§cNo home named §e"+name+" §cfor §e"+target.getGameProfile().getName()), false);
+            return 0;
+        }
+        var h = opt.get();
 
                             long now = System.currentTimeMillis();
                             if (!Bypass.cooldown(ctx.getSource()) && cooldowns.getDefaultSeconds("home") > 0
