@@ -1,11 +1,11 @@
 package com.alphine.mysticessentials.commands.tp;
 
+import com.mojang.brigadier.CommandDispatcher;
 import com.alphine.mysticessentials.config.MEConfig;
 import com.alphine.mysticessentials.perm.PermNodes;
 import com.alphine.mysticessentials.perm.Perms;
 import com.alphine.mysticessentials.storage.PlayerDataStore;
 import com.alphine.mysticessentials.util.Teleports;
-import com.mojang.brigadier.CommandDispatcher;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.registries.Registries;
