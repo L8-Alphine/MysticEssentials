@@ -14,19 +14,21 @@ public class DelHomeCmd {
     private final HomesStore store;
     public DelHomeCmd(HomesStore store){ this.store=store; }
 
-    private static final SuggestionProvider<CommandSourceStack> HOME_SUGGEST = (ctx, b) -> {
-        try {
-            var p = ctx.getSource().getPlayerOrException();
-            for (var n : com.alphine.mysticessentials.MysticEssentialsCommon.get().homes.names(p.getUUID())) b.suggest(n);
-        } catch (Exception ignored) {}
-        return b.buildFuture();
-    };
+    private SuggestionProvider<CommandSourceStack> homeSuggest() {
+        return (ctx, b) -> {
+            try {
+                var p = ctx.getSource().getPlayerOrException();
+                for (var n : store.names(p.getUUID())) b.suggest(n);
+            } catch (Exception ignored) {}
+            return b.buildFuture();
+        };
+    }
 
     public void register(CommandDispatcher<CommandSourceStack> d) {
         d.register(Commands.literal("delhome")
-                .requires(src -> Perms.has(src, PermNodes.HOME_DEL, 2))
+                .requires(src -> Perms.has(src, PermNodes.HOME_DEL, 0))
                 .then(Commands.argument("name", StringArgumentType.word())
-                        .suggests(HOME_SUGGEST)
+                        .suggests(homeSuggest())
                         .executes(ctx -> {
                             ServerPlayer p = ctx.getSource().getPlayerOrException();
                             String name = StringArgumentType.getString(ctx, "name");
