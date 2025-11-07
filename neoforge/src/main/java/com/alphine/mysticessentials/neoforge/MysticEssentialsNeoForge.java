@@ -5,42 +5,43 @@ import com.alphine.mysticessentials.neoforge.platform.NeoForgeModInfoService;
 import com.alphine.mysticessentials.storage.PlayerDataStore;
 import com.alphine.mysticessentials.inv.InvseeSessions;
 import com.alphine.mysticessentials.util.Teleports;
-
-import net.minecraft.network.chat.Component;
-import net.neoforged.fml.common.Mod;
-import net.neoforged.neoforge.common.NeoForge;
-
-import net.neoforged.neoforge.event.RegisterCommandsEvent;
-import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
-import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
-import net.neoforged.neoforge.event.server.ServerAboutToStartEvent;
-import net.neoforged.neoforge.event.server.ServerStoppingEvent;
-import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
-import net.neoforged.neoforge.event.entity.player.PlayerContainerEvent;
-import net.neoforged.neoforge.event.entity.player.PlayerEvent;
-import net.neoforged.neoforge.event.tick.PlayerTickEvent;
-import net.neoforged.neoforge.event.tick.ServerTickEvent;
-import net.neoforged.neoforge.event.ServerChatEvent;
-
 import net.minecraft.core.registries.Registries;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.Level;
+import net.neoforged.fml.common.Mod;
+import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.RegisterCommandsEvent;
+import net.neoforged.neoforge.event.ServerChatEvent;
+import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
+import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
+import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerContainerEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
+import net.neoforged.neoforge.event.server.ServerAboutToStartEvent;
+import net.neoforged.neoforge.event.server.ServerStoppingEvent;
+import net.neoforged.neoforge.event.tick.PlayerTickEvent;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
 
 @Mod(MysticEssentialsCommon.MOD_ID)
 public class MysticEssentialsNeoForge {
 
     // --- AFK movement tracking ---
     private int afkTickAccum = 0;
-    private final java.util.Map<java.util.UUID, net.minecraft.world.phys.Vec3> afkLastPos = new java.util.HashMap<>();
-    private final java.util.Map<java.util.UUID, float[]> afkLastRot = new java.util.HashMap<>();
-
+    private final Map<UUID, net.minecraft.world.phys.Vec3> afkLastPos = new HashMap<>();
+    private final Map<UUID, float[]> afkLastRot = new HashMap<>();
 
     public MysticEssentialsNeoForge() {
         // Mod Info Service
         MysticEssentialsCommon.get().setModInfoService(new NeoForgeModInfoService());
+
         // GAME bus listeners
         NeoForge.EVENT_BUS.addListener(this::onServerAboutToStart);
         NeoForge.EVENT_BUS.addListener(this::onRegisterCommands);
@@ -80,13 +81,13 @@ public class MysticEssentialsNeoForge {
 
     private void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent e){
         if(!(e.getEntity() instanceof ServerPlayer p)) return;
-        var pdata = MysticEssentialsCommon.get().pdata;
-        // AFK essentials
-        MysticEssentialsCommon.get().onPlayerQuit(p);
+        var common = MysticEssentialsCommon.get();
+        common.onPlayerQuit(p);
+
         var l = new PlayerDataStore.LastLoc();
         l.dim = p.serverLevel().dimension().location().toString();
         l.x=p.getX(); l.y=p.getY(); l.z=p.getZ(); l.yaw=p.getYRot(); l.pitch=p.getXRot(); l.when=System.currentTimeMillis();
-        pdata.setLast(p.getUUID(), l);
+        common.pdata.setLast(p.getUUID(), l);
 
         // also stop tracking any invsee session
         InvseeSessions.close(p);
@@ -94,11 +95,10 @@ public class MysticEssentialsNeoForge {
 
     private void onPlayerDeath(LivingDeathEvent e){
         if(!(e.getEntity() instanceof ServerPlayer p)) return;
-        var pdata = MysticEssentialsCommon.get().pdata;
         var l = new PlayerDataStore.LastLoc();
         l.dim = p.serverLevel().dimension().location().toString();
         l.x=p.getX(); l.y=p.getY(); l.z=p.getZ(); l.yaw=p.getYRot(); l.pitch=p.getXRot(); l.when=System.currentTimeMillis();
-        pdata.setDeath(p.getUUID(), l);
+        MysticEssentialsCommon.get().pdata.setDeath(p.getUUID(), l);
     }
 
     private void onServerTickPost(ServerTickEvent.Post e) {
@@ -121,22 +121,21 @@ public class MysticEssentialsNeoForge {
     // Block chat if muted
     private void onChat(ServerChatEvent e){
         ServerPlayer p = e.getPlayer();
+        var ps = MysticEssentialsCommon.get().punish;
 
-        // mark AFK activity on attempt
+        // Mark AFK attempt immediately
         MysticEssentialsCommon.get().onPlayerChat(p);
 
-        // --- your mute gate first ---
-        var ps = MysticEssentialsCommon.get().punish;
+        // Mute gate
         var om = ps.getMute(p.getUUID());
         if (om.isPresent()){
             var m = om.get();
             if (m.until == null || System.currentTimeMillis() < m.until){
                 e.setCanceled(true);
-                long rem = m.until==null? -1 : (m.until - System.currentTimeMillis());
+                long rem = m.until==null ? -1 : (m.until - System.currentTimeMillis());
                 p.displayClientMessage(
-                        net.minecraft.network.chat.Component.literal(
-                                "§cYou are muted" + (rem>0 ? " §7(" +
-                                        com.alphine.mysticessentials.util.DurationUtil.fmtRemaining(rem) + ")" : "§7 (permanent)") + "."),
+                        Component.literal("§cYou are muted" +
+                                (rem>0 ? " §7(" + com.alphine.mysticessentials.util.DurationUtil.fmtRemaining(rem) + ")" : " §7(permanent)") + "."),
                         false
                 );
                 return; // don't AFK-DM if blocked
@@ -145,11 +144,9 @@ public class MysticEssentialsNeoForge {
             }
         }
 
-        // Afk ping processing
+        // AFK ping processing (raw content)
         Component comp = e.getMessage();
         String raw = comp.getString();
-
-        // DM the pinger about AFK targets mentioned
         com.alphine.mysticessentials.util.AfkPingUtil.handleChatMention(p.getServer(), p, raw);
     }
 
@@ -172,7 +169,7 @@ public class MysticEssentialsNeoForge {
             afkLastRot.put(id, new float[]{yRot, xRot});
         }
 
-        // Freeze: cancel movement
+        // Freeze: cancel movement and mark for motion sync
         var ps = MysticEssentialsCommon.get().punish;
         if (ps.isFrozen(p.getUUID())){
             p.setDeltaMovement(0,0,0);
@@ -186,21 +183,20 @@ public class MysticEssentialsNeoForge {
         var common = MysticEssentialsCommon.get();
         var ps = common.punish;
         var oj = ps.getJailed(p.getUUID());
-        if (oj.isPresent()){
-            var name = oj.get();
-            var opt = ps.getJail(name);
-            if (opt.isPresent()){
-                var pt = opt.get();
+        if (oj.isEmpty()) return;
 
-                var id = ResourceLocation.tryParse(pt.dim);
-                if (id != null) {
-                    ResourceKey<Level> key = ResourceKey.create(Registries.DIMENSION, id);
-                    ServerLevel lvl = p.getServer().getLevel(key);
-                    if (lvl != null) {
-                        Teleports.pushBackAndTeleport(p, lvl, pt.x, pt.y, pt.z, pt.yaw, pt.pitch, common.pdata);
-                    }
-                }
-            }
+        var name = oj.get();
+        var opt = ps.getJail(name);
+        if (opt.isEmpty()) return;
+
+        var pt = opt.get();
+        var id = ResourceLocation.tryParse(pt.dim);
+        if (id == null) return;
+
+        ResourceKey<Level> key = ResourceKey.create(Registries.DIMENSION, id);
+        ServerLevel lvl = p.getServer().getLevel(key);
+        if (lvl != null) {
+            Teleports.pushBackAndTeleport(p, lvl, pt.x, pt.y, pt.z, pt.yaw, pt.pitch, common.pdata);
         }
     }
 
@@ -217,7 +213,7 @@ public class MysticEssentialsNeoForge {
         if (ub.isPresent()){
             var b = ub.get();
             if (b.until==null || System.currentTimeMillis()<b.until){
-                p.connection.disconnect(net.minecraft.network.chat.Component.literal("§cBanned: §f"+b.reason));
+                p.connection.disconnect(Component.literal("§cBanned: §f"+b.reason));
                 return;
             } else ps.unbanUuid(p.getUUID());
         }
@@ -227,7 +223,7 @@ public class MysticEssentialsNeoForge {
         if (ib.isPresent()){
             var b = ib.get();
             if (b.until==null || System.currentTimeMillis()<b.until){
-                p.connection.disconnect(net.minecraft.network.chat.Component.literal("§cIP Banned: §f"+b.reason));
+                p.connection.disconnect(Component.literal("§cIP Banned: §f"+b.reason));
             } else ps.unbanIp(ip);
         }
     }
@@ -235,7 +231,6 @@ public class MysticEssentialsNeoForge {
     // Warmups: only cancel after real damage was applied
     private void onDamagePost(LivingDamageEvent.Post e){
         if (e.getEntity() instanceof ServerPlayer sp) {
-            // If you only want to cancel on positive damage, you could check e.getAmount() > 0
             MysticEssentialsCommon.get().warmups.onDamaged(sp);
         }
     }
