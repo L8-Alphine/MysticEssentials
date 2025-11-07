@@ -2,18 +2,21 @@ package com.alphine.mysticessentials.commands.tp;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.alphine.mysticessentials.config.MEConfig;
+import com.alphine.mysticessentials.perm.Bypass;
 import com.alphine.mysticessentials.perm.PermNodes;
 import com.alphine.mysticessentials.perm.Perms;
-import com.alphine.mysticessentials.perm.Bypass;
 import com.alphine.mysticessentials.storage.SpawnStore;
 import com.alphine.mysticessentials.teleport.CooldownManager;
 import com.alphine.mysticessentials.teleport.WarmupManager;
 import com.alphine.mysticessentials.util.Teleports;
-import net.minecraft.commands.*;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.Commands;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.*;
-import net.minecraft.server.level.*;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.Level;
 
 public class SpawnCmds {
@@ -33,30 +36,22 @@ public class SpawnCmds {
                     if (!featureOn()) { ctx.getSource().sendFailure(Component.literal("§cTeleport features are disabled by config.")); return 0; }
 
                     ServerPlayer p = ctx.getSource().getPlayerOrException();
-                    var s = spawn.get(); if(s==null){ p.displayClientMessage(Component.literal("§cSpawn is not set."), false); return 0; }
+                    var s = spawn.get(); if (s == null) { p.displayClientMessage(Component.literal("§cSpawn is not set."), false); return 0; }
 
                     long now = System.currentTimeMillis();
                     boolean bypassCd = Bypass.cooldown(ctx.getSource());
-                    if(!bypassCd && cd.getDefaultSeconds("spawn") > 0 && !cd.checkAndStampDefault(p.getUUID(),"spawn",now)){
-                        long rem = cd.remaining(p.getUUID(),"spawn",now);
-                        p.displayClientMessage(Component.literal("§cCooldown: §e"+rem+"s"), false); return 0;
+                    if (!bypassCd && cd.getDefaultSeconds("spawn") > 0 && !cd.checkAndStampDefault(p.getUUID(), "spawn", now)) {
+                        long rem = cd.remaining(p.getUUID(), "spawn", now);
+                        p.displayClientMessage(Component.literal("§cCooldown: §e" + rem + "s"), false); return 0;
                     }
 
-                    int warmSec = MEConfig.INSTANCE != null ? MEConfig.INSTANCE.getWarmup("spawn") : 0;
+                    int warmSec = (MEConfig.INSTANCE != null) ? MEConfig.INSTANCE.getWarmup("spawn") : 0;
                     Runnable tp = () -> {
-                        ResourceLocation id = ResourceLocation.tryParse(s.dim); // e.g. "minecraft:overworld"
-                        if (id == null) {
-                            p.displayClientMessage(Component.literal("§cBad dimension id: " + s.dim), false);
-                            return;
-                        }
-
+                        ResourceLocation id = ResourceLocation.tryParse(s.dim);
+                        if (id == null) { p.displayClientMessage(Component.literal("§cBad dimension id: " + s.dim), false); return; }
                         ResourceKey<Level> key = ResourceKey.create(Registries.DIMENSION, id);
                         ServerLevel level = p.getServer().getLevel(key);
-                        if (level == null) {
-                            p.displayClientMessage(Component.literal("§cWorld missing: " + s.dim), false);
-                            return;
-                        }
-
+                        if (level == null) { p.displayClientMessage(Component.literal("§cWorld missing: " + s.dim), false); return; }
                         Teleports.pushBackAndTeleport(p, level, s.x, s.y, s.z, s.yaw, s.pitch, pdata);
                     };
 
@@ -72,8 +67,9 @@ public class SpawnCmds {
                     ServerPlayer p = ctx.getSource().getPlayerOrException();
                     var pos = p.blockPosition();
                     SpawnStore.Point s = new SpawnStore.Point();
-                    s.dim=p.serverLevel().dimension().location().toString();
-                    s.x=pos.getX()+0.5; s.y=pos.getY(); s.z=pos.getZ()+0.5; s.yaw=p.getYRot(); s.pitch=p.getXRot();
+                    s.dim = p.serverLevel().dimension().location().toString();
+                    s.x = pos.getX() + 0.5; s.y = pos.getY(); s.z = pos.getZ() + 0.5;
+                    s.yaw = p.getYRot(); s.pitch = p.getXRot();
                     spawn.set(s);
                     p.displayClientMessage(Component.literal("§aSpawn set."), false);
                     return 1;
