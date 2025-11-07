@@ -3,14 +3,15 @@ package com.alphine.mysticessentials.commands.tp;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.alphine.mysticessentials.config.MEConfig;
+import com.alphine.mysticessentials.perm.Bypass;
 import com.alphine.mysticessentials.perm.PermNodes;
 import com.alphine.mysticessentials.perm.Perms;
-import com.alphine.mysticessentials.perm.Bypass;
 import com.alphine.mysticessentials.storage.PlayerDataStore;
 import com.alphine.mysticessentials.teleport.CooldownManager;
 import com.alphine.mysticessentials.teleport.WarmupManager;
 import com.alphine.mysticessentials.util.Teleports;
-import net.minecraft.commands.*;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.Commands;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
@@ -38,14 +39,16 @@ public class TpDirectCmds {
                             ServerPlayer p = ctx.getSource().getPlayerOrException();
                             String name = StringArgumentType.getString(ctx,"player");
                             ServerPlayer target = p.getServer().getPlayerList().getPlayerByName(name);
-                            if(target==null){ p.displayClientMessage(Component.literal("§cPlayer not found."), false); return 0; }
+                            if (target == null) { p.displayClientMessage(Component.literal("§cPlayer not found."), false); return 0; }
+                            if (p.getUUID().equals(target.getUUID())) { p.displayClientMessage(Component.literal("§cYou are already at your own location."), false); return 0; }
 
                             long now = System.currentTimeMillis();
-                            if(!Bypass.cooldown(ctx.getSource()) && cd.getDefaultSeconds("tp") > 0 && !cd.checkAndStampDefault(p.getUUID(),"tp",now)){
-                                long rem=cd.remaining(p.getUUID(),"tp",now); p.displayClientMessage(Component.literal("§cCooldown: §e"+rem+"s"), false); return 0;
+                            if (!Bypass.cooldown(ctx.getSource()) && cd.getDefaultSeconds("tp") > 0 && !cd.checkAndStampDefault(p.getUUID(),"tp",now)){
+                                long rem = cd.remaining(p.getUUID(),"tp",now);
+                                p.displayClientMessage(Component.literal("§cCooldown: §e"+rem+"s"), false); return 0;
                             }
 
-                            int warmSec = MEConfig.INSTANCE != null ? MEConfig.INSTANCE.getWarmup("tp") : 0;
+                            int warmSec = (MEConfig.INSTANCE != null) ? MEConfig.INSTANCE.getWarmup("tp") : 0;
                             Runnable tp = () -> Teleports.pushBackAndTeleport(p, target.serverLevel(), target.getX(), target.getY(), target.getZ(), target.getYRot(), target.getXRot(), pdata);
                             if (Bypass.warmup(ctx.getSource())) tp.run();
                             else warm.startOrBypass(ctx.getSource().getServer(), p, warmSec, tp);
@@ -64,7 +67,9 @@ public class TpDirectCmds {
                             ServerPlayer p = ctx.getSource().getPlayerOrException();
                             String name = StringArgumentType.getString(ctx,"player");
                             ServerPlayer target = p.getServer().getPlayerList().getPlayerByName(name);
-                            if(target==null){ p.displayClientMessage(Component.literal("§cPlayer not found."), false); return 0; }
+                            if (target == null) { p.displayClientMessage(Component.literal("§cPlayer not found."), false); return 0; }
+                            if (p.getUUID().equals(target.getUUID())) { p.displayClientMessage(Component.literal("§cThat's you."), false); return 0; }
+
                             Teleports.pushBack(target, pdata);
                             target.teleportTo(p.serverLevel(), p.getX(), p.getY(), p.getZ(), p.getYRot(), p.getXRot());
                             return 1;
@@ -81,24 +86,19 @@ public class TpDirectCmds {
 
                             ServerPlayer p = ctx.getSource().getPlayerOrException();
                             String name = StringArgumentType.getString(ctx,"name");
-                            var profile = p.getServer().getProfileCache().get(name).orElse(null);
-                            if(profile==null){ p.displayClientMessage(Component.literal("§cNo such player profile."), false); return 0; }
+                            var profileOpt = p.getServer().getProfileCache().get(name);
+                            if (profileOpt.isEmpty()) { p.displayClientMessage(Component.literal("§cNo such player profile."), false); return 0; }
+                            var profile = profileOpt.get();
+
                             var ol = pdata.getLast(profile.getId());
-                            if(ol.isEmpty()){ p.displayClientMessage(Component.literal("§cNo last known location for that player."), false); return 0; }
+                            if (ol.isEmpty()) { p.displayClientMessage(Component.literal("§cNo last known location for that player."), false); return 0; }
                             var l = ol.get();
 
-                            ResourceLocation id = ResourceLocation.tryParse(l.dim); // e.g. "minecraft:overworld"
-                            if (id == null) {
-                                p.displayClientMessage(Component.literal("§cBad dimension id: " + l.dim), false);
-                                return 0;
-                            }
-
+                            ResourceLocation id = ResourceLocation.tryParse(l.dim);
+                            if (id == null) { p.displayClientMessage(Component.literal("§cBad dimension id: " + l.dim), false); return 0; }
                             ResourceKey<Level> key = ResourceKey.create(Registries.DIMENSION, id);
                             ServerLevel level = p.getServer().getLevel(key);
-                            if (level == null) {
-                                p.displayClientMessage(Component.literal("§cWorld missing: " + l.dim), false);
-                                return 0;
-                            }
+                            if (level == null) { p.displayClientMessage(Component.literal("§cWorld missing: " + l.dim), false); return 0; }
 
                             Teleports.pushBackAndTeleport(p, level, l.x, l.y, l.z, l.yaw, l.pitch, pdata);
                             p.displayClientMessage(Component.literal("§aTeleported to §e" + name + "§a's last location."), false);
