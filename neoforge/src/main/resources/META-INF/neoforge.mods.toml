@@ -1,0 +1,44 @@
+modLoader = "javafml"
+loaderVersion = "[2,)"
+#issueTrackerURL = ""
+license = "All Rights Reserved"
+
+[[mods]]
+modId = "mysticessentials"
+version = "${version}"
+displayName = "MysticEssentials"
+authors = "Alphine"
+description = '''
+A EssentialsX Like mod built for customization and ultilty in mind.
+'''
+#logoFile = ""
+
+[[dependencies.mysticessentials]]
+modId = "neoforge"
+type = "required"
+versionRange = "[21,)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.mysticessentials]]
+modId = "minecraft"
+type = "required"
+versionRange = "[1.21.1,)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.mysticessentials]]
+modId = "architectury"
+type = "required"
+versionRange = "[13.0.8,)"
+ordering = "AFTER"
+side = "BOTH"
+
+[[dependencies.mysticessentials]]
+modId= "luckperms"
+type = "optional"
+versionRange="[5,)"
+side="SERVER"
+
+[[mixins]]
+config = "mysticessentials.mixins.json"

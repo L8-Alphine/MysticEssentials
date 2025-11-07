@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "id": "mysticessentials",
+  "version": "${version}",
+  "name": "MysticEssentials",
+  "description": "A EssentialsX Like mod built for customization and ultilty in mind.",
+  "authors": [
+    "Alphine"
+  ],
+  "contact": {
+    "homepage": ""
+  },
+  "license": "All-Rights-Reserved",
+  "icon": "assets/mysticessentials/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "com.alphine.mysticessentials.fabric.MysticEssentialsFabric"
+    ]
+  },
+  "mixins": [
+    "mysticessentials.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.17.3",
+    "minecraft": "~1.21.1",
+    "java": ">=21",
+    "architectury": ">=13.0.8",
+    "fabric-api": "*"
+  },
+  "suggests": {
+    "luckperms": "*"
+  }
+}
