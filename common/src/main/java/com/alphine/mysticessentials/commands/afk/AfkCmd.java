@@ -40,24 +40,4 @@ public final class AfkCmd {
                 )
         );
     }
-
-    // TODO: Removed in favor of above simplified version
-//    private int toggle(CommandSourceStack src, String message) {
-//        ServerPlayer p = src.getPlayer();
-//        if (p == null) {
-//            src.sendFailure(Component.literal("Players only."));
-//            return 0;
-//        }
-//
-//        // Permission to set a custom message?
-//        if (message != null && !message.isBlank() && !Perms.has(p, PermNodes.AFK_MESSAGE_SET, 0)) {
-//            src.sendFailure(Component.literal("You don't have permission to set a custom AFK message."));
-//            return 0;
-//        }
-//
-//        boolean nowAfk = afk.toggleAfk(p, message);
-//        if (nowAfk) src.sendSuccess(() -> Component.literal("You are now AFK."), false);
-//        else        src.sendSuccess(() -> Component.literal("You are no longer AFK."), false);
-//        return 1;
-//    }
 }
