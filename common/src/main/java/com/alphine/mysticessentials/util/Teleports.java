@@ -7,7 +7,9 @@ import net.minecraft.server.level.ServerPlayer;
 public final class Teleports {
     private Teleports(){}
 
-    public static void pushBackAndTeleport(ServerPlayer p, ServerLevel to, double x, double y, double z, float yaw, float pitch, PlayerDataStore pdata){
+    public static void pushBackAndTeleport(ServerPlayer p, ServerLevel to,
+                                           double x, double y, double z, float yaw, float pitch,
+                                           PlayerDataStore pdata) {
         pushBack(p, pdata);
         p.teleportTo(to, x, y, z, yaw, pitch);
     }
@@ -18,6 +20,7 @@ public final class Teleports {
         cur.x = p.getX(); cur.y = p.getY(); cur.z = p.getZ();
         cur.yaw = p.getYRot(); cur.pitch = p.getXRot();
         cur.when = System.currentTimeMillis();
-        pdata.pushBack(p.getUUID(), cur);
+        // store a single back location
+        pdata.setBack(p.getUUID(), cur);
     }
 }
