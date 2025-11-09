@@ -51,11 +51,37 @@ public final class PermNodes {
     public static final String SPEED_USE         = "messentials.speed.use";
     public static final String INVSEE_USE        = "messentials.invsee.use";
     public static final String INVSEE_EDIT   = "messentials.invsee.edit";
+    public static final String INVSEE_EDIT_OFFLINE = "messentials.invsee.edit.offline";
     public static final String INVSEE_EXEMPT = "messentials.invsee.exempt";
     public static final String WORKBENCH_USE     = "messentials.workbench.use";
     public static final String ANVIL_USE         = "messentials.anvil.use";
     public static final String ENCHANT_USE       = "messentials.enchant.use";
     public static final String NEAR_USE          = "messentials.near.use";
+
+    // Repair System
+    public static final String REPAIR_USE        = "messentials.repair";
+    public static final String REPAIR_ENCHANTED  = "messentials.repair.enchanted";
+
+    // Kill System
+    public static final String KILL_USE          = "messentials.kill";
+    public static final String KILL_PLAYERS      = "messentials.kill.players"; // players only
+    public static final String KILL_MOBS         = "messentials.kill.mobs"; // living entities except players
+    public static final String KILL_ENTITIES     = "messentials.kill.entities"; // all entities, including items, vehicles, etc.
+    public static final String KILL_ALL          = "messentials.kill.all"; // all entities including players
+    public static final String KILL_EXEMPT       = "messentials.kill.exempt"; // exempts you from being killed by /kill all
+
+    // Sleep Permission
+    public static final String SLEEP = "messentials.sleep"; // allows the use of the command /rest to reset your insomnia timer
+
+    // Recipe
+    public static final String RECIPE_USE        = "messentials.recipe"; // allows the use of /recipe <item> to view the recipe of an item
+
+    // Item Rename System
+    public static final String RENAME_USE        = "messentials.rename"; // allows the use of /rename <name> to rename the item in your hand - Includes color codes
+    public static final String RENAME_LORE       = "messentials.rename.lore"; // allows the use of /lore [line number] <lore> to set the lore of the item in your hand - Includes color codes
+    public static final String RENAME_ENCHANTED  = "messentials.rename.enchanted"; // allows renaming/setting lore on enchanted items
+    public static final String RENAME_UNIQUE     = "messentials.rename.unique"; // allows renaming/setting lore on items with custom NBT data
+
 
     // AFK System
     public static final String AFK_USE           = "messentials.afk.use";
