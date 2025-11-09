@@ -3,7 +3,10 @@ package com.alphine.mysticessentials.commands;
 import com.alphine.mysticessentials.MysticEssentialsCommon;
 
 // HOMES
+import com.alphine.mysticessentials.commands.admin.KillCmd;
 import com.alphine.mysticessentials.commands.admin.ModlistCmd;
+import com.alphine.mysticessentials.commands.admin.RecipeCmd;
+import com.alphine.mysticessentials.commands.admin.RenameCmds;
 import com.alphine.mysticessentials.commands.afk.AfkCmd;
 import com.alphine.mysticessentials.commands.afk.AfkPoolSetupCmd;
 import com.alphine.mysticessentials.commands.homes.DelHomeCmd;
@@ -46,6 +49,21 @@ public final class CommandRegistrar {
 
         new HelpCmd().register(d);
         idx("help");
+
+        new RepairCmd().register(d);
+        idx("repair", "fix");
+
+        new KillCmd().register(d);
+        idx("kill");
+
+        new SleepCmd().register(d);
+        idx("sleep", "rest");
+
+        new RenameCmds().register(d);
+        idx("rename", "lore");
+
+        new RecipeCmd().register(d);
+        idx("recipe", "recipes", "clearrecipes");
 
         if (common.getModInfoService() != null) {
             new ModlistCmd(common.getModInfoService()).register(d);
@@ -131,7 +149,7 @@ public final class CommandRegistrar {
             // Usual GM roots
             idx("gm", "gmc", "gms", "gmsp", "gma");
 
-            new InvseeFullCmd().register(d);
+            new InvseeFullCmd(common.pdata).register(d);
             idx("invsee");
 
             new AnvilCmd().register(d);
