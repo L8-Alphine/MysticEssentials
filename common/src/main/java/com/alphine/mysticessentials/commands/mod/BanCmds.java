@@ -7,11 +7,12 @@ import com.alphine.mysticessentials.storage.PunishStore;
 import com.alphine.mysticessentials.util.DurationUtil;
 import com.alphine.mysticessentials.perm.*;
 import com.alphine.mysticessentials.util.ModerationPerms;
+import com.alphine.mysticessentials.util.MessagesUtil;
 import net.minecraft.commands.*;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.util.Date;
+import java.util.Map;
 
 public class BanCmds {
     private final PunishStore store;
@@ -29,15 +30,15 @@ public class BanCmds {
                                     String name = StringArgumentType.getString(ctx,"player");
                                     String reason = StringArgumentType.getString(ctx,"reason");
                                     ServerPlayer target = actor.getServer().getPlayerList().getPlayerByName(name);
-                                    if(target==null){ actor.displayClientMessage(Component.literal("§cPlayer not found."), false); return 0; }
-                                    if (ModerationPerms.exempt(target, "ban")) { actor.displayClientMessage(Component.literal("§cTarget is exempt."), false); return 0; }
+                                    if(target==null){ actor.displayClientMessage(MessagesUtil.msg("tp.player_not_found"), false); return 0; }
+                                    if (ModerationPerms.exempt(target, "ban")) { actor.displayClientMessage(MessagesUtil.msg("moderation.target_exempt"), false); return 0; }
 
                                     PunishStore.Ban b = new PunishStore.Ban();
-                                    b.target = target.getUUID(); b.actor = actor.getUUID(); b.reason=reason; b.at=System.currentTimeMillis(); b.until=null;
+                                    b.target = target.getUUID(); b.actor = actor.getUUID(); b.reason = reason; b.at = System.currentTimeMillis(); b.until = null;
                                     store.banUuid(b);
 
-                                    target.connection.disconnect(Component.literal("§cBanned: §f"+reason));
-                                    actor.displayClientMessage(Component.literal("§aBanned §e"+name), false);
+                                    target.connection.disconnect(MessagesUtil.msg("ban.notify.to.perm", Map.of("reason", reason)));
+                                    actor.displayClientMessage(MessagesUtil.msg("ban.ok.perm", Map.of("player", name)), false);
                                     audit.log(AuditLogStore.make("BAN", actor.getUUID(), target.getUUID(), target.getName().getString(), reason, null, null, null));
                                     return 1;
                                 })
@@ -57,16 +58,18 @@ public class BanCmds {
                                             String durStr = StringArgumentType.getString(ctx,"duration");
                                             String reason = StringArgumentType.getString(ctx,"reason");
                                             long ms = DurationUtil.parseToMillis(durStr);
-                                            if(ms<=0){ actor.displayClientMessage(Component.literal("§cInvalid duration."), false); return 0; }
+                                            if(ms<=0){ actor.displayClientMessage(MessagesUtil.msg("duration.invalid"), false); return 0; }
                                             ServerPlayer target = actor.getServer().getPlayerList().getPlayerByName(name);
-                                            if(target==null){ actor.displayClientMessage(Component.literal("§cPlayer not found."), false); return 0; }
-                                            if (ModerationPerms.exempt(target, "tempban")) { actor.displayClientMessage(Component.literal("§cTarget is exempt."), false); return 0; }
+                                            if(target==null){ actor.displayClientMessage(MessagesUtil.msg("tp.player_not_found"), false); return 0; }
+                                            if (ModerationPerms.exempt(target, "tempban")) { actor.displayClientMessage(MessagesUtil.msg("moderation.target_exempt"), false); return 0; }
 
                                             PunishStore.Ban b = new PunishStore.Ban();
                                             b.target=target.getUUID(); b.actor=actor.getUUID(); b.reason=reason; b.at=System.currentTimeMillis(); b.until=b.at+ms;
                                             store.banUuid(b);
-                                            target.connection.disconnect(Component.literal("§cTemp-banned until §e"+new Date(b.until)+"§c: §f"+reason));
-                                            actor.displayClientMessage(Component.literal("§aTemp-banned §e"+name+" §7for §e"+durStr), false);
+
+                                            String untilStr = new Date(b.until).toString();
+                                            target.connection.disconnect(MessagesUtil.msg("ban.notify.to.temp", Map.of("until", untilStr, "reason", reason)));
+                                            actor.displayClientMessage(MessagesUtil.msg("ban.ok.temp", Map.of("player", name, "duration", durStr)), false);
                                             audit.log(AuditLogStore.make("TEMPBAN", actor.getUUID(), target.getUUID(), target.getName().getString(), reason, b.until, null, null));
                                             return 1;
                                         })
@@ -83,9 +86,9 @@ public class BanCmds {
                             var src = ctx.getSource();
                             String name = StringArgumentType.getString(ctx,"player");
                             var profile = src.getServer().getProfileCache().get(name).orElse(null);
-                            if(profile==null){ src.sendFailure(Component.literal("§cUnknown profile.")); return 0; }
+                            if(profile==null){ src.sendFailure(MessagesUtil.msg("profile.unknown")); return 0; }
                             store.unbanUuid(profile.getId());
-                            src.sendSuccess(() -> Component.literal("§aUnbanned §e"+name), false);
+                            src.sendSuccess(() -> MessagesUtil.msg("unban.ok", Map.of("player", name)), false);
                             audit.log(AuditLogStore.make("UNBAN", src.getPlayerOrException().getUUID(), profile.getId(), profile.getName(), null, null, null, null));
                             return 1;
                         })
@@ -97,12 +100,12 @@ public class BanCmds {
                 .requires(src -> Perms.has(src, PermNodes.BANLIST_USE, 2))
                 .executes(ctx -> {
                     var list = store.allBans();
-                    if(list.isEmpty()){ ctx.getSource().sendSuccess(() -> Component.literal("§7No active bans."), false); return 1; }
-                    ctx.getSource().sendSuccess(() -> Component.literal("§aActive bans:"), false);
+                    if(list.isEmpty()){ ctx.getSource().sendSuccess(() -> MessagesUtil.msg("banlist.none"), false); return 1; }
+                    ctx.getSource().sendSuccess(() -> MessagesUtil.msg("banlist.header"), false);
                     for(var b:list){
                         String who = b.target!=null? b.target.toString() : b.ip;
                         String until = (b.until==null? "permanent" : new Date(b.until).toString());
-                        ctx.getSource().sendSuccess(() -> Component.literal("§7- §e"+who+" §7until §e"+until+" §7reason §f"+b.reason), false);
+                        ctx.getSource().sendSuccess(() -> MessagesUtil.msg("banlist.entry", Map.of("who", who, "until", until, "reason", b.reason)), false);
                     }
                     return 1;
                 })

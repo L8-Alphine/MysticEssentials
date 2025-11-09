@@ -7,11 +7,13 @@ import com.alphine.mysticessentials.storage.PunishStore;
 import com.alphine.mysticessentials.perm.PermNodes;
 import com.alphine.mysticessentials.perm.Perms;
 import com.alphine.mysticessentials.util.ModerationPerms;
+import com.alphine.mysticessentials.util.MessagesUtil;
 import net.minecraft.commands.*;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.util.Arrays;
+import java.util.Date;
+import java.util.Map;
 
 public class WarnCmd {
     private final PunishStore store;
@@ -28,11 +30,19 @@ public class WarnCmd {
                                     String name = StringArgumentType.getString(ctx,"player");
                                     String reason = StringArgumentType.getString(ctx,"reason");
                                     ServerPlayer target = actor.getServer().getPlayerList().getPlayerByName(name);
-                                    if(target==null){ actor.displayClientMessage(Component.literal("§cPlayer not found."), false); return 0; }
-                                    if (ModerationPerms.exempt(target, "warn")) { actor.displayClientMessage(Component.literal("§cTarget is exempt."), false); return 0; }
+                                    if(target==null){
+                                        actor.displayClientMessage(MessagesUtil.msg("tp.player_not_found"), false);
+                                        return 0;
+                                    }
+                                    if (ModerationPerms.exempt(target, "warn")) {
+                                        actor.displayClientMessage(MessagesUtil.msg("moderation.target_exempt"), false);
+                                        return 0;
+                                    }
                                     var w = store.addWarning(target.getUUID(), actor.getUUID(), reason);
-                                    actor.displayClientMessage(Component.literal("§aWarned §e"+target.getName().getString()+" §7[id: §e"+w.id+"§7]"), false);
-                                    target.displayClientMessage(Component.literal("§cYou have been warned: §e"+reason), false);
+                                    actor.displayClientMessage(MessagesUtil.msg("moderation.warn.ok",
+                                            Map.of("player", target.getName().getString(), "id", w.id)), false);
+                                    target.displayClientMessage(MessagesUtil.msg("moderation.warn.notify",
+                                            Map.of("reason", reason)), false);
                                     audit.log(AuditLogStore.make("WARN", actor.getUUID(), target.getUUID(), target.getName().getString(), reason, null, null, null));
                                     return 1;
                                 })
@@ -50,7 +60,7 @@ public class WarnCmd {
                     // need self permission (or alias / broad)
                     if (!Perms.has(ctx.getSource(),
                             Arrays.toString(new String[]{ PermNodes.WARNINGS_LIST_SELF, PermNodes.WARNINGS_LIST, PermNodes.ADMIN, PermNodes.ALL }), 0)) {
-                        viewer.displayClientMessage(Component.literal("§cYou don't have permission to view your warnings."), false);
+                        viewer.displayClientMessage(MessagesUtil.msg("moderation.warnings.self.no_perm"), false);
                         return 0;
                     }
                     return showWarnings(store, viewer, viewer.getUUID(), viewer.getName().getString());
@@ -62,7 +72,7 @@ public class WarnCmd {
                             String name = StringArgumentType.getString(ctx, "player");
                             ServerPlayer target = viewer.getServer().getPlayerList().getPlayerByName(name);
                             if (target == null) {
-                                viewer.displayClientMessage(Component.literal("§cPlayer not found."), false);
+                                viewer.displayClientMessage(MessagesUtil.msg("tp.player_not_found"), false);
                                 return 0;
                             }
 
@@ -70,13 +80,13 @@ public class WarnCmd {
                             if (isSelf) {
                                 if (!Perms.has(ctx.getSource(),
                                         Arrays.toString(new String[]{ PermNodes.WARNINGS_LIST_SELF, PermNodes.WARNINGS_LIST, PermNodes.ADMIN, PermNodes.ALL }), 0)) {
-                                    viewer.displayClientMessage(Component.literal("§cYou don't have permission to view your warnings."), false);
+                                    viewer.displayClientMessage(MessagesUtil.msg("moderation.warnings.self.no_perm"), false);
                                     return 0;
                                 }
                             } else {
                                 if (!Perms.has(ctx.getSource(),
                                         Arrays.toString(new String[]{ PermNodes.WARNINGS_LIST_OTHERS, PermNodes.ADMIN, PermNodes.ALL }), 2)) {
-                                    viewer.displayClientMessage(Component.literal("§cYou don't have permission to view others' warnings."), false);
+                                    viewer.displayClientMessage(MessagesUtil.msg("moderation.warnings.others.no_perm"), false);
                                     return 0;
                                 }
                             }
@@ -91,7 +101,7 @@ public class WarnCmd {
                             ServerPlayer viewer = ctx.getSource().getPlayerOrException();
                             if (!Perms.has(ctx.getSource(),
                                     Arrays.toString(new String[]{ PermNodes.WARNINGS_LIST_SELF, PermNodes.WARNINGS_LIST, PermNodes.ADMIN, PermNodes.ALL }), 0)) {
-                                viewer.displayClientMessage(Component.literal("§cYou don't have permission to view your warnings."), false);
+                                viewer.displayClientMessage(MessagesUtil.msg("moderation.warnings.self.no_perm"), false);
                                 return 0;
                             }
                             return showWarnings(store, viewer, viewer.getUUID(), viewer.getName().getString());
@@ -103,7 +113,7 @@ public class WarnCmd {
                                     String name = StringArgumentType.getString(ctx, "player");
                                     ServerPlayer target = viewer.getServer().getPlayerList().getPlayerByName(name);
                                     if (target == null) {
-                                        viewer.displayClientMessage(Component.literal("§cPlayer not found."), false);
+                                        viewer.displayClientMessage(MessagesUtil.msg("tp.player_not_found"), false);
                                         return 0;
                                     }
 
@@ -111,13 +121,13 @@ public class WarnCmd {
                                     if (isSelf) {
                                         if (!Perms.has(ctx.getSource(),
                                                 Arrays.toString(new String[]{ PermNodes.WARNINGS_LIST_SELF, PermNodes.WARNINGS_LIST, PermNodes.ADMIN, PermNodes.ALL }), 0)) {
-                                            viewer.displayClientMessage(Component.literal("§cYou don't have permission to view your warnings."), false);
+                                            viewer.displayClientMessage(MessagesUtil.msg("moderation.warnings.self.no_perm"), false);
                                             return 0;
                                         }
                                     } else {
                                         if (!Perms.has(ctx.getSource(),
                                                 Arrays.toString(new String[]{ PermNodes.WARNINGS_LIST_OTHERS, PermNodes.ADMIN, PermNodes.ALL }), 2)) {
-                                            viewer.displayClientMessage(Component.literal("§cYou don't have permission to view others' warnings."), false);
+                                            viewer.displayClientMessage(MessagesUtil.msg("moderation.warnings.others.no_perm"), false);
                                             return 0;
                                         }
                                     }
@@ -138,9 +148,16 @@ public class WarnCmd {
                                     String name = StringArgumentType.getString(ctx,"player");
                                     String id = StringArgumentType.getString(ctx,"id");
                                     ServerPlayer target = actor.getServer().getPlayerList().getPlayerByName(name);
-                                    if(target==null){ actor.displayClientMessage(Component.literal("§cPlayer not found."), false); return 0; }
+                                    if(target==null){
+                                        actor.displayClientMessage(MessagesUtil.msg("tp.player_not_found"), false);
+                                        return 0;
+                                    }
                                     boolean ok = store.pardonWarning(target.getUUID(), id);
-                                    actor.displayClientMessage(Component.literal(ok? "§aRemoved warning §e"+id : "§cNo warning with id §e"+id), false);
+                                    actor.displayClientMessage(
+                                            ok ? MessagesUtil.msg("moderation.pardon.ok", Map.of("id", id))
+                                                    : MessagesUtil.msg("moderation.pardon.missing", Map.of("id", id)),
+                                            false
+                                    );
                                     audit.log(AuditLogStore.make("PARDON", actor.getUUID(), target.getUUID(), target.getName().getString(), "warning:"+id, null, null, null));
                                     return ok?1:0;
                                 })
@@ -155,9 +172,16 @@ public class WarnCmd {
                             ServerPlayer actor = ctx.getSource().getPlayerOrException();
                             String name = StringArgumentType.getString(ctx,"player");
                             ServerPlayer target = actor.getServer().getPlayerList().getPlayerByName(name);
-                            if(target==null){ actor.displayClientMessage(Component.literal("§cPlayer not found."), false); return 0; }
+                            if(target==null){
+                                actor.displayClientMessage(MessagesUtil.msg("tp.player_not_found"), false);
+                                return 0;
+                            }
                             boolean ok = store.clearWarnings(target.getUUID());
-                            actor.displayClientMessage(Component.literal(ok? "§aCleared warnings." : "§7No warnings to clear."), false);
+                            actor.displayClientMessage(
+                                    ok ? MessagesUtil.msg("moderation.warnings.clear.ok")
+                                            : MessagesUtil.msg("moderation.warnings.clear.none"),
+                                    false
+                            );
                             audit.log(AuditLogStore.make("WARNINGS_CLEAR", actor.getUUID(), target.getUUID(), target.getName().getString(), null, null, null, null));
                             return 1;
                         })
@@ -166,18 +190,20 @@ public class WarnCmd {
     }
 
     // helper to print a target's warnings to a viewer
-    private static int showWarnings(com.alphine.mysticessentials.storage.PunishStore store,
+    private static int showWarnings(PunishStore store,
                                     ServerPlayer viewer,
                                     java.util.UUID targetId,
                                     String targetName) {
         var list = store.getWarnings(targetId);
         if (list.isEmpty()) {
-            viewer.displayClientMessage(Component.literal("§7No warnings."), false);
+            viewer.displayClientMessage(MessagesUtil.msg("moderation.warnings.none"), false);
             return 1;
         }
-        viewer.displayClientMessage(Component.literal("§aWarnings for §e" + targetName + "§a:"), false);
+        viewer.displayClientMessage(MessagesUtil.msg("moderation.warnings.header", Map.of("player", targetName)), false);
         for (var w : list) {
-            viewer.displayClientMessage(Component.literal("§7- §e" + w.id + " §7| " + new java.util.Date(w.at) + " §7| §f" + w.reason), false);
+            String date = new Date(w.at).toString(); // simple human-readable format
+            viewer.displayClientMessage(MessagesUtil.msg("moderation.warnings.entry",
+                    Map.of("id", w.id, "date", date, "reason", w.reason)), false);
         }
         return 1;
     }

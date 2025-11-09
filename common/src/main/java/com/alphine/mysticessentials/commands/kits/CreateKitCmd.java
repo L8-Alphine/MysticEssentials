@@ -4,12 +4,14 @@ import com.alphine.mysticessentials.perm.PermNodes;
 import com.alphine.mysticessentials.perm.Perms;
 import com.alphine.mysticessentials.storage.KitStore;
 import com.alphine.mysticessentials.util.DurationUtil;
+import com.alphine.mysticessentials.util.MessagesUtil;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import net.minecraft.commands.*;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
+
+import java.util.Map;
 
 public class CreateKitCmd {
     private final KitStore kits;
@@ -22,7 +24,7 @@ public class CreateKitCmd {
                         .then(Commands.argument("time", StringArgumentType.word()) // -1 | 0/none | 1h30m ...
                                 .executes(ctx -> {
                                     ServerPlayer p = ctx.getSource().getPlayerOrException();
-                                    var provider = p.server.registryAccess(); // <-- get HolderLookup.Provider
+                                    var provider = p.server.registryAccess();
 
                                     String name = StringArgumentType.getString(ctx, "kit");
                                     String timeArg = StringArgumentType.getString(ctx, "time").toLowerCase();
@@ -44,29 +46,32 @@ public class CreateKitCmd {
                                     kit.oneTime = oneTime;
 
                                     var inv = p.getInventory();
-
-                                    // main 0..35
                                     for (int i = 0; i < 36; i++) {
                                         ItemStack st = inv.getItem(i);
                                         if (!st.isEmpty()) kit.itemsB64.add(KitStore.stackToB64(st, provider));
                                     }
-
-                                    // armor boots..helmet (0..3)
                                     for (int i = 0; i < 4; i++) {
                                         ItemStack st = inv.armor.get(i);
                                         if (!st.isEmpty()) kit.itemsB64.add(KitStore.stackToB64(st, provider));
                                     }
-
-                                    // offhand (slot 0)
                                     if (!inv.offhand.get(0).isEmpty()) {
                                         kit.itemsB64.add(KitStore.stackToB64(inv.offhand.getFirst(), provider));
                                     }
 
                                     kits.put(kit);
-                                    p.displayClientMessage(Component.literal("§aKit §e" + name + " §asaved. " +
-                                            (oneTime ? "§7(one-time)" :
-                                                    (cooldown > 0 ? "§7cooldown §e" + DurationUtil.fmtRemaining(cooldown) : "§7no cooldown"))), false);
-                                    p.displayClientMessage(Component.literal("§7Permission to use: §e" + PermNodes.kitNode(name)), false);
+
+                                    if (oneTime) {
+                                        p.displayClientMessage(MessagesUtil.msg("kit.create.saved_one_time",
+                                                Map.of("kit", name)), false);
+                                    } else if (cooldown > 0) {
+                                        p.displayClientMessage(MessagesUtil.msg("kit.create.saved_cooldown",
+                                                Map.of("kit", name, "time", DurationUtil.fmtRemaining(cooldown))), false);
+                                    } else {
+                                        p.displayClientMessage(MessagesUtil.msg("kit.create.saved_no_cooldown",
+                                                Map.of("kit", name)), false);
+                                    }
+                                    p.displayClientMessage(MessagesUtil.msg("kit.create.permission",
+                                            Map.of("perm", PermNodes.kitNode(name))), false);
                                     return 1;
                                 })
                         )

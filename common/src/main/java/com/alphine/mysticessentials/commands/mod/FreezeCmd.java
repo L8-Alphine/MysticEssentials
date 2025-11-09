@@ -5,9 +5,10 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.alphine.mysticessentials.storage.PunishStore;
 import com.alphine.mysticessentials.perm.*;
+import com.alphine.mysticessentials.util.MessagesUtil;
 import net.minecraft.commands.*;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
+import java.util.Map;
 
 public class FreezeCmd {
     private final PunishStore store;
@@ -22,10 +23,13 @@ public class FreezeCmd {
                             ServerPlayer actor = ctx.getSource().getPlayerOrException();
                             String name = StringArgumentType.getString(ctx,"player");
                             ServerPlayer target = actor.getServer().getPlayerList().getPlayerByName(name);
-                            if(target==null){ actor.displayClientMessage(Component.literal("§cPlayer not found."), false); return 0; }
+                            if (target == null) {
+                                actor.displayClientMessage(MessagesUtil.msg("tp.player_not_found"), false);
+                                return 0;
+                            }
                             boolean on = store.toggleFreeze(target.getUUID());
-                            target.displayClientMessage(Component.literal(on ? "§cYou have been frozen." : "§aYou are unfrozen."), false);
-                            actor.displayClientMessage(Component.literal((on ? "§aFroze " : "§aUnfroze ") + target.getName().getString()), false);
+                            target.displayClientMessage(MessagesUtil.msg(on ? "freeze.notify.to.on" : "freeze.notify.to.off"), false);
+                            actor.displayClientMessage(MessagesUtil.msg(on ? "freeze.ok.on" : "freeze.ok.off", Map.of("player", target.getName().getString())), false);
                             audit.log(AuditLogStore.make(on? "FREEZE" : "UNFREEZE", actor.getUUID(), target.getUUID(), target.getName().getString(), null, null, null, null));
                             return 1;
                         })

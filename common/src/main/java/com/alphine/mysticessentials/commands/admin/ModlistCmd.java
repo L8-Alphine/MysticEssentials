@@ -3,6 +3,7 @@ package com.alphine.mysticessentials.commands.admin;
 import com.alphine.mysticessentials.perm.Perms;
 import com.alphine.mysticessentials.platform.ModInfoService;
 import com.alphine.mysticessentials.platform.PasteService;
+import com.alphine.mysticessentials.util.MessagesUtil; // ← add
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
@@ -16,6 +17,7 @@ import net.minecraft.network.chat.HoverEvent;
 import java.util.Comparator;
 import java.util.Locale;
 import java.util.stream.Collectors;
+import java.util.Map;
 
 public class ModlistCmd {
     private final ModInfoService mods;
@@ -34,7 +36,6 @@ public class ModlistCmd {
                                         ctx.getArgument("filter", String.class),
                                         ctx.getArgument("upload", Boolean.class)))));
 
-        // sub-literal: /modlist upload
         root.then(Commands.literal("upload")
                 .executes(ctx -> show(ctx.getSource(), "all", true)));
 
@@ -55,9 +56,8 @@ public class ModlistCmd {
                     m.name().toLowerCase(Locale.ROOT).contains(norm);
         }).toList();
 
-        // Pretty chat view (first 20 + hint)
-        src.sendSystemMessage(Component.literal("— Mods (" + filtered.size() + "/" + all.size() + ") —")
-                .withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD));
+        src.sendSystemMessage(MessagesUtil.msg("modlist.header",
+                Map.of("shown", filtered.size(), "total", all.size())));
 
         int shown = 0;
         for (var m : filtered) {
@@ -69,14 +69,19 @@ public class ModlistCmd {
                     .append(Component.literal("  v" + m.version()).withStyle(ChatFormatting.DARK_GRAY));
             src.sendSystemMessage(line);
         }
-        if (filtered.size() > 20)
-            src.sendSystemMessage(Component.literal("…and " + (filtered.size()-20) + " more. Use ")
-                    .append(Component.literal("/modlist " + filter + " true")
-                            .withStyle(style -> style
+        if (filtered.size() > 20) {
+            String cmd = "/modlist " + filter + " true";
+            src.sendSystemMessage(
+                    Component.empty()
+                            .append(MessagesUtil.msg("modlist.more_hint", Map.of("more", filtered.size() - 20)))
+                            .append(Component.literal(" "))
+                            .append(Component.literal(cmd).withStyle(s -> s
                                     .withColor(ChatFormatting.AQUA)
-                                    .withClickEvent(new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, "/modlist " + filter + " true"))
-                                    .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Component.literal("Upload full list to mclo.gs")))))
-                    .append(Component.literal(" to upload.")));
+                                    .withClickEvent(new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, cmd))
+                                    .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+                                            MessagesUtil.msg("modlist.upload_hover")))))
+            );
+        }
 
         if (upload) {
             String text = filtered.stream()
@@ -86,13 +91,17 @@ public class ModlistCmd {
                     .collect(Collectors.joining("\n"));
             try {
                 String url = PasteService.uploadToMclogs(text);
-                src.sendSystemMessage(Component.literal("Uploaded to mclo.gs → ").withStyle(ChatFormatting.GRAY)
-                        .append(Component.literal(url).withStyle(style -> style
-                                .withColor(ChatFormatting.AQUA)
-                                .withClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL, url))
-                                .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Component.literal("Open in browser"))))));
+                src.sendSystemMessage(
+                        Component.empty()
+                                .append(MessagesUtil.msg("modlist.upload_ok"))
+                                .append(Component.literal(url).withStyle(s -> s
+                                        .withColor(ChatFormatting.AQUA)
+                                        .withClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL, url))
+                                        .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+                                                MessagesUtil.msg("modlist.open_browser")))))
+                );
             } catch (Exception e) {
-                src.sendFailure(Component.literal("Upload failed: " + e.getMessage()).withStyle(ChatFormatting.RED));
+                src.sendFailure(MessagesUtil.msg("modlist.upload_fail", Map.of("error", e.getMessage())));
                 return 0;
             }
         }

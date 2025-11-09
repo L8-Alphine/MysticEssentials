@@ -3,8 +3,8 @@ package com.alphine.mysticessentials.commands.misc;
 import com.mojang.brigadier.CommandDispatcher;
 import com.alphine.mysticessentials.perm.PermNodes;
 import com.alphine.mysticessentials.perm.Perms;
+import com.alphine.mysticessentials.util.MessagesUtil;
 import net.minecraft.commands.CommandSourceStack;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 
 public class FeedCmd {
@@ -15,7 +15,7 @@ public class FeedCmd {
                     ServerPlayer p = ctx.getSource().getPlayerOrException();
                     p.getFoodData().setFoodLevel(20);
                     p.getFoodData().setSaturation(10f);
-                    p.displayClientMessage(Component.literal("§aYou feel full."), false);
+                    p.displayClientMessage(MessagesUtil.msg("feed.ok"), false);
                     return 1;
                 })
         );

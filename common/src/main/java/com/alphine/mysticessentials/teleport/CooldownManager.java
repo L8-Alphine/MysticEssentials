@@ -12,51 +12,42 @@ import java.util.UUID;
  * Supports config-driven defaults and reload via updateFromConfig().
  */
 public class CooldownManager {
-
     private final Map<UUID, Map<String, Long>> map = new HashMap<>();
-
-    // Cached defaults (seconds) pulled from MEConfig
     private int defHome = 0, defWarp = 0, defTp = 0, defTpa = 0, defSpawn = 0;
 
-    // --- API ---
+    public CooldownManager() { updateFromConfig(); } // ensure defaults once
 
-    /** Check if on cooldown; if not, stamp next-allowed with provided seconds. */
     public boolean checkAndStamp(UUID id, String key, long nowMs, long seconds) {
         var m = map.computeIfAbsent(id, k -> new HashMap<>());
         long until = m.getOrDefault(key, 0L);
         if (nowMs < until) return false;
-        m.put(key, nowMs + seconds * 1000L);
+        m.put(key, nowMs + Math.max(0, seconds) * 1000L);
         return true;
     }
 
-    /** Check if on cooldown; if not, stamp using the config default for this key. */
     public boolean checkAndStampDefault(UUID id, String key, long nowMs) {
         return checkAndStamp(id, key, nowMs, getDefaultSeconds(key));
     }
 
-    /** Remaining seconds on cooldown for a key. */
     public long remaining(UUID id, String key, long nowMs) {
         var m = map.get(id);
         if (m == null) return 0;
         long remMs = m.getOrDefault(key, 0L) - nowMs;
-        return remMs <= 0 ? 0 : (remMs + 999) / 1000; // ceil
+        return remMs <= 0 ? 0 : (remMs + 999) / 1000;
     }
 
-    /** Manually stamp/clear. */
     public void set(UUID id, String key, long secondsFromNow, long nowMs) {
-        map.computeIfAbsent(id, k -> new HashMap<>()).put(key, nowMs + Math.max(0, secondsFromNow) * 1000L);
+        map.computeIfAbsent(id, k -> new HashMap<>())
+                .put(key, nowMs + Math.max(0, secondsFromNow) * 1000L);
     }
     public void clear(UUID id, String key) {
         var m = map.get(id);
         if (m != null) m.remove(key);
     }
 
-    // --- Config integration ---
-
-    /** Pulls fresh defaults from MEConfig; call from /mereload. */
     public void updateFromConfig() {
         var c = MEConfig.INSTANCE;
-        if (c == null) return;
+        if (c == null) { defHome=defWarp=defTp=defTpa=defSpawn=0; return; }
         this.defHome  = Math.max(0, c.getCooldown("home"));
         this.defWarp  = Math.max(0, c.getCooldown("warp"));
         this.defTp    = Math.max(0, c.getCooldown("tp"));
@@ -64,16 +55,15 @@ public class CooldownManager {
         this.defSpawn = Math.max(0, c.getCooldown("spawn"));
     }
 
-    /** Map a logical key → default seconds (from config cache). */
     public int getDefaultSeconds(String key) {
         if (key == null) return 0;
-        return switch (key.toLowerCase(Locale.ROOT)) {
-            case "home"  -> defHome;
-            case "warp"  -> defWarp;
-            case "tp"    -> defTp;
-            case "tpa"   -> defTpa;
-            case "spawn" -> defSpawn;
-            default -> 0;
-        };
+        switch (key.toLowerCase(Locale.ROOT)) {
+            case "home":  return defHome;
+            case "warp":  return defWarp;
+            case "tp":    return defTp;
+            case "tpa":   return defTpa;
+            case "spawn": return defSpawn;
+            default:      return 0;
+        }
     }
 }

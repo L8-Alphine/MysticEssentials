@@ -2,28 +2,32 @@ package com.alphine.mysticessentials.teleport;
 
 import com.alphine.mysticessentials.config.MEConfig;
 import com.alphine.mysticessentials.perm.Bypass;
+import com.alphine.mysticessentials.util.MessagesUtil;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.UUID;
 
-/**
- * Lightweight warmup tracker. Re-schedules itself each tick via server.execute().
- * Honors config flags (cancel on move/damage) and warmup bypass.
- */
 public class WarmupManager {
 
     private static final class W {
+        final UUID playerId;
         final Runnable task;
+        final ResourceKey<net.minecraft.world.level.Level> dim;
         final double x, y, z;
-        int ticks;
-        boolean cancelOnMove;
-        boolean cancelOnDamage;
-        W(Runnable t, double x, double y, double z, int ticks, boolean onMove, boolean onDamage) {
-            this.task=t; this.x=x; this.y=y; this.z=z; this.ticks=ticks;
+        int ticks;                       // remaining
+        final boolean cancelOnMove;
+        final boolean cancelOnDamage;
+
+        W(UUID pid, Runnable t, ResourceKey<net.minecraft.world.level.Level> dim,
+          double x, double y, double z, int ticks, boolean onMove, boolean onDamage) {
+            this.playerId = pid; this.task=t; this.dim=dim;
+            this.x=x; this.y=y; this.z=z; this.ticks=ticks;
             this.cancelOnMove=onMove; this.cancelOnDamage=onDamage;
         }
     }
@@ -31,11 +35,7 @@ public class WarmupManager {
     private final Map<UUID, W> pending = new HashMap<>();
 
     /**
-     * Start a warmup if not bypassed. If bypassed, runs task immediately.
-     * Reads default behavior from MEConfig.INSTANCE.features.
-     *
-     * @param seconds warmup seconds (0 to run immediately)
-     * @param task    the action to run after warmup
+     * Start a warmup if not bypassed. If bypassed or seconds <= 0, runs task immediately.
      */
     public void startOrBypass(MinecraftServer server, ServerPlayer p, int seconds, Runnable task) {
         if (seconds <= 0 || Bypass.warmup(p.createCommandSourceStack())) {
@@ -46,44 +46,78 @@ public class WarmupManager {
         boolean cancelOnMove   = f == null || f.cancelWarmupOnMove;
         boolean cancelOnDamage = f == null || f.cancelWarmupOnDamage;
 
-        W w = new W(task, p.getX(), p.getY(), p.getZ(), seconds * 20, cancelOnMove, cancelOnDamage);
+        var w = new W(p.getUUID(), task, p.level().dimension(),
+                p.getX(), p.getY(), p.getZ(),
+                seconds * 20, cancelOnMove, cancelOnDamage);
+
         pending.put(p.getUUID(), w);
-        p.displayClientMessage(Component.literal("§7Teleporting in §e"+seconds+"§7s..."), false);
-        schedule(server, p);
+
+        // “Teleporting in {seconds}s...”
+        p.displayClientMessage(MessagesUtil.msg("warmup.wait", Map.of("seconds", seconds)), false);
     }
 
-    public void cancel(ServerPlayer p, String msg) {
-        if (pending.remove(p.getUUID()) != null && msg != null && !msg.isBlank()) {
-            p.displayClientMessage(Component.literal(msg), false);
-        }
-    }
-
-    /** Call from your damage event (NeoForge/Fabric) to cancel if configured. */
+    /** Call from your damage hook to cancel if configured. */
     public void onDamaged(ServerPlayer p) {
         W w = pending.get(p.getUUID());
         if (w != null && w.cancelOnDamage) {
-            cancel(p, "§cTeleport cancelled: you took damage.");
+            cancel(p, MessagesUtil.msg("warmup.cancel.damage"));
         }
     }
 
-    private void schedule(MinecraftServer server, ServerPlayer p) {
-        server.execute(() -> {
-            W w = pending.get(p.getUUID());
-            if (w == null) return;
-
-            if (w.cancelOnMove && p.distanceToSqr(w.x, w.y, w.z) > 0.01) {
-                cancel(p, "§cTeleport cancelled: you moved.");
-                return;
-            }
-
-            if (--w.ticks <= 0) {
-                pending.remove(p.getUUID());
-                w.task.run();
-                return;
-            }
-
-            // re-queue next tick
-            schedule(server, p);
-        });
+    /** Cancel helper with raw message (kept for compatibility). */
+    public void cancel(ServerPlayer p, String rawMsg) {
+        if (pending.remove(p.getUUID()) != null && rawMsg != null && !rawMsg.isBlank()) {
+            p.displayClientMessage(Component.literal(rawMsg), false);
+        }
     }
+    /** Preferred cancel with a localized message. */
+    public void cancel(ServerPlayer p, Component msg) {
+        if (pending.remove(p.getUUID()) != null && msg != null) {
+            p.displayClientMessage(msg, false);
+        }
+    }
+
+    /** Tick once per server tick from Fabric/NeoForge events. */
+    public void tick(MinecraftServer server) {
+        if (pending.isEmpty()) return;
+
+        Iterator<Map.Entry<UUID, W>> it = pending.entrySet().iterator();
+        while (it.hasNext()) {
+            var e = it.next();
+            UUID id = e.getKey();
+            W w = e.getValue();
+
+            ServerPlayer p = server.getPlayerList().getPlayer(id);
+            if (p == null) { it.remove(); continue; }
+
+            // Cancel if dimension changed
+            if (p.level().dimension() != w.dim) {
+                cancel(p, MessagesUtil.msg("warmup.cancel.move"));
+                it.remove();
+                continue;
+            }
+
+            // Cancel if moved more than ~0.5 blocks (squared threshold 0.25)
+            if (w.cancelOnMove && p.distanceToSqr(w.x, w.y, w.z) > 0.25) {
+                cancel(p, MessagesUtil.msg("warmup.cancel.move"));
+                it.remove();
+                continue;
+            }
+
+            // Countdown
+            if (--w.ticks <= 0) {
+                it.remove();
+                // Run on main thread immediately
+                w.task.run();
+            }
+        }
+    }
+
+    /** Optional: clear warmups on world change or disconnect */
+    public void onWorldChange(ServerPlayer p) {
+        if (pending.remove(p.getUUID()) != null) {
+            p.displayClientMessage(MessagesUtil.msg("warmup.cancel.move"), false);
+        }
+    }
+    public void onDisconnect(UUID playerId) { pending.remove(playerId); }
 }

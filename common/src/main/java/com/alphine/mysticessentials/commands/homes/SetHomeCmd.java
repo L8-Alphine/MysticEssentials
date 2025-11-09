@@ -6,9 +6,11 @@ import com.alphine.mysticessentials.storage.HomesStore;
 import com.alphine.mysticessentials.util.HomeLimitResolver;
 import com.alphine.mysticessentials.perm.PermNodes;
 import com.alphine.mysticessentials.perm.Perms;
+import com.alphine.mysticessentials.util.MessagesUtil;
 import net.minecraft.commands.*;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
+
+import java.util.Map;
 
 public class SetHomeCmd {
     private final HomesStore store;
@@ -26,7 +28,7 @@ public class SetHomeCmd {
                             int existing = store.all(p.getUUID()).size();
                             boolean replacing = store.get(p.getUUID(), name).isPresent();
                             if (!replacing && existing >= limit) {
-                                p.displayClientMessage(Component.literal("§cHome limit reached (§e"+limit+"§c)."), false);
+                                p.displayClientMessage(MessagesUtil.msg("home.limit_reached", Map.of("limit", limit)), false);
                                 return 0;
                             }
 
@@ -37,7 +39,7 @@ public class SetHomeCmd {
                             h.yaw=p.getYRot(); h.pitch=p.getXRot();
 
                             store.set(p.getUUID(), h);
-                            p.displayClientMessage(Component.literal("§aHome §e"+name+" §aset."), false);
+                            p.displayClientMessage(MessagesUtil.msg("home.set.ok", Map.of("name", name)), false);
                             return 1;
                         })
                 )

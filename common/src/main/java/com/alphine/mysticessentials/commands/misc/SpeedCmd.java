@@ -4,9 +4,11 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.FloatArgumentType;
 import com.alphine.mysticessentials.perm.PermNodes;
 import com.alphine.mysticessentials.perm.Perms;
+import com.alphine.mysticessentials.util.MessagesUtil;
 import net.minecraft.commands.CommandSourceStack;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
+
+import java.util.Map;
 
 public class SpeedCmd {
     public void register(CommandDispatcher<CommandSourceStack> d){
@@ -22,7 +24,7 @@ public class SpeedCmd {
                                 p.getAbilities().setWalkingSpeed(amount / 10.0f);
                             }
                             p.onUpdateAbilities();
-                            p.displayClientMessage(Component.literal("§7Speed set to §e" + amount), false);
+                            p.displayClientMessage(MessagesUtil.msg("speed.set", Map.of("amount", amount)), false);
                             return 1;
                         })
                 )

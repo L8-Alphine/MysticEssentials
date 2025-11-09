@@ -6,13 +6,15 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.alphine.mysticessentials.storage.PunishStore;
 import com.alphine.mysticessentials.perm.*;
+import com.alphine.mysticessentials.util.MessagesUtil;
 import com.alphine.mysticessentials.util.Teleports;
 import net.minecraft.commands.*;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.network.chat.Component;
 import net.minecraft.resources.*;
 import net.minecraft.server.level.*;
 import net.minecraft.world.level.Level;
+
+import java.util.Map;
 
 public class JailCmds {
     private final PunishStore store;
@@ -29,11 +31,11 @@ public class JailCmds {
                             ServerPlayer p = ctx.getSource().getPlayerOrException();
                             var pos = p.blockPosition();
                             PunishStore.Point pt = new PunishStore.Point();
-                            pt.dim=p.serverLevel().dimension().location().toString();
-                            pt.x=pos.getX()+0.5; pt.y=pos.getY(); pt.z=pos.getZ()+0.5; pt.yaw=p.getYRot(); pt.pitch=p.getXRot();
+                            pt.dim = p.serverLevel().dimension().location().toString();
+                            pt.x = pos.getX()+0.5; pt.y = pos.getY(); pt.z = pos.getZ()+0.5; pt.yaw = p.getYRot(); pt.pitch = p.getXRot();
                             String name = StringArgumentType.getString(ctx,"name");
                             store.setJail(name, pt);
-                            p.displayClientMessage(Component.literal("§aJail §e"+name+" §asaved."), false);
+                            p.displayClientMessage(MessagesUtil.msg("jail.set.saved", Map.of("jail", name)), false);
                             return 1;
                         })
                 )
@@ -44,9 +46,10 @@ public class JailCmds {
                 .requires(src -> Perms.has(src, PermNodes.JAIL_DEL, 2))
                 .then(Commands.argument("name", StringArgumentType.word())
                         .executes(ctx -> {
-                            var ok = store.delJail(StringArgumentType.getString(ctx,"name"));
-                            ctx.getSource().sendSuccess(() -> Component.literal(ok? "§aDeleted jail." : "§cNo such jail."), false);
-                            return ok?1:0;
+                            boolean ok = store.delJail(StringArgumentType.getString(ctx,"name"));
+                            ctx.getSource().sendSuccess(() ->
+                                    (ok ? MessagesUtil.msg("jail.del.ok") : MessagesUtil.msg("jail.del.missing")), false);
+                            return ok ? 1 : 0;
                         })
                 )
         );
@@ -61,28 +64,34 @@ public class JailCmds {
                                     String name = StringArgumentType.getString(ctx,"player");
                                     String jail = StringArgumentType.getString(ctx,"jailName");
                                     var opt = store.getJail(jail);
-                                    if(opt.isEmpty()){ actor.displayClientMessage(Component.literal("§cJail not found."), false); return 0; }
+                                    if (opt.isEmpty()) {
+                                        actor.displayClientMessage(MessagesUtil.msg("jail.not_found"), false);
+                                        return 0;
+                                    }
                                     ServerPlayer target = actor.getServer().getPlayerList().getPlayerByName(name);
-                                    if(target==null){ actor.displayClientMessage(Component.literal("§cPlayer not found."), false); return 0; }
+                                    if (target == null) {
+                                        actor.displayClientMessage(MessagesUtil.msg("tp.player_not_found"), false);
+                                        return 0;
+                                    }
                                     var p = opt.get();
 
                                     ResourceLocation id = ResourceLocation.tryParse(p.dim); // e.g. "minecraft:overworld"
                                     if (id == null) {
-                                        actor.displayClientMessage(Component.literal("§cBad dimension id for jail: " + p.dim), false);
+                                        actor.displayClientMessage(MessagesUtil.msg("warp.bad_dimension", Map.of("dim", p.dim)), false);
                                         return 0;
                                     }
 
                                     ResourceKey<Level> key = ResourceKey.create(Registries.DIMENSION, id);
                                     ServerLevel level = actor.getServer().getLevel(key);
                                     if (level == null) {
-                                        actor.displayClientMessage(Component.literal("§cWorld missing for jail: " + p.dim), false);
+                                        actor.displayClientMessage(MessagesUtil.msg("warp.world_missing", Map.of("dim", p.dim)), false);
                                         return 0;
                                     }
 
                                     store.jail(target.getUUID(), jail);
                                     Teleports.pushBackAndTeleport(target, level, p.x, p.y, p.z, p.yaw, p.pitch, pdata);
-                                    target.displayClientMessage(Component.literal("§cYou have been jailed at §e" + jail), false);
-                                    actor.displayClientMessage(Component.literal("§aJailed §e" + name + " §7at §e" + jail), false);
+                                    target.displayClientMessage(MessagesUtil.msg("jail.notify.to", Map.of("jail", jail)), false);
+                                    actor.displayClientMessage(MessagesUtil.msg("jail.ok", Map.of("player", name, "jail", jail)), false);
                                     audit.log(AuditLogStore.make("JAIL", actor.getUUID(), target.getUUID(), target.getName().getString(), null, null, null, jail));
                                     return 1;
                                 })
@@ -98,9 +107,12 @@ public class JailCmds {
                             var src = ctx.getSource();
                             String name = StringArgumentType.getString(ctx,"player");
                             ServerPlayer target = src.getServer().getPlayerList().getPlayerByName(name);
-                            if(target==null){ src.sendFailure(Component.literal("§cPlayer not found.")); return 0; }
+                            if (target == null) {
+                                src.sendFailure(MessagesUtil.msg("tp.player_not_found"));
+                                return 0;
+                            }
                             store.unjail(target.getUUID());
-                            src.sendSuccess(() -> Component.literal("§aUnjailed §e"+name), false);
+                            src.sendSuccess(() -> MessagesUtil.msg("unjail.ok", Map.of("player", name)), false);
                             audit.log(AuditLogStore.make("UNJAIL", src.getPlayerOrException().getUUID(), target.getUUID(), target.getName().getString(), null, null, null, null));
                             return 1;
                         })

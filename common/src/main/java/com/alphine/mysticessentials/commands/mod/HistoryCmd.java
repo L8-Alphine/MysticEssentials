@@ -1,15 +1,14 @@
 package com.alphine.mysticessentials.commands.mod;
 
+import com.alphine.mysticessentials.storage.AuditLogStore;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.alphine.mysticessentials.perm.PermNodes;
 import com.alphine.mysticessentials.perm.Perms;
-import com.alphine.mysticessentials.storage.AuditLogStore;
 import com.mojang.brigadier.context.CommandContext;
+import com.alphine.mysticessentials.util.MessagesUtil;
 import net.minecraft.commands.*;
-import net.minecraft.network.chat.Component;
-
 import java.text.SimpleDateFormat;
 import java.util.*;
 
@@ -45,10 +44,10 @@ public class HistoryCmd {
         var src = ctx.getSource();
         String name = StringArgumentType.getString(ctx,"player");
         var prof = src.getServer().getProfileCache().get(name).orElse(null);
-        if (prof == null) { src.sendFailure(Component.literal("§cUnknown profile.")); return 0; }
+        if (prof == null) { src.sendFailure(MessagesUtil.msg("profile.unknown")); return 0; }
 
         var all = audit.byTarget(prof.getId(), Integer.MAX_VALUE); // full list; we’ll page it
-        if (all.isEmpty()) { src.sendSuccess(() -> Component.literal("§7No history for §e"+name), false); return 1; }
+        if (all.isEmpty()) { src.sendSuccess(() -> MessagesUtil.msg("history.none_for_player", Map.of("player", name)), false); return 1; }
 
         // reverse chronological
         Collections.reverse(all);
@@ -60,13 +59,13 @@ public class HistoryCmd {
 
         var df = utc();
         int finalPage = page;
-        src.sendSuccess(() -> Component.literal("§aHistory for §e"+name+" §7(page §e"+ finalPage +"§7/§e"+maxPage+"§7)"), false);
+        src.sendSuccess(() -> MessagesUtil.msg("history.header", Map.of("player", name, "page", finalPage, "max", maxPage)), false);
         for (var e : slice){
-            src.sendSuccess(() -> Component.literal(formatLine(e, df)), false);
+            src.sendSuccess(() -> MessagesUtil.msg("history.entry.raw", Map.of("line", formatLine(e, df))), false);
         }
         if (page < maxPage) {
-            int finalPage1 = page;
-            src.sendSuccess(() -> Component.literal("§7Next: §e/history "+name+" "+(finalPage1 +1)), false);
+            int next = page + 1;
+            src.sendSuccess(() -> MessagesUtil.msg("history.next", Map.of("player", name, "next", next)), false);
         }
         return 1;
     }
@@ -74,7 +73,7 @@ public class HistoryCmd {
     private int showRecent(CommandContext<CommandSourceStack> ctx, int page){
         var src = ctx.getSource();
         var all = audit.recent(5000); // cap safety
-        if (all.isEmpty()) { src.sendSuccess(() -> Component.literal("§7No recent actions."), false); return 1; }
+        if (all.isEmpty()) { src.sendSuccess(() -> MessagesUtil.msg("historyrecent.none"), false); return 1; }
 
         int maxPage = (int)Math.ceil(all.size() / (double) PAGE_SIZE);
         page = Math.min(Math.max(page, 1), Math.max(maxPage,1));
@@ -84,13 +83,13 @@ public class HistoryCmd {
 
         var df = utc();
         int finalPage = page;
-        src.sendSuccess(() -> Component.literal("§aRecent moderation actions §7(page §e"+ finalPage +"§7/§e"+maxPage+"§7)"), false);
+        src.sendSuccess(() -> MessagesUtil.msg("historyrecent.header", Map.of("page", finalPage, "max", maxPage)), false);
         for (var e : slice){
-            src.sendSuccess(() -> Component.literal(formatLine(e, df)), false);
+            src.sendSuccess(() -> MessagesUtil.msg("history.entry.raw", Map.of("line", formatLine(e, df))), false);
         }
         if (page < maxPage) {
-            int finalPage1 = page;
-            src.sendSuccess(() -> Component.literal("§7Next: §e/historyrecent "+(finalPage1 +1)), false);
+            int next = page + 1;
+            src.sendSuccess(() -> MessagesUtil.msg("historyrecent.next", Map.of("next", next)), false);
         }
         return 1;
     }

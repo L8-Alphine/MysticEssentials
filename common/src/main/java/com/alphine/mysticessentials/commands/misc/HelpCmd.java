@@ -1,6 +1,7 @@
 package com.alphine.mysticessentials.commands.misc;
 
 import com.alphine.mysticessentials.commands.CommandIndex;
+import com.alphine.mysticessentials.util.MessagesUtil;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
@@ -9,9 +10,7 @@ import com.mojang.brigadier.tree.RootCommandNode;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
-import net.minecraft.network.chat.ClickEvent;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.HoverEvent;
+import net.minecraft.network.chat.*;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -40,14 +39,11 @@ public class HelpCmd {
 
     private int show(CommandSourceStack src, Optional<String> filter, Optional<String> modFilter, int page) {
         RootCommandNode<CommandSourceStack> root = src.getServer().getCommands().getDispatcher().getRoot();
-
-        // Collect visible root commands for this source (permission-aware)
         List<CommandNode<CommandSourceStack>> visible = root.getChildren().stream()
-                .filter(n -> n.canUse(src)) // respects requires()
+                .filter(n -> n.canUse(src))
                 .sorted(Comparator.comparing(CommandNode::getName))
                 .collect(Collectors.toList());
 
-        // Filter by string and/or mod id mapping
         String f = filter.map(String::toLowerCase).orElse(null);
         String mf = modFilter.map(String::toLowerCase).orElse(null);
 
@@ -58,14 +54,11 @@ public class HelpCmd {
             if (f != null && !(name.toLowerCase().contains(f))) continue;
             if (mf != null && !mod.equals(mf)) continue;
 
-            // smart usage for this node
             var usage = src.getServer().getCommands().getDispatcher().getSmartUsage(n, src);
             if (usage.isEmpty()) {
                 entries.add(new Entry(name, mod, "/" + name));
             } else {
-                for (var u : usage.values()) {
-                    entries.add(new Entry(name, mod, "/" + name + " " + u));
-                }
+                for (var u : usage.values()) entries.add(new Entry(name, mod, "/" + name + " " + u));
             }
         }
 
@@ -73,7 +66,16 @@ public class HelpCmd {
         page = Math.max(1, Math.min(page, pages));
         int from = (page-1)*PAGE_SIZE, to = Math.min(entries.size(), from+PAGE_SIZE);
 
-        src.sendSystemMessage(titleComponent(entries.size(), page, pages, filter, modFilter));
+        // Header (localized)
+        src.sendSystemMessage(
+                MessagesUtil.msg("help.header", Map.of(
+                        "total", entries.size(),
+                        "page", page,
+                        "pages", pages,
+                        "filter", filter.orElse(""),
+                        "mod", modFilter.orElse("")
+                ))
+        );
 
         for (int i = from; i < to; i++) {
             var e = entries.get(i);
@@ -82,59 +84,45 @@ public class HelpCmd {
                     .withStyle(style -> style
                             .withClickEvent(new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, e.usage()))
                             .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
-                                    Component.literal("Click to copy/run\nMod: " + e.modId()))));
-            // show root + mod tag
+                                    MessagesUtil.msg("help.hover.copy_run", Map.of("mod", e.modId())))));
+
             src.sendSystemMessage(
-                    Component.literal("[/" + e.root() + "] ")
-                            .withStyle(ChatFormatting.GRAY)
+                    Component.literal("[/" + e.root() + "] ").withStyle(ChatFormatting.GRAY)
                             .append(Component.literal("[" + e.modId() + "] ").withStyle(ChatFormatting.DARK_GRAY))
                             .append(line)
             );
         }
 
-        // Pager
         if (pages > 1) {
             var prev = page > 1
-                    ? pagerButton("← Prev", page - 1, filter, modFilter)
-                    : Component.literal("← Prev").withStyle(ChatFormatting.DARK_GRAY); // this is a MutableComponent
-            var next = page < pages
-                    ? pagerButton("Next →", page + 1, filter, modFilter)
-                    : Component.literal("Next →").withStyle(ChatFormatting.DARK_GRAY);
+                    ? pagerButton("help.pager.prev", page - 1, filter, modFilter)
+                    : MessagesUtil.msg("help.pager.prev.disabled");
 
-            // copy() avoids mutating the 'prev' instance if it were reused later
+            var next = page < pages
+                    ? pagerButton("help.pager.next", page + 1, filter, modFilter)
+                    : MessagesUtil.msg("help.pager.next.disabled");
+
             src.sendSystemMessage(prev.copy().append(Component.literal("  ")).append(next));
         }
         return 1;
     }
 
-    private Component titleComponent(int total, int page, int pages, Optional<String> filter, Optional<String> mod) {
-        String base = "— Help (" + total + " cmds";
-        if (filter.isPresent()) base += ", filter=\"" + filter.get() + "\"";
-        if (mod.isPresent()) base += ", mod=" + mod.get();
-        base += ") — Page " + page + "/" + pages;
-        return Component.literal(base).withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD);
-    }
+    private Component pagerButton(String labelKey, int page, Optional<String> filter, Optional<String> mod) {
+        final String cmd = mod.isPresent()
+                ? "/help mod " + mod.get() + " " + page + (filter.isPresent() ? " " + filter.get() : "")
+                : "/help " + page + (filter.isPresent() ? " " + filter.get() : "");
 
-    private net.minecraft.network.chat.MutableComponent pagerButton(
-            String label, int page, Optional<String> filter, Optional<String> mod
-    ) {
-        String cmd;
-        if (mod.isPresent()) {
-            // /help mod <modid> <page> [filter...]
-            cmd = "/help mod " + mod.get() + " " + page;
-            if (filter.isPresent()) cmd += " " + filter.get();
-        } else {
-            // /help <page> [filter...]
-            cmd = "/help " + page;
-            if (filter.isPresent()) cmd += " " + filter.get();
-        }
+        // Start from msg() → copy() to get a MutableComponent
+        MutableComponent c = MessagesUtil.msg(labelKey).copy();
 
-        String hover = "Go to page " + page;
-        String finalCmd = cmd;
-        return Component.literal(label).withStyle(style -> style
-                .withColor(ChatFormatting.YELLOW)
-                .withClickEvent(new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, finalCmd))
-                .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Component.literal(hover))));
+        // Build a Style and apply it
+        Style styled = c.getStyle()
+                .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, cmd))
+                .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+                        MessagesUtil.msg("help.pager.hover", Map.of("page", page))));
+
+        c.setStyle(styled);
+        return c;
     }
 
     private record Entry(String root, String modId, String usage) {}

@@ -6,9 +6,11 @@ import com.mojang.brigadier.suggestion.SuggestionProvider;
 import com.alphine.mysticessentials.storage.HomesStore;
 import com.alphine.mysticessentials.perm.PermNodes;
 import com.alphine.mysticessentials.perm.Perms;
+import com.alphine.mysticessentials.util.MessagesUtil;
 import net.minecraft.commands.*;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
+
+import java.util.Map;
 
 public class DelHomeCmd {
     private final HomesStore store;
@@ -33,7 +35,9 @@ public class DelHomeCmd {
                             ServerPlayer p = ctx.getSource().getPlayerOrException();
                             String name = StringArgumentType.getString(ctx, "name");
                             boolean ok = store.delete(p.getUUID(), name);
-                            p.displayClientMessage(Component.literal(ok ? "§aDeleted home §e"+name : "§cNo home named §e"+name), false);
+                            p.displayClientMessage(ok
+                                    ? MessagesUtil.msg("home.delete.ok", Map.of("name", name))
+                                    : MessagesUtil.msg("home.delete.no_such", Map.of("name", name)), false);
                             return ok ? 1 : 0;
                         })
                 )

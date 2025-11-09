@@ -3,13 +3,10 @@ package com.alphine.mysticessentials.commands.misc;
 import com.mojang.brigadier.CommandDispatcher;
 import com.alphine.mysticessentials.perm.PermNodes;
 import com.alphine.mysticessentials.perm.Perms;
+import com.alphine.mysticessentials.util.MessagesUtil;
 import net.minecraft.commands.CommandSourceStack;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 
-/**
- * Toggle flight mode for the player.
- */
 public class FlyCmd {
     public void register(CommandDispatcher<CommandSourceStack> d){
         d.register(net.minecraft.commands.Commands.literal("fly")
@@ -20,7 +17,7 @@ public class FlyCmd {
                     p.getAbilities().mayfly = enabled;
                     p.getAbilities().flying = enabled;
                     p.onUpdateAbilities();
-                    p.displayClientMessage(Component.literal("§7Flight: " + (enabled ? "§aON" : "§cOFF")), false);
+                    p.displayClientMessage(MessagesUtil.msg(enabled ? "fly.on" : "fly.off"), false);
                     return 1;
                 })
         );

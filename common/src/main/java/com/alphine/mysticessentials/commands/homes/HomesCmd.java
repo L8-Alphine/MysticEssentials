@@ -5,11 +5,12 @@ import com.alphine.mysticessentials.storage.HomesStore;
 import com.alphine.mysticessentials.util.HomeLimitResolver;
 import com.alphine.mysticessentials.perm.PermNodes;
 import com.alphine.mysticessentials.perm.Perms;
+import com.alphine.mysticessentials.util.MessagesUtil;
 import net.minecraft.commands.*;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.util.Comparator;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 public class HomesCmd {
@@ -21,12 +22,17 @@ public class HomesCmd {
                 .requires(src -> Perms.has(src, PermNodes.HOME_LIST, 0))
                 .executes(ctx -> {
                     ServerPlayer p = ctx.getSource().getPlayerOrException();
-                    var names = store.names(p.getUUID()).stream().sorted(Comparator.naturalOrder()).collect(Collectors.toList());
+                    var names = store.names(p.getUUID()).stream()
+                            .sorted(Comparator.naturalOrder()).collect(Collectors.toList());
                     int limit = HomeLimitResolver.resolve(p);
-                    p.displayClientMessage(Component.literal(
-                            names.isEmpty() ? "§7You have no homes. §8(§7limit: "+limit+"§8)"
-                                    : "§aHomes ("+names.size()+"/"+limit+"): §e"+String.join("§7, §e", names)
-                    ), false);
+
+                    if (names.isEmpty()) {
+                        p.displayClientMessage(MessagesUtil.msg("home.list.none", Map.of("limit", limit)), false);
+                    } else {
+                        String joined = names.stream().map(n -> "&e"+n).collect(Collectors.joining("&7, "));
+                        p.displayClientMessage(MessagesUtil.msg("home.list.some",
+                                Map.of("count", names.size(), "limit", limit, "homes", joined)), false);
+                    }
                     return 1;
                 })
         );

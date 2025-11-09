@@ -5,6 +5,7 @@ import com.alphine.mysticessentials.perm.Perms;
 import com.alphine.mysticessentials.perm.PermNodes;
 import com.alphine.mysticessentials.storage.AfkPoolsStore;
 import com.alphine.mysticessentials.util.AfkService;
+import com.alphine.mysticessentials.util.MessagesUtil;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
@@ -20,10 +21,9 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public final class AfkPoolSetupCmd {
     private final AfkService afkService;
-    private final MEConfig config;        // used only for runtime mirror + fallback defaults
-    private final AfkPoolsStore store;    // persistent source of truth
+    private final MEConfig config;
+    private final AfkPoolsStore store;
 
-    // Per-executor working edits before /save
     private final Map<UUID, Working> drafts = new ConcurrentHashMap<>();
 
     public AfkPoolSetupCmd(AfkService svc, MEConfig cfg, AfkPoolsStore store) {
@@ -41,7 +41,7 @@ public final class AfkPoolSetupCmd {
             if (this.pool.region == null) this.pool.region = new MEConfig.PoolBox();
             if (this.pool.teleport == null) this.pool.teleport = new MEConfig.TeleportPoint("minecraft:overworld", 0.5,64,0.5,0,0);
         }
-        BlockPos pos1Tmp, pos2Tmp; // temp corners before normalization
+        BlockPos pos1Tmp, pos2Tmp;
     }
 
     public void register(CommandDispatcher<CommandSourceStack> d) {
@@ -105,7 +105,7 @@ public final class AfkPoolSetupCmd {
 
     private int setPos(CommandSourceStack src, String name, int which) {
         ServerPlayer p = src.getPlayer();
-        if (p == null) { src.sendFailure(Component.literal("Players only.")); return 0; }
+        if (p == null) { src.sendFailure(MessagesUtil.msg("common.players_only")); return 0; }
 
         MEConfig.AfkPool base = store.get(name).orElse(config.afk.pools.get(name));
         Working w = drafts.computeIfAbsent(p.getUUID(), id -> new Working(name, base));
@@ -115,14 +115,14 @@ public final class AfkPoolSetupCmd {
         BlockPos bp = p.blockPosition();
         if (which == 1) w.pos1Tmp = bp; else w.pos2Tmp = bp;
 
-        src.sendSuccess(() -> Component.literal("Set " + (which==1?"pos1":"pos2")
-                + " for pool '" + name + "' at " + bp.getX() + "," + bp.getY() + "," + bp.getZ()), false);
+        src.sendSuccess(() -> MessagesUtil.msg("afkpool.setup.set_pos",
+                Map.of("which", which==1? "pos1":"pos2", "name", name, "x", bp.getX(), "y", bp.getY(), "z", bp.getZ())), false);
         return 1;
     }
 
     private int setTp(CommandSourceStack src, String name) {
         ServerPlayer p = src.getPlayer();
-        if (p == null) { src.sendFailure(Component.literal("Players only.")); return 0; }
+        if (p == null) { src.sendFailure(MessagesUtil.msg("common.players_only")); return 0; }
 
         MEConfig.AfkPool base = store.get(name).orElse(config.afk.pools.get(name));
         Working w = drafts.computeIfAbsent(p.getUUID(), id -> new Working(name, base));
@@ -133,7 +133,7 @@ public final class AfkPoolSetupCmd {
         w.pool.teleport = new MEConfig.TeleportPoint(p.level().dimension().location().toString(),
                 pos.x, pos.y, pos.z, p.getYRot(), p.getXRot());
 
-        src.sendSuccess(() -> Component.literal("Set teleport for pool '" + name + "'."), false);
+        src.sendSuccess(() -> MessagesUtil.msg("afkpool.setup.set_tp", Map.of("name", name)), false);
         return 1;
     }
 
@@ -141,7 +141,8 @@ public final class AfkPoolSetupCmd {
         Working w = ensureDraft(src, name);
         if (w == null) return 0;
         w.pool.enabled = enabled;
-        src.sendSuccess(() -> Component.literal((enabled?"Enabled":"Disabled") + " pool '" + name + "' (draft)."), false);
+        src.sendSuccess(() -> MessagesUtil.msg("afkpool.setup.enabled",
+                Map.of("name", name, "state", enabled ? "on" : "off")), false);
         return 1;
     }
 
@@ -154,7 +155,8 @@ public final class AfkPoolSetupCmd {
             case "allow-chat" -> w.pool.allowChatInside = value;
             case "allow-exit" -> w.pool.allowEnterExitFreely = value;
         }
-        src.sendSuccess(() -> Component.literal("Set " + field + "=" + value + " for pool '" + name + "' (draft)."), false);
+        src.sendSuccess(() -> MessagesUtil.msg("afkpool.setup.flip",
+                Map.of("field", field, "value", value, "name", name)), false);
         return 1;
     }
 
@@ -163,7 +165,8 @@ public final class AfkPoolSetupCmd {
         if (w == null) return 0;
         var tr = findOrCreateTrack(w.pool, trackId);
         tr.id = trackId; tr.everySeconds = everySeconds;
-        src.sendSuccess(() -> Component.literal("Added/updated reward track '" + trackId + "' (every " + everySeconds + "s) for pool '" + name + "' (draft)."), false);
+        src.sendSuccess(() -> MessagesUtil.msg("afkpool.setup.reward.add",
+                Map.of("track", trackId, "sec", everySeconds, "name", name)), false);
         return 1;
     }
 
@@ -173,7 +176,8 @@ public final class AfkPoolSetupCmd {
         var tr = findOrCreateTrack(w.pool, trackId);
         if (tr.commands == null) tr.commands = new ArrayList<>();
         tr.commands.add(cmd);
-        src.sendSuccess(() -> Component.literal("Added command to track '" + trackId + "': " + cmd), false);
+        src.sendSuccess(() -> MessagesUtil.msg("afkpool.setup.reward.add_cmd",
+                Map.of("track", trackId, "cmd", cmd)), false);
         return 1;
     }
 
@@ -185,21 +189,21 @@ public final class AfkPoolSetupCmd {
         MEConfig.ItemSpec it = new MEConfig.ItemSpec();
         it.type = material; it.amount = amount; it.nbt = (nbtJson == null || nbtJson.isBlank()) ? "{}" : nbtJson;
         tr.items.add(it);
-        src.sendSuccess(() -> Component.literal("Added item to track '" + trackId + "': " + material + " x" + amount), false);
+        src.sendSuccess(() -> MessagesUtil.msg("afkpool.setup.reward.add_item",
+                Map.of("track", trackId, "mat", material, "amt", amount)), false);
         return 1;
     }
 
     private int save(CommandSourceStack src, String name) {
         ServerPlayer p = src.getPlayer();
-        if (p == null) { src.sendFailure(Component.literal("Players only.")); return 0; }
+        if (p == null) { src.sendFailure(MessagesUtil.msg("common.players_only")); return 0; }
 
         Working w = drafts.get(p.getUUID());
         if (w == null || !w.name.equalsIgnoreCase(name)) {
-            src.sendFailure(Component.literal("No draft found for '" + name + "'. Start with pos1/pos2/tp."));
+            src.sendFailure(MessagesUtil.msg("afkpool.setup.no_draft", Map.of("name", name)));
             return 0;
         }
 
-        // normalize region if both corners set
         if (w.pos1Tmp != null && w.pos2Tmp != null) {
             int minX = Math.min(w.pos1Tmp.getX(), w.pos2Tmp.getX());
             int minY = Math.min(w.pos1Tmp.getY(), w.pos2Tmp.getY());
@@ -214,24 +218,20 @@ public final class AfkPoolSetupCmd {
             w.pool.region.max = new MEConfig.Vec3i(maxX, maxY, maxZ);
         }
 
-        // persist to the store
         store.put(name, w.pool);
 
-        // mirror store -> config (runtime) and ping AFK service
         config.afk.pools.clear();
         config.afk.pools.putAll(store.viewAll());
         afkService.reloadPools();
 
         drafts.remove(p.getUUID());
-        src.sendSuccess(() -> Component.literal("Saved AFK pool '" + name + "' to afk_pools.json and reloaded AFK service."), true);
+        src.sendSuccess(() -> MessagesUtil.msg("afkpool.setup.saved", Map.of("name", name)), true);
         return 1;
     }
 
-    // --- helpers ---
-
     private Working ensureDraft(CommandSourceStack src, String name) {
         ServerPlayer p = src.getPlayer();
-        if (p == null) { src.sendFailure(Component.literal("Players only.")); return null; }
+        if (p == null) { src.sendFailure(MessagesUtil.msg("common.players_only")); return null; }
         MEConfig.AfkPool base = store.get(name).orElse(config.afk.pools.get(name));
         Working w = drafts.computeIfAbsent(p.getUUID(), id -> new Working(name, base));
         if (!w.name.equalsIgnoreCase(name)) {
