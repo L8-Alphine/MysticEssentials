@@ -3,6 +3,8 @@
 [![Platform](https://img.shields.io/badge/Platforms-NeoForge%20%7C%20Fabric-green.svg)]()
 [![Minecraft](https://img.shields.io/badge/Minecraft-1.21%2B-orange.svg)]()
 [![Status](https://img.shields.io/badge/Build-Stable-success.svg)]()
+[![CodeFactor](https://www.codefactor.io/repository/github/l8-alphine/mysticessentials/badge/master)](https://www.codefactor.io/repository/github/l8-alphine/mysticessentials/overview/master)
+![GitHub Release](https://img.shields.io/github/v/release/l8-alphine/mysticessentials?include_prereleases&sort=date&display_name=tag)
 
 > **MysticEssentials** is a lightweight, server-side only utility mod inspired by *EssentialsX*, designed for **NeoForge** and **Fabric** environments.  
 > Built for the **MysticHorizonsMC** network and other dedicated server operators who want powerful, configurable commands without bloat.
