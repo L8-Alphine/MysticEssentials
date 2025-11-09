@@ -8,6 +8,7 @@ import com.alphine.mysticessentials.storage.PlayerDataStore.LastLoc;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.TagParser;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
@@ -45,6 +46,8 @@ public final class AfkService {
     private MEConfig cfg; // live reference to INSTANCE
     private final PlayerDataStore pdata;
 
+    private enum ActivityType { MOVE, INTERACT, CHAT }
+
     public AfkService(MEConfig cfg, PlayerDataStore pdata) {
         this.cfg = Objects.requireNonNull(cfg, "config");
         this.pdata = Objects.requireNonNull(pdata, "player data");
@@ -58,11 +61,11 @@ public final class AfkService {
         // nothing else needed; we always read from cfg.afk at runtime
     }
 
-    /** Mark activity from movement/interaction/etc. */
-    public void markActiveMovement(ServerPlayer p) { markActive(p, false); }
-    public void markActiveInteraction(ServerPlayer p) { markActive(p, false); }
-    /** Mark activity from chat; in pools that allowChatInside we do not auto-unAFK. */
-    public void markActiveChat(ServerPlayer p) { markActive(p, true); }
+    /** Mark activity from movement/interaction/chat */
+    public void markActiveMovement(ServerPlayer p)    { markActive(p, ActivityType.MOVE); }
+    public void markActiveInteraction(ServerPlayer p) { markActive(p, ActivityType.INTERACT); }
+    /** For chat; pool.allowChatInside can permit staying AFK while chatting. */
+    public void markActiveChat(ServerPlayer p)        { markActive(p, ActivityType.CHAT); }
 
     /** For join: reset lastActive; do not force AFK. */
     public void onJoin(ServerPlayer p) {
@@ -155,44 +158,75 @@ public final class AfkService {
 
     // ---------------- internals ----------------
 
-    private void markActive(ServerPlayer p, boolean isChat) {
+    private void markActive(ServerPlayer p, ActivityType type) {
         State s = state.computeIfAbsent(p.getUUID(), k -> new State());
         final long now = System.currentTimeMillis();
-        // If AFK in a pool that allows chat, don't auto-unAFK on chat.
-        if (s.afk && isChat) {
-            MEConfig.AfkPool pool = poolOf(s.poolName);
-            if (pool != null && pool.allowChatInside) {
-                // do not reset AFK, but still update lastActive to avoid immediate auto-AFK after leaving area
-                s.lastActiveMs = now;
-                return;
-            }
+
+        if (!s.afk) {
+            s.lastActiveMs = now;
+            return;
         }
-        // just bump activity clock
-        s.lastActiveMs = now;
+
+        // If player is AFK:
+        boolean poolsAvailable = hasActivePoolsFor(p);
+        if (!poolsAvailable) {
+            // No active/eligible pools -> any activity cancels AFK.
+            exitAfk(p, s, false);
+            return;
+        }
+
+        MEConfig.AfkPool pool = poolOf(s.poolName);
+        boolean insideAssigned = pool != null && isInsidePool(p, pool);
+
+        if (!insideAssigned) {
+            // Active pools exist but player is not inside their assigned pool -> activity cancels AFK and returns them.
+            exitAfk(p, s, false);
+            return;
+        }
+
+        // Inside the assigned pool: respect per-activity allowances
+        boolean allow;
+        switch (type) {
+            case MOVE ->     allow = pool.allowMoveInside;
+            case INTERACT -> allow = pool.allowInteractInside;
+            case CHAT ->     allow = pool.allowChatInside;
+            default ->       allow = false;
+        }
+
+        if (allow) {
+            // Keep AFK, but bump lastActive to keep idle-kick math sane.
+            s.lastActiveMs = now;
+        } else {
+            // Not allowed activity while AFK in pool -> cancel AFK
+            exitAfk(p, s, false);
+        }
     }
 
     private void enterAfk(ServerPlayer p, State s, boolean teleportToPool) {
         if (s.afk) return;
         s.afk = true;
         s.afkSinceMs = System.currentTimeMillis();
+        s.poolName = null; // reset
 
-        // persist return location for this session
-        LastLoc loc = new LastLoc();
-        loc.dim = dimKey(p).location().toString();
-        Vec3 pos = p.position();
-        loc.x = pos.x; loc.y = pos.y; loc.z = pos.z;
-        loc.yaw = p.getYRot(); loc.pitch = p.getXRot();
-        loc.when = System.currentTimeMillis();
-        pdata.setAfkReturnLoc(p.getUUID(), loc);
+        boolean poolsAvailable = teleportToPool && hasActivePoolsFor(p);
 
-        if (teleportToPool) {
-            // pick first eligible pool
+        if (poolsAvailable) {
+            // save return location ONLY when a pool is available
+            LastLoc loc = new LastLoc();
+            loc.dim = dimKey(p).location().toString();
+            Vec3 pos = p.position();
+            loc.x = pos.x; loc.y = pos.y; loc.z = pos.z;
+            loc.yaw = p.getYRot(); loc.pitch = p.getXRot();
+            loc.when = System.currentTimeMillis();
+            pdata.setAfkReturnLoc(p.getUUID(), loc);
+
+            // pick first eligible pool and teleport
             for (Map.Entry<String, MEConfig.AfkPool> e : cfg.afk.pools.entrySet()) {
                 String name = e.getKey();
                 MEConfig.AfkPool pool = e.getValue();
                 if (pool == null || !pool.enabled) continue;
                 if (pool.requirePermission && !Perms.has(p, PermNodes.afkPoolNode(name), 0)) continue;
-                if (!teleport(p, pool.teleport)) break; // if failed, still proceed but no pool assigned
+                if (!teleport(p, pool.teleport)) break; // fail → stay AFK without pool/teleport
                 s.poolName = name;
                 s.nextRewardAtEpochSec.clear();
                 long nowSec = System.currentTimeMillis() / 1000L;
@@ -204,21 +238,37 @@ public final class AfkService {
                 }
                 break;
             }
+        } else {
+            // no eligible pools: do not save location and do not teleport
+            pdata.clearAfkReturnLoc(p.getUUID());
         }
+
+        // messages: private + broadcast
+        var args = Map.<String,Object>of("name", p.getGameProfile().getName());
+        msgSelf(p, "afk.enter.self", args);          // "You're now AFK."
+        broadcast(p, "afk.enter.broadcast", args);   // "<name> is now AFK."
     }
 
     private void exitAfk(ServerPlayer p, State s, boolean leftArea) {
         if (!s.afk) return;
         s.afk = false;
-        s.poolName = null;
         s.nextRewardAtEpochSec.clear();
         s.afkSinceMs = 0L;
 
-        // return & clear session message
+        // try to return if we saved a location (i.e., we had a pool)
         teleportBackOrFallback(p);
+
+        // clear session message and saved loc (if any)
         pdata.clearAfkMessage(p.getUUID());
         pdata.clearAfkReturnLoc(p.getUUID());
+
+        s.poolName = null;
+
+        var args = Map.<String,Object>of("name", p.getGameProfile().getName());
+        msgSelf(p, "afk.exit.self", args);            // "You're no longer AFK."
+        broadcast(p, "afk.exit.broadcast", args);     // "<name> is no longer AFK."
     }
+
 
     private void teleportBackOrFallback(ServerPlayer p) {
         Optional<LastLoc> back = pdata.getAfkReturnLoc(p.getUUID());
@@ -299,6 +349,14 @@ public final class AfkService {
         }
     }
 
+    private void msgSelf(ServerPlayer p, String key, Map<String, Object> args) {
+        p.sendSystemMessage(MessagesUtil.msg(key, args));
+    }
+
+    private void broadcast(ServerPlayer p, String key, Map<String, Object> args) {
+        p.server.getPlayerList().broadcastSystemMessage(MessagesUtil.msg(key, args), false);
+    }
+
     private ItemStack makeItem(MEConfig.ItemSpec it) {
         try {
             ResourceLocation rl = ResourceLocation.tryParse(it.type); // << was: new ResourceLocation(...)
@@ -318,6 +376,18 @@ public final class AfkService {
         } catch (Exception e) {
             return ItemStack.EMPTY;
         }
+    }
+
+    private boolean hasActivePoolsFor(ServerPlayer p) {
+        if (cfg == null || cfg.afk == null || cfg.afk.pools == null || cfg.afk.pools.isEmpty()) return false;
+        for (var e : cfg.afk.pools.entrySet()) {
+            String name = e.getKey();
+            MEConfig.AfkPool pool = e.getValue();
+            if (pool == null || !pool.enabled) continue;
+            if (pool.requirePermission && !Perms.has(p, PermNodes.afkPoolNode(name), 0)) continue;
+            return true; // found at least one usable pool
+        }
+        return false;
     }
 
     // ---------------- convenience types ----------------
