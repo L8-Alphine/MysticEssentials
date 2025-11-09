@@ -58,7 +58,7 @@ public class MysticEssentialsFabric implements ModInitializer {
                 !(entity instanceof ServerPlayer p) || !MysticEssentialsCommon.get().god.isGod(p.getUUID())
         );
 
-        // Last location on disconnect + stop any invsee tracking
+        // Last location on disconnect + stop any invsee tracking + cancel warmup
         ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
             ServerPlayer p = handler.player;
             var common = MysticEssentialsCommon.get();
@@ -72,6 +72,7 @@ public class MysticEssentialsFabric implements ModInitializer {
             common.pdata.setLast(p.getUUID(), l);
 
             InvseeSessions.close(p);
+            common.warmups.cancel(p, net.minecraft.network.chat.Component.empty());
         });
 
         // Last death
@@ -88,13 +89,19 @@ public class MysticEssentialsFabric implements ModInitializer {
 
         // Once-per-second AFK tick
         ServerTickEvents.END_SERVER_TICK.register(server -> {
+            // warmups: tick every server tick
+            MysticEssentialsCommon.get().warmups.tick(server);
+
+            // invsee sessions: tick to push container updates
+            InvseeSessions.tick(server);
+
             if (++afkTickAccum >= 20) {
                 afkTickAccum = 0;
                 MysticEssentialsCommon.get().serverTick1s(server);
             }
         });
 
-        // Per-world tick: AFK movement + freeze + invsee guard
+        // Per-world tick: AFK movement + freeze + invsee guard (non-invasive)
         ServerTickEvents.END_WORLD_TICK.register(world -> {
             var common = MysticEssentialsCommon.get();
             var punish = common.punish;
@@ -121,19 +128,23 @@ public class MysticEssentialsFabric implements ModInitializer {
                     sp.setDeltaMovement(0, 0, 0);
                 }
 
-                // If they closed out of any container (back to inventory), ensure invsee is closed
+                // If they closed back to personal inventory, ensure invsee is cleaned up
                 if (sp.containerMenu == sp.inventoryMenu) {
                     InvseeSessions.close(sp);
                 }
             }
         });
 
-        // Close invsee when any screen handler closes (and background ticking)
-        ServerTickEvents.END_SERVER_TICK.register(InvseeSessions::tick);
-
-        // Enforce jails on world change
+        // Enforce jails + cancel warmup + close invsee on world change
         ServerEntityWorldChangeEvents.AFTER_PLAYER_CHANGE_WORLD.register((player, origin, destination) -> {
             var common = MysticEssentialsCommon.get();
+
+            // close any invsee session to avoid UI race/flicker on dimension swap
+            InvseeSessions.close(player);
+
+            // treat as movement for warmup cancellation
+            common.warmups.onWorldChange(player);
+
             var ps = common.punish;
             var oj = ps.getJailed(player.getUUID());
             if (oj.isEmpty()) return;
@@ -152,7 +163,7 @@ public class MysticEssentialsFabric implements ModInitializer {
             }
         });
 
-        // Chat mute (sender is already a ServerPlayer)
+        // Chat mute + AFK ping
         ServerMessageEvents.ALLOW_CHAT_MESSAGE.register((message, sender, params) -> {
             ServerPlayer p = sender;
             var ps = MysticEssentialsCommon.get().punish;
@@ -165,9 +176,10 @@ public class MysticEssentialsFabric implements ModInitializer {
                 String raw = (message.unsignedContent() != null)
                         ? message.unsignedContent().getString()
                         : message.signedContent();
-
-                com.alphine.mysticessentials.util.AfkPingUtil.handleChatMention(p.getServer(), p, raw);
-                return true;
+                if (!raw.isBlank() && !raw.startsWith("/")) {
+                    MysticEssentialsCommon.get().onPlayerChat(p);
+                    com.alphine.mysticessentials.util.AfkPingUtil.handleChatMention(p.getServer(), p, raw);
+                }
             }
 
             var m = om.get();

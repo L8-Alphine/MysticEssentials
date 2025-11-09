@@ -7,6 +7,7 @@ import com.alphine.mysticessentials.teleport.*;
 import com.alphine.mysticessentials.config.MEConfig;
 import com.alphine.mysticessentials.util.AfkService;
 import com.alphine.mysticessentials.util.GodService;
+import com.alphine.mysticessentials.util.MessagesUtil; // <-- added
 import com.mojang.brigadier.CommandDispatcher;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.server.MinecraftServer;
@@ -49,6 +50,8 @@ public final class MysticEssentialsCommon {
                 .resolve("config").resolve(MOD_ID).normalize();
         ensureCoreServices(cfgDir);
 
+        cooldowns.updateFromConfig();
+
         // Re-mirror store -> config and notify AFK service
         cfg.afk.pools.clear();
         cfg.afk.pools.putAll(afkPools.viewAll());
@@ -60,6 +63,16 @@ public final class MysticEssentialsCommon {
             cfg = MEConfig.load(cfgDir);
             if (MEConfig.INSTANCE == null) MEConfig.INSTANCE = cfg;
         }
+
+        // Initialize messages AFTER config is available so we know the locale.
+        // cfg.locale should default to "en_us" if not set.
+        try {
+            String locale = (cfg.locale == null || cfg.locale.isBlank()) ? "en_us" : cfg.locale;
+            MessagesUtil.init(cfgDir, locale);
+        } catch (Throwable t) {
+            System.err.println("[MysticEssentials] Failed to initialize MessagesUtil: " + t.getMessage());
+        }
+
         if (pdata == null)      pdata = new PlayerDataStore(cfgDir);
         if (homes == null)      homes = new HomesStore(pdata);
         if (warps == null)      warps = new WarpsStore(cfgDir);
@@ -89,13 +102,16 @@ public final class MysticEssentialsCommon {
         if (pdata != null) pdata.save();
         if (punish != null) punish.save();
         if (afkPools != null) afkPools.save();
-
     }
 
     // Call this from /mereload
     public int reloadAll() {
         int n = 0;
         if (MEConfig.INSTANCE != null) { MEConfig.INSTANCE.reload(); n++; }
+
+        // Reload message files too
+        try { MessagesUtil.reload(); n++; } catch (Throwable ignored) {}
+
         try { this.cooldowns.updateFromConfig(); n++; } catch (Throwable ignored) {}
 
         // Re-mirror store -> config and notify AFK service

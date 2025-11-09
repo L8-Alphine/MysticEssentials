@@ -95,8 +95,11 @@ public class MysticEssentialsNeoForge {
         l.x=p.getX(); l.y=p.getY(); l.z=p.getZ(); l.yaw=p.getYRot(); l.pitch=p.getXRot(); l.when=System.currentTimeMillis();
         common.pdata.setLast(p.getUUID(), l);
 
-        // also stop tracking any invsee session
+        // stop tracking any invsee session
         InvseeSessions.close(p);
+
+        // be safe: cancel warmup for leaver
+        common.warmups.cancel(p, Component.empty());
     }
 
     private void onPlayerDeath(LivingDeathEvent e){
@@ -108,6 +111,10 @@ public class MysticEssentialsNeoForge {
     }
 
     private void onServerTickPost(ServerTickEvent.Post e) {
+        // warmups: tick every server tick (END/POST)
+        MysticEssentialsCommon.get().warmups.tick(e.getServer());
+
+        // invsee: push container updates for open viewers
         InvseeSessions.tick(e.getServer());
 
         // once per second for AFK service
@@ -129,10 +136,7 @@ public class MysticEssentialsNeoForge {
         ServerPlayer p = e.getPlayer();
         var ps = MysticEssentialsCommon.get().punish;
 
-        // Mark AFK attempt immediately
-        MysticEssentialsCommon.get().onPlayerChat(p);
-
-        // Mute gate
+        // Mute gate first
         var om = ps.getMute(p.getUUID());
         if (om.isPresent()){
             var m = om.get();
@@ -144,11 +148,14 @@ public class MysticEssentialsNeoForge {
                                 (rem>0 ? " §7(" + com.alphine.mysticessentials.util.DurationUtil.fmtRemaining(rem) + ")" : " §7(permanent)") + "."),
                         false
                 );
-                return; // don't AFK-DM if blocked
+                return; // do NOT mark AFK chat on blocked messages
             } else {
                 ps.unmute(p.getUUID());
             }
         }
+
+        // Only now mark AFK chat (message allowed)
+        MysticEssentialsCommon.get().onPlayerChat(p);
 
         // AFK ping processing (raw content)
         Component comp = e.getMessage();
@@ -183,9 +190,16 @@ public class MysticEssentialsNeoForge {
         }
     }
 
-    // Enforce jails on dimension change
+    // Cancel warmups + enforce jails on dimension change; also close invsee
     private void onPlayerChangedDimension(PlayerEvent.PlayerChangedDimensionEvent e){
         if (!(e.getEntity() instanceof ServerPlayer p)) return;
+
+        // close any invsee session to avoid UI race/flicker
+        InvseeSessions.close(p);
+
+        // cancel warmup if any (moving worlds counts as movement)
+        MysticEssentialsCommon.get().warmups.onWorldChange(p);
+
         var common = MysticEssentialsCommon.get();
         var ps = common.punish;
         var oj = ps.getJailed(p.getUUID());
