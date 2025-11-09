@@ -1,0 +1,291 @@
+{
+  "_comment": "Mensajes por defecto en español para MysticEssentials",
+  "prefix": "&8[&bMystic&fEssentials&8]&r ",
+
+  "error.no_permission": "&cNo tienes permiso para hacer eso.",
+  "error.player_only": "&cEste comando solo puede ser usado por jugadores.",
+  "error.unknown": "&cOcurrió un error desconocido.",
+
+  "cooldown.wait": "&ePor favor espera &6{seconds}s &eantes de usar eso de nuevo.",
+
+  "homes.set": "&aSe ha establecido la casa '&f{home}&a'.",
+  "homes.teleport": "&aTeleportando a la casa '&f{home}&a'...",
+  "homes.deleted": "&cCasa '&f{home}&c' eliminada.",
+  "homes.list.header": "&bTus casas (&f{count}&b):",
+  "homes.list.entry": "&7- &f{home}",
+
+  "back.none": "&7No hay una ubicación anterior.",
+  "back.returned": "&aHas regresado a la ubicación anterior.",
+  "deathback.none": "&7No hay una ubicación de muerte registrada.",
+  "deathback.tp": "&aTeletransportado a la última ubicación de muerte.",
+
+  "feature.disabled.teleport": "&cLas funciones de teletransporte están deshabilitadas por la configuración.",
+  "warp.unknown": "&cWarp desconocido: &e{warp}",
+  "warp.bad_dimension": "&cID de dimensión inválida: {dim}",
+  "warp.world_missing": "&cMundo inexistente: {dim}",
+  "warp.set.saved": "&aWarp &e{warp} &aguardado.",
+  "warp.del.ok": "&aWarp &e{warp} &aeliminado.",
+  "warp.del.missing": "&cNo existe un warp llamado &e{warp}",
+  "warps.none": "&7No hay warps.",
+  "warps.list": "&aWarps: {list}",
+
+  "warps.teleport": "&aTeleportando al warp '&f{warp}&a'...",
+  "warps.list.header": "&bWarps disponibles (&f{count}&b):",
+  "warmup.wait": "&7Teletransportando en &e{seconds}&7s...",
+  "warmup.cancel.move": "&cTeletransporte cancelado: te moviste.",
+  "warmup.cancel.damage": "&cTeletransporte cancelado: recibiste daño.",
+
+  "tp.sent": "&aTeleportando...",
+  "tpa.sent": "&aSolicitud enviada a &f{target}&a.",
+  "tpa.received": "&e{sender} &aha solicitado teletransportarse a ti. &7(&a/tpaccept &7o &c/tpadeny&7)",
+  "tpa.accepted": "&aSolicitud de teletransporte aceptada.",
+  "tpa.denied": "&cSolicitud de teletransporte denegada.",
+  "tpa.self": "&cNo puedes enviarte TPA a ti mismo.",
+  "tpa.target_not_accepting": "&cEse jugador no acepta solicitudes de TPA.",
+  "tpa.auto_accept.from": "&aAceptado automáticamente. Teletransportando a &e{target}",
+  "tpa.auto_accept.to": "&7TPA aceptado automáticamente de &e{sender}",
+  "tpa.none": "&cNo hay solicitudes pendientes.",
+  "tpa.requester_offline": "&cSolicitante desconectado.",
+  "tpa.accepted.to": "&aSolicitud aceptada.",
+  "tpa.accepted.from": "&aTeletransportando a &e{target}",
+  "tptoggle.on": "&7TPA Toggle: &aON",
+  "tptoggle.off": "&7TPA Toggle: &cOFF",
+  "tpauto.on": "&7TPA Auto-Aceptar: &aON",
+  "tpauto.off": "&7TPA Auto-Aceptar: &cOFF",
+  "tp.player_not_found": "&cJugador no encontrado.",
+  "tp.already_here": "&cYa estás en tu propia ubicación.",
+  "tphere.self": "&cEres tú.",
+  "tpo.profile_missing": "&cNo existe ese perfil de jugador.",
+  "tpo.no_last_location": "&cSin última ubicación registrada para ese jugador.",
+  "tpo.teleported_to_last": "&aTeletransportado a la última ubicación de &e{name}&a.",
+
+  "spawn.teleport": "&aTeleportando al spawn...",
+  "back.teleport": "&aTeleportando atrás...",
+
+  "spawn.not_set": "&cEl spawn no está establecido.",
+  "spawn.set.ok": "&aSpawn establecido.",
+
+  "afk.enabled": "&7Ahora estás &fAFK&7.",
+  "afk.disabled": "&7Ya no estás &fAFK&7.",
+  "afk.notify": "&7{sender} → {target}: &f{msg}",
+  "afk.kicked": "&cExpulsado por estar AFK demasiado tiempo.",
+
+  "near.entry": "&7- &f{player} &7({distance}m)",
+  "god.enabled": "&aModo dios activado.",
+  "god.disabled": "&cModo dios desactivado.",
+
+  "repair.success": "&aTu objeto ha sido reparado.",
+  "kill.done": "&cEliminadas &f{count}&c entidades.",
+
+  "moderation.target_exempt": "&cEl objetivo está exento.",
+  "moderation.warn.ok": "&aAdvertido &e{player} &7[id: &e{id}&7]",
+  "moderation.warn.notify": "&cHas sido advertido: &e{reason}",
+
+  "moderation.warnings.self.no_perm": "&cNo tienes permiso para ver tus advertencias.",
+  "moderation.warnings.others.no_perm": "&cNo tienes permiso para ver las advertencias de otros.",
+  "moderation.warnings.none": "&7No hay advertencias.",
+  "moderation.warnings.header": "&aAdvertencias de &e{player}&a:",
+  "moderation.warnings.entry": "&7- &e{id} &7| {date} &7| &f{reason}",
+
+  "moderation.pardon.ok": "&aSe eliminó la advertencia &e{id}",
+  "moderation.pardon.missing": "&cNo existe una advertencia con id &e{id}",
+
+  "moderation.warnings.clear.ok": "&aAdvertencias borradas.",
+  "moderation.warnings.clear.none": "&7No hay advertencias que borrar.",
+
+  "mute.notify.to.temp": "&cHas sido silenciado hasta &e{until}&c: &f{reason}",
+  "mute.notify.to.perm": "&cHas sido silenciado permanentemente: &f{reason}",
+  "mute.ok.temp": "&aSilenciado &e{player} &7por &e{duration}",
+  "mute.ok.perm": "&aSilenciado &e{player} &7(permanente)",
+
+  "unmute.unknown_profile": "&cPerfil desconocido.",
+  "unmute.ok": "&aSe ha quitado el silencio a &e{name}",
+
+  "kick.notify.to": "&cHas sido expulsado: &f{reason}",
+  "kick.ok": "&aExpulsado &e{player}",
+
+  "jail.set.saved": "&aCárcel &e{jail} &aguardada.",
+  "jail.del.ok": "&aCárcel eliminada.",
+  "jail.del.missing": "&cNo existe esa cárcel.",
+  "jail.not_found": "&cCárcel no encontrada.",
+  "jail.notify.to": "&cHas sido encarcelado en &e{jail}",
+  "jail.ok": "&aEncarcelado &e{player} &7en &e{jail}",
+  "unjail.ok": "&aLiberado &e{player}",
+
+  "duration.invalid": "&cDuración inválida.",
+  "profile.unknown": "&cPerfil desconocido.",
+
+  "ipban.ok": "&aIP bloqueada &e{ip}",
+  "tempipban.ok": "&aIP bloqueada temporalmente &e{ip} &7por &e{duration}",
+  "unbanip.ok": "&aIP desbloqueada &e{ip}",
+
+  "freeze.notify.to.on": "&cHas sido congelado.",
+  "freeze.notify.to.off": "&aHas sido descongelado.",
+  "freeze.ok.on": "&aCongelado &e{player}",
+  "freeze.ok.off": "&aDescongelado &e{player}",
+
+  "ban.notify.to.perm": "&cBaneado: &f{reason}",
+  "ban.notify.to.temp": "&cBaneado temporalmente hasta &e{until}&c: &f{reason}",
+  "ban.ok.perm": "&aBaneado &e{player}",
+  "ban.ok.temp": "&aBaneado temporalmente &e{player} &7por &e{duration}",
+  "unban.ok": "&aDesbaneado &e{player}",
+
+  "banlist.none": "&7No hay baneos activos.",
+  "banlist.header": "&aBaneos activos:",
+  "banlist.entry": "&7- &e{who} &7hasta &e{until} &7razón &f{reason}",
+
+  "history.none_for_player": "&7Sin historial para &e{player}",
+  "history.header": "&aHistorial de &e{player} &7(página &e{page}&7/&e{max}&7)",
+  "history.entry.raw": "{line}",
+  "history.next": "&7Siguiente: &e/history {player} {next}",
+
+  "historyrecent.none": "&7No hay acciones recientes.",
+  "historyrecent.header": "&aAcciones de moderación recientes &7(página &e{page}&7/&e{max}&7)",
+  "historyrecent.next": "&7Siguiente: &e/historyrecent {next}",
+
+  "weather.cleared": "&eClima despejado.",
+  "weather.rain.started": "&eLluvia iniciada.",
+  "weather.storm.started": "&eTormenta eléctrica iniciada.",
+
+  "time.day": "&aHora establecida a &edía",
+  "time.night": "&aHora establecida a &enoche",
+  "time.set.ticks": "&aHora establecida a &e{ticks}",
+
+  "speed.set": "&7Velocidad establecida a &e{amount}",
+
+  "repair.players_only": "&cSolo jugadores.",
+  "repair.unknown_scope": "&cÁmbito desconocido: &e{scope} &7(usa hand/offhand/armor/hotbar/all)",
+  "repair.nothing": "&7Nada que reparar.",
+  "repair.nothing.enchanted_hint": "&7Nada que reparar &7(&clos objetos encantados requieren permiso&7).",
+  "repair.ok": "&aReparado(s) &e{count} &aartículo(s).",
+
+  "near.none": "&7No hay jugadores cercanos (&le; &e{radius}&7 bloques).",
+  "near.list": "&aCercanos (&e{radius}&a): {players}",
+
+  "jump.no_block": "&cNo hay un bloque a la vista dentro de &e{range}&c bloques.",
+  "jump.ok": "&aTeletransportado hacia adelante.",
+
+  "invsee.exempt": "&cNo puedes ver el inventario de este jugador.",
+  "invsee.open.view": "&aAbriendo el inventario de &e{player} &7(solo lectura).",
+  "invsee.open.edit": "&aAbriendo el inventario de &e{player} &7(editable).",
+
+  "help.header": "— Ayuda (&e{total}&r comandos) — Página &e{page}&r/&e{pages}",
+  "help.hover.copy_run": "Haz clic para copiar/ejecutar\\nMod: {mod}",
+  "help.pager.prev": "← Anterior",
+  "help.pager.next": "Siguiente →",
+  "help.pager.prev.disabled": "← Anterior",
+  "help.pager.next.disabled": "Siguiente →",
+  "help.pager.hover": "Ir a la página {page}",
+
+  "heal.ok": "&aHas sido curado.",
+
+  "gm.unknown": "&cModo de juego desconocido.",
+  "gm.set": "&aModo de juego: &e{mode}",
+
+  "fly.on": "&7Vuelo: &aACTIVADO",
+  "fly.off": "&7Vuelo: &cDESACTIVADO",
+
+  "feed.ok": "&aTe sientes satisfecho.",
+
+  "enchant.hold_item": "&cSostén un objeto (o un libro encantado).",
+  "enchant.unknown": "&cEncantamiento desconocido: &e{id}",
+  "enchant.incompatible": "&cEse encantamiento no puede aplicarse a este objeto.",
+  "enchant.removed": "&7Se quitó &e{id} &7del objeto.",
+  "enchant.applied": "&aSe aplicó &e{id} &7niv &e{level} &aal objeto.",
+
+  "kit.list.none": "&7No tienes kits.",
+  "kit.list.some": "&aKits: {kits}",
+  "kit.no_such": "&cNo existe el kit &e{kit}",
+  "kit.target_lacks_perm": "&cEl jugador no tiene el permiso: &e{node}",
+  "kit.already_one_time.self": "&cYa has reclamado este kit de una sola vez.",
+  "kit.already_one_time.other": "&cEse jugador ya ha reclamado este kit de una sola vez.",
+  "kit.cooldown.self": "&cTiempo de reutilización restante: &e{time}",
+  "kit.cooldown.other": "&cReutilización del objetivo. &7Restante: &e{time}",
+  "kit.received.self": "&aHas recibido el kit &e{kit} &7({count} objetos)",
+  "kit.gave": "&aEntregado el kit &e{kit} &7a &e{player} &7({count} objetos)",
+  "kit.received.other": "&aHas recibido el kit &e{kit} &7de &e{player}",
+
+  "kit.delete.ok": "&aKit eliminado &e{kit}",
+  "kit.delete.no_such": "&cNo existe el kit &e{kit}",
+
+  "kit.create.saved_one_time": "&aKit &e{kit} &aguardado. &7(una sola vez)",
+  "kit.create.saved_cooldown": "&aKit &e{kit} &aguardado. &7reutilización &e{time}",
+  "kit.create.saved_no_cooldown": "&aKit &e{kit} &aguardado. &7sin reutilización",
+  "kit.create.permission": "&7Permiso para usar: &e{perm}",
+
+  "home.limit_reached": "&cSe alcanzó el límite de homes (&e{limit}&c).",
+  "home.set.ok": "&aHome &e{name} &aconfigurada.",
+  "home.list.none": "&7No tienes homes. &8(&7límite: {limit}&8)",
+  "home.list.some": "&aHomes (&e{count}&7/&e{limit}&a): {homes}",
+  "home.no_such_for": "&cNo existe un home llamado &e{name} &cpara &e{player}",
+  "home.delete.ok": "&aHome &e{name} &aeliminada",
+  "home.delete.no_such": "&cNo existe un home llamado &e{name}",
+
+  "sleep.reset": "&aTe sientes descansado. Los fantasmas no aparecerán por ahora.",
+  "sleep.no_permission": "&cNo tienes permiso para descansar.",
+  "sleep.player_only": "&cEste comando solo puede ser usado por jugadores.",
+
+  "recipe.held_none": "&cSostén un objeto o especifica una ID de receta.",
+  "recipe.none": "&cNo se encontró ninguna receta para &f{item}&c.",
+  "recipe.found": "&aReceta desbloqueada para &f{item}&a. &7(Abre tu libro de recetas para verla.)",
+  "recipe.multiple": "&aSe han desbloqueado &f{count}&a receta(s) para &f{item}&7. (Revisa tu libro de recetas.)",
+  "recipe.no_permission": "&cNo tienes permiso para ver recetas.",
+  "recipe.viewer_hint": "&7Consejo: Para una vista en el juego, instala un visor de recetas como &fEMI/JEI/NEI&7.",
+
+  "rename.no_item": "&cDebes tener un objeto en la mano para renombrarlo.",
+  "rename.success": "&aObjeto renombrado a &r{name}&a.",
+  "rename.denied.enchanted": "&cNo puedes renombrar objetos encantados.",
+  "rename.denied.unique": "&cNo puedes renombrar objetos con datos personalizados.",
+  "rename.no_permission": "&cNo tienes permiso para renombrar objetos.",
+
+  "lore.no_item": "&cDebes tener un objeto en la mano para editar el lore.",
+  "lore.updated": "&aEl lore del objeto ha sido actualizado.",
+  "lore.denied.enchanted": "&cNo puedes editar el lore de objetos encantados.",
+  "lore.denied.unique": "&cNo puedes editar el lore de objetos con datos personalizados.",
+  "lore.no_permission": "&cNo tienes permiso para modificar el lore de los objetos.",
+
+  "tp.feature_off": "&cLas funciones de teletransporte están desactivadas por configuración.",
+  "tp.cooldown_seconds": "&cReutilización: &e{seconds}s",
+  "tp.bad_dimension": "&cID de dimensión no válido: &e{id}",
+  "tp.world_missing": "&cMundo faltante: &e{id}",
+
+  "common.players_only": "&cSolo jugadores.",
+
+  "afk.on": "&7Ahora estás &eAFK&7.",
+  "afk.off": "&aYa no estás AFK.",
+
+  "reload.ok": "&aMysticEssentials recargado (&e{count}&a módulos).",
+
+  "modlist.header": "&6— Mods (&e{shown}&6/&e{total}&6) —",
+  "modlist.more_hint": "&7…y &e{more}&7 más. Usa el comando mostrado para subir.",
+  "modlist.upload_hover": "&7Subir lista completa a mclo.gs",
+  "modlist.upload_ok": "&aSubido a mclo.gs → ",
+  "modlist.open_browser": "&7Abrir en el navegador",
+  "modlist.upload_fail": "&cFallo al subir: &e{error}",
+
+  "afkpool.setup.set_pos": "&aFijado &e{which}&a para la piscina '&e{name}&a' en &e{x}&7,&e{y}&7,&e{z}",
+  "afkpool.setup.set_tp": "&aTeletransporte fijado para la piscina '&e{name}&a'.",
+  "afkpool.setup.enabled": "&a{state,select,on{Activada} off{Desactivada} other{Cambiada}} la piscina '&e{name}&a' (borrador).",
+  "afkpool.setup.flip": "&aAjustado &e{field}&a=&e{value}&a para la piscina '&e{name}&a' (borrador).",
+  "afkpool.setup.reward.add": "&aPista de recompensa '&e{track}&a' agregada/actualizada (cada &e{sec}&as) para la piscina '&e{name}&a' (borrador).",
+  "afkpool.setup.reward.add_cmd": "&aComando añadido a la pista '&e{track}&a': &f{cmd}",
+  "afkpool.setup.reward.add_item": "&aObjeto añadido a la pista '&e{track}&a': &e{mat} &7x&e{amt}",
+  "afkpool.setup.no_draft": "&cNo se encontró borrador para '&e{name}&c'. Empieza con &e/afkpool setup {name} pos1/pos2/tp&c.",
+  "afkpool.setup.saved": "&aPiscina AFK '&e{name}&a' guardada en &eafk_pools.json &ay servicio AFK recargado.",
+
+  "kill.no_perm": "&cNo tienes el permiso: &e{perm}",
+  "kill.self_exempt": "&cEstás exento de /kill.",
+  "kill.self_ok": "&7Puf.",
+  "kill.no_world": "&cNo hay mundo cargado.",
+  "kill.radius_needs_player": "&cLa forma con radio requiere un ejecutor jugador.",
+  "kill.group_ok": "&aEliminados &e{count}&a {scope} en &e{area}&a.",
+  "kill.scope.players": "jugador(es)",
+  "kill.scope.mobs": "mob(s)",
+  "kill.scope.entities": "entidades",
+  "kill.scope.all": "elemento(s)",
+
+  "afk.enter.self": "&7Ahora estás &eAFK&7.",
+  "afk.enter.broadcast": "&7{nombre} &eahora está AFK&7.",
+  "afk.exit.self": "&aYa no estás AFK.",
+  "afk.exit.broadcast": "&a{nombre} ya no está AFK."
+}
