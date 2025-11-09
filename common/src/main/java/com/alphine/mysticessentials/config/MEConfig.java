@@ -11,6 +11,9 @@ public class MEConfig {
     public static MEConfig INSTANCE;
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().serializeNulls().create();
 
+    @SerializedName("locale")
+    public String locale = "en_us";
+
     @SerializedName("cooldowns") public Cooldowns cooldowns = new Cooldowns();
     @SerializedName("warmups")   public Warmups   warmups   = new Warmups();
     @SerializedName("limits")    public Limits    limits    = new Limits();
@@ -122,6 +125,12 @@ public class MEConfig {
 
         /** Allow chat while AFK in this region (won't auto-unAFK on chat) */
         public boolean allowChatInside = true;
+
+        /** Allow movement while AFK in this region */
+        public boolean allowMoveInside = true;
+
+        /** Allow interaction (blocks, entities) while AFK in this region */
+        public boolean allowInteractInside = true;
 
         /** Allow walking out to unAFK */
         public boolean allowEnterExitFreely = true;
