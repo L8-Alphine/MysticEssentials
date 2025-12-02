@@ -36,9 +36,16 @@ side = "BOTH"
 
 [[dependencies.mysticessentials]]
 modId= "luckperms"
-type = "optional"
+type = "required"
 versionRange="[5,)"
 side="SERVER"
+
+[[dependencies.mysticessentials]]
+modId="adventure_platform_neoforge"
+type = "required"
+versionRange="[6.0.0,)" # or whatever you're targeting
+ordering="AFTER"
+side="BOTH"
 
 [[mixins]]
 config = "mysticessentials.mixins.json"
