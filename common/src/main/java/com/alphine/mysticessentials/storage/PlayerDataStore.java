@@ -36,8 +36,16 @@ import java.util.*;
 public class PlayerDataStore {
 
     // ---------- Data Types ----------
-    public static final class LastLoc { public String dim; public double x,y,z; public float yaw,pitch; public long when; }
-    public static final class Flags { public boolean tpToggle=false; public boolean tpAuto=false; }
+    public static final class LastLoc {
+        public String dim;
+        public double x,y,z;
+        public float yaw,pitch;
+        public long when;
+    }
+    public static final class Flags {
+        public boolean tpToggle=false;
+        public boolean tpAuto=false;
+    }
 
     /** Since schema 2: single back location only. */
     public static final class BackDataV2 {
@@ -137,7 +145,9 @@ public class PlayerDataStore {
     public PlayerDataStore(Path cfgDir) {
         this.cfgDir = cfgDir;
         this.baseDir = cfgDir.resolve("playerdata");
-        try { Files.createDirectories(baseDir); } catch (Exception ignored) {}
+        try {
+            Files.createDirectories(baseDir);
+        } catch (Exception ignored) {}
         migrateOldStoresIfPresent();
     }
 
@@ -162,7 +172,9 @@ public class PlayerDataStore {
             save(id, r);
         }
     }
-    public synchronized Optional<Identity> getIdentity(UUID id){ return Optional.of(rec(id).id); }
+    public synchronized Optional<Identity> getIdentity(UUID id){
+        return Optional.of(rec(id).id);
+    }
 
     // ---------- Playtime ----------
     public synchronized void markLogin(UUID id) {
@@ -172,6 +184,7 @@ public class PlayerDataStore {
         r.play.lastSeen = now;
         save(id, r);
     }
+
     public synchronized void markLogout(UUID id) {
         PlayerRecord r = rec(id);
         long now = System.currentTimeMillis();
@@ -182,6 +195,7 @@ public class PlayerDataStore {
         r.play.lastSeen = now;
         save(id, r);
     }
+
     public synchronized long getTotalPlaytimeMillis(UUID id) {
         PlayerRecord r = rec(id);
         long total = r.play.totalMillis;
@@ -189,15 +203,37 @@ public class PlayerDataStore {
         return total;
     }
 
+    /** Admin helper: set raw accumulated playtime (in millis). Does not touch sessionStart. */
+    public synchronized void setTotalPlaytimeMillis(UUID id, long millis) {
+        PlayerRecord r = rec(id);
+        r.play.totalMillis = Math.max(0L, millis);
+        save(id, r);
+    }
+
+
     // ---------- Last ----------
     public synchronized void setLast(UUID id, LastLoc l) { PlayerRecord r = rec(id); r.last = l; save(id,r); }
     public synchronized Optional<LastLoc> getLast(UUID id) { return Optional.ofNullable(rec(id).last); }
 
     // ---------- Flags ----------
-    public synchronized Flags getFlags(UUID id) { return rec(id).flags; }
-    public synchronized void saveFlags(UUID id, Flags f) { PlayerRecord r = rec(id); r.flags = f; save(id,r); }
-    public synchronized void setTpToggle(UUID id, boolean v){ PlayerRecord r=rec(id); r.flags.tpToggle=v; save(id,r); }
-    public synchronized void setTpAuto(UUID id, boolean v){ PlayerRecord r=rec(id); r.flags.tpAuto=v; save(id,r); }
+    public synchronized Flags getFlags(UUID id) {
+        return rec(id).flags;
+    }
+    public synchronized void saveFlags(UUID id, Flags f) {
+        PlayerRecord r = rec(id);
+        r.flags = f;
+        save(id,r);
+    }
+    public synchronized void setTpToggle(UUID id, boolean v){
+        PlayerRecord r=rec(id);
+        r.flags.tpToggle=v;
+        save(id,r);
+    }
+    public synchronized void setTpAuto(UUID id, boolean v){
+        PlayerRecord r=rec(id);
+        r.flags.tpAuto=v;
+        save(id,r);
+    }
 
     // ---------- Back (single) ----------
     public synchronized void setBack(UUID id, LastLoc l){
@@ -217,18 +253,42 @@ public class PlayerDataStore {
     public synchronized Optional<LastLoc> peekBack(UUID id){
         return Optional.ofNullable(rec(id).back.last);
     }
-    public synchronized void setDeath(UUID id, LastLoc l){ PlayerRecord r=rec(id); r.back.lastDeath=l; save(id,r); }
-    public synchronized Optional<LastLoc> getDeath(UUID id){ return Optional.ofNullable(rec(id).back.lastDeath); }
+    public synchronized void setDeath(UUID id, LastLoc l){
+        PlayerRecord r=rec(id);
+        r.back.lastDeath=l;
+        save(id,r);
+    }
+    public synchronized Optional<LastLoc> getDeath(UUID id){
+        return Optional.ofNullable(rec(id).back.lastDeath);
+    }
 
     // ---------- AFK ----------
-    public synchronized void setAfkMessage(UUID id, String msg){ PlayerRecord r=rec(id); r.afk.message = msg==null?"":msg; save(id,r); }
-    public synchronized Optional<String> getAfkMessage(UUID id){
-        String m = rec(id).afk.message; return (m==null || m.isBlank())? Optional.empty() : Optional.of(m);
+    public synchronized void setAfkMessage(UUID id, String msg){
+        PlayerRecord r=rec(id);
+        r.afk.message = msg==null?"":msg;
+        save(id,r);
     }
-    public synchronized void clearAfkMessage(UUID id){ PlayerRecord r=rec(id); r.afk.message=""; save(id,r); }
-    public synchronized void setAfkReturnLoc(UUID id, LastLoc loc){ PlayerRecord r=rec(id); r.afk.returnLoc=loc; save(id,r); }
-    public synchronized Optional<LastLoc> getAfkReturnLoc(UUID id){ return Optional.ofNullable(rec(id).afk.returnLoc); }
-    public synchronized void clearAfkReturnLoc(UUID id){ PlayerRecord r=rec(id); r.afk.returnLoc=null; save(id,r); }
+    public synchronized Optional<String> getAfkMessage(UUID id){
+        String m = rec(id).afk.message;
+        return (m==null || m.isBlank())? Optional.empty() : Optional.of(m);
+    }
+    public synchronized void clearAfkMessage(UUID id){
+        PlayerRecord r=rec(id); r.afk.message="";
+        save(id,r);
+    }
+    public synchronized void setAfkReturnLoc(UUID id, LastLoc loc){
+        PlayerRecord r=rec(id);
+        r.afk.returnLoc=loc;
+        save(id,r);
+    }
+    public synchronized Optional<LastLoc> getAfkReturnLoc(UUID id){
+        return Optional.ofNullable(rec(id).afk.returnLoc);
+    }
+    public synchronized void clearAfkReturnLoc(UUID id){
+        PlayerRecord r=rec(id);
+        r.afk.returnLoc=null;
+        save(id,r);
+    }
 
     // ---------- Homes ----------
     public synchronized void setHome(UUID id, Home h) {
@@ -272,8 +332,12 @@ public class PlayerDataStore {
         r.kits.usedOnce.add(kit.toLowerCase(Locale.ROOT));
         save(id, r);
     }
-    public synchronized Map<String, Long> getAllKitLast(UUID id) { return new HashMap<>(rec(id).kits.lastClaim); }
-    public synchronized Set<String> getAllKitsUsedOnce(UUID id) { return new HashSet<>(rec(id).kits.usedOnce); }
+    public synchronized Map<String, Long> getAllKitLast(UUID id) {
+        return new HashMap<>(rec(id).kits.lastClaim);
+    }
+    public synchronized Set<String> getAllKitsUsedOnce(UUID id) {
+        return new HashSet<>(rec(id).kits.usedOnce);
+    }
 
     // ---------- Inventory ----------
     public synchronized void saveInventory(UUID id, String format, Map<String,Object> payload, String note){
@@ -415,6 +479,8 @@ public class PlayerDataStore {
     public synchronized void save() { saveAll(); }
 
     // ---------- Migration of separate old stores ----------
+    // This stays here to migrate from old monolithic stores.
+    // Incase someone still uses those old files.
     @SuppressWarnings("unchecked")
     private void migrateOldStoresIfPresent() {
         // old monolith
