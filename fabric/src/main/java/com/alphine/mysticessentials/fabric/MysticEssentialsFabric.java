@@ -1,9 +1,16 @@
 package com.alphine.mysticessentials.fabric;
 
 import com.alphine.mysticessentials.MysticEssentialsCommon;
+import com.alphine.mysticessentials.chat.ChatModule;
+import com.alphine.mysticessentials.chat.redis.RedisClientAdapter;
+import com.alphine.mysticessentials.chat.platform.CommonPlayer;
+import com.alphine.mysticessentials.chat.platform.CommonServer;
+import com.alphine.mysticessentials.config.MEConfig;
 import com.alphine.mysticessentials.fabric.platform.FabricModInfoService;
+import com.alphine.mysticessentials.fabric.redis.LettuceRedisClientAdapter;
 import com.alphine.mysticessentials.inv.InvseeSessions;
 import com.alphine.mysticessentials.storage.PlayerDataStore;
+import com.alphine.mysticessentials.update.ModrinthUpdateChecker;
 import com.alphine.mysticessentials.util.Teleports;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
@@ -15,8 +22,10 @@ import net.fabricmc.fabric.api.message.v1.ServerMessageEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.Level;
@@ -31,6 +40,7 @@ public class MysticEssentialsFabric implements ModInitializer {
     private int afkTickAccum = 0;
     private final Map<UUID, net.minecraft.world.phys.Vec3> afkLastPos = new HashMap<>();
     private final Map<UUID, float[]> afkLastRot = new HashMap<>();
+    private RedisClientAdapter redisAdapter;
 
     @Override
     public void onInitialize() {
@@ -38,8 +48,36 @@ public class MysticEssentialsFabric implements ModInitializer {
         MysticEssentialsCommon.get().setModInfoService(new FabricModInfoService());
 
         // Lifecycle
-        ServerLifecycleEvents.SERVER_STARTING.register(MysticEssentialsCommon.get()::serverStarting);
-        ServerLifecycleEvents.SERVER_STOPPING.register(server -> MysticEssentialsCommon.get().serverStopping());
+        ServerLifecycleEvents.SERVER_STARTING.register(server -> {
+            // core services + config
+            MysticEssentialsCommon.get().serverStarting(server);
+
+            MEConfig cfg = MysticEssentialsCommon.get().cfg;
+            RedisClientAdapter adapter = null;
+
+            if (cfg != null && cfg.chat != null && cfg.chat.redis != null && cfg.chat.redis.enabled) {
+                this.redisAdapter = new LettuceRedisClientAdapter(cfg.chat.redis);
+                adapter = this.redisAdapter;
+            }
+
+            // init chat module (creates ChatPipeline with or without Redis)
+            ChatModule.init(adapter);
+
+            // --- Modrinth update check (Fabric) ---
+            String currentVersion = MysticEssentialsCommon.get().getVersion();
+            ModrinthUpdateChecker.checkForUpdatesAsync(
+                    "JEA9OHq8",
+                    currentVersion,
+                    msg -> server.sendSystemMessage(Component.literal(msg))
+            );
+        });
+        ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
+            MysticEssentialsCommon.get().serverStopping();
+            if (redisAdapter != null) {
+                redisAdapter.shutdown();
+                redisAdapter = null;
+            }
+        });
 
         // Commands
         CommandRegistrationCallback.EVENT.register((dispatcher, regAccess, env) -> {
@@ -62,7 +100,14 @@ public class MysticEssentialsFabric implements ModInitializer {
         ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
             ServerPlayer p = handler.player;
             var common = MysticEssentialsCommon.get();
+            // System quit message
+            CommonServer cs = wrapServer(server);
+            CommonPlayer cp = wrapPlayer(p);
+            common.systemMessages.broadcastQuit(cs, cp);
             common.onPlayerQuit(p);
+
+            // Playtime tracking
+            common.pdata.markLogout(p.getUUID());
 
             var l = new PlayerDataStore.LastLoc();
             l.dim = p.serverLevel().dimension().location().toString();
@@ -73,6 +118,8 @@ public class MysticEssentialsFabric implements ModInitializer {
 
             InvseeSessions.close(p);
             common.warmups.cancel(p, net.minecraft.network.chat.Component.empty());
+
+            common.privateMessages.onQuit(p);
         });
 
         // Last death
@@ -84,6 +131,12 @@ public class MysticEssentialsFabric implements ModInitializer {
                 l.yaw = p.getYRot(); l.pitch = p.getXRot();
                 l.when = System.currentTimeMillis();
                 MysticEssentialsCommon.get().pdata.setDeath(p.getUUID(), l);
+
+                // System death message
+                String deathMsg = p.getCombatTracker().getDeathMessage().getString();
+                CommonServer cs = wrapServer(p.getServer());
+                CommonPlayer cp = wrapPlayer(p);
+                MysticEssentialsCommon.get().systemMessages.broadcastDeath(cs, cp, deathMsg);
             }
         });
 
@@ -163,52 +216,69 @@ public class MysticEssentialsFabric implements ModInitializer {
             }
         });
 
-        // Chat mute + AFK ping
+        // Chat mute + AFK ping + custom chat pipeline
         ServerMessageEvents.ALLOW_CHAT_MESSAGE.register((message, sender, params) -> {
             ServerPlayer p = sender;
-            var ps = MysticEssentialsCommon.get().punish;
+            var common = MysticEssentialsCommon.get();
+            var ps = common.punish;
 
             var om = ps.getMute(p.getUUID());
-            if (om.isEmpty()) {
-                // mark AFK activity only when message is allowed
-                MysticEssentialsCommon.get().onPlayerChat(p);
 
-                String raw = (message.unsignedContent() != null)
-                        ? message.unsignedContent().getString()
-                        : message.signedContent();
-                if (!raw.isBlank() && !raw.startsWith("/")) {
-                    MysticEssentialsCommon.get().onPlayerChat(p);
-                    com.alphine.mysticessentials.util.AfkPingUtil.handleChatMention(p.getServer(), p, raw);
+            // --- MUTE GATE ---
+            if (om.isPresent()) {
+                var m = om.get();
+                if (m.until == null || System.currentTimeMillis() < m.until) {
+                    long rem = m.until == null ? -1 : (m.until - System.currentTimeMillis());
+                    p.displayClientMessage(
+                            net.minecraft.network.chat.Component.literal(
+                                    "§cYou are muted" + (rem > 0 ? " §7(" +
+                                            com.alphine.mysticessentials.util.DurationUtil.fmtRemaining(rem) + ")" : " §7(permanent)") + "."),
+                            false
+                    );
+                    // Block message entirely (no AFK mark, no chat pipeline)
+                    return false;
+                } else {
+                    ps.unmute(p.getUUID());
                 }
             }
 
-            var m = om.get();
-            if (m.until == null || System.currentTimeMillis() < m.until) {
-                long rem = m.until == null ? -1 : (m.until - System.currentTimeMillis());
-                p.displayClientMessage(
-                        net.minecraft.network.chat.Component.literal(
-                                "§cYou are muted" + (rem > 0 ? " §7(" +
-                                        com.alphine.mysticessentials.util.DurationUtil.fmtRemaining(rem) + ")" : " §7(permanent)") + "."),
-                        false
-                );
-                return false;
-            } else {
-                ps.unmute(p.getUUID());
-                MysticEssentialsCommon.get().onPlayerChat(p);
-                String raw = (message.unsignedContent() != null)
-                        ? message.unsignedContent().getString()
-                        : message.signedContent();
+            // --- AFK activity + AFK ping util (your old behavior) ---
+            String raw = (message.unsignedContent() != null)
+                    ? message.unsignedContent().getString()
+                    : message.signedContent();
+
+            common.onPlayerChat(p); // mark AFK activity
+            if (!raw.isBlank() && !raw.startsWith("/")) {
                 com.alphine.mysticessentials.util.AfkPingUtil.handleChatMention(p.getServer(), p, raw);
-                return true;
             }
+
+            // --- Custom chat pipeline (common) ---
+            boolean handled = com.alphine.mysticessentials.fabric.chat.FabricChatBridge
+                    .handleAllowChat(message, p);
+
+            // If handled by MysticEssentials, cancel vanilla handling
+            return !handled;
         });
 
         // Kick on join if banned (uuid/ip)
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
             ServerPlayer p = handler.player;
-            var ps = MysticEssentialsCommon.get().punish;
-            MysticEssentialsCommon.get().onPlayerJoin(p);
+            var common = MysticEssentialsCommon.get();
+            var ps = common.punish;
 
+            // --- NEW: identity + playtime ---
+            common.pdata.setIdentityBasic(
+                    p.getUUID(),
+                    p.getGameProfile().getName(), // username
+                    null                          // don't touch nickname here
+            );
+            common.pdata.setLastIp(p.getUUID(), p.getIpAddress());
+            common.pdata.markLogin(p.getUUID());
+
+            // AFK + other join logic
+            common.onPlayerJoin(p);
+
+            // Ban Checks
             var ub = ps.getUuidBan(p.getUUID());
             if (ub.isPresent()) {
                 var b = ub.get();
@@ -226,6 +296,111 @@ public class MysticEssentialsFabric implements ModInitializer {
                     p.connection.disconnect(net.minecraft.network.chat.Component.literal("§cIP Banned: §f" + b.reason));
                 } else ps.unbanIp(ip);
             }
+
+            // If still here, broadcast system join message
+            CommonServer cs = wrapServer(server);
+            CommonPlayer cp = wrapPlayer(p);
+            common.systemMessages.broadcastJoin(cs, cp);
         });
+    }
+
+    private static CommonServer wrapServer(MinecraftServer server) {
+        return new CommonServer() {
+            @Override
+            public String getServerName() {
+                return server.getServerModName();
+            }
+
+            @Override
+            public Iterable<? extends CommonPlayer> getOnlinePlayers() {
+                java.util.List<CommonPlayer> list = new java.util.ArrayList<>();
+                for (ServerPlayer p : server.getPlayerList().getPlayers()) {
+                    list.add(wrapPlayer(p));
+                }
+                return list;
+            }
+
+            @Override
+            public void runCommandAsConsole(String cmd) {
+                server.getCommands().performPrefixedCommand(server.createCommandSourceStack(), cmd);
+            }
+
+            @Override
+            public void runCommandAsPlayer(CommonPlayer player, String cmd) {
+                if (player instanceof WrappedCommonPlayer w) {
+                    ServerPlayer sp = w.handle;
+                    server.getCommands().performPrefixedCommand(sp.createCommandSourceStack(), cmd);
+                }
+            }
+
+            @Override
+            public void logToConsole(String plainText) {
+                server.sendSystemMessage(net.minecraft.network.chat.Component.literal(plainText));
+            }
+        };
+    }
+
+    private static CommonPlayer wrapPlayer(ServerPlayer p) {
+        return new WrappedCommonPlayer(p);
+    }
+
+    private record WrappedCommonPlayer(ServerPlayer handle) implements CommonPlayer {
+
+        @Override
+        public java.util.UUID getUuid() {
+            return handle.getUUID();
+        }
+
+        @Override
+        public String getName() {
+            return handle.getGameProfile().getName();
+        }
+
+        @Override
+        public String getWorldId() {
+            return handle.serverLevel().dimension().location().toString();
+        }
+
+        @Override
+        public double getX() {
+            return handle.getX();
+        }
+
+        @Override
+        public double getY() {
+            return handle.getY();
+        }
+
+        @Override
+        public double getZ() {
+            return handle.getZ();
+        }
+
+        @Override
+        public boolean hasPermission(String permission) {
+            // TODO: real perms later; not needed for system messages
+            return handle.hasPermissions(2);
+        }
+
+        @Override
+        public void sendChatMessage(String miniMessageString) {
+            // 1) pb4 placeholders in system messages / broadcasts
+            String withPlaceholders = com.alphine.mysticessentials.fabric.placeholder.FabricPlaceholders
+                    .apply(handle, miniMessageString);
+
+            // 2) MiniMessage → Adventure → vanilla Component
+            Object adv = com.alphine.mysticessentials.chat.ChatText.mm(withPlaceholders);
+
+            net.minecraft.network.chat.Component vanilla =
+                    com.alphine.mysticessentials.util.AdventureComponentBridge
+                            .advToNative(adv, handle.registryAccess());
+
+            handle.displayClientMessage(vanilla, false);
+        }
+
+        @Override
+        public void playSound(String soundId, float volume, float pitch) {
+            // Not used by system messages; implement with registry lookup if needed
+        }
     }
 }
