@@ -213,6 +213,12 @@
   "kit.create.saved_no_cooldown": "&aKit &e{kit} &aguardado. &7sin reutilización",
   "kit.create.permission": "&7Permiso para usar: &e{perm}",
 
+  "playtime.self": "&bTu tiempo de juego: &f{time}",
+  "playtime.other": "&bTiempo de juego de &f{name}&b: &f{time}",
+
+  "playtime.admin.reset": "&aTiempo de juego reiniciado para &f{name}&a.",
+  "playtime.admin.set": "&aTiempo de juego establecido para &f{name}&a a &f{time} &7({seconds}s)",
+
   "home.limit_reached": "&cSe alcanzó el límite de homes (&e{limit}&c).",
   "home.set.ok": "&aHome &e{name} &aconfigurada.",
   "home.list.none": "&7No tienes homes. &8(&7límite: {limit}&8)",
@@ -254,7 +260,7 @@
   "afk.on": "&7Ahora estás &eAFK&7.",
   "afk.off": "&aYa no estás AFK.",
 
-  "reload.ok": "&aMysticEssentials recargado (&e{count}&a módulos).",
+  "reload.ok": "&aMysticEssentials recargado (&e{count}&a módulos). &7Algunas funciones como Redis requerirán reiniciar el servidor.",
 
   "modlist.header": "&6— Mods (&e{shown}&6/&e{total}&6) —",
   "modlist.more_hint": "&7…y &e{more}&7 más. Usa el comando mostrado para subir.",

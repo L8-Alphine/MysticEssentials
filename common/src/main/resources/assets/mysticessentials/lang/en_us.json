@@ -213,6 +213,12 @@
   "kit.create.saved_no_cooldown": "&aKit &e{kit} &asaved. &7no cooldown",
   "kit.create.permission": "&7Permission to use: &e{perm}",
 
+  "playtime.self": "&bYour playtime: &f{time}",
+  "playtime.other": "&bPlaytime for &f{name}&b: &f{time}",
+
+  "playtime.admin.reset": "&aReset playtime for &f{name}&a.",
+  "playtime.admin.set": "&aSet playtime for &f{name}&a to &f{time} &7({seconds}s)",
+
   "home.limit_reached": "&cHome limit reached (&e{limit}&c).",
   "home.set.ok": "&aHome &e{name} &aset.",
   "home.list.none": "&7You have no homes. &8(&7limit: {limit}&8)",
@@ -254,7 +260,7 @@
   "afk.on": "&7You are now &eAFK&7.",
   "afk.off": "&aYou are no longer AFK.",
 
-  "reload.ok": "&aMysticEssentials reloaded (&e{count}&a modules).",
+  "reload.ok": "&aMysticEssentials reloaded (&e{count}&a modules). &7Some features like redis will require a server restart.",
 
   "modlist.header": "&6— Mods (&e{shown}&6/&e{total}&6) —",
   "modlist.more_hint": "&7…and &e{more}&7 more. Use the shown command to upload.",
