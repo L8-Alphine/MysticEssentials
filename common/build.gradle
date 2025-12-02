@@ -12,4 +12,15 @@ dependencies {
 
     // Luckperms API is used for cross-platform config handling.
     modImplementation "net.luckperms:api:$rootProject.luckperms_api_version"
+
+    compileOnly('net.kyori:adventure-platform-mod-shared:6.7.0')
+}
+
+tasks.processResources {
+    // Expand placeholders in any file containing tokens
+    filesMatching("mysticessentials-common.properties") {
+        expand([
+                VERSION: mod_version
+        ])
+    }
 }
