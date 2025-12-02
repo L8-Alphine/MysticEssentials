@@ -57,6 +57,48 @@ public final class PermNodes {
     public static final String ANVIL_USE         = "messentials.anvil.use";
     public static final String ENCHANT_USE       = "messentials.enchant.use";
     public static final String NEAR_USE          = "messentials.near.use";
+    public static final String PLAYTIME = "messentials.playtime";
+    public static final String PLAYTIME_OTHERS = "messentials.playtime.others";
+    public static final String PLAYTIME_ADMIN = "messentials.playtime.admin";
+
+    // Enderchest Access
+    public static final String ENDERCHEST_USE        = "messentials.enderchest";
+    public static final String ENDERCHEST_OTHERS     = "messentials.enderchest.others";
+
+    // Vault System
+    public static final String VAULT_USE = "messentials.vault";
+    public static final String VAULT_OTHERS = "messentials.vault.others";
+    public static final String VAULT_AMOUNT_BASE = "messentials.vault.amount"; // append with .<number>
+    public static String vaultAmountNode(int amount) { return VAULT_AMOUNT_BASE + "." + amount; }
+    public static final String VAULT_ROW_BASE = "messentials.vault.row"; // append with .<rowcode> Only 1 - 6
+    public static String vaultSizeNode(String rowCode) { return VAULT_ROW_BASE + "." + rowCode.toLowerCase(Locale.ROOT); }
+    public static final String VAULT_ITEM_ALLOW_BASE = "messentials.vault.item"; // append with .<itemid>
+    public static String vaultItemAllowNode(String itemId) { return VAULT_ITEM_ALLOW_BASE + "." + itemId.toLowerCase(Locale.ROOT).replace(":", "_"); }
+    public static final String VAULT_RENAME = "messentials.vault.rename";
+    public static final String VAULT_RENAME_COLOR_BASE = "messentials.vault.rename.color";
+    public static String vaultRenameColorNode(char code) { return VAULT_RENAME_COLOR_BASE + "." + Character.toLowerCase(code); }
+    public static final String VAULT_RENAME_FORMAT_BASE = "messentials.vault.rename.format";
+    public static String vaultRenameFormatNode(char code) { return VAULT_RENAME_FORMAT_BASE + "." + Character.toLowerCase(code); }
+    public static final String VAULT_RESET = "messentials.vault.reset"; // allows resetting vaults - includes clearing all items and renaming back to default
+    public static final String VAULT_RESET_EXEMPT = "messentials.vault.reset.exempt"; // exempts you from having your vault reset by other admins
+    public static final String VAULT_RESET_ALL = "messentials.vault.reset.all"; // allows resetting all vaults on the server
+
+    // Chat System
+    public static final String MSG_SEND = "messentials.msg.send";
+    public static final String MSG_RECEIVE = "messentials.msg.receive";
+    public static final String MSG_SPY = "messentials.msg.spy";
+    public static final String CHAT_COLOR_BASE = "messentials.chat.color"; // append with .<colorcode>
+    public static String chatColorNode(char code) { return CHAT_COLOR_BASE + "." + Character.toLowerCase(code); }
+    public static final String CHAT_FORMAT_BASE = "messentials.chat.format"; // append with .<formatcode>
+    public static String chatFormatNode(char code) { return CHAT_FORMAT_BASE + "." + Character.toLowerCase(code); }
+    public static final String CHAT_CHANNEL_BASE = "messentials.chat.channel"; // append with .<channelid>
+    public static String chatChannelNode(String channelId) { return CHAT_CHANNEL_BASE + "." + channelId.toLowerCase(Locale.ROOT); }
+    public static final String CHAT_COLOR_ALL  = "messentials.chat.color.*";
+    public static final String CHAT_FORMAT_ALL = "messentials.chat.format.*";
+    public static final String CHAT_CHANNEL_ALL = "messentials.chat.channel.*";
+    public static final String CHAT_BROADCAST = "messentials.chat.broadcast"; // allows broadcasting messages to all players
+    public static final String CHAT_SHOUT = "messentials.chat.shout"; // allows shouting messages to nearby players
+    public static final String CHAT_CLEAR = "messentials.chat.clear"; // allows clearing the chat for all players
 
     // Repair System
     public static final String REPAIR_USE        = "messentials.repair";
