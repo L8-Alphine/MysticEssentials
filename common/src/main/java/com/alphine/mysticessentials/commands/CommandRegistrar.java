@@ -9,6 +9,7 @@ import com.alphine.mysticessentials.commands.admin.RecipeCmd;
 import com.alphine.mysticessentials.commands.admin.RenameCmds;
 import com.alphine.mysticessentials.commands.afk.AfkCmd;
 import com.alphine.mysticessentials.commands.afk.AfkPoolSetupCmd;
+import com.alphine.mysticessentials.commands.chat.*;
 import com.alphine.mysticessentials.commands.homes.DelHomeCmd;
 import com.alphine.mysticessentials.commands.homes.HomeCmd;
 import com.alphine.mysticessentials.commands.homes.HomesCmd;
@@ -64,6 +65,12 @@ public final class CommandRegistrar {
 
         new RecipeCmd().register(d);
         idx("recipe", "recipes", "clearrecipes");
+
+        new EcShareCmd().register(d);
+        idx("ecshare");
+
+        new InvShareCmd().register(d);
+        idx("invshare");
 
         if (common.getModInfoService() != null) {
             new ModlistCmd(common.getModInfoService()).register(d);
@@ -157,6 +164,40 @@ public final class CommandRegistrar {
 
             new EnchantCmd().register(d);
             idx("enchant");
+
+            new PlaytimeCmds().register(d);
+            idx("playtime", "topplaytime");
+
+            new EnderChestCmd().register(d);
+            idx("enderchest", "ec", "echest");
+        }
+
+        // --------- Chat System ---------
+        if (on(() -> common.cfg.features.enableChatSystem)) {
+            new IgnoreCmd().register(d);
+            idx("ignore", "unignore", "ignores", "ignoredby");
+
+            new MsgCmd().register(d);
+            idx("msg", "message", "tell", "whisper", "w", "pm");
+
+            new ReplyCmd().register(d);
+            idx("reply", "r");
+
+            new SocialSpyCmd().register(d);
+            idx("socialspy", "ss");
+
+            new ChannelCmd().register(d);
+            idx("channel", "ch", "channels");
+
+            new ClearChatCmd().register(d);
+            idx("clearchat", "cc");
+
+            new BroadcastCmd().register(d);
+            idx("broadcast", "bc", "bcast");
+
+            new ShoutCmd().register(d);
+            idx("shout", "sh", "yell");
+
         }
 
         // --------- MODERATION ---------
