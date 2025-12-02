@@ -26,9 +26,12 @@
     "minecraft": "~1.21.1",
     "java": ">=21",
     "architectury": ">=13.0.8",
+    "adventure_platform_fabric": ">=5.14.0",
+    "luckperms": "5.4.140",
+    "placeholder-api": "*",
     "fabric-api": "*"
   },
   "suggests": {
-    "luckperms": "*"
+
   }
 }
