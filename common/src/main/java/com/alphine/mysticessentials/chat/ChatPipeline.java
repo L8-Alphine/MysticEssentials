@@ -8,16 +8,16 @@ import com.alphine.mysticessentials.config.MEConfig;
 public class ChatPipeline {
 
     private final ChatReplacementsService replacements = new ChatReplacementsService();
-    private final ChatTriggersService     triggers     = new ChatTriggersService();
-    private final ChatTagsService         tags         = new ChatTagsService();
-    private final ChatMentionService      mentions     = new ChatMentionService();
-    private final ChatColorService        colors       = new ChatColorService();
-    private final ChatChannelService      channels     = new ChatChannelService();
+    private final ChatTriggersService triggers = new ChatTriggersService();
+    private final ChatTagsService tags = new ChatTagsService();
+    private final ChatMentionService mentions = new ChatMentionService();
+    private final ChatColorService colors = new ChatColorService();
+    private final ChatChannelService channels = new ChatChannelService();
 
-    private final ChatDelivery            delivery;
-    private final ChatFormatter           formatter;
+    private final ChatDelivery delivery;
+    private final ChatFormatter formatter;
 
-    private final ChatHistoryService      history      = new ChatHistoryService();
+    private final ChatHistoryService history = new ChatHistoryService();
 
     public ChatPipeline(RedisClientAdapter redisAdapter) {
         this.delivery = createDelivery(redisAdapter);
