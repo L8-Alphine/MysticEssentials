@@ -6,6 +6,7 @@
   "client": [
   ],
   "mixins": [
+    "PlayerListSystemMessageMixin"
   ],
   "injectors": {
     "defaultRequire": 1
