@@ -19,11 +19,9 @@ public class ChatTagsService {
         String msg = ctx.processedMessage;
         if (cfg == null || !cfg.enabled) return;
 
-        // Fully handle <item> tag
-        applyItemTag(ctx, cfg.item);
 
-
-        // Handle <inv> and <ec> tags
+        // Handle <item> <inv> and <ec> tags
+        msg = applyItemTag(ctx, msg, cfg.item);
         msg = applyInventoryShareTag(ctx, msg, cfg.inventory);
         msg = applyEnderChestShareTag(ctx, msg, cfg.enderchest);
 
@@ -34,58 +32,51 @@ public class ChatTagsService {
     // <item> tag: inline label + hover full tooltip
     // ------------------------------------------------------------------------
 
-    private void applyItemTag(ChatContext ctx, Tag tag) {
-        if (tag == null || !tag.enabled) return;
-        if (ctx.sender == null) return;
-
-        String text = ctx.processedMessage;
-        if (text == null || text.isEmpty()) return;
+    private String applyItemTag(ChatContext ctx, String msg, Tag tag) {
+        if (tag == null || !tag.enabled) return msg;
+        if (ctx.sender == null) return msg;
+        if (msg == null || msg.isEmpty()) return msg;
 
         boolean foundAlias = false;
         for (String alias : tag.aliases) {
-            if (text.contains(alias)) {
+            if (alias != null && !alias.isBlank() && msg.contains(alias)) {
                 foundAlias = true;
                 break;
             }
         }
 
         if (!foundAlias) {
-            // No alias present, nothing to do
-            return;
+            return msg;
         }
 
         CommonPlayer player = ctx.sender;
-
-        // If the platform hasn't wired item support yet, just mark presence and bail.
         if (!player.hasMainHandItem()) {
-            // Fallback: show configured "empty" text if present
             String replacement = tag.hoverEmpty != null && !tag.hoverEmpty.isBlank()
                     ? tag.hoverEmpty
                     : "<gray>(no item)</gray>";
 
             for (String alias : tag.aliases) {
-                text = text.replace(alias, replacement);
+                if (alias == null || alias.isBlank()) continue;
+                msg = msg.replace(alias, replacement);
             }
 
-            ctx.processedMessage = text;
             ctx.metadata.put("has_item_tag", Boolean.TRUE);
-            return;
+            return msg;
         }
 
         CommonPlayer.ItemTagInfo info = player.getMainHandItemTagInfo();
         if (info == null || info.label == null || info.label.isBlank()) {
-            // If platform didn't provide details, behave like "no item" fallback
             String replacement = tag.hoverEmpty != null && !tag.hoverEmpty.isBlank()
                     ? tag.hoverEmpty
                     : "<gray>(no item)</gray>";
 
             for (String alias : tag.aliases) {
-                text = text.replace(alias, replacement);
+                if (alias == null || alias.isBlank()) continue;
+                msg = msg.replace(alias, replacement);
             }
 
-            ctx.processedMessage = text;
             ctx.metadata.put("has_item_tag", Boolean.TRUE);
-            return;
+            return msg;
         }
 
         String label = escapeMiniMessageText(info.label);
@@ -93,21 +84,21 @@ public class ChatTagsService {
 
         String replacement;
         if (showItemNbt != null && !showItemNbt.isBlank()) {
-            // MiniMessage "show_item" hover:
-            //   <hover:show_item:{id:"minecraft:stone"}>Label</hover>
+            // MiniMessage show_item hover:
+            // <hover:show_item:{id:"minecraft:stone",Count:1b,...}>Label</hover>
             String nbtPart = showItemNbt.trim();
             replacement = "<hover:show_item:" + nbtPart + ">" + label + "</hover>";
         } else {
-            // No NBT provided, just show label without hover
             replacement = label;
         }
 
         for (String alias : tag.aliases) {
-            text = text.replace(alias, replacement);
+            if (alias == null || alias.isBlank()) continue;
+            msg = msg.replace(alias, replacement);
         }
 
-        ctx.processedMessage = text;
         ctx.metadata.put("has_item_tag", Boolean.TRUE);
+        return msg;
     }
 
     /**
