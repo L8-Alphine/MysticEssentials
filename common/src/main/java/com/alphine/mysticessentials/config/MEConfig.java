@@ -383,6 +383,7 @@ public class MEConfig {
         public String motd = "chat/motd.json";
         public String broadcast = "chat/broadcast.json";
         public String shout = "chat/shout.json";
+        public String announcements = "chat/announcements.json";
     }
 
     /**
