@@ -17,6 +17,7 @@ public final class ChatConfigManager {
     private static final Gson GSON = new GsonBuilder()
             .setPrettyPrinting()
             .serializeNulls()
+            .disableHtmlEscaping()
             .create();
 
     public static HistoryConfig HISTORY;
@@ -29,6 +30,7 @@ public final class ChatConfigManager {
     public static PrivateMessagesConfig PRIVATE;
     public static BroadcastConfig BROADCAST;
     public static ShoutConfig SHOUT;
+    public static AnnouncementsConfig ANNOUNCEMENTS;
 
     private ChatConfigManager() {
     }
@@ -48,6 +50,7 @@ public final class ChatConfigManager {
         MOTD = loadOrCreate(configDir, files.motd, MotdConfig.class, MotdConfig::new);
         BROADCAST = loadOrCreate(configDir, files.broadcast, BroadcastConfig.class, BroadcastConfig::new);
         SHOUT = loadOrCreate(configDir, files.shout, ShoutConfig.class, ShoutConfig::new);
+        ANNOUNCEMENTS = loadOrCreate(configDir, files.announcements, AnnouncementsConfig.class, AnnouncementsConfig::new);
     }
 
     private static <T> T loadOrCreate(Path configDir,
@@ -614,6 +617,124 @@ public final class ChatConfigManager {
          */
         public String nobodyHeard =
                 "<gray>No one is close enough to hear your shout (radius <radius> blocks).</gray>";
+    }
+
+    // ------------------------------------------------------------------------
+    // AUTO ANNOUNCEMENTS CONFIG
+    // ------------------------------------------------------------------------
+
+    /**
+     * Periodic auto-broadcast announcements.
+     *
+     * Designed to be used by a scheduler in your plugin:
+     *  - Check ANNOUNCEMENTS.enabled
+     *  - Every X seconds, pick the next message based on randomOrder / priority.
+     *
+     * All formatting is MiniMessage, so full color/gradient support works.
+     */
+    public static class AnnouncementsConfig {
+
+        /**
+         * Master toggle for auto announcements.
+         */
+        public boolean enabled = true;
+
+        /**
+         * If true, each broadcast chooses a random group.
+         * If false, groups are walked in the given "priority" order.
+         */
+        public boolean randomOrder = false;
+
+        /**
+         * Default interval between announcements in seconds.
+         * Individual groups can override this with their own intervalSeconds.
+         */
+        public int intervalSeconds = 300;
+
+        /**
+         * Priority order for groups when randomOrder == false.
+         * Each entry must be a group id present in "groups".
+         */
+        public java.util.List<String> priority = new java.util.ArrayList<>();
+
+        /**
+         * Groups of announcements, keyed by id.
+         */
+        public java.util.Map<String, Group> groups = new java.util.LinkedHashMap<>();
+
+        public AnnouncementsConfig() {
+            // Provide a simple default group so the file isn't empty on first run.
+            Group g = new Group();
+            g.id = "global";
+            g.displayName = "Global Announcements";
+            g.randomOrder = true;
+            g.center = false; // default: no centering
+            g.intervalSeconds = 0; // use global interval
+            g.format =
+                    "<gray>[<gold>Announcement</gold>]</gray> <yellow><message></yellow>";
+
+            g.messages.add("<gray>Welcome to <gold>MysticHorizonsMC</gold>!</gray>");
+            g.messages.add("<gray>Join our Discord: <aqua>discord.gg/yourcode</aqua></gray>");
+            g.messages.add("<gray>Use <green>/sethome</green> and <green>/home</green> to save your favorite spots.</gray>");
+
+            groups.put(g.id, g);
+            priority.add(g.id);
+        }
+
+        public static class Group {
+
+            /**
+             * Unique id for this group ("global", "survival-tips", etc.)
+             */
+            public String id = "default";
+
+            /**
+             * Friendly display name (optional, mostly for future GUIs or debug).
+             */
+            public String displayName = "Default Group";
+
+            /**
+             * Toggle this group on/off.
+             */
+            public boolean enabled = true;
+
+            /**
+             * If true, messages from this group are picked randomly.
+             * If false, messages are cycled in their list order.
+             */
+            public boolean randomOrder = true;
+
+            /**
+             * Per-group interval override (seconds).
+             * If <= 0, the global intervalSeconds is used.
+             */
+            public int intervalSeconds = 0;
+
+            /**
+             * If true, each logical line of the message will be auto-centered
+             * (using a simple padding-based centering in chat).
+             */
+            public boolean center = false;
+
+            /**
+             * MiniMessage format for this group's announcements.
+             * <message> is replaced with the actual message text.
+             */
+            public String format =
+                    "<gray>[<gold>Announcement</gold>]</gray> <yellow><message></yellow>";
+
+            /**
+             * MiniMessage messages themselves.
+             *
+             * Line breaks:
+             *  - You can use actual newlines inside the string (e.g. "Line1\nLine2"),
+             *    or the token <br> which will be converted to a newline.
+             *
+             * Centering:
+             *  - If center == true, each line is centered separately.
+             */
+            public java.util.List<String> messages = new java.util.ArrayList<>();
+        }
     }
 
 }
