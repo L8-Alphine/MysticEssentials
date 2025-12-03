@@ -1,8 +1,6 @@
 package com.alphine.mysticessentials.commands;
 
 import com.alphine.mysticessentials.MysticEssentialsCommon;
-
-// HOMES
 import com.alphine.mysticessentials.commands.admin.KillCmd;
 import com.alphine.mysticessentials.commands.admin.ModlistCmd;
 import com.alphine.mysticessentials.commands.admin.RecipeCmd;
@@ -14,30 +12,31 @@ import com.alphine.mysticessentials.commands.homes.DelHomeCmd;
 import com.alphine.mysticessentials.commands.homes.HomeCmd;
 import com.alphine.mysticessentials.commands.homes.HomesCmd;
 import com.alphine.mysticessentials.commands.homes.SetHomeCmd;
-
-// TP / WARP / SPAWN
 import com.alphine.mysticessentials.commands.kits.CreateKitCmd;
 import com.alphine.mysticessentials.commands.kits.DelKitCmd;
 import com.alphine.mysticessentials.commands.kits.KitCmd;
 import com.alphine.mysticessentials.commands.misc.*;
 import com.alphine.mysticessentials.commands.mod.*;
-import com.alphine.mysticessentials.commands.tp.BackCmds;
-import com.alphine.mysticessentials.commands.tp.SpawnCmds;
-import com.alphine.mysticessentials.commands.tp.TpDirectCmds;
-import com.alphine.mysticessentials.commands.tp.TpaCmds;
-import com.alphine.mysticessentials.commands.tp.WarpCmd;
-
+import com.alphine.mysticessentials.commands.tp.*;
 import com.mojang.brigadier.CommandDispatcher;
 import net.minecraft.commands.CommandSourceStack;
 
 public final class CommandRegistrar {
-    private CommandRegistrar() {}
-
-    private static boolean on(java.util.function.Supplier<Boolean> s) {
-        try { Boolean b = s.get(); return b == null || b; } catch (Throwable t) { return true; }
+    private CommandRegistrar() {
     }
 
-    /** Convenience: index multiple roots to this mod id. */
+    private static boolean on(java.util.function.Supplier<Boolean> s) {
+        try {
+            Boolean b = s.get();
+            return b == null || b;
+        } catch (Throwable t) {
+            return true;
+        }
+    }
+
+    /**
+     * Convenience: index multiple roots to this mod id.
+     */
     private static void idx(String... roots) {
         for (String r : roots) CommandIndex.indexRoot(r, MysticEssentialsCommon.MOD_ID);
     }
@@ -112,11 +111,11 @@ public final class CommandRegistrar {
             // Likely direct-TP roots
             idx("tp", "tppos", "tphere", "tpo");
 
-            new TpaCmds(common.tpas, common.warmups, common.pdata).register(d);
+            new TpaCmds(common.tpas, common.warmups, common.pdata, common.cooldowns).register(d);
             // Common /tpa family
             idx("tpa", "tpahere", "tpaccept", "tpdeny", "tpcancel");
 
-            new BackCmds(common.pdata).register(d);
+            new BackCmds(common.pdata, common.cooldowns, common.warmups).register(d);
             idx("back");
         }
 
