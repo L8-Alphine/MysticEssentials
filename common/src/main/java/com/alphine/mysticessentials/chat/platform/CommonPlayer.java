@@ -41,6 +41,10 @@ public interface CommonPlayer {
         return null;
     }
 
+    default String applySenderPlaceholders(String input) {
+        return input;
+    }
+
     /**
      * Simple record to carry label + SNBT for show_item hover.
      */
