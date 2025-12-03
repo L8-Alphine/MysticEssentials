@@ -2,9 +2,9 @@ package com.alphine.mysticessentials.chat.placeholder;
 
 import net.luckperms.api.LuckPerms;
 import net.luckperms.api.LuckPermsProvider;
+import net.luckperms.api.cacheddata.CachedMetaData;
 import net.luckperms.api.model.group.Group;
 import net.luckperms.api.model.user.User;
-import net.luckperms.api.cacheddata.CachedMetaData;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.util.regex.Matcher;
@@ -13,6 +13,8 @@ import java.util.regex.Pattern;
 public final class LuckPermsPlaceholders {
 
     private static LuckPerms LP;
+    private static boolean triedInit = false;
+    private static boolean loggedMissing = false;
 
     // %luckperms_meta_<key>% and %lp_meta_<key>%
     private static final Pattern META_PATTERN =
@@ -21,14 +23,19 @@ public final class LuckPermsPlaceholders {
     private LuckPermsPlaceholders() {}
 
     private static LuckPerms luckPerms() {
-        if (LP != null) return LP;
+        if (triedInit) return LP;
+        triedInit = true;
         try {
             LP = LuckPermsProvider.get();
-            return LP;
+            System.out.println("[MysticEssentials] LuckPerms API found, enabling LP placeholders.");
         } catch (IllegalStateException e) {
-            // LuckPerms not loaded on this server
-            return null;
+            LP = null;
+            if (!loggedMissing) {
+                System.out.println("[MysticEssentials] LuckPerms not found – LP placeholders will be left as-is.");
+                loggedMissing = true;
+            }
         }
+        return LP;
     }
 
     public static String apply(ServerPlayer player, String input) {
@@ -38,7 +45,7 @@ public final class LuckPermsPlaceholders {
 
         LuckPerms lp = luckPerms();
         if (lp == null) {
-            // No LP installed → leave placeholders as-is
+            // No LP installed → leave placeholders as-is (but at least don’t crash)
             return input;
         }
 
@@ -46,6 +53,11 @@ public final class LuckPermsPlaceholders {
         try {
             user = lp.getPlayerAdapter(ServerPlayer.class).getUser(player);
         } catch (Exception ex) {
+            if (!loggedMissing) {
+                System.out.println("[MysticEssentials] Failed to fetch LuckPerms user for "
+                        + player.getGameProfile().getName() + ": " + ex.getMessage());
+                loggedMissing = true;
+            }
             return input;
         }
 
@@ -56,17 +68,17 @@ public final class LuckPermsPlaceholders {
         String primaryGroup = user.getPrimaryGroup();
 
         Group group = lp.getGroupManager().getGroup(primaryGroup);
-        String groupDisplay = group != null && group.getDisplayName() != null
+        String groupDisplay = (group != null && group.getDisplayName() != null)
                 ? group.getDisplayName()
                 : primaryGroup;
 
         String result = input;
 
-        // --- MAIN placeholders you’re using ---
+        // --- MAIN placeholders ---
         result = result.replace("%luckperms_prefix%", safe(prefix));
         result = result.replace("%luckperms_suffix%", safe(suffix));
 
-        // Synonyms if you ever want short forms
+        // Short aliases
         result = result.replace("%lp_prefix%", safe(prefix));
         result = result.replace("%lp_suffix%", safe(suffix));
 
