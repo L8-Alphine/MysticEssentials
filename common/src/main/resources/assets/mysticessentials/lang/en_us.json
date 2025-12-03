@@ -169,13 +169,13 @@
   "invsee.open.view": "&aOpening &e{player}&a's inventory &7(read-only).",
   "invsee.open.edit": "&aOpening &e{player}&a's inventory &7(editable).",
 
-  "help.header": "— Help (&e{total}&r cmds{filter,select, ''#| other#; filter=\"{filter}\"}{mod,select, ''#| other#, mod={mod}}) — Page &e{page}&r/&e{pages}",
-  "help.hover.copy_run": "Click to copy/run\\nMod: {mod}",
-  "help.pager.prev": "← Prev",
-  "help.pager.next": "Next →",
-  "help.pager.prev.disabled": "← Prev",
-  "help.pager.next.disabled": "Next →",
-  "help.pager.hover": "Go to page {page}",
+  "help.header": "&7- Help (&e{total}&7 cmds) - Page &b{page}&7/&b{pages}",
+  "help.hover.copy_run": "&7Click to suggest this command (&8mod: &f{mod}&7)",
+  "help.pager.prev": "&8[ Prev ]",
+  "help.pager.prev.disabled": "&8[ Prev ]",
+  "help.pager.next": "&b[ Next » ]",
+  "help.pager.next.disabled": "&8[ Next » ]",
+  "help.pager.hover": "&7Go to page &e{page}",
 
   "heal.ok": "&aYou have been healed.",
 
