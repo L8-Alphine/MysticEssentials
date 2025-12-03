@@ -1,11 +1,9 @@
 package com.alphine.mysticessentials;
 
-import com.alphine.mysticessentials.chat.ChatStateService;
-import com.alphine.mysticessentials.chat.MotdService;
-import com.alphine.mysticessentials.chat.PrivateMessageService;
-import com.alphine.mysticessentials.chat.SystemMessageService;
+import com.alphine.mysticessentials.chat.*;
 import com.alphine.mysticessentials.chat.platform.CommonPlayer;
 import com.alphine.mysticessentials.commands.CommandRegistrar;
+import com.alphine.mysticessentials.config.ChatConfigManager;
 import com.alphine.mysticessentials.config.MEConfig;
 import com.alphine.mysticessentials.perm.Perms;
 import com.alphine.mysticessentials.platform.ModInfoService;
@@ -14,10 +12,16 @@ import com.alphine.mysticessentials.teleport.*;
 import com.alphine.mysticessentials.util.AfkService;
 import com.alphine.mysticessentials.util.GodService;
 import com.alphine.mysticessentials.util.MessagesUtil;
+import com.alphine.mysticessentials.util.Teleports;
 import com.mojang.brigadier.CommandDispatcher;
 import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.Level;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -57,6 +61,8 @@ public final class MysticEssentialsCommon {
 
     // per-player chat state (active channel, etc.)
     public final ChatStateService chatState = new ChatStateService();
+
+    private BroadcastScheduler broadcastScheduler;
 
     // Mod info service
     public void setModInfoService(ModInfoService svc) { this.modInfo = svc; }
@@ -144,6 +150,11 @@ public final class MysticEssentialsCommon {
                 com.alphine.mysticessentials.config.ChatConfigManager
                         .loadAll(this.configDir, cfg.chat.files);
                 n++;
+
+                // Reset announcement timer so new config takes effect cleanly
+                if (broadcastScheduler != null) {
+                    broadcastScheduler.resetTimer();
+                }
             }
         } catch (Throwable t) {
             System.err.println("[MysticEssentials] Failed to reload chat configs: " + t.getMessage());
@@ -178,6 +189,9 @@ public final class MysticEssentialsCommon {
     /** Call once per second from Fabric/NeoForge adapters. */
     public void serverTick1s(MinecraftServer server) {
         if (afk != null) afk.tick(server);
+        if (broadcastScheduler != null && cfg != null && cfg.features != null && cfg.features.enableChatSystem) {
+            broadcastScheduler.tick();
+        }
     }
 
     private boolean featuresEnabled() {
@@ -279,5 +293,51 @@ public final class MysticEssentialsCommon {
 
     public static String getVersion() {
         return version;
+    }
+
+    /**
+     * Initialize auto-broadcasts once the chat module + platform are ready.
+     * The broadcaster should send a MiniMessage string to all online players.
+     */
+    public void initBroadcasts(ChatBroadcaster broadcaster) {
+        this.broadcastScheduler = new BroadcastScheduler(
+                () -> ChatConfigManager.ANNOUNCEMENTS,
+                broadcaster
+        );
+    }
+
+    /**
+     * Teleport a player to the global spawn, if one is set.
+     *
+     * @return true if a teleport actually happened, false if no spawn is configured.
+     */
+    public boolean teleportToSpawnIfSet(ServerPlayer player) {
+        if (spawn == null) return false;
+
+        SpawnStore.Point pt = spawn.get();
+        if (pt == null || pt.dim == null || pt.dim.isBlank()) {
+            return false;
+        }
+
+        var server = player.getServer();
+        if (server == null) {
+            return false;
+        }
+
+        ResourceLocation id = ResourceLocation.tryParse(pt.dim);
+        if (id == null) return false;
+
+        ResourceKey<Level> key = ResourceKey.create(Registries.DIMENSION, id);
+        ServerLevel level = server.getLevel(key);
+        if (level == null) return false;
+
+        Teleports.pushBackAndTeleport(
+                player,
+                level,
+                pt.x, pt.y, pt.z,
+                pt.yaw, pt.pitch,
+                pdata
+        );
+        return true;
     }
 }
