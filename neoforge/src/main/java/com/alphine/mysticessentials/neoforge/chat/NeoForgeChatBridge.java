@@ -1,13 +1,13 @@
 package com.alphine.mysticessentials.neoforge.chat;
 
 import com.alphine.mysticessentials.chat.ChatModule;
+import com.alphine.mysticessentials.chat.placeholder.LuckPermsPlaceholders;
 import com.alphine.mysticessentials.chat.platform.CommonPlayer;
 import com.alphine.mysticessentials.chat.platform.CommonServer;
 import com.alphine.mysticessentials.neoforge.placeholder.NeoForgePlaceholders;
 import com.alphine.mysticessentials.perm.Perms;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundSource;
@@ -40,8 +40,6 @@ public final class NeoForgeChatBridge {
         if (raw.startsWith("/")) {
             return false;
         }
-
-        raw = NeoForgePlaceholders.apply(sender, raw);
 
         CommonServer server = new NeoForgeCommonServer(sender.getServer());
         CommonPlayer commonSender = new NeoForgeCommonPlayer(sender);
@@ -127,9 +125,9 @@ public final class NeoForgeChatBridge {
 
         @Override
         public void sendChatMessage(String miniMessageString) {
-            // 1) Apply placeholders with the RECEIVER as context
+            // 1) Apply placeholders with the RECEIVER as context (NO LuckPerms)
             String withPlaceholders =
-                    NeoForgePlaceholders.apply(handle, miniMessageString);
+                    NeoForgePlaceholders.applyViewer(handle, miniMessageString);
 
             // 2) MiniMessage → Adventure → vanilla
             Object adv = com.alphine.mysticessentials.chat.ChatText.mm(withPlaceholders);
@@ -140,6 +138,7 @@ public final class NeoForgeChatBridge {
 
             handle.displayClientMessage(vanilla, false);
         }
+
 
         @Override
         public void playSound(String soundId, float volume, float pitch) {
@@ -177,6 +176,11 @@ public final class NeoForgeChatBridge {
             String snbt = tag.toString(); // SNBT format for MiniMessage
 
             return new ItemTagInfo(label, snbt);
+        }
+
+        @Override
+        public String applySenderPlaceholders(String input) {
+            return LuckPermsPlaceholders.apply(handle, input);
         }
 
     }

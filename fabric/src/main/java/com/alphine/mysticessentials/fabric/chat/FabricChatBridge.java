@@ -1,13 +1,12 @@
 package com.alphine.mysticessentials.fabric.chat;
 
 import com.alphine.mysticessentials.chat.ChatModule;
+import com.alphine.mysticessentials.chat.placeholder.LuckPermsPlaceholders;
 import com.alphine.mysticessentials.chat.platform.CommonPlayer;
 import com.alphine.mysticessentials.chat.platform.CommonServer;
-import com.alphine.mysticessentials.fabric.placeholder.FabricPlaceholders;
 import com.alphine.mysticessentials.perm.Perms;
 import com.mojang.authlib.GameProfile;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.PlayerChatMessage;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
@@ -42,7 +41,6 @@ public final class FabricChatBridge {
         if (raw.startsWith("/")) {
             return false;
         }
-        raw = FabricPlaceholders.apply(sender, raw);
 
         CommonServer server = new FabricCommonServer(sender.getServer());
         CommonPlayer commonSender = new FabricCommonPlayer(sender);
@@ -130,9 +128,10 @@ public final class FabricChatBridge {
 
         @Override
         public void sendChatMessage(String miniMessageString) {
-            // 1) pb4 placeholders, using the RECEIVER as context
-            String withPlaceholders = com.alphine.mysticessentials.fabric.placeholder.FabricPlaceholders
-                    .apply(handle, miniMessageString);
+            // 1) pb4 placeholders, using the RECEIVER as context (NO LuckPerms here)
+            String withPlaceholders =
+                    com.alphine.mysticessentials.fabric.placeholder.FabricPlaceholders
+                            .applyViewer(handle, miniMessageString);
 
             // 2) MiniMessage → Adventure → vanilla Component
             Object adv = com.alphine.mysticessentials.chat.ChatText.mm(withPlaceholders);
@@ -143,6 +142,7 @@ public final class FabricChatBridge {
 
             handle.displayClientMessage(vanilla, false);
         }
+
 
         @Override
         public void playSound(String soundId, float volume, float pitch) {
@@ -178,6 +178,12 @@ public final class FabricChatBridge {
             String snbt = tag.toString();
 
             return new CommonPlayer.ItemTagInfo(label, snbt);
+        }
+
+        @Override
+        public String applySenderPlaceholders(String input) {
+            // Only LuckPerms – viewer pb4 is handled later when sending
+            return LuckPermsPlaceholders.apply(handle, input);
         }
 
     }
