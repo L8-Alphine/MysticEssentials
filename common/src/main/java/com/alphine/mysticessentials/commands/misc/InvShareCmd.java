@@ -14,11 +14,14 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Container;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.SimpleMenuProvider;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.ChestMenu;
 import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.ItemStack;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Map;
+import java.util.Objects;
 
 public class InvShareCmd {
 
@@ -26,13 +29,15 @@ public class InvShareCmd {
         d.register(Commands.literal("invshare")
                 // no permission check – anyone can use; we only show read-only snapshot
                 .then(Commands.argument("player", StringArgumentType.word())
-                        .executes(ctx -> openSnapshot(ctx.getSource(),
-                                StringArgumentType.getString(ctx, "player")))));
+                        .executes(ctx -> openSnapshot(
+                                ctx.getSource(),
+                                StringArgumentType.getString(ctx, "player")
+                        ))));
     }
 
     private int openSnapshot(CommandSourceStack src, String name) throws CommandSyntaxException {
         ServerPlayer viewer = src.getPlayerOrException();
-        ServerPlayer target = viewer.getServer().getPlayerList().getPlayerByName(name);
+        ServerPlayer target = Objects.requireNonNull(viewer.getServer()).getPlayerList().getPlayerByName(name);
 
         if (target == null) {
             viewer.displayClientMessage(
@@ -47,7 +52,7 @@ public class InvShareCmd {
         Map<String, Object> payload = InventoryIO.captureToPayload(target);
         ItemStack[] stacks = InventoryIO.stacksFromPayload(provider, payload);
 
-        // Read-only snapshot container
+        // Read-only snapshot container (editable = false, no onSave)
         SnapshotInventoryContainer snap =
                 new SnapshotInventoryContainer(stacks, false, null);
 
@@ -62,7 +67,13 @@ public class InvShareCmd {
                         playerInv,
                         ensureRows(snap, 6),
                         6
-                ),
+                ) {
+                    // IMPORTANT: prevent shift-click moving items into the snapshot
+                    @Override
+                    public @NotNull ItemStack quickMoveStack(Player player, int index) {
+                        return ItemStack.EMPTY;
+                    }
+                },
                 title
         ));
 
