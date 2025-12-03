@@ -34,22 +34,36 @@ public final class PermNodes {
     public static final String TPAUTO_USE   = "messentials.tpauto.use";
     public static final String TPP_TOGGLE   = "messentials.tptoggle.use";  // privacy toggle
     public static final String BACK_USE     = "messentials.back.use";
-    public static final String DEATHBACK_USE= "messentials.deathback.use";
+    public static final String DEATHBACK_USE = "messentials.deathback.use";
+    public static final String TELEPORT_COOLDOWN = "messentials.teleport.cooldown";
+    public static final String TELEPORT_COOLDOWN_BYPASS = "messentials.teleport.cooldown.bypass";
+    public static final String TELEPORT_WARMUP = "messentials.teleport.warmup";
+    public static final String TELEPORT_WARMUP_BYPASS = "messentials.teleport.warmup.bypass";
 
     // ========= Misc =========
-    public static final String CREATIVE_USE     = "messentials.creative.use";
-    public static final String HEAL_USE          = "messentials.heal.use";
-    public static final String FEED_USE          = "messentials.feed.use";
+    public static final String GAMEMODE_USE    = "messentials.gamemode";
+    public static final String GAMEMODE_CREATIVE = "messentials.gamemode.creative";
+    public static final String GAMEMODE_ADVENTURE = "messentials.gamemode.adventure";
+    public static final String GAMEMODE_SURVIVAL = "messentials.gamemode.survival";
+    public static final String GAMEMODE_SPECTATOR = "messentials.gamemode.spectator";
+    public static final String GAMEMODE_OTHERS = "messentials.gamemode.others";
+    public static final String HEAL_USE          = "messentials.heal";
+    public static final String HEAL_USE_OTHERS = "messentials.heal.others";
+    public static final String FEED_USE          = "messentials.feed";
+    public static final String FEED_USE_OTHERS = "messentials.feed.others";
     public static final String TIME_SET          = "messentials.time.set";
     public static final String WEATHER_SET       = "messentials.weather.set";
     public static final String DAY_USE           = "messentials.day.use";
     public static final String NIGHT_USE         = "messentials.night.use";
     public static final String RAIN_USE          = "messentials.rain.use";
     public static final String CLEAR_WEATHER_USE = "messentials.clearweather.use";
-    public static final String FLY_USE           = "messentials.fly.use";
-    public static final String GOD_USE           = "messentials.god.use";
-    public static final String SPEED_USE         = "messentials.speed.use";
-    public static final String INVSEE_USE        = "messentials.invsee.use";
+    public static final String FLY_USE           = "messentials.fly";
+    public static final String FLY_SAFE_LOGIN = "messentials.fly.safelogon";
+    public static final String FLY_USE_OTHERS = "messentials.fly.others";
+    public static final String GOD_USE           = "messentials.god";
+    public static final String GOD_USE_OTHERS = "messentials.god.others";
+    public static final String SPEED_USE         = "messentials.speed";
+    public static final String INVSEE_USE        = "messentials.invsee";
     public static final String INVSEE_EDIT   = "messentials.invsee.edit";
     public static final String INVSEE_EDIT_OFFLINE = "messentials.invsee.edit.offline";
     public static final String INVSEE_EXEMPT = "messentials.invsee.exempt";
@@ -64,6 +78,7 @@ public final class PermNodes {
     // Enderchest Access
     public static final String ENDERCHEST_USE        = "messentials.enderchest";
     public static final String ENDERCHEST_OTHERS     = "messentials.enderchest.others";
+    public static final String ENDERCHEST_OTHERS_MODIFY = "messentials.enderchest.others.modify";
 
     // Vault System
     public static final String VAULT_USE = "messentials.vault";
