@@ -33,7 +33,11 @@ import java.util.regex.Pattern;
  *   source.sendSuccess(() -> c, false);
  */
 public final class MessagesUtil {
-    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    private static final Gson GSON = new GsonBuilder()
+            .setPrettyPrinting()
+            .disableHtmlEscaping()
+            .serializeNulls()
+            .create();
     private static final Type MAP_TYPE = new TypeToken<Map<String, String>>(){}.getType();
 
     private static final String MOD_ID = "mysticessentials";
