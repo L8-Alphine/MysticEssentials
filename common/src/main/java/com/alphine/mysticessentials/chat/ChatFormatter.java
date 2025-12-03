@@ -1,7 +1,5 @@
 package com.alphine.mysticessentials.chat;
 
-import com.alphine.mysticessentials.config.ChatConfigManager;
-import com.alphine.mysticessentials.config.ChatConfigManager.ChannelsConfig;
 import com.alphine.mysticessentials.config.ChatConfigManager.ChannelsConfig.Channel;
 
 /**
@@ -17,37 +15,36 @@ public class ChatFormatter {
     }
 
     public void sendChannelMessage(ChatContext ctx, Channel channel) {
-        if (channel == null) return;
+        if (channel == null || ctx.sender == null) return;
 
         String format = channel.format;
-        String msg    = ctx.processedMessage;
+        if (format == null || format.isBlank()) {
+            format = "<display-name>: <message>";
+        }
 
-        // Basic placeholders – later you’ll pipe this through Text Placeholder API + LP meta.
-        String prefix      = "%luckperms_prefix%";
-        String suffix      = "%luckperms_suffix%";
-        String displayName = ctx.sender.getName();
-        String world       = ctx.sender.getWorldId();
-        String serverName  = ctx.server.getServerName(); // or config value
+        String msg = ctx.processedMessage;
 
-        String formatted = format
-                .replace("<prefix>", prefix == null ? "" : prefix)
-                .replace("<suffix>", suffix == null ? "" : suffix)
-                .replace("<display-name>", displayName)
-                .replace("<world>", world)
-                .replace("<server>", serverName)
+        String base = format
+                .replace("<prefix>", "%luckperms_prefix%")
+                .replace("<suffix>", "%luckperms_suffix%")
+                .replace("<display-name>", ctx.sender.getName())
+                .replace("<world>", ctx.sender.getWorldId())
+                .replace("<server>", ctx.server.getServerName())
                 .replace("<message>", msg);
 
-        // 1) Deliver to players (local-only for now)
+        String formatted = ctx.sender.applySenderPlaceholders(base);
+
+        // Deliver to players
         delivery.deliver(ctx, channel, formatted);
 
-        // 2) Console log
+        // Console log
         String consoleFormat = channel.consoleFormat != null
                 ? channel.consoleFormat
                 : "[Chat] <name>: <message>";
 
         String consoleLine = consoleFormat
-                .replace("<name>", displayName)
-                .replace("<world>", world)
+                .replace("<name>", ctx.sender.getName())
+                .replace("<world>", ctx.sender.getWorldId())
                 .replace("<message>", msg);
 
         // Use CommonServer logging
