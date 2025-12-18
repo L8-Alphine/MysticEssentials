@@ -110,12 +110,26 @@ public class KitCmd {
         }
 
         int given = 0;
+
         for (var b64 : kit.itemsB64) {
-            ItemStack st = KitStore.b64ToStack(b64, provider);
-            if (st.isEmpty()) continue;
-            if (!target.addItem(st.copy())) target.drop(st.copy(), false, true);
+            ItemStack stack = KitStore.b64ToStack(b64, provider);
+            if (stack.isEmpty()) continue;
+
+            ItemStack toGive = stack.copy();
+
+            // Try to add to inventory; if it can't fully fit, drop the remainder
+            boolean fullyAdded = target.getInventory().add(toGive);
+            if (!fullyAdded && !toGive.isEmpty()) {
+                target.drop(toGive, false, true);
+            }
+
             given++;
         }
+
+        // Force client inventory to refresh (fixes “visual bug” / ghost items)
+        target.getInventory().setChanged();
+        target.inventoryMenu.broadcastChanges();
+        target.containerMenu.broadcastChanges();
 
         if (!(bypassSelf || bypassOthers)) {
             pdata.setLast(target.getUUID(), kit.name, now);
