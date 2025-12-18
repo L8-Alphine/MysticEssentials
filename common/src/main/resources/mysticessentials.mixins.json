@@ -6,7 +6,10 @@
   "client": [
   ],
   "mixins": [
-    "PlayerListSystemMessageMixin"
+    "PlayerListChatSenderCaptureMixin",
+    "PlayerListChatTagsMixin",
+    "PlayerListSystemMessageMixin",
+    "ServerPlayerLinkifyMixin"
   ],
   "injectors": {
     "defaultRequire": 1
