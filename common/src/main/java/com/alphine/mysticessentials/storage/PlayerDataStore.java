@@ -11,7 +11,7 @@ import java.util.*;
 /**
  * Unified per-player storage:
  *   config/mysticessentials/playerdata/<UUID>.json
- *
+ * <p>
  * Contains:
  *  - identity: uuid, lastIp, username, nickname
  *  - playtime (total + sessionStart to accumulate)
@@ -23,7 +23,7 @@ import java.util.*;
  *  - kits  (lastClaim, usedOnce)
  *  - inventory snapshot (format + payload)
  *  - (optional snapshot) punishments relevant to player (warnings/mute/ban/frozen/jail)
- *
+ * <p>
  * Also migrates from:
  *  - config/mysticessentials/playerdata.json            (old monolith)
  *  - config/mysticessentials/homes.json                 (old HomesStore)
