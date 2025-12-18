@@ -293,5 +293,36 @@
   "afk.enter.self": "&7You are now &eAFK&7.",
   "afk.enter.broadcast": "&7{name} &eis now AFK&7.",
   "afk.exit.self": "&aYou are no longer AFK.",
-  "afk.exit.broadcast": "&a{name} is no longer AFK."
+  "afk.exit.broadcast": "&a{name} is no longer AFK.",
+
+  "vault.ui.selector.title": "&bVaults",
+  "vault.ui.settings.title": "&dVault Settings &8- &7#{index}",
+  "vault.ui.rename.title": "&eRename Vault &8- &7#{index}",
+
+  "vault.ui.common.filler": " ",
+  "vault.ui.common.blank": " ",
+  "vault.ui.common.close": "&cClose",
+  "vault.ui.common.back": "&7Back",
+
+  "vault.ui.selector.locked.name": "&cLocked Vault",
+  "vault.ui.selector.vault.name": "&f{name} &8- &7#{index}",
+  "vault.ui.selector.vault.lore": "&7{used}&8/&7{available}",
+
+  "vault.ui.settings.preview.slots": "&7Slots: &f{used}&8/&f{available}",
+  "vault.ui.settings.preview.left": "&7Left-click: &aOpen vault",
+  "vault.ui.settings.preview.right": "&7Right-click: &dSettings",
+
+  "vault.ui.settings.rename.name": "&eRename Vault",
+  "vault.ui.settings.rename.lore": "&7Opens the rename menu.",
+
+  "vault.ui.settings.icon.name": "&bSet Icon",
+  "vault.ui.settings.icon.lore": "&7Uses the item in your main hand.",
+
+  "vault.ui.settings.reset.name": "&cReset This Vault",
+  "vault.ui.settings.reset.lore1": "&7Clears items and resets name/icon.",
+  "vault.ui.settings.reset.lore2": "&7Requires staff permission.",
+
+  "vault.ui.settings.resetall.name": "&4Reset ALL Vaults (Admin)",
+  "vault.ui.settings.resetall.lore1": "&7Deletes the entire vault file for this player.",
+  "vault.ui.settings.resetall.lore2": "&7Requires admin permission."
 }

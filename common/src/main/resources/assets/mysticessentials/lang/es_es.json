@@ -293,5 +293,36 @@
   "afk.enter.self": "&7Ahora estás &eAFK&7.",
   "afk.enter.broadcast": "&7{nombre} &eahora está AFK&7.",
   "afk.exit.self": "&aYa no estás AFK.",
-  "afk.exit.broadcast": "&a{nombre} ya no está AFK."
+  "afk.exit.broadcast": "&a{nombre} ya no está AFK.",
+
+  "vault.ui.selector.title": "&bBóvedas",
+  "vault.ui.settings.title": "&dConfiguración de la Bóveda &8- &7#{index}",
+  "vault.ui.rename.title": "&eRenombrar Bóveda &8- &7#{index}",
+
+  "vault.ui.common.filler": " ",
+  "vault.ui.common.blank": " ",
+  "vault.ui.common.close": "&cCerrar",
+  "vault.ui.common.back": "&7Volver",
+
+  "vault.ui.selector.locked.name": "&cBóveda Bloqueada",
+  "vault.ui.selector.vault.name": "&f{name} &8- &7#{index}",
+  "vault.ui.selector.vault.lore": "&7{used}&8/&7{available}",
+
+  "vault.ui.settings.preview.slots": "&7Espacios: &f{used}&8/&f{available}",
+  "vault.ui.settings.preview.left": "&7Clic izquierdo: &aAbrir bóveda",
+  "vault.ui.settings.preview.right": "&7Clic derecho: &dConfiguración",
+
+  "vault.ui.settings.rename.name": "&eRenombrar Bóveda",
+  "vault.ui.settings.rename.lore": "&7Abre el menú para cambiar el nombre.",
+
+  "vault.ui.settings.icon.name": "&bEstablecer Ícono",
+  "vault.ui.settings.icon.lore": "&7Usa el objeto en tu mano principal.",
+
+  "vault.ui.settings.reset.name": "&cRestablecer Esta Bóveda",
+  "vault.ui.settings.reset.lore1": "&7Elimina los objetos y restablece el nombre y el ícono.",
+  "vault.ui.settings.reset.lore2": "&7Requiere permiso del staff.",
+
+  "vault.ui.settings.resetall.name": "&4Restablecer TODAS las Bóvedas (Admin)",
+  "vault.ui.settings.resetall.lore1": "&7Elimina por completo el archivo de bóvedas de este jugador.",
+  "vault.ui.settings.resetall.lore2": "&7Requiere permiso de administrador."
 }
