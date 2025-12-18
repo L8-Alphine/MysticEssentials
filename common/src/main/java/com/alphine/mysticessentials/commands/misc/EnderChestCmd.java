@@ -22,7 +22,7 @@ public class EnderChestCmd {
         var root = Commands.literal("enderchest")
                 // must be a player, must have self permission
                 .requires(src -> src.getEntity() instanceof ServerPlayer
-                        && Perms.has(src, PermNodes.ENDERCHEST_USE, 0))
+                        && Perms.has(src, PermNodes.ENDERCHEST_USE, 1))
                 // /enderchest  -> open own real ender chest
                 .executes(ctx -> openOwn(ctx.getSource()))
                 // /enderchest <player>
