@@ -12,16 +12,6 @@ import java.util.*;
 public final class InventoryIO {
     private InventoryIO(){}
 
-    /** Capture target inventory -> payload with proper registry provider */
-    public static Map<String,Object> captureToPayload(ServerPlayer p){
-        HolderLookup.Provider provider = p.level().registryAccess();
-        Map<String,Object> payload = new LinkedHashMap<>();
-        payload.put("main",  writeRange(p.getInventory(), 0, 36, provider));
-        payload.put("armor", writeArmor(p.getInventory(), provider));
-        payload.put("offhand", writeOne(p.getInventory().offhand.get(0), provider));
-        return payload;
-    }
-
     /** Build stacks (0..40) from payload using a provider. */
     public static ItemStack[] stacksFromPayload(HolderLookup.Provider provider, Map<String,Object> payload){
         ItemStack[] out = new ItemStack[41];
@@ -69,20 +59,18 @@ public final class InventoryIO {
 
     /** 1.21: save requires Provider first. Return NBT JSON string or null for empty. */
     private static Object writeOne(ItemStack s, HolderLookup.Provider provider){
-        if(s==null || s.isEmpty()) return null;
+        if (s == null || s.isEmpty()) return null;
         CompoundTag tag = new CompoundTag();
-        s.save(provider, tag);                 // <-- FIX
-        return tag.toString();
+        s.save(provider, tag);
+        return tag; // store CompoundTag, not String
     }
 
     /** 1.21: parse requires Provider. */
     private static ItemStack readOne(Object raw, HolderLookup.Provider provider){
-        if(!(raw instanceof String str) || str.isBlank()) return ItemStack.EMPTY;
+        if (!(raw instanceof CompoundTag tag)) return ItemStack.EMPTY;
         try {
-            CompoundTag tag = TagParser.parseTag(str);
-            // 1.21 method:
             return ItemStack.parse(provider, tag).orElse(ItemStack.EMPTY);
-        } catch (Exception ignored){
+        } catch (Exception ignored) {
             return ItemStack.EMPTY;
         }
     }
