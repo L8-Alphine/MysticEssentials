@@ -1,14 +1,13 @@
 package com.alphine.mysticessentials.util;
 
 import com.alphine.mysticessentials.config.MEConfig;
-import com.alphine.mysticessentials.perm.Perms;
 import com.alphine.mysticessentials.perm.PermNodes;
+import com.alphine.mysticessentials.perm.Perms;
 import com.alphine.mysticessentials.storage.PlayerDataStore;
 import com.alphine.mysticessentials.storage.PlayerDataStore.LastLoc;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.TagParser;
-import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
@@ -32,48 +31,75 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class AfkService {
 
-    // -------- runtime state (not persisted) --------
-    private static final class State {
-        boolean afk = false;
-        String poolName = null;
-        long lastActiveMs = System.currentTimeMillis();
-        long afkSinceMs = 0L; // when we actually went AFK
-        final Map<String, Long> nextRewardAtEpochSec = new HashMap<>();
-    }
-
     private final Map<UUID, State> state = new ConcurrentHashMap<>();
-
-    private MEConfig cfg; // live reference to INSTANCE
     private final PlayerDataStore pdata;
-
-    private enum ActivityType { MOVE, INTERACT, CHAT }
-
+    private MEConfig cfg; // live reference to INSTANCE
     public AfkService(MEConfig cfg, PlayerDataStore pdata) {
         this.cfg = Objects.requireNonNull(cfg, "config");
         this.pdata = Objects.requireNonNull(pdata, "player data");
     }
 
-    // ---------------- public API ----------------
+    private static ResourceKey<Level> dimKey(ServerPlayer p) {
+        return p.level().dimension();
+    }
 
-    /** Re-read pools/settings after config save/reload. */
+    /**
+     * Re-read pools/settings after config save/reload.
+     */
     public void reloadPools() {
         this.cfg = MEConfig.INSTANCE != null ? MEConfig.INSTANCE : this.cfg;
         // nothing else needed; we always read from cfg.afk at runtime
     }
 
-    /** Mark activity from movement/interaction/chat */
-    public void markActiveMovement(ServerPlayer p)    { markActive(p, ActivityType.MOVE); }
-    public void markActiveInteraction(ServerPlayer p) { markActive(p, ActivityType.INTERACT); }
-    /** For chat; pool.allowChatInside can permit staying AFK while chatting. */
-    public void markActiveChat(ServerPlayer p)        { markActive(p, ActivityType.CHAT); }
+    // ---------------- public API ----------------
 
-    /** For join: reset lastActive; do not force AFK. */
+    /**
+     * Mark activity from movement/interaction/chat
+     */
+    public void markActiveMovement(ServerPlayer p) {
+        State s = state.computeIfAbsent(p.getUUID(), k -> new State());
+        long now = System.currentTimeMillis();
+
+        // Debounce: only evaluate movement every 250ms
+        if (now - s.lastMoveCheckMs < 250) return;
+        s.lastMoveCheckMs = now;
+
+        double dx = p.getX() - s.lastX;
+        double dy = p.getY() - s.lastY;
+        double dz = p.getZ() - s.lastZ;
+
+        // Update last position regardless (prevents “ratcheting”)
+        s.lastX = p.getX(); s.lastY = p.getY(); s.lastZ = p.getZ();
+
+        // Ignore tiny jitter: require at least 0.35 blocks moved
+        double distSq = dx*dx + dy*dy + dz*dz;
+        if (distSq < (0.35 * 0.35)) return;
+
+        markActive(p, ActivityType.MOVE);
+    }
+
+    public void markActiveInteraction(ServerPlayer p) {
+        markActive(p, ActivityType.INTERACT);
+    }
+
+    /**
+     * For chat; pool.allowChatInside can permit staying AFK while chatting.
+     */
+    public void markActiveChat(ServerPlayer p) {
+        markActive(p, ActivityType.CHAT);
+    }
+
+    /**
+     * For join: reset lastActive; do not force AFK.
+     */
     public void onJoin(ServerPlayer p) {
         State s = state.computeIfAbsent(p.getUUID(), k -> new State());
         s.lastActiveMs = System.currentTimeMillis();
     }
 
-    /** For quit: drop ephemeral state (safe). */
+    /**
+     * For quit: drop ephemeral state (safe).
+     */
     public void onQuit(UUID id) {
         state.remove(id);
     }
@@ -81,6 +107,7 @@ public final class AfkService {
     /**
      * Command toggle: if not AFK -> enter AFK (optionally set custom message)
      * If AFK -> exit AFK and return to saved location (or fallback)
+     *
      * @return true if now AFK, false if un-AFK
      */
     public boolean toggleAfk(ServerPlayer p, String message) {
@@ -156,8 +183,6 @@ public final class AfkService {
         }
     }
 
-    // ---------------- internals ----------------
-
     private void markActive(ServerPlayer p, ActivityType type) {
         State s = state.computeIfAbsent(p.getUUID(), k -> new State());
         final long now = System.currentTimeMillis();
@@ -176,7 +201,7 @@ public final class AfkService {
         }
 
         MEConfig.AfkPool pool = poolOf(s.poolName);
-        boolean insideAssigned = pool != null && isInsidePool(p, pool);
+        boolean insideAssigned = isInsidePool(p, pool);
 
         if (!insideAssigned) {
             // Active pools exist but player is not inside their assigned pool -> activity cancels AFK and returns them.
@@ -187,10 +212,10 @@ public final class AfkService {
         // Inside the assigned pool: respect per-activity allowances
         boolean allow;
         switch (type) {
-            case MOVE ->     allow = pool.allowMoveInside;
+            case MOVE -> allow = pool.allowMoveInside;
             case INTERACT -> allow = pool.allowInteractInside;
-            case CHAT ->     allow = pool.allowChatInside;
-            default ->       allow = false;
+            case CHAT -> allow = pool.allowChatInside;
+            default -> allow = false;
         }
 
         if (allow) {
@@ -201,6 +226,8 @@ public final class AfkService {
             exitAfk(p, s, false);
         }
     }
+
+    // ---------------- internals ----------------
 
     private void enterAfk(ServerPlayer p, State s, boolean teleportToPool) {
         if (s.afk) return;
@@ -215,8 +242,11 @@ public final class AfkService {
             LastLoc loc = new LastLoc();
             loc.dim = dimKey(p).location().toString();
             Vec3 pos = p.position();
-            loc.x = pos.x; loc.y = pos.y; loc.z = pos.z;
-            loc.yaw = p.getYRot(); loc.pitch = p.getXRot();
+            loc.x = pos.x;
+            loc.y = pos.y;
+            loc.z = pos.z;
+            loc.yaw = p.getYRot();
+            loc.pitch = p.getXRot();
             loc.when = System.currentTimeMillis();
             pdata.setAfkReturnLoc(p.getUUID(), loc);
 
@@ -244,7 +274,7 @@ public final class AfkService {
         }
 
         // messages: private + broadcast
-        var args = Map.<String,Object>of("name", p.getGameProfile().getName());
+        var args = Map.<String, Object>of("name", p.getGameProfile().getName());
         msgSelf(p, "afk.enter.self", args);          // "You're now AFK."
         broadcast(p, "afk.enter.broadcast", args);   // "<name> is now AFK."
     }
@@ -264,11 +294,10 @@ public final class AfkService {
 
         s.poolName = null;
 
-        var args = Map.<String,Object>of("name", p.getGameProfile().getName());
+        var args = Map.<String, Object>of("name", p.getGameProfile().getName());
         msgSelf(p, "afk.exit.self", args);            // "You're no longer AFK."
         broadcast(p, "afk.exit.broadcast", args);     // "<name> is no longer AFK."
     }
-
 
     private void teleportBackOrFallback(ServerPlayer p) {
         Optional<LastLoc> back = pdata.getAfkReturnLoc(p.getUUID());
@@ -290,7 +319,9 @@ public final class AfkService {
             if (level == null) return false;
             p.teleportTo(level, t.x, t.y, t.z, t.yaw, t.pitch);
             return true;
-        } catch (Exception ignored) { return false; }
+        } catch (Exception ignored) {
+            return false;
+        }
     }
 
     private boolean isInsidePool(ServerPlayer p, MEConfig.AfkPool pool) {
@@ -298,9 +329,9 @@ public final class AfkService {
         String curWorld = dimKey(p).location().toString();
         if (!pool.region.world.equalsIgnoreCase(curWorld)) return false;
         Vec3 pos = p.position();
-        int x = (int)Math.floor(pos.x);
-        int y = (int)Math.floor(pos.y);
-        int z = (int)Math.floor(pos.z);
+        int x = (int) Math.floor(pos.x);
+        int y = (int) Math.floor(pos.y);
+        int z = (int) Math.floor(pos.z);
         int minX = Math.min(pool.region.min.x, pool.region.max.x);
         int minY = Math.min(pool.region.min.y, pool.region.max.y);
         int minZ = Math.min(pool.region.min.z, pool.region.max.z);
@@ -315,10 +346,6 @@ public final class AfkService {
     private MEConfig.AfkPool poolOf(String name) {
         if (name == null) return null;
         return cfg.afk.pools.get(name);
-    }
-
-    private static ResourceKey<Level> dimKey(ServerPlayer p) {
-        return p.level().dimension();
     }
 
     private void giveRewards(MinecraftServer server, ServerPlayer p, MEConfig.AfkReward tr) {
@@ -390,33 +417,52 @@ public final class AfkService {
         return false;
     }
 
-    // ---------------- convenience types ----------------
-
-    /** Local TeleportPoint mirror to avoid importing other utils here. */
-    private static final class TeleportPoint extends MEConfig.TeleportPoint {
-        TeleportPoint(String world, double x, double y, double z, float yaw, float pitch) {
-            super(world, x, y, z, yaw, pitch);
-        }
-    }
-
-
     // global helpers
     public boolean isAfk(UUID id) {
         State s = state.get(id);
         return s != null && s.afk;
     }
 
-    /** The player’s current AFK message if set (empty means use default). */
+    /**
+     * The player’s current AFK message if set (empty means use default).
+     */
     public Optional<String> currentAfkMessage(UUID id) {
         return pdata.getAfkMessage(id).filter(msg -> !msg.isBlank());
     }
 
-    /** Formats the private notify string with config’s notifyFormat. */
+    // ---------------- convenience types ----------------
+
+    /**
+     * Formats the private notify string with config’s notifyFormat.
+     */
     public String formatNotify(String senderName, String targetName, String message) {
         String fmt = cfg.afk.notifyFormat == null || cfg.afk.notifyFormat.isBlank()
                 ? "<gray><sender> → <target>: <msg>" : cfg.afk.notifyFormat;
         return fmt.replace("<sender>", senderName)
                 .replace("<target>", targetName)
                 .replace("<msg>", message);
+    }
+
+
+    private enum ActivityType {MOVE, INTERACT, CHAT}
+
+    // -------- runtime state (not persisted) --------
+    private static final class State {
+        final Map<String, Long> nextRewardAtEpochSec = new HashMap<>();
+        boolean afk = false;
+        String poolName = null;
+        long lastActiveMs = System.currentTimeMillis();
+        long afkSinceMs = 0L; // when we actually went AFK
+        double lastX, lastY, lastZ;
+        long lastMoveCheckMs = 0L;
+    }
+
+    /**
+     * Local TeleportPoint mirror to avoid importing other utils here.
+     */
+    private static final class TeleportPoint extends MEConfig.TeleportPoint {
+        TeleportPoint(String world, double x, double y, double z, float yaw, float pitch) {
+            super(world, x, y, z, yaw, pitch);
+        }
     }
 }
