@@ -44,6 +44,12 @@ public class MysticEssentialsFabric implements ModInitializer {
     private int afkTickAccum = 0;
     private RedisClientAdapter redisAdapter;
 
+    private final Map<UUID, Long> afkLastMoveCheckMs = new HashMap<>();
+    private static final double AFK_MOVE_THRESHOLD = 0.35D;          // blocks
+    private static final double AFK_MOVE_THRESHOLD_SQ = AFK_MOVE_THRESHOLD * AFK_MOVE_THRESHOLD;
+    private static final long AFK_MOVE_DEBOUNCE_MS = 250L;
+    private static final float AFK_ROT_THRESHOLD = 1.0f;             // degrees
+
     private static CommonServer wrapServer(MinecraftServer server) {
         return new CommonServer() {
             @Override
@@ -183,6 +189,9 @@ public class MysticEssentialsFabric implements ModInitializer {
             common.warmups.cancel(p, net.minecraft.network.chat.Component.empty());
 
             common.privateMessages.onQuit(p);
+            afkLastPos.remove(p.getUUID());
+            afkLastRot.remove(p.getUUID());
+            afkLastMoveCheckMs.remove(p.getUUID());
         });
 
         // Last death
@@ -228,28 +237,40 @@ public class MysticEssentialsFabric implements ModInitializer {
             for (ServerPlayer sp : world.players()) {
                 // --- AFK movement/rotation activity ---
                 var id = sp.getUUID();
-                var curPos = sp.position();
-                var lastPos = afkLastPos.get(id);
-                float yRot = sp.getYRot(), xRot = sp.getXRot();
-                var lastRot = afkLastRot.get(id);
+                long nowMs = System.currentTimeMillis();
 
-                boolean moved = lastPos == null || curPos.distanceToSqr(lastPos) > 0.0004D;
-                boolean rotated = lastRot == null || Math.abs(lastRot[0] - yRot) > 0.1f || Math.abs(lastRot[1] - xRot) > 0.1f;
+                // debounce
+                long lastCheck = afkLastMoveCheckMs.getOrDefault(id, 0L);
+                if (nowMs - lastCheck >= AFK_MOVE_DEBOUNCE_MS) {
+                    afkLastMoveCheckMs.put(id, nowMs);
 
-                if (moved || rotated) {
-                    common.onPlayerMove(sp);
-                    afkLastPos.put(id, curPos);
-                    afkLastRot.put(id, new float[]{yRot, xRot});
-                }
+                    var curPos = sp.position();
+                    var lastPos = afkLastPos.get(id);
 
-                // --- Freeze: cancel movement (Fabric: no hurtMarked touch) ---
-                if (punish.isFrozen(sp.getUUID())) {
-                    sp.setDeltaMovement(0, 0, 0);
-                }
+                    float yRot = sp.getYRot(), xRot = sp.getXRot();
+                    var lastRot = afkLastRot.get(id);
 
-                // If they closed back to personal inventory, ensure invsee is cleaned up
-                if (sp.containerMenu == sp.inventoryMenu) {
-                    InvseeSessions.close(sp);
+                    boolean moved = false;
+                    if (lastPos == null) {
+                        moved = true;
+                    } else {
+                        // Vec3 has distanceToSqr(Vec3)
+                        moved = curPos.distanceToSqr(lastPos) >= AFK_MOVE_THRESHOLD_SQ;
+                    }
+
+                    boolean rotated = false;
+                    if (lastRot == null) {
+                        rotated = true;
+                    } else {
+                        rotated = Math.abs(lastRot[0] - yRot) >= AFK_ROT_THRESHOLD
+                                || Math.abs(lastRot[1] - xRot) >= AFK_ROT_THRESHOLD;
+                    }
+
+                    if (moved || rotated) {
+                        common.onPlayerMove(sp);
+                        afkLastPos.put(id, curPos);
+                        afkLastRot.put(id, new float[]{yRot, xRot});
+                    }
                 }
             }
         });
