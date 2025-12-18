@@ -62,6 +62,12 @@ public final class MysticEssentialsCommon {
     // per-player chat state (active channel, etc.)
     public final ChatStateService chatState = new ChatStateService();
 
+    // Vaults
+    public com.alphine.mysticessentials.vault.VaultStore vaultStore;
+    public com.alphine.mysticessentials.vault.VaultService vaultService;
+    public com.alphine.mysticessentials.vault.VaultOpen vaultOpen;
+    public com.alphine.mysticessentials.vault.VaultSelectorUi vaultSelectorUi;
+
     private BroadcastScheduler broadcastScheduler;
 
     // Mod info service
@@ -76,6 +82,11 @@ public final class MysticEssentialsCommon {
         Path cfgDir = server.getServerDirectory()
                 .resolve("config").resolve(MOD_ID).normalize();
         ensureCoreServices(cfgDir);
+
+        // Vault store needs registry access for ItemStack (1.21+)
+        if (vaultStore instanceof com.alphine.mysticessentials.vault.store.JsonVaultStore js) {
+            js.setRegistryAccess(server.registryAccess());
+        }
 
         cooldowns.updateFromConfig();
 
@@ -117,6 +128,11 @@ public final class MysticEssentialsCommon {
         if (audit == null)      audit  = new AuditLogStore(cfgDir);
         if (kits == null)       kits   = new KitStore(cfgDir);
         if (kitsPlayers == null) kitsPlayers = new KitPlayerStore(pdata);
+
+        if (vaultStore == null) vaultStore = new com.alphine.mysticessentials.vault.store.JsonVaultStore(cfgDir);
+        if (vaultService == null) vaultService = new com.alphine.mysticessentials.vault.VaultService(vaultStore);
+        if (vaultOpen == null) vaultOpen = new com.alphine.mysticessentials.vault.VaultOpen(vaultService);
+        if (vaultSelectorUi == null) vaultSelectorUi = new com.alphine.mysticessentials.vault.VaultSelectorUi(vaultService, vaultOpen);
     }
 
     public void registerCommands(CommandDispatcher<CommandSourceStack> d) {
