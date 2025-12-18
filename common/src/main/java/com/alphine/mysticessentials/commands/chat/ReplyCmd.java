@@ -14,7 +14,7 @@ public class ReplyCmd {
 
     public void register(CommandDispatcher<CommandSourceStack> d) {
         var root = Commands.literal("reply")
-                .requires(src -> Perms.has(src, PermNodes.MSG_SEND, 0))
+                .requires(src -> Perms.has(src, PermNodes.MSG_REPLY, 0))
                 .then(Commands.argument("message", MessageArgument.message())
                         .executes(ctx -> {
                             ServerPlayer sender = ctx.getSource().getPlayerOrException();
