@@ -14,13 +14,13 @@ public class SleepCmd {
 
     public void register(CommandDispatcher<CommandSourceStack> d) {
         d.register(Commands.literal("sleep")
-                .requires(src -> Perms.has(src, PermNodes.SLEEP, 0))
+                .requires(src -> Perms.has(src, PermNodes.SLEEP, 2))
                 .executes(ctx -> doRest(ctx.getSource()))
         );
 
         // Alias: /rest
         d.register(Commands.literal("rest")
-                .requires(src -> Perms.has(src, PermNodes.SLEEP, 0))
+                .requires(src -> Perms.has(src, PermNodes.SLEEP, 2))
                 .executes(ctx -> doRest(ctx.getSource()))
         );
     }
