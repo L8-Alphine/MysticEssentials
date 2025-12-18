@@ -43,6 +43,9 @@ public final class MessagesUtil {
     private static final String MOD_ID = "mysticessentials";
     private static final String BUNDLED_PATH_FMT = "/assets/" + MOD_ID + "/lang/%s.json";
 
+    private static final Pattern HEX_CODE = Pattern.compile("(?i)&#([0-9a-f]{6})");
+    private static final Pattern ANY_CODE = Pattern.compile("(?i)&#[0-9a-f]{6}|&[0-9a-fk-or]");
+
     private static Path messagesDir;
     private static String activeLocale = "en_us";
 
@@ -91,7 +94,12 @@ public final class MessagesUtil {
         String raw = getRaw(key);
         if (raw == null) raw = key; // show key if truly missing
         raw = applyPlaceholders(raw, placeholders);
-        return legacyStringToComponent(raw);
+        return legacyStringToComponentWithHex(raw);
+    }
+
+    /** Convert a user string with & codes (and optional &#RRGGBB) into a styled Component. */
+    public static Component styled(String s) {
+        return legacyStringToComponentWithHex(s);
     }
 
     /**
@@ -185,10 +193,10 @@ public final class MessagesUtil {
 
     private static final Pattern CODE = Pattern.compile("&([0-9a-fA-FlLoOnNmMrR])");
 
-    private static Component legacyStringToComponent(String s) {
+    private static Component legacyStringToComponentWithHex(String s) {
         if (s == null || s.isEmpty()) return Component.empty();
 
-        Matcher m = CODE.matcher(s);
+        Matcher m = ANY_CODE.matcher(s);
         int lastEnd = 0;
 
         Style current = Style.EMPTY;
@@ -201,7 +209,21 @@ public final class MessagesUtil {
                 if (!chunk.isEmpty()) root.append(Component.literal(chunk).withStyle(current));
             }
 
-            char code = Character.toLowerCase(m.group(1).charAt(0));
+            String token = m.group();
+
+            // HEX: &#RRGGBB
+            if (token.length() == 8 && token.charAt(0) == '&' && token.charAt(1) == '#') {
+                String hex = token.substring(2); // RRGGBB
+                try {
+                    int rgb = Integer.parseInt(hex, 16);
+                    current = current.withColor(rgb);
+                } catch (Exception ignored) {}
+                lastEnd = m.end();
+                continue;
+            }
+
+            // Legacy: &x
+            char code = Character.toLowerCase(token.charAt(1));
             switch (code) {
                 // Colors
                 case '0' -> current = current.withColor(ChatFormatting.BLACK);
@@ -226,6 +248,7 @@ public final class MessagesUtil {
                 case 'o' -> current = current.withItalic(true);
                 case 'n' -> current = current.withUnderlined(true);
                 case 'm' -> current = current.withStrikethrough(true);
+                case 'k' -> current = current.withObfuscated(true);
 
                 // Reset
                 case 'r' -> current = Style.EMPTY;
