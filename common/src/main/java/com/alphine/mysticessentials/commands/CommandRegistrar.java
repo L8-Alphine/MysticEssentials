@@ -18,6 +18,8 @@ import com.alphine.mysticessentials.commands.kits.KitCmd;
 import com.alphine.mysticessentials.commands.misc.*;
 import com.alphine.mysticessentials.commands.mod.*;
 import com.alphine.mysticessentials.commands.tp.*;
+import com.alphine.mysticessentials.commands.vaults.VaultAdminCMD;
+import com.alphine.mysticessentials.commands.vaults.VaultCMD;
 import com.mojang.brigadier.CommandDispatcher;
 import net.minecraft.commands.CommandSourceStack;
 
@@ -88,10 +90,20 @@ public final class CommandRegistrar {
 
         // --------- CORE (Homes/Warps/TP/Spawn) ---------
         if (on(() -> common.cfg.features.enableHomesWarpsTP)) {
+
+            // Create ONE executor for all teleport commands
+            // (So warmup + cooldown behavior is consistent everywhere)
+            var tpExec = new com.alphine.mysticessentials.teleport.TeleportExecutor(
+                    common.cooldowns,
+                    common.warmups
+            );
+
             new SetHomeCmd(common.homes).register(d);
             idx("sethome");
 
-            new HomeCmd(common.homes, common.cooldowns, common.warmups, common.pdata).register(d);
+            // If your HomeCmd currently takes (homes, cooldowns, warmups, pdata),
+            // change it to (homes, tpExec, pdata) and update this line accordingly:
+            new HomeCmd(common.homes, tpExec, common.pdata).register(d);
             idx("home");
 
             new DelHomeCmd(common.homes).register(d);
@@ -100,23 +112,25 @@ public final class CommandRegistrar {
             new HomesCmd(common.homes).register(d);
             idx("homes");
 
-            new WarpCmd(common.warps, common.cooldowns, common.warmups, common.pdata).register(d);
-            // Index common warp roots (WarpCmd may register these internally)
+            // WarpCmd: change constructor to (warps, tpExec, pdata)
+            new WarpCmd(common.warps, tpExec, common.pdata).register(d);
             idx("warp", "warps", "setwarp", "delwarp");
 
-            new SpawnCmds(common.spawn, common.cooldowns, common.warmups, common.pdata).register(d);
+            // SpawnCmds: change constructor to (spawn, tpExec, pdata)
+            new SpawnCmds(common.spawn, tpExec, common.pdata).register(d);
             idx("spawn", "setspawn");
 
-            new TpDirectCmds(common.cooldowns, common.warmups, common.pdata).register(d);
-            // Likely direct-TP roots
+            // TpDirectCmds: you already switched it to (TeleportExecutor, PlayerDataStore)
+            new TpDirectCmds(tpExec, common.pdata).register(d);
             idx("tp", "tppos", "tphere", "tpo");
 
-            new TpaCmds(common.tpas, common.warmups, common.pdata, common.cooldowns).register(d);
-            // Common /tpa family
+            // TpaCmds: change constructor to (tpas, tpExec, pdata)
+            new TpaCmds(common.tpas, tpExec, common.pdata).register(d);
             idx("tpa", "tpahere", "tpaccept", "tpdeny", "tpcancel");
 
-            new BackCmds(common.pdata, common.cooldowns, common.warmups).register(d);
-            idx("back");
+            // BackCmds: change constructor to (pdata, tpExec)
+            new BackCmds(common.pdata, tpExec).register(d);
+            idx("back", "deathback");
         }
 
         // --------- MISC ---------
@@ -237,6 +251,15 @@ public final class CommandRegistrar {
 
             new KitCmd(common.kits, common.kitsPlayers).register(d);
             idx("kit", "kits");
+        }
+
+        // Vaults
+        if (on(() -> common.cfg.features.enableVaultSystem)) {
+            VaultCMD.register(d);
+            idx("vault", "vaults");
+
+            VaultAdminCMD.register(d);
+            idx("vaultadmin", "vaultadmincmd");
         }
     }
 }
