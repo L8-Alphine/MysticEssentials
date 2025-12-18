@@ -36,6 +36,14 @@ public final class Perms {
         return p.hasPermissions(opLevelFallback);
     }
 
+    public static boolean has(CommandSourceStack src, String node) {
+        return has(src, node, 2); // default OP fallback
+    }
+
+    public static boolean has(ServerPlayer p, String node) {
+        return has(p, node, 2); // default OP fallback
+    }
+
     /** Bypass helper: null/blank means disabled. Also honors ADMIN/ALL. */
     public static boolean hasBypass(ServerPlayer p, String bypassNode, int opLevelFallback) {
         if (bypassNode == null || bypassNode.isBlank()) return false;
