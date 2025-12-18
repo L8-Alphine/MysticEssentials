@@ -1,12 +1,10 @@
 package com.alphine.mysticessentials.commands.tp;
 
 import com.alphine.mysticessentials.config.MEConfig;
-import com.alphine.mysticessentials.perm.Bypass;
 import com.alphine.mysticessentials.perm.PermNodes;
 import com.alphine.mysticessentials.perm.Perms;
 import com.alphine.mysticessentials.storage.SpawnStore;
-import com.alphine.mysticessentials.teleport.CooldownManager;
-import com.alphine.mysticessentials.teleport.WarmupManager;
+import com.alphine.mysticessentials.teleport.TeleportExecutor;
 import com.alphine.mysticessentials.util.MessagesUtil;
 import com.alphine.mysticessentials.util.Teleports;
 import com.mojang.brigadier.CommandDispatcher;
@@ -23,15 +21,13 @@ import java.util.Map;
 
 public class SpawnCmds {
     private final SpawnStore spawn;
-    private final CooldownManager cd;
-    private final WarmupManager warm;
+    private final TeleportExecutor exec;
     private final com.alphine.mysticessentials.storage.PlayerDataStore pdata;
 
-    public SpawnCmds(SpawnStore s, CooldownManager cd, WarmupManager warm,
+    public SpawnCmds(SpawnStore s, TeleportExecutor exec,
                      com.alphine.mysticessentials.storage.PlayerDataStore pdata) {
         this.spawn = s;
-        this.cd = cd;
-        this.warm = warm;
+        this.exec = exec;
         this.pdata = pdata;
     }
 
@@ -50,38 +46,31 @@ public class SpawnCmds {
                     }
 
                     ServerPlayer p = ctx.getSource().getPlayerOrException();
-                    var s = spawn.get();
-                    if (s == null) {
-                        p.displayClientMessage(MessagesUtil.msg("spawn.not_set"), false);
-                        return 0;
-                    }
 
-                    long now = System.currentTimeMillis();
-                    if (!Bypass.cooldown(ctx.getSource())
-                            && cd.getDefaultSeconds("spawn") > 0
-                            && !cd.checkAndStampDefault(p.getUUID(), "spawn", now)) {
-                        long rem = cd.remaining(p.getUUID(), "spawn", now);
-                        p.displayClientMessage(MessagesUtil.msg("cooldown.wait", Map.of("seconds", rem)), false);
-                        return 0;
-                    }
+                    exec.runTeleport(ctx.getSource().getServer(), p, ctx.getSource(), "spawn", () -> {
+                        var s = spawn.get();
+                        if (s == null) {
+                            p.displayClientMessage(MessagesUtil.msg("spawn.not_set"), false);
+                            return false;
+                        }
 
-                    int warmSec = (MEConfig.INSTANCE != null) ? MEConfig.INSTANCE.getWarmup("spawn") : 0;
-                    Runnable tp = () -> {
                         ResourceLocation id = ResourceLocation.tryParse(s.dim);
                         if (id == null) {
                             p.displayClientMessage(MessagesUtil.msg("warp.bad_dimension", Map.of("dim", s.dim)), false);
-                            return;
+                            return false;
                         }
+
                         ResourceKey<Level> key = ResourceKey.create(Registries.DIMENSION, id);
                         ServerLevel level = p.getServer().getLevel(key);
                         if (level == null) {
                             p.displayClientMessage(MessagesUtil.msg("warp.world_missing", Map.of("dim", s.dim)), false);
-                            return;
+                            return false;
                         }
-                        Teleports.pushBackAndTeleport(p, level, s.x, s.y, s.z, s.yaw, s.pitch, pdata);
-                    };
 
-                    warm.startOrBypass(ctx.getSource().getServer(), p, warmSec, tp);
+                        Teleports.pushBackAndTeleport(p, level, s.x, s.y, s.z, s.yaw, s.pitch, pdata);
+                        return true;
+                    });
+
                     return 1;
                 })
         );

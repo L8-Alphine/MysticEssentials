@@ -1,18 +1,16 @@
 package com.alphine.mysticessentials.commands.homes;
 
+import com.alphine.mysticessentials.config.MEConfig;
+import com.alphine.mysticessentials.perm.PermNodes;
+import com.alphine.mysticessentials.perm.Perms;
+import com.alphine.mysticessentials.storage.HomesStore;
+import com.alphine.mysticessentials.teleport.TeleportExecutor;
+import com.alphine.mysticessentials.util.MessagesUtil;
+import com.alphine.mysticessentials.util.Teleports;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
-import com.alphine.mysticessentials.config.MEConfig;
-import com.alphine.mysticessentials.storage.HomesStore;
-import com.alphine.mysticessentials.teleport.CooldownManager;
-import com.alphine.mysticessentials.teleport.WarmupManager;
-import com.alphine.mysticessentials.util.MessagesUtil;
-import com.alphine.mysticessentials.util.Teleports;
-import com.alphine.mysticessentials.perm.PermNodes;
-import com.alphine.mysticessentials.perm.Perms;
-import com.alphine.mysticessentials.perm.Bypass;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.EntityArgument;
@@ -28,22 +26,22 @@ import java.util.Map;
 
 public class HomeCmd {
     private final HomesStore store;
-    private final CooldownManager cooldowns;
-    private final WarmupManager warmups;
+    private final TeleportExecutor exec;
     private final com.alphine.mysticessentials.storage.PlayerDataStore pdata;
 
-    public HomeCmd(HomesStore s, CooldownManager c, WarmupManager w,
-                   com.alphine.mysticessentials.storage.PlayerDataStore pdata){
-        this.store = s; this.cooldowns = c; this.warmups = w; this.pdata = pdata;
+    public HomeCmd(HomesStore s, TeleportExecutor exec,
+                   com.alphine.mysticessentials.storage.PlayerDataStore pdata) {
+        this.store = s;
+        this.exec = exec;
+        this.pdata = pdata;
     }
 
     private SuggestionProvider<CommandSourceStack> homeSuggest() {
         return (ctx, b) -> {
             try {
                 Player target;
-                // If a "player" arg is present, suggest that player's homes; else, the executor's homes.
-                if (ctx.getNodes().size() >= 2 &&
-                        ctx.getNodes().stream().anyMatch(n -> "player".equals(n.getNode().getName()))) {
+                // If a "player" arg is present, suggest that player's homes; else, executor's homes.
+                if (ctx.getNodes().stream().anyMatch(n -> "player".equals(n.getNode().getName()))) {
                     target = EntityArgument.getPlayer(ctx, "player");
                 } else {
                     target = ctx.getSource().getPlayerOrException();
@@ -54,7 +52,7 @@ public class HomeCmd {
         };
     }
 
-    private static boolean featureOn(){
+    private static boolean featureOn() {
         var c = MEConfig.INSTANCE;
         return c == null || c.features == null || c.features.enableHomesWarpsTP;
     }
@@ -88,7 +86,7 @@ public class HomeCmd {
             return 0;
         }
 
-        ServerPlayer actor;
+        final ServerPlayer actor;
         try {
             actor = ctx.getSource().getPlayerOrException();
         } catch (Exception e) {
@@ -100,46 +98,32 @@ public class HomeCmd {
             actor.displayClientMessage(
                     MessagesUtil.msg("home.no_such_for",
                             Map.of("name", name, "player", target.getGameProfile().getName())),
-                    false);
+                    false
+            );
             return 0;
         }
         var h = opt.get();
 
-        // Cooldown (bypass allowed)
-        long now = System.currentTimeMillis();
-        if (!Bypass.cooldown(ctx.getSource())
-                && cooldowns.getDefaultSeconds("home") > 0
-                && !cooldowns.checkAndStampDefault(actor.getUUID(), "home", now)) {
-            long rem = cooldowns.remaining(actor.getUUID(), "home", now);
-            actor.displayClientMessage(
-                    MessagesUtil.msg("cooldown.wait", Map.of("seconds", rem)),
-                    false);
-            return 0;
-        }
-
-        // Warmup seconds from config
-        int warmSec = (MEConfig.INSTANCE != null) ? MEConfig.INSTANCE.getWarmup("home") : 0;
-
-        // Teleport action
-        Runnable tp = () -> {
+        exec.runTeleport(ctx.getSource().getServer(), actor, ctx.getSource(), "home", () -> {
             ResourceLocation id = ResourceLocation.tryParse(h.dim);
             if (id == null) {
                 actor.displayClientMessage(
                         MessagesUtil.msg("tp.bad_dimension", Map.of("id", h.dim)), false);
-                return;
+                return false;
             }
+
             ResourceKey<Level> key = ResourceKey.create(Registries.DIMENSION, id);
             ServerLevel level = actor.getServer().getLevel(key);
             if (level == null) {
                 actor.displayClientMessage(
                         MessagesUtil.msg("tp.world_missing", Map.of("id", h.dim)), false);
-                return;
+                return false;
             }
-            Teleports.pushBackAndTeleport(actor, level, h.x, h.y, h.z, h.yaw, h.pitch, pdata);
-        };
 
-        // Warmup manager handles bypass internally
-        warmups.startOrBypass(ctx.getSource().getServer(), actor, warmSec, tp);
+            Teleports.pushBackAndTeleport(actor, level, h.x, h.y, h.z, h.yaw, h.pitch, pdata);
+            return true;
+        });
+
         return 1;
     }
 }

@@ -1,14 +1,12 @@
 package com.alphine.mysticessentials.commands.tp;
 
 import com.alphine.mysticessentials.config.MEConfig;
-import com.alphine.mysticessentials.perm.Bypass;
 import com.alphine.mysticessentials.perm.PermNodes;
 import com.alphine.mysticessentials.perm.Perms;
 import com.alphine.mysticessentials.storage.PlayerDataStore;
-import com.alphine.mysticessentials.teleport.CooldownManager;
+import com.alphine.mysticessentials.teleport.TeleportExecutor;
 import com.alphine.mysticessentials.teleport.TpaManager;
 import com.alphine.mysticessentials.teleport.TpaManager.Direction;
-import com.alphine.mysticessentials.teleport.WarmupManager;
 import com.alphine.mysticessentials.util.MessagesUtil;
 import com.alphine.mysticessentials.util.Teleports;
 import com.mojang.brigadier.CommandDispatcher;
@@ -28,16 +26,15 @@ import java.util.concurrent.CompletableFuture;
 public class TpaCmds {
     private static final SuggestionProvider<CommandSourceStack> TPA_SUGGEST =
             (ctx, builder) -> suggestOnlineExceptSelf(ctx.getSource(), builder);
-    private final TpaManager tpa;
-    private final WarmupManager warm;
-    private final PlayerDataStore pdata;
-    private final CooldownManager cd;
 
-    public TpaCmds(TpaManager tpa, WarmupManager warm, PlayerDataStore pdata, CooldownManager cd) {
+    private final TpaManager tpa;
+    private final PlayerDataStore pdata;
+    private final TeleportExecutor exec;
+
+    public TpaCmds(TpaManager tpa, TeleportExecutor exec, PlayerDataStore pdata) {
         this.tpa = tpa;
-        this.warm = warm;
+        this.exec = exec;
         this.pdata = pdata;
-        this.cd = cd;
     }
 
     private static CompletableFuture<Suggestions> suggestOnlineExceptSelf(
@@ -65,9 +62,8 @@ public class TpaCmds {
     }
 
     public void register(CommandDispatcher<CommandSourceStack> d) {
-        // ---------------------------------------------------------------------
-        // /tpa <player>  (request: teleport ME to THEM)
-        // ---------------------------------------------------------------------
+
+        // /tpa <player>
         d.register(Commands.literal("tpa")
                 .requires(src -> Perms.has(src, PermNodes.TPA_USE, 0))
                 .then(Commands.argument("player", EntityArgument.player())
@@ -92,41 +88,25 @@ public class TpaCmds {
                                 return 0;
                             }
 
-                            // --- Auto-accept: teleport FROM -> TO with cooldown + warmup ---
+                            // Auto-accept: FROM -> TO (FROM is moving)
                             if (flags != null && flags.tpAuto) {
-                                int warmSec = (MEConfig.INSTANCE != null) ? MEConfig.INSTANCE.getWarmup("tpa") : 0;
-                                CommandSourceStack src = ctx.getSource();
-
-                                Runnable tp = () -> {
-                                    // Cooldown on the moving player (from)
-                                    long now = System.currentTimeMillis();
-                                    if (!Bypass.cooldown(src)
-                                            && cd.getDefaultSeconds("tpa") > 0
-                                            && !cd.checkAndStampDefault(from.getUUID(), "tpa", now)) {
-
-                                        long rem = cd.remaining(from.getUUID(), "tpa", now);
-                                        from.displayClientMessage(
-                                                MessagesUtil.msg("cooldown.wait", Map.of("seconds", rem)), false
-                                        );
-                                        return;
-                                    }
-
+                                exec.runTeleport(ctx.getSource().getServer(), from, ctx.getSource(), "tpa", () -> {
                                     Teleports.pushBackAndTeleport(
                                             from, to.serverLevel(),
                                             to.getX(), to.getY(), to.getZ(),
                                             to.getYRot(), to.getXRot(), pdata
                                     );
+
                                     from.displayClientMessage(
                                             MessagesUtil.msg("tpa.auto_accept.from", Map.of("target", to.getName().getString())), false);
                                     to.displayClientMessage(
                                             MessagesUtil.msg("tpa.auto_accept.to", Map.of("sender", from.getName().getString())), false);
-                                };
-
-                                warm.startOrBypass(src.getServer(), from, warmSec, tp);
+                                    return true;
+                                });
                                 return 1;
                             }
 
-                            // Normal request (no cooldown yet, only when teleport actually occurs)
+                            // Normal request
                             tpa.request(from.getUUID(), to.getUUID(), 60);
                             from.displayClientMessage(
                                     MessagesUtil.msg("tpa.sent", Map.of("target", to.getName().getString())), false);
@@ -136,11 +116,9 @@ public class TpaCmds {
                         }))
         );
 
-        // ---------------------------------------------------------------------
-        // /tpahere <player>  (request: teleport THEM to ME)
-        // ---------------------------------------------------------------------
+        // /tpahere <player>
         d.register(Commands.literal("tpahere")
-                .requires(src -> Perms.has(src, PermNodes.TPA_USE, 0)) // or a dedicated node
+                .requires(src -> Perms.has(src, PermNodes.TPA_USE, 0))
                 .then(Commands.argument("player", EntityArgument.player())
                         .suggests(TPA_SUGGEST)
                         .executes(ctx -> {
@@ -149,7 +127,7 @@ public class TpaCmds {
                                 return 0;
                             }
 
-                            ServerPlayer requester = ctx.getSource().getPlayerOrException(); // "here" player
+                            ServerPlayer requester = ctx.getSource().getPlayerOrException();
                             ServerPlayer target = EntityArgument.getPlayer(ctx, "player");
 
                             if (target.getUUID().equals(requester.getUUID())) {
@@ -163,41 +141,25 @@ public class TpaCmds {
                                 return 0;
                             }
 
-                            // --- Auto-accept: teleport TARGET -> REQUESTER with cooldown + warmup ---
+                            // Auto-accept: TARGET -> REQUESTER (TARGET is moving)
                             if (flags != null && flags.tpAuto) {
-                                int warmSec = (MEConfig.INSTANCE != null) ? MEConfig.INSTANCE.getWarmup("tpa") : 0;
-                                CommandSourceStack src = ctx.getSource();
-
-                                Runnable tp = () -> {
-                                    // Cooldown on the moving player (target)
-                                    long now = System.currentTimeMillis();
-                                    if (!Bypass.cooldown(src)
-                                            && cd.getDefaultSeconds("tpa") > 0
-                                            && !cd.checkAndStampDefault(target.getUUID(), "tpa", now)) {
-
-                                        long rem = cd.remaining(target.getUUID(), "tpa", now);
-                                        target.displayClientMessage(
-                                                MessagesUtil.msg("cooldown.wait", Map.of("seconds", rem)), false
-                                        );
-                                        return;
-                                    }
-
+                                exec.runTeleport(ctx.getSource().getServer(), target, ctx.getSource(), "tpa", () -> {
                                     Teleports.pushBackAndTeleport(
                                             target, requester.serverLevel(),
                                             requester.getX(), requester.getY(), requester.getZ(),
                                             requester.getYRot(), requester.getXRot(), pdata
                                     );
+
                                     requester.displayClientMessage(
                                             MessagesUtil.msg("tpa.auto_accept.from", Map.of("target", target.getName().getString())), false);
                                     target.displayClientMessage(
                                             MessagesUtil.msg("tpa.auto_accept.to", Map.of("sender", requester.getName().getString())), false);
-                                };
-
-                                warm.startOrBypass(src.getServer(), target, warmSec, tp);
+                                    return true;
+                                });
                                 return 1;
                             }
 
-                            // Normal request (no cooldown yet)
+                            // Normal request
                             tpa.requestHere(requester.getUUID(), target.getUUID(), 60);
                             requester.displayClientMessage(
                                     MessagesUtil.msg("tpa.sent", Map.of("target", target.getName().getString())), false);
@@ -207,9 +169,7 @@ public class TpaCmds {
                         }))
         );
 
-        // ---------------------------------------------------------------------
-        // /tpaccept  (actual teleport happens here)
-        // ---------------------------------------------------------------------
+        // /tpaccept
         d.register(Commands.literal("tpaccept")
                 .requires(src -> Perms.has(src, PermNodes.TPACCEPT_USE, 0))
                 .executes(ctx -> {
@@ -219,6 +179,7 @@ public class TpaCmds {
                     }
 
                     ServerPlayer to = ctx.getSource().getPlayerOrException();
+
                     var optReq = tpa.consume(to.getUUID());
                     if (optReq.isEmpty()) {
                         to.displayClientMessage(MessagesUtil.msg("tpa.none"), false);
@@ -232,29 +193,9 @@ public class TpaCmds {
                         return 0;
                     }
 
-                    int warmSec = (MEConfig.INSTANCE != null) ? MEConfig.INSTANCE.getWarmup("tpa") : 0;
-                    CommandSourceStack src = ctx.getSource();
-
-                    // Determine who moves + where they go
-                    Runnable tp;
-                    ServerPlayer moving;
-
                     if (req.direction == Direction.TO_TARGET) {
-                        // normal /tpa: move requester (from) to accepter (to)
-                        moving = from;
-                        tp = () -> {
-                            long now = System.currentTimeMillis();
-                            if (!Bypass.cooldown(src)
-                                    && cd.getDefaultSeconds("tpa") > 0
-                                    && !cd.checkAndStampDefault(moving.getUUID(), "tpa", now)) {
-
-                                long rem = cd.remaining(moving.getUUID(), "tpa", now);
-                                moving.displayClientMessage(
-                                        MessagesUtil.msg("cooldown.wait", Map.of("seconds", rem)), false
-                                );
-                                return;
-                            }
-
+                        // requester moves (from -> to)
+                        exec.runTeleport(ctx.getSource().getServer(), from, ctx.getSource(), "tpa", () -> {
                             Teleports.pushBackAndTeleport(
                                     from, to.serverLevel(),
                                     to.getX(), to.getY(), to.getZ(),
@@ -264,23 +205,11 @@ public class TpaCmds {
                             to.displayClientMessage(MessagesUtil.msg("tpa.accepted.to"), false);
                             from.displayClientMessage(
                                     MessagesUtil.msg("tpa.accepted.from", Map.of("target", to.getName().getString())), false);
-                        };
+                            return true;
+                        });
                     } else {
-                        // /tpahere: move accepter (to) to requester (from)
-                        moving = to;
-                        tp = () -> {
-                            long now = System.currentTimeMillis();
-                            if (!Bypass.cooldown(src)
-                                    && cd.getDefaultSeconds("tpa") > 0
-                                    && !cd.checkAndStampDefault(moving.getUUID(), "tpa", now)) {
-
-                                long rem = cd.remaining(moving.getUUID(), "tpa", now);
-                                moving.displayClientMessage(
-                                        MessagesUtil.msg("cooldown.wait", Map.of("seconds", rem)), false
-                                );
-                                return;
-                            }
-
+                        // accepter moves (to -> from)
+                        exec.runTeleport(ctx.getSource().getServer(), to, ctx.getSource(), "tpa", () -> {
                             Teleports.pushBackAndTeleport(
                                     to, from.serverLevel(),
                                     from.getX(), from.getY(), from.getZ(),
@@ -290,18 +219,15 @@ public class TpaCmds {
                             to.displayClientMessage(MessagesUtil.msg("tpa.accepted.to"), false);
                             from.displayClientMessage(
                                     MessagesUtil.msg("tpa.accepted.from", Map.of("target", to.getName().getString())), false);
-                        };
+                            return true;
+                        });
                     }
 
-                    // Warmup is applied to the player being moved
-                    warm.startOrBypass(ctx.getSource().getServer(), moving, warmSec, tp);
                     return 1;
                 })
         );
 
-        // ---------------------------------------------------------------------
         // /tpdeny
-        // ---------------------------------------------------------------------
         d.register(Commands.literal("tpdeny")
                 .requires(src -> Perms.has(src, PermNodes.TPDENY_USE, 0))
                 .executes(ctx -> {
@@ -320,11 +246,9 @@ public class TpaCmds {
                 })
         );
 
-        // ---------------------------------------------------------------------
         // /tptoggle
-        // ---------------------------------------------------------------------
         d.register(Commands.literal("tptoggle")
-                .requires(src -> Perms.has(src, /* adjust node name if needed */ PermNodes.TPP_TOGGLE, 0))
+                .requires(src -> Perms.has(src, PermNodes.TPP_TOGGLE, 0))
                 .executes(ctx -> {
                     if (!featureOn()) {
                         ctx.getSource().sendFailure(MessagesUtil.msg("feature.disabled.teleport"));
@@ -340,9 +264,7 @@ public class TpaCmds {
                 })
         );
 
-        // ---------------------------------------------------------------------
         // /tpauto
-        // ---------------------------------------------------------------------
         d.register(Commands.literal("tpauto")
                 .requires(src -> Perms.has(src, PermNodes.TPAUTO_USE, 0))
                 .executes(ctx -> {

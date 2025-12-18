@@ -2,12 +2,11 @@ package com.alphine.mysticessentials.commands.tp;
 
 import com.alphine.mysticessentials.MysticEssentialsCommon;
 import com.alphine.mysticessentials.config.MEConfig;
-import com.alphine.mysticessentials.perm.Bypass;
 import com.alphine.mysticessentials.perm.PermNodes;
 import com.alphine.mysticessentials.perm.Perms;
+import com.alphine.mysticessentials.storage.PlayerDataStore;
 import com.alphine.mysticessentials.storage.WarpsStore;
-import com.alphine.mysticessentials.teleport.CooldownManager;
-import com.alphine.mysticessentials.teleport.WarmupManager;
+import com.alphine.mysticessentials.teleport.TeleportExecutor;
 import com.alphine.mysticessentials.util.MessagesUtil;
 import com.alphine.mysticessentials.util.Teleports;
 import com.mojang.brigadier.CommandDispatcher;
@@ -34,15 +33,12 @@ public class WarpCmd {
         return b.buildFuture();
     };
     private final WarpsStore warps;
-    private final CooldownManager cd;
-    private final WarmupManager warm;
-    private final com.alphine.mysticessentials.storage.PlayerDataStore pdata;
+    private final TeleportExecutor exec;
+    private final PlayerDataStore pdata;
 
-    public WarpCmd(WarpsStore w, CooldownManager cd, WarmupManager warm,
-                   com.alphine.mysticessentials.storage.PlayerDataStore pdata) {
+    public WarpCmd(WarpsStore w, TeleportExecutor exec, PlayerDataStore pdata) {
         this.warps = w;
-        this.cd = cd;
-        this.warm = warm;
+        this.exec = exec;
         this.pdata = pdata;
     }
 
@@ -71,38 +67,22 @@ public class WarpCmd {
                             }
                             var w = ow.get();
 
-                            int warmSec = (MEConfig.INSTANCE != null) ? MEConfig.INSTANCE.getWarmup("warp") : 0;
-                            CommandSourceStack src = ctx.getSource();
-
-                            Runnable tp = () -> {
-                                // Cooldown at the moment of teleport
-                                long now = System.currentTimeMillis();
-                                if (!Bypass.cooldown(src)
-                                        && cd.getDefaultSeconds("warp") > 0
-                                        && !cd.checkAndStampDefault(p.getUUID(), "warp", now)) {
-
-                                    long rem = cd.remaining(p.getUUID(), "warp", now);
-                                    p.displayClientMessage(
-                                            MessagesUtil.msg("cooldown.wait", Map.of("seconds", rem)), false
-                                    );
-                                    return;
-                                }
-
+                            exec.runTeleport(ctx.getSource().getServer(), p, ctx.getSource(), "warp", () -> {
                                 ResourceLocation id = ResourceLocation.tryParse(w.dim);
                                 if (id == null) {
                                     p.displayClientMessage(MessagesUtil.msg("warp.bad_dimension", Map.of("dim", w.dim)), false);
-                                    return;
+                                    return false;
                                 }
                                 ResourceKey<Level> key = ResourceKey.create(Registries.DIMENSION, id);
                                 ServerLevel level = Objects.requireNonNull(p.getServer()).getLevel(key);
                                 if (level == null) {
                                     p.displayClientMessage(MessagesUtil.msg("warp.world_missing", Map.of("dim", w.dim)), false);
-                                    return;
+                                    return false;
                                 }
                                 Teleports.pushBackAndTeleport(p, level, w.x, w.y, w.z, w.yaw, w.pitch, pdata);
-                            };
+                                return true;
+                            });
 
-                            warm.startOrBypass(ctx.getSource().getServer(), p, warmSec, tp);
                             return 1;
                         })
                 )

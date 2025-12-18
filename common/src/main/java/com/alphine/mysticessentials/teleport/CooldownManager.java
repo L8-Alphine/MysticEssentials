@@ -2,68 +2,99 @@ package com.alphine.mysticessentials.teleport;
 
 import com.alphine.mysticessentials.config.MEConfig;
 
-import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Per-player cooldowns keyed by a logical action string (home/warp/tp/tpa/spawn...).
- * Supports config-driven defaults and reload via updateFromConfig().
+ * Cooldowns are stamped AFTER successful teleports by TeleportExecutor.
  */
-public class CooldownManager {
-    private final Map<UUID, Map<String, Long>> map = new HashMap<>();
-    private int defHome = 0, defWarp = 0, defTp = 0, defTpa = 0, defSpawn = 0;
+public final class CooldownManager {
 
-    public CooldownManager() { updateFromConfig(); } // ensure defaults once
+    // per-player -> (key -> untilEpochMs)
+    private final Map<UUID, Map<String, Long>> untilByPlayer = new ConcurrentHashMap<>();
 
-    public boolean checkAndStamp(UUID id, String key, long nowMs, long seconds) {
-        var m = map.computeIfAbsent(id, k -> new HashMap<>());
-        long until = m.getOrDefault(key, 0L);
-        if (nowMs < until) return false;
-        m.put(key, nowMs + Math.max(0, seconds) * 1000L);
-        return true;
+    // key -> defaultSeconds (from config)
+    private final Map<String, Integer> defaults = new ConcurrentHashMap<>();
+
+    public CooldownManager() {
+        updateFromConfig();
     }
 
-    public boolean checkAndStampDefault(UUID id, String key, long nowMs) {
-        return checkAndStamp(id, key, nowMs, getDefaultSeconds(key));
+    /** True if this key has a non-zero default cooldown. */
+    public boolean hasDefault(String key) {
+        return getDefaultSeconds(key) > 0;
     }
 
-    public long remaining(UUID id, String key, long nowMs) {
-        var m = map.get(id);
+    /** Remaining seconds (rounded up), 0 if none. */
+    public long remainingSeconds(UUID id, String key, long nowMs) {
+        if (id == null || key == null) return 0;
+        Map<String, Long> m = untilByPlayer.get(id);
         if (m == null) return 0;
-        long remMs = m.getOrDefault(key, 0L) - nowMs;
+
+        long until = m.getOrDefault(norm(key), 0L);
+        long remMs = until - nowMs;
         return remMs <= 0 ? 0 : (remMs + 999) / 1000;
     }
 
+    /** Stamp a cooldown for the given key for secondsFromNow starting at nowMs. */
     public void set(UUID id, String key, long secondsFromNow, long nowMs) {
-        map.computeIfAbsent(id, k -> new HashMap<>())
-                .put(key, nowMs + Math.max(0, secondsFromNow) * 1000L);
-    }
-    public void clear(UUID id, String key) {
-        var m = map.get(id);
-        if (m != null) m.remove(key);
+        if (id == null || key == null) return;
+        untilByPlayer
+                .computeIfAbsent(id, k -> new ConcurrentHashMap<>())
+                .put(norm(key), nowMs + Math.max(0, secondsFromNow) * 1000L);
     }
 
+    /** Convenience: stamp using the default seconds for the key. */
+    public void stampDefault(UUID id, String key, long nowMs) {
+        int secs = getDefaultSeconds(key);
+        if (secs > 0) set(id, key, secs, nowMs);
+    }
+
+    /** Clears a specific cooldown key for a player. */
+    public void clear(UUID id, String key) {
+        if (id == null || key == null) return;
+        Map<String, Long> m = untilByPlayer.get(id);
+        if (m != null) m.remove(norm(key));
+    }
+
+    /** Optional: clear all cooldowns for a player (on logout, etc.) */
+    public void clearAll(UUID id) {
+        if (id == null) return;
+        untilByPlayer.remove(id);
+    }
+
+    /** Reload default cooldowns from config. */
     public void updateFromConfig() {
-        var c = MEConfig.INSTANCE;
-        if (c == null) { defHome=defWarp=defTp=defTpa=defSpawn=0; return; }
-        this.defHome  = Math.max(0, c.getCooldown("home"));
-        this.defWarp  = Math.max(0, c.getCooldown("warp"));
-        this.defTp    = Math.max(0, c.getCooldown("tp"));
-        this.defTpa   = Math.max(0, c.getCooldown("tpa"));
-        this.defSpawn = Math.max(0, c.getCooldown("spawn"));
+        defaults.clear();
+
+        MEConfig c = MEConfig.INSTANCE;
+        if (c == null) return;
+
+        putDefault("home", c.getCooldown("home"));
+        putDefault("warp", c.getCooldown("warp"));
+        putDefault("tp", c.getCooldown("tp"));
+        putDefault("tpa", c.getCooldown("tpa"));
+        putDefault("spawn", c.getCooldown("spawn"));
+        putDefault("back", c.getCooldown("back"));
+        putDefault("deathback", c.getCooldown("deathback"));
+        putDefault("tphere", c.getCooldown("tphere"));
+        putDefault("tpo", c.getCooldown("tpo"));
+        putDefault("tpahere", c.getCooldown("tpahere"));
     }
 
     public int getDefaultSeconds(String key) {
         if (key == null) return 0;
-        switch (key.toLowerCase(Locale.ROOT)) {
-            case "home":  return defHome;
-            case "warp":  return defWarp;
-            case "tp":    return defTp;
-            case "tpa":   return defTpa;
-            case "spawn": return defSpawn;
-            default:      return 0;
-        }
+        return Math.max(0, defaults.getOrDefault(norm(key), 0));
+    }
+
+    private void putDefault(String key, int seconds) {
+        defaults.put(norm(key), Math.max(0, seconds));
+    }
+
+    private static String norm(String key) {
+        return key.toLowerCase(Locale.ROOT);
     }
 }

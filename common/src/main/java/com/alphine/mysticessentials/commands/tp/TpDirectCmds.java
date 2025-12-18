@@ -1,12 +1,10 @@
 package com.alphine.mysticessentials.commands.tp;
 
 import com.alphine.mysticessentials.config.MEConfig;
-import com.alphine.mysticessentials.perm.Bypass;
 import com.alphine.mysticessentials.perm.PermNodes;
 import com.alphine.mysticessentials.perm.Perms;
 import com.alphine.mysticessentials.storage.PlayerDataStore;
-import com.alphine.mysticessentials.teleport.CooldownManager;
-import com.alphine.mysticessentials.teleport.WarmupManager;
+import com.alphine.mysticessentials.teleport.TeleportExecutor;
 import com.alphine.mysticessentials.util.MessagesUtil;
 import com.alphine.mysticessentials.util.Teleports;
 import com.mojang.brigadier.CommandDispatcher;
@@ -19,13 +17,11 @@ import net.minecraft.server.level.ServerPlayer;
 import java.util.Map;
 
 public class TpDirectCmds {
-    private final CooldownManager cd;
-    private final WarmupManager warm;
+    private final TeleportExecutor exec;
     private final PlayerDataStore pdata;
 
-    public TpDirectCmds(CooldownManager cd, WarmupManager warm, PlayerDataStore pdata) {
-        this.cd = cd;
-        this.warm = warm;
+    public TpDirectCmds(TeleportExecutor exec, PlayerDataStore pdata) {
+        this.exec = exec;
         this.pdata = pdata;
     }
 
@@ -34,16 +30,22 @@ public class TpDirectCmds {
         return c == null || c.features == null || c.features.enableHomesWarpsTP;
     }
 
-    public void register(CommandDispatcher<CommandSourceStack> d) {
+    private static void removeRootLiteral(CommandDispatcher<CommandSourceStack> d, String name) {
+        var root = d.getRoot();
+        CommandNode<CommandSourceStack> node = root.getChild(name);
+        if (node == null) return;
 
-        // -------------------------------------------------------------
-        // IMPORTANT: remove vanilla /tp so ours fully overrides it.
-        // This does NOT touch /teleport.
-        // -------------------------------------------------------------
-        CommandNode<CommandSourceStack> existingTp = d.getRoot().getChild("tp");
-        if (existingTp != null) {
-            d.getRoot().getChildren().remove(existingTp);
-        }
+        try {
+            var f = CommandNode.class.getDeclaredField("children");
+            f.setAccessible(true);
+            @SuppressWarnings("unchecked")
+            var map = (java.util.Map<String, CommandNode<CommandSourceStack>>) f.get(root);
+            map.remove(name);
+        } catch (Throwable ignored) {}
+    }
+
+    public void register(CommandDispatcher<CommandSourceStack> d) {
+        removeRootLiteral(d, "tp");
 
         // /tp <player>
         d.register(Commands.literal("tp")
@@ -67,35 +69,21 @@ public class TpDirectCmds {
                                 return 0;
                             }
 
-                            long now = System.currentTimeMillis();
-                            if (!Bypass.cooldown(ctx.getSource())
-                                    && cd.getDefaultSeconds("tp") > 0
-                                    && !cd.checkAndStampDefault(p.getUUID(), "tp", now)) {
-                                long rem = cd.remaining(p.getUUID(), "tp", now);
-                                p.displayClientMessage(
-                                        MessagesUtil.msg("cooldown.wait", Map.of("seconds", rem)),
-                                        false
+                            exec.runTeleport(ctx.getSource().getServer(), p, ctx.getSource(), "tp", () -> {
+                                Teleports.pushBackAndTeleport(
+                                        p, target.serverLevel(),
+                                        target.getX(), target.getY(), target.getZ(),
+                                        target.getYRot(), target.getXRot(), pdata
                                 );
-                                return 0;
-                            }
+                                return true;
+                            });
 
-                            int warmSec = (MEConfig.INSTANCE != null)
-                                    ? MEConfig.INSTANCE.getWarmup("tp")
-                                    : 0;
-
-                            Runnable tp = () -> Teleports.pushBackAndTeleport(
-                                    p, target.serverLevel(),
-                                    target.getX(), target.getY(), target.getZ(),
-                                    target.getYRot(), target.getXRot(), pdata
-                            );
-
-                            warm.startOrBypass(ctx.getSource().getServer(), p, warmSec, tp);
                             return 1;
                         })
                 )
         );
 
-        // /tphere <player>
+        // /tphere <player> (TARGET moves)
         d.register(Commands.literal("tphere")
                 .requires(src -> Perms.has(src, PermNodes.TPHERE_USE, 2))
                 .then(Commands.argument("player", StringArgumentType.word())
@@ -105,30 +93,34 @@ public class TpDirectCmds {
                                 return 0;
                             }
 
-                            ServerPlayer p = ctx.getSource().getPlayerOrException();
+                            ServerPlayer issuer = ctx.getSource().getPlayerOrException();
                             String name = StringArgumentType.getString(ctx, "player");
-                            ServerPlayer target = p.getServer().getPlayerList().getPlayerByName(name);
+                            ServerPlayer target = issuer.getServer().getPlayerList().getPlayerByName(name);
                             if (target == null) {
-                                p.displayClientMessage(MessagesUtil.msg("tp.player_not_found"), false);
+                                issuer.displayClientMessage(MessagesUtil.msg("tp.player_not_found"), false);
                                 return 0;
                             }
-                            if (p.getUUID().equals(target.getUUID())) {
-                                p.displayClientMessage(MessagesUtil.msg("tphere.self"), false);
+                            if (issuer.getUUID().equals(target.getUUID())) {
+                                issuer.displayClientMessage(MessagesUtil.msg("tphere.self"), false);
                                 return 0;
                             }
 
-                            Teleports.pushBack(target, pdata);
-                            target.teleportTo(
-                                    p.serverLevel(),
-                                    p.getX(), p.getY(), p.getZ(),
-                                    p.getYRot(), p.getXRot()
-                            );
+                            exec.runTeleport(ctx.getSource().getServer(), target, ctx.getSource(), "tphere", () -> {
+                                Teleports.pushBack(target, pdata);
+                                target.teleportTo(
+                                        issuer.serverLevel(),
+                                        issuer.getX(), issuer.getY(), issuer.getZ(),
+                                        issuer.getYRot(), issuer.getXRot()
+                                );
+                                return true;
+                            });
+
                             return 1;
                         })
                 )
         );
 
-        // /tpo <offlineName>  (teleport to offline player's last location)
+        // /tpo <offlineName> (issuer moves)
         d.register(Commands.literal("tpo")
                 .requires(src -> Perms.has(src, PermNodes.TPO_USE, 2))
                 .then(Commands.argument("name", StringArgumentType.word())
@@ -140,6 +132,7 @@ public class TpDirectCmds {
 
                             ServerPlayer p = ctx.getSource().getPlayerOrException();
                             String name = StringArgumentType.getString(ctx, "name");
+
                             var profileOpt = p.getServer().getProfileCache().get(name);
                             if (profileOpt.isEmpty()) {
                                 p.displayClientMessage(MessagesUtil.msg("tpo.profile_missing"), false);
@@ -154,31 +147,26 @@ public class TpDirectCmds {
                             }
                             var l = ol.get();
 
-                            var id = net.minecraft.resources.ResourceLocation.tryParse(l.dim);
-                            if (id == null) {
-                                p.displayClientMessage(
-                                        MessagesUtil.msg("warp.bad_dimension", Map.of("dim", l.dim)),
-                                        false
+                            exec.runTeleport(ctx.getSource().getServer(), p, ctx.getSource(), "tpo", () -> {
+                                var id = net.minecraft.resources.ResourceLocation.tryParse(l.dim);
+                                if (id == null) {
+                                    p.displayClientMessage(MessagesUtil.msg("warp.bad_dimension", Map.of("dim", l.dim)), false);
+                                    return false;
+                                }
+                                var key = net.minecraft.resources.ResourceKey.create(
+                                        net.minecraft.core.registries.Registries.DIMENSION, id
                                 );
-                                return 0;
-                            }
-                            var key = net.minecraft.resources.ResourceKey.create(
-                                    net.minecraft.core.registries.Registries.DIMENSION, id
-                            );
-                            var level = p.getServer().getLevel(key);
-                            if (level == null) {
-                                p.displayClientMessage(
-                                        MessagesUtil.msg("warp.world_missing", Map.of("dim", l.dim)),
-                                        false
-                                );
-                                return 0;
-                            }
+                                var level = p.getServer().getLevel(key);
+                                if (level == null) {
+                                    p.displayClientMessage(MessagesUtil.msg("warp.world_missing", Map.of("dim", l.dim)), false);
+                                    return false;
+                                }
 
-                            Teleports.pushBackAndTeleport(p, level, l.x, l.y, l.z, l.yaw, l.pitch, pdata);
-                            p.displayClientMessage(
-                                    MessagesUtil.msg("tpo.teleported_to_last", Map.of("name", name)),
-                                    false
-                            );
+                                Teleports.pushBackAndTeleport(p, level, l.x, l.y, l.z, l.yaw, l.pitch, pdata);
+                                p.displayClientMessage(MessagesUtil.msg("tpo.teleported_to_last", Map.of("name", name)), false);
+                                return true;
+                            });
+
                             return 1;
                         })
                 )
