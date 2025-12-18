@@ -13,7 +13,7 @@ import java.util.*;
 
 public class MEConfig {
 
-    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().serializeNulls().create();
+    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().serializeNulls().create();
     public static MEConfig INSTANCE;
     @SerializedName("locale")
     public String locale = "en_us";
@@ -34,6 +34,8 @@ public class MEConfig {
     public Afk afk = new Afk();
     @SerializedName("chat")
     public Chat chat = new Chat();
+    @SerializedName("vaults")
+    public Vaults vaults = new Vaults();
 
     private transient Path filePath;
 
@@ -111,6 +113,10 @@ public class MEConfig {
             case "tp" -> cooldowns.tp;
             case "tpa" -> cooldowns.tpa;
             case "spawn" -> cooldowns.spawn;
+            case "back" -> cooldowns.back;
+            case "deathback" -> cooldowns.deathback;
+            case "tpo" -> cooldowns.tpo;
+            case "tphere" -> cooldowns.tphere;
             default -> 0;
         };
     }
@@ -125,6 +131,10 @@ public class MEConfig {
             case "tp" -> warmups.tp;
             case "tpa" -> warmups.tpa;
             case "spawn" -> warmups.spawn;
+            case "back" -> warmups.back;
+            case "deathback" -> warmups.deathback;
+            case "tpo" -> warmups.tpo;
+            case "tphere" -> warmups.tphere;
             default -> 0;
         };
     }
@@ -134,11 +144,11 @@ public class MEConfig {
     // ------------------------------------------------------------
 
     public static class Cooldowns {
-        public int home = 3, warp = 3, tp = 3, tpa = 3, spawn = 3;
+        public int home = 3, warp = 3, tp = 3, tpa = 3, spawn = 3, back = 300, deathback = 300, tpo = 3, tphere = 3;
     }
 
     public static class Warmups {
-        public int home = 2, warp = 2, tp = 2, tpa = 2, spawn = 2;
+        public int home = 2, warp = 2, tp = 2, tpa = 2, spawn = 2, back = 5, deathback = 5, tpo = 2, tphere = 2;
     }
 
     public static class Limits {
@@ -175,6 +185,7 @@ public class MEConfig {
         public boolean enableHomesWarpsTP = true;
         public boolean enableAfkSystem = true;
         public boolean enableChatSystem = true;
+        public boolean enableVaultSystem = true;
     }
 
     public static class Permissions {
@@ -420,5 +431,32 @@ public class MEConfig {
          * Ignore toggle pub/sub channel.
          */
         public String ignoreChannel = "chat:ignore";
+    }
+
+    public static class Vaults {
+        public boolean enabled = true;
+
+        // Selector GUI is always 6 rows (54)
+        public int selectorRows = 6;
+
+        // Default display item for accessible vaults
+        public String defaultDisplayItem = "minecraft:barrel";
+
+        // Default vault name (without suffix)
+        public String defaultVaultName = "&bVault";
+
+        // Locked vault appearance
+        public String lockedItem = "minecraft:barrier";
+        public String lockedName = "&cLocked Vault";
+
+        // If true, selector shows up to 5 vault slots (row 1-5) and row 6 is nav/settings
+        public boolean selectorUsesLastRowForNav = true;
+
+        // Permissions behavior
+        public boolean allowHexInRenameIfPermitted = true;
+        public boolean allowLegacyInRenameIfPermitted = true;
+
+        // Hard cap convenience (if you want it): max vault count to scan perms for
+        public int numericCap = 64;
     }
 }
