@@ -1,5 +1,6 @@
 package com.alphine.mysticessentials.mixin;
 
+import com.alphine.mysticessentials.chat.ChatSystemGate;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.ComponentContents;
 import net.minecraft.network.chat.contents.TranslatableContents;
@@ -17,21 +18,25 @@ public abstract class PlayerListSystemMessageMixin {
             at = @At("HEAD"),
             cancellable = true
     )
-    private void mysticessentials$filterJoinQuit(Component message, boolean overlay, CallbackInfo ci) {
-        if (message == null) {
+    private void mysticessentials$filterJoinQuitDeath(Component message, boolean overlay, CallbackInfo ci) {
+        if (message == null) return;
+
+        // Only override vanilla system messages if chat system is actually enabled/configured.
+        if (!ChatSystemGate.chatSystemEnabled()) return;
+
+        ComponentContents contents = message.getContents();
+        if (!(contents instanceof TranslatableContents tc)) return;
+
+        String key = tc.getKey();
+
+        // Join/leave
+        if ("multiplayer.player.joined".equals(key) || "multiplayer.player.left".equals(key)) {
+            ci.cancel();
             return;
         }
 
-        ComponentContents contents = message.getContents();
-        if (!(contents instanceof TranslatableContents tc)) {
-            return; // not a vanilla translatable message -> let it through
-        }
-
-        String key = tc.getKey();
-        // Vanilla join / leave keys
-        if ("multiplayer.player.joined".equals(key)
-                || "multiplayer.player.left".equals(key)) {
-            // Suppress vanilla join/quit so only MysticEssentials’ SystemMessageService fires
+        // Death messages (covers death.attack.*, death.fell.*, etc.)
+        if (key != null && key.startsWith("death.")) {
             ci.cancel();
         }
     }
