@@ -10,7 +10,7 @@ import java.util.Map;
 public class ChatContext {
 
     public final CommonServer server;
-    public final CommonPlayer sender;
+    public CommonPlayer sender;
     public final Instant timestamp;
 
     public String rawMessage;
