@@ -261,5 +261,17 @@ public final class CommandRegistrar {
             VaultAdminCMD.register(d);
             idx("vaultadmin", "vaultadmincmd");
         }
+
+        // Holograms
+        if (on(() -> common.cfg.features.enableHologramSystem)) {
+            com.alphine.mysticessentials.commands.hologram.HologramCmd.register(common, d);
+            idx("hologram", "holograms", "holo", "holos");
+        }
+
+        // NPCs
+        if (on(() -> common.cfg.features.enableNpcSystem)) {
+            com.alphine.mysticessentials.commands.npc.NpcCmd.register(common, d);
+            idx("npc", "npcs");
+        }
     }
 }
