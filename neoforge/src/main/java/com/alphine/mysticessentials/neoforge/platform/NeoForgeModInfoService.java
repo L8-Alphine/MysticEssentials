@@ -8,6 +8,8 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 
+import static com.alphine.mysticessentials.MysticEssentialsCommon.MOD_ID;
+
 public final class NeoForgeModInfoService implements ModInfoService {
     @Override
     public List<ModInfo> getAllMods() {
@@ -23,5 +25,13 @@ public final class NeoForgeModInfoService implements ModInfoService {
                     jar
             );
         }).toList();
+    }
+
+    @Override
+    public String getVersion() {
+        return ModList.get()
+                .getModContainerById(MOD_ID)
+                .map(c -> c.getModInfo().getVersion().toString())
+                .orElse("UNKNOWN");
     }
 }
