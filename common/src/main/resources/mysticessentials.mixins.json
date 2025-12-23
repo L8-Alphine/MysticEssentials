@@ -9,7 +9,10 @@
     "PlayerListChatSenderCaptureMixin",
     "PlayerListChatTagsMixin",
     "PlayerListSystemMessageMixin",
-    "ServerPlayerLinkifyMixin"
+    "ServerPlayerLinkifyMixin",
+    "accessor.BillboardConstraintsAccessor",
+    "accessor.DisplayAccessors",
+    "accessor.TextDisplayAccessors"
   ],
   "injectors": {
     "defaultRequire": 1
