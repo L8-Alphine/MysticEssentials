@@ -112,6 +112,61 @@ public final class PermNodes {
     public static final String CHAT_SHOUT = "messentials.chat.shout"; // allows shouting messages to nearby players
     public static final String CHAT_CLEAR = "messentials.chat.clear"; // allows clearing the chat for all players
 
+    // Hologram System
+    public static final String HOLOGRAM_BASE = "messentials.hologram";
+    public static String hologramNode(String action) { return HOLOGRAM_BASE + "." + action.toLowerCase(Locale.ROOT); }
+
+    public static final String HOLOGRAM_USE      = "messentials.hologram.use";
+    public static final String HOLOGRAM_CREATE   = "messentials.hologram.create";
+    public static final String HOLOGRAM_DELETE   = "messentials.hologram.delete";
+    public static final String HOLOGRAM_EDIT     = "messentials.hologram.edit";
+    public static final String HOLOGRAM_MOVE     = "messentials.hologram.move";
+    public static final String HOLOGRAM_LIST     = "messentials.hologram.list";
+    public static final String HOLOGRAM_TELEPORT = "messentials.hologram.teleport";
+    public static final String HOLOGRAM_RENAME   = "messentials.hologram.rename";
+    public static final String HOLOGRAM_RELOAD   = "messentials.hologram.reload";
+
+    public static final String HOLOGRAM_LINE_ADD    = "messentials.hologram.line.add";
+    public static final String HOLOGRAM_LINE_EDIT   = "messentials.hologram.line.edit";
+    public static final String HOLOGRAM_LINE_DELETE = "messentials.hologram.line.delete";
+
+    public static final String HOLOGRAM_SETTING               = "messentials.hologram.setting";
+    public static final String HOLOGRAM_SETTING_SCALE         = "messentials.hologram.setting.scale";
+    public static final String HOLOGRAM_SETTING_VISIBILITY    = "messentials.hologram.setting.visibility";
+    public static final String HOLOGRAM_SETTING_INTERACTION   = "messentials.hologram.setting.interaction";
+    public static final String HOLOGRAM_SETTING_BILLBOARD     = "messentials.hologram.setting.billboard";
+    public static final String HOLOGRAM_SETTING_ROTATION      = "messentials.hologram.setting.rotation";
+    public static final String HOLOGRAM_SETTING_VIEWDISTANCE  = "messentials.hologram.setting.viewdistance";
+
+
+    // NPC System
+    public static final String NPC_BASE = "messentials.npc";
+    public static String npcNode(String action) { return NPC_BASE + "." + action.toLowerCase(Locale.ROOT); }
+
+    public static final String NPC_USE       = "messentials.npc.use";
+    public static final String NPC_CREATE    = "messentials.npc.create";
+    public static final String NPC_DELETE    = "messentials.npc.delete";
+    public static final String NPC_EDIT      = "messentials.npc.edit";
+    public static final String NPC_LIST      = "messentials.npc.list";
+    public static final String NPC_TELEPORT  = "messentials.npc.teleport";
+    public static final String NPC_RENAME    = "messentials.npc.rename";
+    public static final String NPC_RELOAD    = "messentials.npc.reload";
+
+    public static final String NPC_SETTING_EQUIP = "messentials.npc.setting.equip";
+
+    public static final String NPC_SKIN_CHANGE      = "messentials.npc.skinchange";
+    public static final String NPC_DIALOGUE_ADD     = "messentials.npc.dialogue.add";
+    public static final String NPC_DIALOGUE_EDIT    = "messentials.npc.dialogue.edit";
+    public static final String NPC_DIALOGUE_DELETE  = "messentials.npc.dialogue.delete";
+
+    public static final String NPC_SETTING              = "messentials.npc.setting";
+    public static final String NPC_SETTING_INTERACTION  = "messentials.npc.setting.interaction";
+    public static final String NPC_SETTING_VISIBILITY   = "messentials.npc.setting.visibility";
+    public static final String NPC_SETTING_SCALE        = "messentials.npc.setting.scale";
+
+    public static final String NPC_ACTION_BIND          = "messentials.npc.action.bind";
+    public static final String NPC_ACTION_UNBIND        = "messentials.npc.action.unbind";
+
     // Repair System
     public static final String REPAIR_USE        = "messentials.repair";
     public static final String REPAIR_ENCHANTED  = "messentials.repair.enchanted";
