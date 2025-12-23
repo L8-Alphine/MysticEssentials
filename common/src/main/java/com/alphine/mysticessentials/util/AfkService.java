@@ -49,6 +49,7 @@ public final class AfkService {
     public void reloadPools() {
         this.cfg = MEConfig.INSTANCE != null ? MEConfig.INSTANCE : this.cfg;
         // nothing else needed; we always read from cfg.afk at runtime
+        System.out.println("[MysticEssentials] AFK pools reloaded.");
     }
 
     // ---------------- public API ----------------
