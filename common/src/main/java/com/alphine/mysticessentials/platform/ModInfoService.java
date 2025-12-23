@@ -9,4 +9,6 @@ public interface ModInfoService {
 
     /** Return all mods. active=true means loaded; if the loader exposes disabled/not-loaded entries, mark them false. */
     List<ModInfo> getAllMods();
+
+    String getVersion();
 }
