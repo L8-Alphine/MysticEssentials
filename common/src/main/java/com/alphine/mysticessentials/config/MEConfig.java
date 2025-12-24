@@ -36,6 +36,10 @@ public class MEConfig {
     public Chat chat = new Chat();
     @SerializedName("vaults")
     public Vaults vaults = new Vaults();
+    @SerializedName("holograms")
+    public Holograms holograms = new Holograms();
+    @SerializedName("npcs")
+    public Npcs npcs = new Npcs();
 
     private transient Path filePath;
 
@@ -97,6 +101,9 @@ public class MEConfig {
                 this.permissions = x.permissions;
                 this.afk = x.afk;
                 this.chat = x.chat;
+                this.vaults = x.vaults;
+                this.holograms = x.holograms;
+                this.npcs = x.npcs;
             }
         } catch (IOException e) {
             System.err.println("[MysticEssentials] Failed to reload config: " + e.getMessage());
@@ -186,6 +193,8 @@ public class MEConfig {
         public boolean enableAfkSystem = true;
         public boolean enableChatSystem = true;
         public boolean enableVaultSystem = true;
+        public boolean enableHologramSystem = true;
+        public boolean enableNpcSystem = true;
     }
 
     public static class Permissions {
@@ -436,9 +445,6 @@ public class MEConfig {
     public static class Vaults {
         public boolean enabled = true;
 
-        // Selector GUI is always 6 rows (54)
-        public int selectorRows = 6;
-
         // Default display item for accessible vaults
         public String defaultDisplayItem = "minecraft:barrel";
 
@@ -447,10 +453,6 @@ public class MEConfig {
 
         // Locked vault appearance
         public String lockedItem = "minecraft:barrier";
-        public String lockedName = "&cLocked Vault";
-
-        // If true, selector shows up to 5 vault slots (row 1-5) and row 6 is nav/settings
-        public boolean selectorUsesLastRowForNav = true;
 
         // Permissions behavior
         public boolean allowHexInRenameIfPermitted = true;
@@ -458,5 +460,87 @@ public class MEConfig {
 
         // Hard cap convenience (if you want it): max vault count to scan perms for
         public int numericCap = 64;
+    }
+
+    public static class Holograms {
+        public boolean enabled = true;
+
+        // Storage
+        public String directory = "holograms";
+        public boolean atomicSaves = true;
+
+        // Defaults for NEW holograms
+        public int defaultViewDistanceBlocks = 10;
+        public double defaultLineSpacing = 0.28;
+        public float defaultScale = 1.0f;
+        public boolean defaultSeeThroughBlocks = false;
+        public boolean defaultPlaceholdersEnabled = true;
+        public int defaultTextUpdateIntervalTicks = 20;
+        public boolean defaultEnablePercentPlaceholders = true;
+        public boolean defaultEnableBracePlaceholders = true;
+
+        // Runtime knobs (manager reconciliation)
+        public int reconcileIntervalTicks = 20;
+    }
+
+    public static class Npcs {
+        public boolean enabled = true;
+
+        // Storage
+        public String directory = "npcs"; // npcs/<name>.json
+        public boolean atomicSaves = true;
+
+        // Defaults
+        public int defaultViewDistanceBlocks = 48;
+        public float defaultScale = 1.0f;
+
+        // Runtime knobs (step 2)
+        public int reconcileIntervalTicks = 20;
+
+        // Skin system (step 3)
+        public Skin skin = new Skin();
+
+        public Visuals visuals = new Visuals();
+
+        public boolean allowHologramNameplates = true;
+
+        public static class Skin {
+            public boolean enabled = true;
+            public String cacheDir = "data/skins";
+            public int cacheTtlMinutes = 10080; // 7d
+            public int negativeCacheMinutes = 60;
+
+            public int connectTimeoutMs = 2500;
+            public int readTimeoutMs = 5000;
+
+            public boolean allowMojangFetch = true;
+            public boolean allowUrlSkins = true;
+
+            public String mineSkinApiKey = ""; // optional later
+            public int mineSkinMaxInFlight = 2;
+
+            public String fallback = "DEFAULT_RANDOM";
+        }
+
+        public static class Visuals {
+            public boolean glowing = false;
+            public String glowingColor = "WHITE";
+        }
+    }
+
+    public static class Placeholders {
+        public boolean enabled = true;
+        public boolean percentStyle = true; // %token% for placeholderapi
+        public boolean braceStyle = true;   // {token} for textplaceholderapi
+
+        // start false for performance; can be enabled later as "advanced"
+        public boolean allowPerViewer = false;
+
+        public int perViewerMaxViewers = 24;
+        public int perViewerMinUpdateTicks = 20;
+    }
+
+    public static Gson getGson() {
+        return GSON;
     }
 }
