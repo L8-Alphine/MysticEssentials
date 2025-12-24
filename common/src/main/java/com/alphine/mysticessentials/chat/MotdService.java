@@ -1,7 +1,11 @@
 package com.alphine.mysticessentials.chat;
 
+import com.alphine.mysticessentials.MysticEssentialsCommon;
 import com.alphine.mysticessentials.config.ChatConfigManager;
 import com.alphine.mysticessentials.config.ChatConfigManager.MotdConfig;
+import com.alphine.mysticessentials.placeholders.LegacyAnglePlaceholderTranslator;
+import com.alphine.mysticessentials.placeholders.PlaceholderContext;
+import com.alphine.mysticessentials.placeholders.PlaceholderService;
 import com.alphine.mysticessentials.util.AdventureComponentBridge;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
@@ -11,41 +15,45 @@ public final class MotdService {
 
     private static final MiniMessage MM = MiniMessage.miniMessage();
 
+    // Inject or store this somewhere central
+    private static PlaceholderService PLACEHOLDERS;
+
     private MotdService() {}
 
-    /**
-     * Send the configured MOTD to the joining player.
-     * Uses chat/motd.json.
-     */
+    public static void init(PlaceholderService svc) {
+        PLACEHOLDERS = svc;
+    }
+
     public static void sendJoinMotd(ServerPlayer player) {
         MotdConfig cfg = ChatConfigManager.MOTD;
         if (cfg == null || !cfg.enabled || cfg.lines == null || cfg.lines.isEmpty()) {
             return;
         }
 
-        var server   = player.getServer();
-        String name  = player.getGameProfile().getName();
-        String disp  = player.getDisplayName().getString();
-        String world = player.serverLevel().dimension().location().toString();
-        int online   = server.getPlayerList().getPlayerCount();
-        int max      = server.getPlayerList().getMaxPlayers();
-        String srv   = server.getServerModName(); // or your custom name
-
+        var server = player.getServer();
         var registries = player.registryAccess();
+
+        var placeholderSvc = MysticEssentialsCommon.get().placeholders;
+        PlaceholderContext ctx = PlaceholderContext.of(server, player)
+                .withViewer(player);
 
         for (String template : cfg.lines) {
             if (template == null || template.isBlank()) continue;
 
-            String line = template
-                    .replace("<player>", name)
-                    .replace("<name>", name)
-                    .replace("<display-name>", disp)
-                    .replace("<world>", world)
-                    .replace("<online>", String.valueOf(online))
-                    .replace("<max>", String.valueOf(max))
-                    .replace("<server>", srv);
+            // 1) Convert <player> → {player}, etc
+            String legacyTranslated =
+                    LegacyAnglePlaceholderTranslator.translate(template);
 
-            Component adv = MM.deserialize(line);
+            // 2) Apply unified placeholder engine
+            String parsed = placeholderSvc.applyAll(
+                    legacyTranslated,
+                    ctx,
+                    true,  // %placeholders%
+                    true   // {placeholders}
+            );
+
+            // 3) MiniMessage
+            Component adv = MM.deserialize(parsed);
             net.minecraft.network.chat.Component vanilla =
                     AdventureComponentBridge.advToNative(adv, registries);
 
