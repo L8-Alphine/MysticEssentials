@@ -7,6 +7,7 @@ import com.alphine.mysticessentials.chat.platform.CommonPlayer;
 import com.alphine.mysticessentials.chat.platform.CommonServer;
 import com.alphine.mysticessentials.chat.redis.RedisClientAdapter;
 import com.alphine.mysticessentials.config.MEConfig;
+import com.alphine.mysticessentials.fabric.npc.NpcInteractionCallbacks;
 import com.alphine.mysticessentials.fabric.platform.FabricModInfoService;
 import com.alphine.mysticessentials.fabric.redis.LettuceRedisClientAdapter;
 import com.alphine.mysticessentials.inv.InvseeSessions;
@@ -18,8 +19,12 @@ import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.entity.event.v1.ServerEntityWorldChangeEvents;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerChunkEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.chunk.LevelChunk;
 import net.fabricmc.fabric.api.message.v1.ServerMessageEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.loader.api.FabricLoader;
@@ -31,6 +36,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.chunk.LevelChunk;
 
 import java.nio.file.Path;
 import java.util.HashMap;
@@ -97,10 +103,14 @@ public class MysticEssentialsFabric implements ModInitializer {
         // Lifecycle
         ServerLifecycleEvents.SERVER_STARTING.register(server -> {
             // core services + config
-            MysticEssentialsCommon.get().serverStarting(server);
+            var common = MysticEssentialsCommon.get();
+            common.setNpcPlatform(new com.alphine.mysticessentials.fabric.npc.FabricNpcPlatform());
+            common.serverStarting(server);
 
             MEConfig cfg = MysticEssentialsCommon.get().cfg;
             RedisClientAdapter adapter = null;
+
+            NpcInteractionCallbacks.register(common);
 
             if (cfg != null && cfg.chat != null && cfg.chat.redis != null && cfg.chat.redis.enabled) {
                 this.redisAdapter = new LettuceRedisClientAdapter(cfg.chat.redis);
@@ -125,9 +135,18 @@ public class MysticEssentialsFabric implements ModInitializer {
                     currentVersion,
                     msg -> server.sendSystemMessage(Component.literal(msg))
             );
+            System.out.println("[MysticEssentials] Starting with MysticEssentials v" + currentVersion);
         });
+
+
         ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
-            MysticEssentialsCommon.get().serverStopping();
+            var common = MysticEssentialsCommon.get();
+            if (common.hologramManager != null) {
+                common.hologramManager.shutdown(server);
+            }
+
+            common.serverStopping();
+
             if (redisAdapter != null) {
                 redisAdapter.shutdown();
                 redisAdapter = null;
@@ -217,6 +236,7 @@ public class MysticEssentialsFabric implements ModInitializer {
 
         // Once-per-second AFK tick
         ServerTickEvents.END_SERVER_TICK.register(server -> {
+            var common = MysticEssentialsCommon.get();
             // warmups: tick every server tick
             MysticEssentialsCommon.get().warmups.tick(server);
 
@@ -226,6 +246,20 @@ public class MysticEssentialsFabric implements ModInitializer {
             if (++afkTickAccum >= 20) {
                 afkTickAccum = 0;
                 MysticEssentialsCommon.get().serverTick1s(server);
+            }
+
+            if (common.cfg != null) {
+                if (common.cfg.holograms != null && common.cfg.holograms.enabled && common.hologramManager != null) {
+                    common.hologramManager.tick(server);
+                }
+                boolean npcFeatureEnabled =
+                        common.cfg.npcs != null
+                                && common.cfg.npcs.enabled
+                                && (common.cfg.features == null || common.cfg.features.enableNpcSystem);
+
+                if (npcFeatureEnabled && common.npcManager != null) {
+                    common.npcManager.tick(server);
+                }
             }
         });
 
@@ -301,6 +335,15 @@ public class MysticEssentialsFabric implements ModInitializer {
             if (lvl != null) {
                 Teleports.pushBackAndTeleport(player, lvl, pt.x, pt.y, pt.z, pt.yaw, pt.pitch, common.pdata);
             }
+        });
+
+        ServerChunkEvents.CHUNK_LOAD.register((server, level) -> {
+            var common = MysticEssentialsCommon.get();
+            if (common.cfg == null || common.cfg.holograms == null || !common.cfg.holograms.enabled) return;
+            if (common.hologramManager == null) return;
+
+            // pos is already ChunkPos
+            common.hologramManager.onChunkLoaded(server.getServer(), (ServerLevel) level.getLevel(), level.getPos());
         });
 
         // Chat mute + AFK ping + custom chat pipeline

@@ -22,6 +22,8 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.chunk.LevelChunk;
+import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.loading.FMLPaths;
 import net.neoforged.neoforge.common.NeoForge;
@@ -32,6 +34,7 @@ import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
 import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerContainerEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
+import net.neoforged.neoforge.event.level.ChunkEvent;
 import net.neoforged.neoforge.event.server.ServerAboutToStartEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
@@ -65,6 +68,7 @@ public class MysticEssentialsNeoForge {
         NeoForge.EVENT_BUS.addListener(this::onServerAboutToStart);
         NeoForge.EVENT_BUS.addListener(this::onRegisterCommands);
         NeoForge.EVENT_BUS.addListener(this::onServerStopping);
+        NeoForge.EVENT_BUS.addListener(this::onChunkLoad);
 
         NeoForge.EVENT_BUS.addListener(this::onIncomingDamage);
         NeoForge.EVENT_BUS.addListener(this::onPlayerLoggedOut);
@@ -119,9 +123,14 @@ public class MysticEssentialsNeoForge {
     }
 
     private void onServerAboutToStart(ServerAboutToStartEvent e) {
-        MysticEssentialsCommon.get().serverStarting(e.getServer());
+        var common = MysticEssentialsCommon.get();
+
+        common.setNpcPlatform(new com.alphine.mysticessentials.neoforge.npc.NeoForgeNpcPlatform());
+
+        common.serverStarting(e.getServer());
 
         var cfg = MEConfig.INSTANCE;
+
         RedisClientAdapter adapter = null;
 
         if (cfg != null && cfg.chat != null && cfg.chat.redis != null && cfg.chat.redis.enabled) {
@@ -148,6 +157,19 @@ public class MysticEssentialsNeoForge {
                 currentVersion,
                 msg -> e.getServer().sendSystemMessage(Component.literal(msg))
         );
+        System.out.println("[MysticEssentials] Starting with MysticEssentials v" + currentVersion);
+    }
+
+    @SubscribeEvent
+    public void onChunkLoad(net.neoforged.neoforge.event.level.ChunkEvent.Load e) {
+        if (!(e.getLevel() instanceof ServerLevel level)) return;
+        if (!(e.getChunk() instanceof net.minecraft.world.level.chunk.LevelChunk chunk)) return;
+
+        var common = MysticEssentialsCommon.get();
+        if (common.cfg == null || common.cfg.holograms == null || !common.cfg.holograms.enabled) return;
+        if (common.hologramManager == null) return;
+
+        common.hologramManager.onChunkLoaded(level.getServer(), level, chunk.getPos());
     }
 
     public void onRegisterCommands(RegisterCommandsEvent e) {
@@ -159,7 +181,13 @@ public class MysticEssentialsNeoForge {
     }
 
     private void onServerStopping(ServerStoppingEvent e) {
-        MysticEssentialsCommon.get().serverStopping();
+        var common = MysticEssentialsCommon.get();
+        if (common.hologramManager != null) {
+            common.hologramManager.shutdown(e.getServer());
+        }
+
+        common.serverStopping();
+
         if (redisAdapter != null) {
             redisAdapter.shutdown();
             redisAdapter = null;
@@ -239,7 +267,9 @@ public class MysticEssentialsNeoForge {
         }
     }
 
+    @SubscribeEvent
     private void onServerTickPost(ServerTickEvent.Post e) {
+        var common = MysticEssentialsCommon.get();
         // warmups: tick every server tick (END/POST)
         MysticEssentialsCommon.get().warmups.tick(e.getServer());
 
@@ -251,6 +281,20 @@ public class MysticEssentialsNeoForge {
             afkTickAccum = 0;
             MysticEssentialsCommon.get().serverTick1s(e.getServer());
         }
+
+        if (common.cfg != null) {
+            if (common.cfg.holograms != null && common.cfg.holograms.enabled && common.hologramManager != null) {
+                common.hologramManager.tick(e.getServer());
+            }
+            boolean npcFeatureEnabled =
+                    common.cfg.npcs != null
+                            && common.cfg.npcs.enabled
+                            && (common.cfg.features == null || common.cfg.features.enableNpcSystem);
+
+            if (npcFeatureEnabled && common.npcManager != null) {
+                common.npcManager.tick(e.getServer());
+            }
+        }
     }
 
     private void onPlayerContainerClose(PlayerContainerEvent.Close e) {
@@ -260,6 +304,7 @@ public class MysticEssentialsNeoForge {
         }
     }
 
+    @SubscribeEvent
     // Block chat if muted
     private void onChat(ServerChatEvent e) {
         ServerPlayer p = e.getPlayer();
@@ -298,6 +343,7 @@ public class MysticEssentialsNeoForge {
         }
     }
 
+    @SubscribeEvent
     private void onPlayerTickPost(PlayerTickEvent.Post e) {
         if (!(e.getEntity() instanceof ServerPlayer p)) return;
 
@@ -346,6 +392,7 @@ public class MysticEssentialsNeoForge {
         }
     }
 
+    @SubscribeEvent
     // Cancel warmups + enforce jails on dimension change; also close invsee
     private void onPlayerChangedDimension(PlayerEvent.PlayerChangedDimensionEvent e) {
         if (!(e.getEntity() instanceof ServerPlayer p)) return;
