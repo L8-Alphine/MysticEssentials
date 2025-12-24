@@ -5,6 +5,10 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 public final class PlaceholderService {
 
+    public String countRegistered() {
+        return "Registered Placeholder Providers: " + providers.size();
+    }
+
     public enum UnknownPolicy { KEEP, BLANK }
 
     private final List<PlaceholderProvider> providers = new CopyOnWriteArrayList<>();
@@ -16,6 +20,7 @@ public final class PlaceholderService {
 
     public void register(PlaceholderProvider provider) {
         if (provider != null) providers.add(provider);
+//        System.out.println("[PlacholderService] Registering provider: " + provider);
     }
 
     public String applyAll(String input, PlaceholderContext ctx, boolean enablePercent, boolean enableBrace) {
