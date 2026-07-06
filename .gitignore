@@ -5,3 +5,6 @@ build/
 out/
 local.properties
 .hytale-server/
+/libs/
+/.claude/
+/.agents/
