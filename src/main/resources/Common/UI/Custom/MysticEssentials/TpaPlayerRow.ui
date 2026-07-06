@@ -1,0 +1,32 @@
+$C = "../Common.ui";
+
+// Row template for the online-player list in the Teleport Requests UI.
+// Appended per player: cmd.append("#PlayerList", "MysticEssentials/TpaPlayerRow.ui").
+
+Group #Row {
+  Anchor: (Height: 48, Bottom: 8);
+  LayoutMode: Left;
+  Padding: (Left: 10, Right: 10, Top: 7, Bottom: 7);
+  Background: #000000(0.18);
+
+  Label #Name {
+    FlexWeight: 1;
+    Style: (FontSize: 16, TextColor: #ffffff, RenderBold: true, VerticalAlignment: Center);
+    Text: "Player";
+  }
+
+  $C.@SmallSecondaryTextButton #TpaButton {
+    @Text = "TPA";
+    @Anchor = (Width: 80, Right: 6);
+  }
+
+  $C.@SmallTertiaryTextButton #HereButton {
+    @Text = "TPA HERE";
+    @Anchor = (Width: 110, Right: 6);
+  }
+
+  $C.@SmallTertiaryTextButton #FavButton {
+    @Text = "FAV +";
+    @Anchor = (Width: 70);
+  }
+}

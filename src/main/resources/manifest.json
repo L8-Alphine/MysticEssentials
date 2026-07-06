@@ -1,0 +1,20 @@
+{
+  "Group": "org.hyzionstudios",
+  "Name": "MysticEssentials",
+  "Version": "1.0.0",
+  "Main": "org.hyzionstudios.mysticessentials.MysticessentialsPlugin",
+  "ServerVersion": ">=0.5.0 <0.6.0",
+  "Description": "The Correct Essentials Mod for all BASE server needs.",
+  "Authors": [
+    {
+      "Name": "Alphine"
+    }
+  ],
+  "Dependencies": {},
+  "OptionalDependencies": {
+    "HelpChat:PlaceholderAPI": ">=1.0.8",
+    "TheNewEconomy:VaultUnlocked": "*",
+    "LuckPerms:LuckPerms": "*"
+  },
+  "IncludesAssetPack": true
+}

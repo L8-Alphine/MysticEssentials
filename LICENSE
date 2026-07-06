@@ -1,0 +1,91 @@
+Mystic Essentials Proprietary License
+
+Copyright (c) 2026 Alphine. All rights reserved.
+
+This license governs Mystic Essentials, including the compiled mod, source
+code, assets, documentation, configuration examples, and any related files
+distributed with the project (the "Software").
+
+1. Ownership and Reservation of Rights
+
+The Software is proprietary. Except for the limited permissions expressly
+granted in this license, no rights are granted to you. Alphine retains all
+right, title, and interest in and to the Software, including all copyrights,
+trade secrets, and other intellectual property rights.
+
+2. Permitted Server Use
+
+You may install and run unmodified compiled copies of the Software on Hytale
+servers that you own, operate, administer, or are authorized to manage.
+
+This permission includes use on servers that generate revenue, including
+servers with donations, subscriptions, paid ranks, cosmetic purchases, store
+sales, advertisements, sponsorships, or other monetization.
+
+Server monetization does not grant any ownership interest in the Software and
+does not grant permission to copy, reuse, publish, sublicense, sell, or
+redistribute the Software's source code.
+
+3. Source Code, Snippet, and Derivative Project Restrictions
+
+You may not copy, paste, adapt, port, translate, modify, include, embed, or
+otherwise use the Software's source code, code snippets, architecture, assets,
+or substantial parts of the Software in another project without prior written
+permission from Alphine.
+
+If another project earns money, is used to earn money, supports a monetized
+server, product, service, business, marketplace, or platform, or is otherwise
+commercial in nature, then any use of the Software's source code, snippets, or
+substantial parts requires an active paid code-use subscription or a separate
+written commercial code license from Alphine.
+
+If the required paid subscription or commercial code license expires,
+terminates, or is cancelled, you must stop using the Software's code in the
+commercial project and remove it from the project before any further public,
+private, or internal release, deployment, or distribution.
+
+4. Redistribution and Modification
+
+Unless you receive separate written permission from Alphine, you may not:
+
+- redistribute the Software or any modified version of it;
+- sell, lease, sublicense, or provide the Software as a standalone product;
+- publish or share the source code;
+- remove or alter copyright, license, or attribution notices;
+- claim the Software or any part of it as your own work;
+- use the Software to create a competing essentials mod, plugin, library,
+  framework, or commercial codebase.
+
+5. Backups and Internal Administration
+
+You may make reasonable internal backup copies of the Software solely for
+server administration, disaster recovery, deployment, or archival purposes.
+Backup copies must remain private and must preserve this license file.
+
+6. Termination
+
+Your permission to use the Software terminates automatically if you violate
+this license. Upon termination, you must stop using the Software, remove it
+from your servers and projects, and delete any unauthorized copies or
+derivative works.
+
+7. No Warranty
+
+THE SOFTWARE IS PROVIDED "AS IS" AND WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE, TITLE, AND NONINFRINGEMENT. USE OF THE SOFTWARE IS
+AT YOUR OWN RISK.
+
+8. Limitation of Liability
+
+TO THE MAXIMUM EXTENT PERMITTED BY LAW, ALPHINE WILL NOT BE LIABLE FOR ANY
+DIRECT, INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, EXEMPLARY, OR PUNITIVE
+DAMAGES ARISING FROM OR RELATED TO THE SOFTWARE OR THIS LICENSE, EVEN IF
+ALPHINE HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+
+9. Separate Written Agreements
+
+Alphine may grant additional rights through a separate written agreement,
+commercial license, or paid subscription. If a separate written agreement
+conflicts with this license, the separate written agreement controls only for
+the party and scope covered by that agreement.

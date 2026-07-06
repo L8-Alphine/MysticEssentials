@@ -1,0 +1,109 @@
+$C = "../Common.ui";
+
+$C.@PageOverlay {}
+
+$C.@Container {
+  Anchor: (Width: 1000, Height: 660);
+
+  #Title {
+    Group {
+      $C.@Title {
+        @Text = "Server Warps";
+      }
+
+      $C.@HeaderSearch {}
+    }
+  }
+
+  #Content {
+    LayoutMode: Left;
+
+    Group {
+      Anchor: (Width: 340);
+      LayoutMode: Top;
+
+      Label #WarpEmpty {
+        Anchor: (Height: 40);
+        Style: (FontSize: 14, TextColor: #9fb0c4, VerticalAlignment: Center);
+        Text: "No warps available.";
+        Visible: false;
+      }
+
+      Group #WarpList {
+        FlexWeight: 1;
+        LayoutMode: TopScrolling;
+        Padding: (Right: 10);
+        ScrollbarStyle: $C.@DefaultScrollbarStyle;
+      }
+    }
+
+    Group {
+      FlexWeight: 1;
+      LayoutMode: TopScrolling;
+      Padding: (Left: 12);
+      ScrollbarStyle: $C.@DefaultScrollbarStyle;
+
+      Group {
+        Background: (TexturePath: "../Common/ContainerPanelPatch.png", Border: 4);
+        LayoutMode: Top;
+        Padding: (Full: 16);
+        Anchor: (Bottom: 12);
+
+        Label #WarpName {
+          Anchor: (Bottom: 8);
+          Style: (FontSize: 22, RenderBold: true, TextColor: #ffffff);
+          Text: "No Warp";
+        }
+
+        Label #WarpDescription {
+          Anchor: (Bottom: 12);
+          Style: (FontSize: 14, TextColor: #96a9be, Wrap: true);
+          Text: "";
+        }
+
+        Group {
+          LayoutMode: Left;
+          Anchor: (Bottom: 8);
+          Label { Anchor: (Width: 110); Style: (...$C.@DefaultLabelStyle, FontSize: 13, RenderBold: true); Text: "Cost"; }
+          Label #WarpCost { FlexWeight: 1; Style: (...$C.@DefaultLabelStyle, FontSize: 13); Text: "-"; }
+        }
+
+        Group {
+          LayoutMode: Left;
+          Anchor: (Bottom: 8);
+          Label { Anchor: (Width: 110); Style: (...$C.@DefaultLabelStyle, FontSize: 13, RenderBold: true); Text: "Visibility"; }
+          Label #WarpVisibility { FlexWeight: 1; Style: (...$C.@DefaultLabelStyle, FontSize: 13); Text: "-"; }
+        }
+
+        Group {
+          LayoutMode: Left;
+          Anchor: (Bottom: 8);
+          Label { Anchor: (Width: 110); Style: (...$C.@DefaultLabelStyle, FontSize: 13, RenderBold: true); Text: "Permission"; }
+          Label #WarpPermission { FlexWeight: 1; Style: (...$C.@DefaultLabelStyle, FontSize: 13, Wrap: true); Text: "-"; }
+        }
+
+        Group {
+          LayoutMode: Left;
+          Label { Anchor: (Width: 110); Style: (...$C.@DefaultLabelStyle, FontSize: 13, RenderBold: true); Text: "World"; }
+          Label #WarpWorld { FlexWeight: 1; Style: (...$C.@DefaultLabelStyle, FontSize: 13); Text: "-"; }
+        }
+      }
+
+      Group {
+        LayoutMode: Left;
+        Anchor: (Height: 44, Bottom: 14);
+
+        $C.@TextButton #TeleportButton {
+          @Text = "Teleport";
+          @Anchor = (Width: 200, Right: 8);
+        }
+
+        $C.@SecondaryTextButton #ManageWarpButton {
+          @Text = "Manage";
+          @Anchor = (Width: 150);
+          Visible: false;
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,92 @@
+$C = "../Common.ui";
+
+$C.@PageOverlay {}
+
+$C.@Container {
+  Anchor: (Width: 940, Height: 640);
+
+  #Title {
+    Group {
+      $C.@Title {
+        @Text = "Teleport Requests";
+      }
+
+      $C.@HeaderSearch {}
+    }
+  }
+
+  #Content {
+    LayoutMode: Left;
+
+    Group {
+      FlexWeight: 1;
+      LayoutMode: Top;
+      Padding: (Right: 12);
+
+      Label {
+        Anchor: (Height: 26, Bottom: 6);
+        Style: (...$C.@DefaultLabelStyle, FontSize: 14, RenderBold: true, RenderUppercase: true);
+        Text: "Favorites";
+      }
+
+      Label #FavoritesEmpty {
+        Anchor: (Height: 30);
+        Style: (FontSize: 13, TextColor: #9fb0c4, VerticalAlignment: Center);
+        Text: "No favorites yet. Use FAV + to add one.";
+        Visible: false;
+      }
+
+      Group #FavoriteList {
+        Anchor: (Height: 170, Bottom: 8);
+        LayoutMode: TopScrolling;
+        Padding: (Right: 10);
+        ScrollbarStyle: $C.@DefaultScrollbarStyle;
+      }
+
+      Label {
+        Anchor: (Height: 26, Bottom: 6);
+        Style: (...$C.@DefaultLabelStyle, FontSize: 14, RenderBold: true, RenderUppercase: true);
+        Text: "Online Players";
+      }
+
+      Label #PlayersEmpty {
+        Anchor: (Height: 40);
+        Style: (FontSize: 14, TextColor: #9fb0c4, VerticalAlignment: Center);
+        Text: "Nobody else is online right now.";
+        Visible: false;
+      }
+
+      Group #PlayerList {
+        FlexWeight: 1;
+        LayoutMode: TopScrolling;
+        Padding: (Right: 10);
+        ScrollbarStyle: $C.@DefaultScrollbarStyle;
+      }
+    }
+
+    Group {
+      Anchor: (Width: 360);
+      LayoutMode: Top;
+
+      Label {
+        Anchor: (Height: 26, Bottom: 6);
+        Style: (...$C.@DefaultLabelStyle, FontSize: 14, RenderBold: true, RenderUppercase: true);
+        Text: "Incoming Requests";
+      }
+
+      Label #RequestsEmpty {
+        Anchor: (Height: 40);
+        Style: (FontSize: 14, TextColor: #9fb0c4, VerticalAlignment: Center);
+        Text: "No pending requests.";
+        Visible: false;
+      }
+
+      Group #RequestList {
+        FlexWeight: 1;
+        LayoutMode: TopScrolling;
+        Padding: (Right: 10);
+        ScrollbarStyle: $C.@DefaultScrollbarStyle;
+      }
+    }
+  }
+}

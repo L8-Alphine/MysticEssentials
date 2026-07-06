@@ -1,0 +1,34 @@
+$C = "../Common.ui";
+
+// Row template for the snapshot list in the Inventory Restore UI.
+// Appended per snapshot: cmd.append("#SnapshotList", "MysticEssentials/InventorySnapshotRow.ui").
+
+Group #Row {
+  Anchor: (Height: 48, Bottom: 8);
+  LayoutMode: Left;
+  Padding: (Left: 10, Right: 10, Top: 7, Bottom: 7);
+  Background: #000000(0.18);
+
+  Label #Cause {
+    Anchor: (Width: 110);
+    Style: (FontSize: 15, TextColor: #ffd97a, RenderBold: true, VerticalAlignment: Center);
+    Text: "Cause";
+  }
+
+  Label #Time {
+    FlexWeight: 1;
+    Style: (FontSize: 14, TextColor: #ffffff, VerticalAlignment: Center);
+    Text: "";
+  }
+
+  Label #Items {
+    Anchor: (Width: 90);
+    Style: (FontSize: 12, TextColor: #9fb0c4, VerticalAlignment: Center);
+    Text: "";
+  }
+
+  $C.@SmallSecondaryTextButton #RestoreButton {
+    @Text = "RESTORE";
+    @Anchor = (Width: 110);
+  }
+}

@@ -1,0 +1,60 @@
+$C = "../Common.ui";
+
+$C.@PageOverlay {}
+
+$C.@Container {
+  Anchor: (Width: 820, Height: 620);
+
+  #Title {
+    Group {
+      $C.@Title {
+        @Text = "Kit Preview";
+      }
+    }
+  }
+
+  #Content {
+    LayoutMode: Top;
+
+    Label #PreviewTitle {
+      Anchor: (Height: 30, Bottom: 4);
+      Style: (FontSize: 22, RenderBold: true, TextColor: #ffffff);
+      Text: "Kit";
+    }
+
+    Label #PreviewDescription {
+      Anchor: (Height: 44, Bottom: 12);
+      Style: (FontSize: 14, TextColor: #96a9be, Wrap: true);
+      Text: "";
+    }
+
+    Label #PreviewEmpty {
+      Anchor: (Height: 40);
+      Style: (FontSize: 14, TextColor: #9fb0c4, VerticalAlignment: Center);
+      Text: "This kit has no items.";
+      Visible: false;
+    }
+
+    Group #PreviewList {
+      FlexWeight: 1;
+      LayoutMode: TopScrolling;
+      Padding: (Right: 10);
+      ScrollbarStyle: $C.@DefaultScrollbarStyle;
+    }
+
+    Group {
+      LayoutMode: Left;
+      Anchor: (Height: 44, Top: 12);
+
+      $C.@SecondaryTextButton #BackButton {
+        @Text = "Back";
+        @Anchor = (Width: 160, Right: 8);
+      }
+
+      $C.@TextButton #ClaimButton {
+        @Text = "Claim";
+        @Anchor = (Width: 180);
+      }
+    }
+  }
+}

@@ -1,0 +1,49 @@
+$C = "../Common.ui";
+
+$C.@PageOverlay {}
+
+$C.@Container {
+  Anchor: (Width: 760, Height: 620);
+
+  #Title {
+    Group {
+      $C.@Title {
+        @Text = "Inventory Snapshots";
+      }
+
+      Label #TargetName {
+        Anchor: (Top: 8, Right: 14, Width: 260, Height: 24);
+        Style: (FontSize: 14, TextColor: #96a9be, HorizontalAlignment: End, VerticalAlignment: Center);
+        Text: "";
+      }
+    }
+  }
+
+  #Content {
+    LayoutMode: Top;
+
+    Label #SnapshotsEmpty {
+      Anchor: (Height: 40);
+      Style: (FontSize: 14, TextColor: #9fb0c4, VerticalAlignment: Center);
+      Text: "No snapshots recorded for this player yet.";
+      Visible: false;
+    }
+
+    Group #SnapshotList {
+      FlexWeight: 1;
+      LayoutMode: TopScrolling;
+      Padding: (Right: 10);
+      ScrollbarStyle: $C.@DefaultScrollbarStyle;
+    }
+
+    Group {
+      LayoutMode: Left;
+      Anchor: (Height: 44, Top: 10);
+
+      $C.@SecondaryTextButton #SnapshotNowButton {
+        @Text = "Take Snapshot Now";
+        @Anchor = (Width: 220);
+      }
+    }
+  }
+}

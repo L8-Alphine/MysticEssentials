@@ -1,0 +1,32 @@
+$C = "../Common.ui";
+
+// Row template for the incoming-request list in the Teleport Requests UI.
+// Appended per request: cmd.append("#RequestList", "MysticEssentials/TpaRequestRow.ui").
+
+Group #Row {
+  Anchor: (Height: 68, Bottom: 8);
+  LayoutMode: Top;
+  Padding: (Left: 10, Right: 10, Top: 7, Bottom: 7);
+  Background: #000000(0.18);
+
+  Label #Text {
+    Anchor: (Height: 20, Bottom: 6);
+    Style: (FontSize: 14, TextColor: #ffffff, VerticalAlignment: Center);
+    Text: "Player wants to teleport to you";
+  }
+
+  Group {
+    LayoutMode: Left;
+    Anchor: (Height: 32);
+
+    $C.@SmallSecondaryTextButton #AcceptButton {
+      @Text = "Accept";
+      @Anchor = (Width: 110, Right: 6);
+    }
+
+    $C.@SmallTertiaryTextButton #DenyButton {
+      @Text = "Deny";
+      @Anchor = (Width: 90);
+    }
+  }
+}

@@ -1,0 +1,107 @@
+$C = "../Common.ui";
+
+$C.@PageOverlay {}
+
+$C.@Container {
+  Anchor: (Width: 1000, Height: 660);
+
+  #Title {
+    Group {
+      $C.@Title {
+        @Text = "Player Warps";
+      }
+
+      $C.@HeaderSearch {}
+    }
+  }
+
+  #Content {
+    LayoutMode: Left;
+
+    Group {
+      Anchor: (Width: 340);
+      LayoutMode: Top;
+
+      Label #PwarpEmpty {
+        Anchor: (Height: 40);
+        Style: (FontSize: 14, TextColor: #9fb0c4, VerticalAlignment: Center);
+        Text: "No player warps yet.";
+        Visible: false;
+      }
+
+      Group #PwarpList {
+        FlexWeight: 1;
+        LayoutMode: TopScrolling;
+        Padding: (Right: 10);
+        ScrollbarStyle: $C.@DefaultScrollbarStyle;
+      }
+    }
+
+    Group {
+      FlexWeight: 1;
+      LayoutMode: TopScrolling;
+      Padding: (Left: 12);
+      ScrollbarStyle: $C.@DefaultScrollbarStyle;
+
+      Group {
+        Background: (TexturePath: "../Common/ContainerPanelPatch.png", Border: 4);
+        LayoutMode: Top;
+        Padding: (Full: 16);
+        Anchor: (Bottom: 12);
+
+        Label #PwarpName {
+          Anchor: (Bottom: 8);
+          Style: (FontSize: 22, RenderBold: true, TextColor: #ffffff);
+          Text: "No Warp";
+        }
+
+        Label #PwarpDescription {
+          Anchor: (Bottom: 12);
+          Style: (FontSize: 14, TextColor: #96a9be, Wrap: true);
+          Text: "";
+        }
+
+        Group {
+          LayoutMode: Left;
+          Anchor: (Bottom: 8);
+          Label { Anchor: (Width: 110); Style: (...$C.@DefaultLabelStyle, FontSize: 13, RenderBold: true); Text: "Owner"; }
+          Label #PwarpOwner { FlexWeight: 1; Style: (...$C.@DefaultLabelStyle, FontSize: 13); Text: "-"; }
+        }
+
+        Group {
+          LayoutMode: Left;
+          Anchor: (Bottom: 8);
+          Label { Anchor: (Width: 110); Style: (...$C.@DefaultLabelStyle, FontSize: 13, RenderBold: true); Text: "Cost"; }
+          Label #PwarpCost { FlexWeight: 1; Style: (...$C.@DefaultLabelStyle, FontSize: 13); Text: "-"; }
+        }
+
+        Group {
+          LayoutMode: Left;
+          Label { Anchor: (Width: 110); Style: (...$C.@DefaultLabelStyle, FontSize: 13, RenderBold: true); Text: "World"; }
+          Label #PwarpWorld { FlexWeight: 1; Style: (...$C.@DefaultLabelStyle, FontSize: 13); Text: "-"; }
+        }
+      }
+
+      Group {
+        LayoutMode: Left;
+        Anchor: (Height: 44, Bottom: 14);
+
+        $C.@TextButton #TeleportButton {
+          @Text = "Teleport";
+          @Anchor = (Width: 200, Right: 8);
+        }
+
+        $C.@SecondaryTextButton #MyWarpsButton {
+          @Text = "My Player Warps";
+          @Anchor = (Width: 220);
+        }
+      }
+
+      Label #PwarpLimit {
+        Anchor: (Height: 20);
+        Style: (FontSize: 13, TextColor: #96a9be, VerticalAlignment: Center);
+        Text: "";
+      }
+    }
+  }
+}

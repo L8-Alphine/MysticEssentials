@@ -1,0 +1,28 @@
+{
+  "ui": "Common/UI/Custom/MysticEssentials/ChatChannels.ui",
+  "rowTemplate": "Common/UI/Custom/MysticEssentials/ChannelRow.ui",
+  "openCommand": "channel",
+  "fields": {
+    "CurrentChannelLabel": "current speaking channel display name",
+    "ChannelList": "scrolling container; one ChannelRow.ui appended per visible channel, addressed as #ChannelList[i]",
+    "ChannelList[i] Name/Meta/Swatch": "per-row display name, 'type | access' subtitle, and resolved channel color",
+    "ChannelEmpty": "shown when no channels are visible",
+    "ChannelName": "selected channel display name",
+    "ChannelDetailSwatch": "selected channel color",
+    "ChannelType": "Server Channel or Temp Channel",
+    "ChannelPrefix": "selected channel prefix (color codes stripped)",
+    "ChannelStatus": "speaking/listening/locked/available",
+    "PasswordInput": "password used by Speak Here / Listen for locked channels"
+  },
+  "actions": {
+    "SwitchButton": "/channel switch {channel} [password]",
+    "ListenButton": "/channel join {channel} [password]",
+    "LeaveButton": "/channel leave {channel}",
+    "OpenTempButton": "opens TempChannel.ui (create temporary channel)",
+    "ManageTempButton": "opens TempChannelManage.ui (visible only to the temp-channel owner)"
+  },
+  "relatedPages": {
+    "TempChannel.ui": "create form: TempNameInput, TempPasswordInput, TempPrefixInput, TempAliasesInput, CreateTempButton, CancelTempButton",
+    "TempChannelManage.ui": "manager: ManageChannelName, ManageExpiry, ManagePasswordInput, ManagePrefixInput, SaveChannelButton, CloseChannelButton, BackToChannelsButton"
+  }
+}

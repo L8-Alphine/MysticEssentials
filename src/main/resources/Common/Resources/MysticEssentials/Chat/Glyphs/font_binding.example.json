@@ -1,0 +1,167 @@
+{
+  "format": "mysticessentials-font-binding-template",
+  "privateUseRange": "U+E001..U+E020",
+  "entries": [
+    {
+      "codepoint": "U+E001",
+      "asset": "Common/Resources/MysticEssentials/Chat/Glyphs/package.png",
+      "alias": ":package:"
+    },
+    {
+      "codepoint": "U+E002",
+      "asset": "Common/Resources/MysticEssentials/Chat/Glyphs/check_box.png",
+      "alias": ":check_box:"
+    },
+    {
+      "codepoint": "U+E003",
+      "asset": "Common/Resources/MysticEssentials/Chat/Glyphs/lock.png",
+      "alias": ":lock:"
+    },
+    {
+      "codepoint": "U+E004",
+      "asset": "Common/Resources/MysticEssentials/Chat/Glyphs/refresh.png",
+      "alias": ":refresh:"
+    },
+    {
+      "codepoint": "U+E005",
+      "asset": "Common/Resources/MysticEssentials/Chat/Glyphs/red_circle.png",
+      "alias": ":red_circle:"
+    },
+    {
+      "codepoint": "U+E006",
+      "asset": "Common/Resources/MysticEssentials/Chat/Glyphs/announcement.png",
+      "alias": ":announcement:"
+    },
+    {
+      "codepoint": "U+E007",
+      "asset": "Common/Resources/MysticEssentials/Chat/Glyphs/success.png",
+      "alias": ":success:"
+    },
+    {
+      "codepoint": "U+E008",
+      "asset": "Common/Resources/MysticEssentials/Chat/Glyphs/plus.png",
+      "alias": ":plus:"
+    },
+    {
+      "codepoint": "U+E009",
+      "asset": "Common/Resources/MysticEssentials/Chat/Glyphs/tick.png",
+      "alias": ":tick:"
+    },
+    {
+      "codepoint": "U+E00A",
+      "asset": "Common/Resources/MysticEssentials/Chat/Glyphs/cross.png",
+      "alias": ":cross:"
+    },
+    {
+      "codepoint": "U+E00B",
+      "asset": "Common/Resources/MysticEssentials/Chat/Glyphs/small_square.png",
+      "alias": ":small_square:"
+    },
+    {
+      "codepoint": "U+E00C",
+      "asset": "Common/Resources/MysticEssentials/Chat/Glyphs/em_dash.png",
+      "alias": ":dash:"
+    },
+    {
+      "codepoint": "U+E00D",
+      "asset": "Common/Resources/MysticEssentials/Chat/Glyphs/double_angle.png",
+      "alias": ":angle:"
+    },
+    {
+      "codepoint": "U+E00E",
+      "asset": "Common/Resources/MysticEssentials/Chat/Glyphs/left_bracket.png",
+      "alias": ":left_bracket:"
+    },
+    {
+      "codepoint": "U+E00F",
+      "asset": "Common/Resources/MysticEssentials/Chat/Glyphs/hollow_square.png",
+      "alias": ":hollow_square:"
+    },
+    {
+      "codepoint": "U+E010",
+      "asset": "Common/Resources/MysticEssentials/Chat/Glyphs/diamond.png",
+      "alias": ":diamond:"
+    },
+    {
+      "codepoint": "U+E011",
+      "asset": "Common/Resources/MysticEssentials/Chat/Glyphs/solid_square.png",
+      "alias": ":solid_square:"
+    },
+    {
+      "codepoint": "U+E012",
+      "asset": "Common/Resources/MysticEssentials/Chat/Glyphs/arrow_right.png",
+      "alias": ":arrow_right:"
+    },
+    {
+      "codepoint": "U+E013",
+      "asset": "Common/Resources/MysticEssentials/Chat/Glyphs/right_bracket.png",
+      "alias": ":right_bracket:"
+    },
+    {
+      "codepoint": "U+E014",
+      "asset": "Common/Resources/MysticEssentials/Chat/Glyphs/bullet.png",
+      "alias": ":bullet:"
+    },
+    {
+      "codepoint": "U+E015",
+      "asset": "Common/Resources/MysticEssentials/Chat/Glyphs/diamond_bullet.png",
+      "alias": ":diamond_bullet:"
+    },
+    {
+      "codepoint": "U+E016",
+      "asset": "Common/Resources/MysticEssentials/Chat/Glyphs/return_arrow.png",
+      "alias": ":return:"
+    },
+    {
+      "codepoint": "U+E017",
+      "asset": "Common/Resources/MysticEssentials/Chat/Glyphs/arrow_left.png",
+      "alias": ":arrow_left:"
+    },
+    {
+      "codepoint": "U+E018",
+      "asset": "Common/Resources/MysticEssentials/Chat/Glyphs/dash_arrow.png",
+      "alias": ":dash_arrow:"
+    },
+    {
+      "codepoint": "U+E019",
+      "asset": "Common/Resources/MysticEssentials/Chat/Glyphs/asterism.png",
+      "alias": ":asterism:"
+    },
+    {
+      "codepoint": "U+E01A",
+      "asset": "Common/Resources/MysticEssentials/Chat/Glyphs/kappa.png",
+      "alias": ":kappa:"
+    },
+    {
+      "codepoint": "U+E01B",
+      "asset": "Common/Resources/MysticEssentials/Chat/Glyphs/play.png",
+      "alias": ":play:"
+    },
+    {
+      "codepoint": "U+E01C",
+      "asset": "Common/Resources/MysticEssentials/Chat/Glyphs/corner_left.png",
+      "alias": ":corner_left:"
+    },
+    {
+      "codepoint": "U+E01D",
+      "asset": "Common/Resources/MysticEssentials/Chat/Glyphs/corner_right.png",
+      "alias": ":corner_right:"
+    },
+    {
+      "codepoint": "U+E01E",
+      "asset": "Common/Resources/MysticEssentials/Chat/Glyphs/wedge.png",
+      "alias": ":wedge:"
+    },
+    {
+      "codepoint": "U+E01F",
+      "asset": "Common/Resources/MysticEssentials/Chat/Glyphs/sup8.png",
+      "alias": ":sup8:"
+    },
+    {
+      "codepoint": "U+E020",
+      "asset": "Common/Resources/MysticEssentials/Chat/Glyphs/copyright.png",
+      "alias": ":copyright:"
+    }
+  ],
+  "assetRoot": "Common/Resources/MysticEssentials/Chat/Glyphs"
+}

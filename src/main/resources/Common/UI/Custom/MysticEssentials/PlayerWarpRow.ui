@@ -1,0 +1,36 @@
+// Row template for player-warp lists. Appended per entry by the server:
+//   cmd.append("#PwarpList", "MysticEssentials/PlayerWarpRow.ui")
+// and populated by index: cmd.set("#PwarpList[i] #Name.Text", ...).
+
+Button #Row {
+  Anchor: (Height: 56, Bottom: 8);
+  LayoutMode: Left;
+  Padding: (Left: 10, Right: 10, Top: 7, Bottom: 7);
+  Style: (
+    Default: (Background: #000000(0.18)),
+    Hovered: (Background: #7a9cc6(0.18)),
+    Pressed: (Background: #7a9cc6(0.28))
+  );
+
+  Group #Swatch {
+    Anchor: (Width: 8, Height: 42, Right: 10);
+    Background: #55FFFF;
+  }
+
+  Group {
+    LayoutMode: Top;
+    FlexWeight: 1;
+
+    Label #Name {
+      Anchor: (Height: 22, Bottom: 2);
+      Style: (FontSize: 16, TextColor: #ffffff, RenderBold: true, VerticalAlignment: Center);
+      Text: "Warp";
+    }
+
+    Label #Meta {
+      Anchor: (Height: 17);
+      Style: (FontSize: 12, TextColor: #9fb0c4, VerticalAlignment: Center);
+      Text: "";
+    }
+  }
+}

@@ -1,0 +1,41 @@
+$C = "../Common.ui";
+
+// Row template for the inbox list in the Mail UI.
+// Appended per message: cmd.append("#MailList", "MysticEssentials/MailRow.ui").
+// The row root is a Button so the whole row is clickable (select + mark read).
+
+Button #Row {
+  Anchor: (Height: 52, Bottom: 8);
+  LayoutMode: Left;
+  Padding: (Left: 10, Right: 10, Top: 6, Bottom: 6);
+  Background: #000000(0.18);
+
+  Label #Unread {
+    Anchor: (Width: 14);
+    Style: (FontSize: 16, TextColor: #ffd97a, VerticalAlignment: Center);
+    Text: "";
+  }
+
+  Group {
+    FlexWeight: 1;
+    LayoutMode: Top;
+
+    Label #From {
+      Anchor: (Height: 20);
+      Style: (FontSize: 15, TextColor: #ffffff, RenderBold: true);
+      Text: "Sender";
+    }
+
+    Label #Preview {
+      Anchor: (Height: 16);
+      Style: (FontSize: 12, TextColor: #9fb0c4);
+      Text: "";
+    }
+  }
+
+  Label #Date {
+    Anchor: (Width: 84);
+    Style: (FontSize: 11, TextColor: #96a9be, VerticalAlignment: Center, HorizontalAlignment: End);
+    Text: "";
+  }
+}

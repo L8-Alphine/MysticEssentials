@@ -1,0 +1,39 @@
+$C = "../Common.ui";
+
+// Row template for the favourites list in the Teleport Requests UI.
+// Appended per favourite: cmd.append("#FavoriteList", "MysticEssentials/TpaFavoriteRow.ui").
+// For offline favourites the TPA / TPA HERE buttons are hidden and #Status shows "offline".
+
+Group #Row {
+  Anchor: (Height: 48, Bottom: 8);
+  LayoutMode: Left;
+  Padding: (Left: 10, Right: 10, Top: 7, Bottom: 7);
+  Background: #000000(0.24);
+
+  Label #Name {
+    FlexWeight: 1;
+    Style: (FontSize: 16, TextColor: #ffd97a, RenderBold: true, VerticalAlignment: Center);
+    Text: "Player";
+  }
+
+  Label #Status {
+    Anchor: (Width: 70);
+    Style: (FontSize: 12, TextColor: #9fb0c4, VerticalAlignment: Center);
+    Text: "";
+  }
+
+  $C.@SmallSecondaryTextButton #TpaButton {
+    @Text = "TPA";
+    @Anchor = (Width: 80, Right: 6);
+  }
+
+  $C.@SmallTertiaryTextButton #HereButton {
+    @Text = "TPA HERE";
+    @Anchor = (Width: 110, Right: 6);
+  }
+
+  $C.@SmallTertiaryTextButton #UnfavButton {
+    @Text = "FAV -";
+    @Anchor = (Width: 70);
+  }
+}

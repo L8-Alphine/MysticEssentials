@@ -1,0 +1,105 @@
+package org.hyzionstudios.mysticessentials.platform.command;
+
+import java.util.Optional;
+import java.util.Map;
+import java.util.UUID;
+
+import org.hyzionstudios.mysticessentials.core.MysticCore;
+
+import com.hypixel.hytale.server.core.command.system.CommandContext;
+import com.hypixel.hytale.server.core.command.system.arguments.system.Argument;
+import com.hypixel.hytale.server.core.universe.PlayerRef;
+
+/**
+ * Convenience wrapper around a Hytale {@link CommandContext} passed to module
+ * command handlers. Exposes identity, a resolved {@link PlayerRef} for player
+ * senders, simple whitespace-split arguments, and message-service-formatted
+ * replies, so command code never touches the raw Hytale command API.
+ */
+public final class MysticCommandSender {
+
+    private final MysticCore core;
+    private final CommandContext context;
+    private final String[] args;
+
+    public MysticCommandSender(MysticCore core, CommandContext context) {
+        this.core = core;
+        this.context = context;
+        this.args = splitArguments(context);
+    }
+
+    private static String[] splitArguments(CommandContext context) {
+        String input = context.getInputString();
+        if (input == null || input.isBlank()) {
+            return new String[0];
+        }
+        return input.trim().split("\\s+");
+    }
+
+    /** Underlying Hytale context, for handlers needing the full command API. */
+    public CommandContext raw() {
+        return context;
+    }
+
+    public boolean isPlayer() {
+        return context.isPlayer();
+    }
+
+    public String name() {
+        return context.sender().getUsername();
+    }
+
+    public UUID uuid() {
+        return context.sender().getUuid();
+    }
+
+    /** @return the sender as a {@link PlayerRef}, or empty for the console. */
+    public Optional<PlayerRef> player() {
+        if (!context.isPlayer()) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.ofNullable(context.senderAs(PlayerRef.class));
+        } catch (Throwable t) {
+            return Optional.empty();
+        }
+    }
+
+    public boolean hasPermission(String permission) {
+        return context.sender().hasPermission(permission);
+    }
+
+    /** Reads a declared argument's parsed value (see {@code withRequiredArg}/{@code withOptionalArg}). */
+    public <T> T get(Argument<?, T> argument) {
+        return context.get(argument);
+    }
+
+    /** @return {@code true} if an optional argument was supplied. */
+    public boolean provided(Argument<?, ?> argument) {
+        return context.provided(argument);
+    }
+
+    /** Simple whitespace-split arguments (argument-token portion of the input). */
+    public String[] args() {
+        return args;
+    }
+
+    public Optional<String> arg(int index) {
+        return index >= 0 && index < args.length ? Optional.of(args[index]) : Optional.empty();
+    }
+
+    /** Sends a raw (formattable) string through the message pipeline. */
+    public void reply(String raw) {
+        context.sendMessage(core.getMessageService().format(raw));
+    }
+
+    /** Sends a message looked up by key from the message bundle. */
+    public void replyKey(String key) {
+        context.sendMessage(core.getMessageService().fromKey(key));
+    }
+
+    /** Sends a message looked up by key with placeholder params. */
+    public void replyKey(String key, Map<String, String> params) {
+        context.sendMessage(core.getMessageService().fromKey(key, params));
+    }
+}
