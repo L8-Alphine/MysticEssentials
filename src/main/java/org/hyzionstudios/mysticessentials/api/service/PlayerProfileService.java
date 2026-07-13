@@ -1,5 +1,6 @@
 package org.hyzionstudios.mysticessentials.api.service;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -33,4 +34,11 @@ public interface PlayerProfileService {
      * offline-by-name operations such as mail. Empty if the name was never seen.
      */
     CompletableFuture<Optional<UUID>> resolveUuid(String username);
+
+    /**
+     * Lists the UUIDs of every player who has a stored profile (i.e. has joined
+     * before), unioned with those currently cached. Enables broadcasts to all
+     * known players, including offline ones.
+     */
+    CompletableFuture<List<UUID>> knownPlayerUuids();
 }

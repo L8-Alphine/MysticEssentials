@@ -212,7 +212,9 @@ public final class MysticCore implements MysticEssentialsAPI {
         protected void run(MysticCommandSender sender) {
             configManager.load();
             messageService.load();
-            moduleManager.reloadAll();
+            // Honour module enable/disable changes in config, not just reload the
+            // already-running ones — this is the hot load/unload path.
+            moduleManager.syncFromConfig();
             sender.replyKey("reload-success");
         }
     }

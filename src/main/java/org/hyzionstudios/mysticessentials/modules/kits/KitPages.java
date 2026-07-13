@@ -12,6 +12,8 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.protocol.packets.interface_.CustomPageLifetime;
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
+import com.hypixel.hytale.server.core.Message;
+import com.hypixel.hytale.server.core.asset.type.item.config.Item;
 import com.hypixel.hytale.server.core.ui.builder.EventData;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
@@ -23,6 +25,7 @@ final class KitPages {
     static final String KITS_UI = "MysticEssentials/Kits.ui";
     static final String KIT_ROW_UI = "MysticEssentials/KitRow.ui";
     static final String KIT_PREVIEW_UI = "MysticEssentials/KitPreview.ui";
+    static final String KIT_PREVIEW_ROW_UI = "MysticEssentials/KitPreviewRow.ui";
 
     private KitPages() {
     }
@@ -52,7 +55,7 @@ final class KitPages {
                 String id = entry.getKey();
                 KitConfig.Kit kit = entry.getValue();
                 cmd.append("#KitList", KIT_ROW_UI);
-                cmd.set(row + " #Name.Text", id);
+                cmd.set(row + " #Name.Text", KitModule.displayName(id, kit));
                 cmd.set(row + " #Meta.Text", kitSummary(id, kit));
                 cmd.set(row + " #Status.Text", kits.statusText(player, id, kit));
                 cmd.set(row + " #Swatch.Background", statusColor(kits.statusText(player, id, kit)));
@@ -114,7 +117,7 @@ final class KitPages {
             }
             String id = selected.getKey();
             KitConfig.Kit kit = selected.getValue();
-            cmd.set("#KitName.Text", id);
+            cmd.set("#KitName.Text", KitModule.displayName(id, kit));
             cmd.set("#KitDescription.Text", kit.description == null || kit.description.isBlank()
                     ? "No description." : kit.description);
             cmd.set("#KitStatus.Text", kits.statusText(player, id, kit));
@@ -141,7 +144,8 @@ final class KitPages {
                 Store<EntityStore> store) {
             cmd.append(KIT_PREVIEW_UI);
             KitConfig.Kit kit = kits.findKit(kitName).orElse(null);
-            cmd.set("#PreviewTitle.Text", kitName.isBlank() ? "Kit Preview" : kitName);
+            String title = KitModule.displayName(kitName, kit);
+            cmd.set("#PreviewTitle.Text", title.isBlank() ? "Kit Preview" : title);
             cmd.set("#PreviewDescription.Text", kit == null || kit.description == null || kit.description.isBlank()
                     ? "No description." : kit.description);
             cmd.set("#PreviewEmpty.Visible", kit == null || kit.items == null || kit.items.isEmpty());
@@ -149,11 +153,28 @@ final class KitPages {
                 for (int i = 0; i < kit.items.size(); i++) {
                     KitConfig.KitItem item = kit.items.get(i);
                     String row = "#PreviewList[" + i + "]";
-                    cmd.append("#PreviewList", KIT_ROW_UI);
-                    cmd.set(row + " #Name.Text", item == null || item.itemId == null ? "Unknown Item" : item.itemId);
-                    cmd.set(row + " #Meta.Text", "Quantity: " + (item == null ? 0 : Math.max(1, item.quantity)));
-                    cmd.set(row + " #Status.Text", "");
-                    cmd.set(row + " #Swatch.Background", "#55FFFF");
+                    cmd.append("#PreviewList", KIT_PREVIEW_ROW_UI);
+                    if (item == null || item.itemId == null || item.itemId.isBlank()) {
+                        cmd.set(row + " #Name.Text", "Unknown Item");
+                        cmd.set(row + " #Meta.Text", "");
+                        cmd.set(row + " #Qty.Text", "");
+                        continue;
+                    }
+                    int quantity = Math.max(1, item.quantity);
+                    Item registryItem = KitModule.itemOrNull(item.itemId);
+                    Message name = KitModule.itemDisplayName(registryItem);
+                    if (registryItem != null) {
+                        cmd.set(row + " #Icon.ItemId", item.itemId);
+                    }
+                    // A raw Message on .Text disconnects the client, so unknown items
+                    // fall back to the plain-String prettified id.
+                    if (name != null) {
+                        cmd.set(row + " #Name.Text", name);
+                    } else {
+                        cmd.set(row + " #Name.Text", KitModule.prettify(item.itemId));
+                    }
+                    cmd.set(row + " #Meta.Text", KitModule.itemMeta(item.itemId));
+                    cmd.set(row + " #Qty.Text", "x" + quantity);
                 }
             }
             event.addEventBinding(CustomUIEventBindingType.Activating, "#BackButton",

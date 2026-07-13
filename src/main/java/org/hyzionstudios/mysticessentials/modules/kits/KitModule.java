@@ -15,6 +15,8 @@ import org.hyzionstudios.mysticessentials.platform.command.MysticCommand;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommandSender;
 
 import com.google.gson.JsonObject;
+import com.hypixel.hytale.server.core.Message;
+import com.hypixel.hytale.server.core.asset.type.item.config.Item;
 import com.hypixel.hytale.server.core.command.system.arguments.system.RequiredArg;
 import com.hypixel.hytale.server.core.command.system.arguments.types.ArgTypes;
 import com.hypixel.hytale.server.core.command.system.suggestion.SuggestionProvider;
@@ -47,7 +49,7 @@ public final class KitModule extends AbstractMysticModule {
     public void onEnable() {
         config = core.configManager().loadModuleConfig(id(), KitConfig.class, new KitConfig());
         registerCommand(new KitCommand());
-        core.platform().onEvent(
+        registerEvent(
                 com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent.class,
                 (com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent event) ->
                         onJoin(event.getPlayerRef()));
@@ -100,6 +102,89 @@ public final class KitModule extends AbstractMysticModule {
 
     static String normalize(String name) {
         return name == null ? "" : name.toLowerCase(Locale.ROOT).trim();
+    }
+
+    /**
+     * Human-readable kit name: the configured {@code displayName} if set,
+     * otherwise the kit id title-cased ({@code warrior's_kit} → {@code Warrior's Kit}).
+     */
+    static String displayName(String id, KitConfig.Kit kit) {
+        if (kit != null && kit.displayName != null && !kit.displayName.isBlank()) {
+            return kit.displayName.trim();
+        }
+        return prettify(id);
+    }
+
+    /** Title-cases an id-style token: {@code _} and spaces split words, each is capitalised. */
+    static String prettify(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return "";
+        }
+        String[] words = raw.replace('_', ' ').trim().split("\\s+");
+        StringBuilder result = new StringBuilder();
+        for (String word : words) {
+            if (word.isEmpty()) {
+                continue;
+            }
+            if (result.length() > 0) {
+                result.append(' ');
+            }
+            result.append(Character.toUpperCase(word.charAt(0)));
+            if (word.length() > 1) {
+                result.append(word.substring(1));
+            }
+        }
+        return result.toString();
+    }
+
+    /**
+     * The item's in-game display name as a client-translated {@link Message}, so the
+     * kit preview reads "Copper Pickaxe" rather than "Tool_Pickaxe_Copper". Returns
+     * {@code null} when there is no real translation to render — callers must then set
+     * the label with the plain-{@link String} {@link #prettify(String)} fallback,
+     * because a {@link Message#raw(String)} value is rejected by the client's
+     * {@code .Text} setter (it disconnects the session).
+     */
+    static Message itemDisplayName(Item item) {
+        if (item == null) {
+            return null;
+        }
+        try {
+            return item.getTranslationMessage();
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    /** Secondary line for a preview item: the raw id plus its sub-category when known. */
+    static String itemMeta(String itemId) {
+        if (itemId == null) {
+            return "";
+        }
+        Item item = itemOrNull(itemId);
+        if (item != null) {
+            try {
+                String sub = item.getSubCategory();
+                if (sub != null && !sub.isBlank()) {
+                    return itemId + "  ·  " + prettify(sub);
+                }
+            } catch (Throwable ignored) {
+                // Fall through to the bare id.
+            }
+        }
+        return itemId;
+    }
+
+    /** @return the registry item for {@code itemId}, or {@code null} when unknown/unavailable. */
+    static Item itemOrNull(String itemId) {
+        if (itemId == null || itemId.isBlank()) {
+            return null;
+        }
+        try {
+            return Item.getAssetMap().getAssetMap().get(itemId);
+        } catch (Throwable t) {
+            return null;
+        }
     }
 
     private void claim(MysticCommandSender sender, String kitName) {

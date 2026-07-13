@@ -65,7 +65,7 @@ public final class SpawnModule extends AbstractMysticModule implements SpawnServ
         // First-join / on-join teleport to spawn (respawn-point interception has no
         // hook in 0.5.6 — respawn is ECS-driven with no event to override it).
         if (config.teleportOnFirstJoin || config.teleportOnJoin) {
-            core.platform().onEvent(
+            registerEvent(
                     com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent.class,
                     (com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent event) ->
                             onJoin(event.getPlayerRef()));

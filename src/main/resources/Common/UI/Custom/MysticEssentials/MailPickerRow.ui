@@ -1,0 +1,35 @@
+$C = "../Common.ui";
+
+// Item-picker row in the Mail compose pane (inventory items, or the full item
+// registry for announcements). Appended per candidate:
+//   cmd.append("#PickerList", "MysticEssentials/MailPickerRow.ui")
+// Clicking the row attaches the item (quantity taken from the qty field).
+
+Button #Row {
+  Anchor: (Height: 36, Bottom: 4);
+  LayoutMode: Left;
+  Padding: (Left: 8, Right: 8);
+  Style: (
+    Default: (Background: #000000(0.18)),
+    Hovered: (Background: #7a9cc6(0.20)),
+    Pressed: (Background: #7a9cc6(0.32))
+  );
+
+  ItemSlot #Icon {
+    Anchor: (Width: 28, Height: 28, Right: 10);
+    ShowQualityBackground: true;
+    ShowQuantity: false;
+  }
+
+  Label #Name {
+    FlexWeight: 1;
+    Style: (FontSize: 13, TextColor: #d7e1ee, VerticalAlignment: Center);
+    Text: "item";
+  }
+
+  Label #Have {
+    Anchor: (Width: 70);
+    Style: (FontSize: 12, TextColor: #96a9be, HorizontalAlignment: End, VerticalAlignment: Center);
+    Text: "";
+  }
+}

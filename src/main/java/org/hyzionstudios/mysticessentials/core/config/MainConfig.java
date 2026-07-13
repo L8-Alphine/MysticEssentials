@@ -29,6 +29,13 @@ public final class MainConfig {
         map.put("flight", true);
         map.put("inventory", true);
         map.put("nick", true);
+        map.put("patchnotes", true);
+        // Tutorial ships disabled: enable here AND in modules/tutorial/config.json.
+        map.put("tutorial", false);
+        // Custom Commands ships disabled: enable here AND in modules/customcommands/config.json.
+        map.put("customcommands", false);
+        // Player Vaults ships disabled: enable here AND in modules/playervaults/config.json.
+        map.put("playervaults", false);
         return map;
     }
 

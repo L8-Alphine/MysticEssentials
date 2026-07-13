@@ -27,6 +27,7 @@ public final class DefaultMessages {
         o.addProperty("teleport-on-cooldown", "&cPlease wait {seconds}s before teleporting again.");
         o.addProperty("teleport-cost-charged", "&7Teleport cost: &f{cost}&7.");
         o.addProperty("teleport-invalid-destination", "&cThat teleport destination is not available.");
+        o.addProperty("teleport-world-disabled", "&cTeleporting to world &f{world} &cis disabled.");
         o.addProperty("teleport-cancelled-move", "&cTeleport cancelled because you moved.");
         o.addProperty("teleport-cancelled-damage", "&cTeleport cancelled because you took damage.");
         o.addProperty("teleport-success", "&aTeleported.");
@@ -45,6 +46,11 @@ public final class DefaultMessages {
         o.addProperty("teleport-request-none-from", "&cNo pending request from that player.");
         o.addProperty("teleport-request-cancelled", "&7Outgoing teleport requests cancelled.");
         o.addProperty("teleport-request-none-outgoing", "&cYou have no outgoing requests.");
+        o.addProperty("teleport-requests-disabled", "&7Incoming teleport requests disabled.");
+        o.addProperty("teleport-requests-enabled", "&aIncoming teleport requests enabled.");
+        o.addProperty("teleport-requests-disabled-target",
+                "&c{player} is not accepting teleport requests.");
+        o.addProperty("teleport-to-failed", "&cCould not teleport to &f{player}&c: {reason}");
         o.addProperty("teleport-here-self", "&cYou are already here.");
         o.addProperty("teleport-here-success", "&aTeleported &f{player} &ato you.");
         o.addProperty("teleport-here-target", "&7You were teleported to &e{player}&7.");
@@ -113,6 +119,17 @@ public final class DefaultMessages {
         o.addProperty("mail-player-never-joined", "&cNo player named &f{player} &chas joined this server.");
         o.addProperty("mail-send-player-message", "&cUsage: /mail send <player> <message>");
         o.addProperty("mail-sendall-message", "&cUsage: /mail sendall <message>");
+        o.addProperty("mail-marked-all-read", "&aMarked &f{count} &amail as read.");
+        o.addProperty("mail-archived", "&aMail archived.");
+        o.addProperty("mail-restored", "&aMail restored.");
+        o.addProperty("mail-claimed", "&aRewards claimed!");
+        o.addProperty("mail-nothing-to-claim", "&7There is nothing to claim on this mail.");
+        o.addProperty("mail-claim-no-space", "&cMake room in your inventory to claim these rewards.");
+        o.addProperty("mail-attach-insufficient", "&cYou no longer have the items you tried to attach.");
+        o.addProperty("mail-announcement-sent", "&aAnnouncement sent to &f{count} &aplayers.");
+        o.addProperty("mail-announcement-missing", "&cThat announcement is no longer in the history.");
+        o.addProperty("mail-audience-need-node", "&cEnter a permission node for the Permission audience.");
+        o.addProperty("mail-audience-need-player", "&cEnter a player name for the One Player audience.");
         o.addProperty("kit-none", "&7No kits are configured.");
         o.addProperty("kit-list-header", "&7Available kits:");
         o.addProperty("kit-list-entry", "&8- &f{kit}{meta}{description}");
@@ -137,10 +154,37 @@ public final class DefaultMessages {
         o.addProperty("afk-now", "&7You are now AFK.");
         o.addProperty("afk-returned", "&7You are no longer AFK.");
         o.addProperty("afk-reward", "&aAFK reward: &f{amount}");
+        o.addProperty("afk-reward-item", "&aAFK reward: &f{quantity}x {item}");
+        o.addProperty("afk-reward-zone-hint", "&7You will only earn AFK rewards inside an AFK reward zone.");
+        o.addProperty("afk-zone-teleported", "&7Teleported to AFK zone '&f{name}&7'. You will be sent back when you return.");
+        o.addProperty("afk-zone-returned", "&7You have been returned to your previous location.");
+        o.addProperty("afkzone-usage", "&7/afkzone &fpos1&7|&fpos2&7|&fcreate <name>&7|&fdelete <name>&7|&fpermission <name> <node|->&7|&fdefault <name|->&7|&flist&7|&fcheck");
+        o.addProperty("afkzone-pos1", "&aAFK zone corner 1 set: &f{pos}");
+        o.addProperty("afkzone-pos2", "&aAFK zone corner 2 set: &f{pos}");
+        o.addProperty("afkzone-need-corners", "&cSet both corners first: stand at each corner and run &f/afkzone pos1 &cand &f/afkzone pos2&c.");
+        o.addProperty("afkzone-cross-world", "&cBoth corners must be in the same world.");
+        o.addProperty("afkzone-invalid-name", "&cZone names may only use letters, numbers, '-' and '_' (max 32 characters).");
+        o.addProperty("afkzone-exists", "&cAn AFK zone named '&f{name}&c' already exists.");
+        o.addProperty("afkzone-created", "&aAFK zone '&f{name}&a' created (&f{size}&a).");
+        o.addProperty("afkzone-zone-not-required-hint", "&7Note: rewards.requireInZone is &ffalse&7, so AFK rewards are earned anywhere. Enable it in modules/afk/config.json to restrict rewards to zones.");
+        o.addProperty("afkzone-deleted", "&aAFK zone '&f{name}&a' deleted.");
+        o.addProperty("afkzone-unknown", "&cNo AFK zone named '&f{name}&c'.");
+        o.addProperty("afkzone-none", "&7No AFK zones are defined yet.");
+        o.addProperty("afkzone-list-header", "&7AFK zones:");
+        o.addProperty("afkzone-list-entry", "&8- &f{name} &7({world}&7, {size})");
+        o.addProperty("afkzone-list-entry-perm", "&8- &f{name} &7({world}&7, {size}&7, requires &f{permission}&7)");
+        o.addProperty("afkzone-permission-set", "&aAFK zone '&f{name}&a' now requires &f{permission}&a.");
+        o.addProperty("afkzone-permission-cleared", "&aAFK zone '&f{name}&a' no longer requires a permission.");
+        o.addProperty("afkzone-default-set", "&aAFK zone '&f{name}&a' is now the default auto-AFK teleport zone.");
+        o.addProperty("afkzone-default-cleared", "&aCleared the default auto-AFK zone; one is now picked automatically.");
+        o.addProperty("afkzone-list-default", "&7Default auto-AFK zone: &f{name}");
+        o.addProperty("afkzone-check-in", "&aYou are inside AFK zone '&f{name}&a'.");
+        o.addProperty("afkzone-check-out", "&7You are not inside any AFK zone.");
         o.addProperty("flight-enabled", "&aFlight enabled.");
         o.addProperty("flight-disabled", "&cFlight disabled.");
         o.addProperty("flight-unavailable", "&cFlight is not available right now.");
         o.addProperty("flight-out-of-money", "&cYou ran out of money for flight.");
+        o.addProperty("flight-charged", "&7Flight cost &f{cost} &7withdrawn. Balance: &f{balance}&7.");
         o.addProperty("flight-not-enough-money", "&cNot enough money for flight (&f{cost}&c/minute).");
         o.addProperty("flight-state", "&7Flight {state}&7.");
         o.addProperty("flight-state-other", "&7Flight {state} &7for &e{player}&7.");
@@ -188,6 +232,96 @@ public final class DefaultMessages {
         o.addProperty("pm-reply-no-permission", "&cYou do not have permission to reply to private messages.");
         o.addProperty("pm-reply-none", "&cYou have no one to reply to.");
         o.addProperty("announcement-broadcast", "{message}");
+        o.addProperty("tutorial-started", "&aTutorial &f{tutorial} &astarted.");
+        o.addProperty("tutorial-started-other", "&aStarted tutorial &f{tutorial} &afor &f{player}&a.");
+        o.addProperty("tutorial-unknown", "&cUnknown tutorial: &f{tutorial}");
+        o.addProperty("tutorial-disabled", "&cTutorial &f{tutorial} &cis disabled.");
+        o.addProperty("tutorial-already-active", "&cA tutorial is already running for that player.");
+        o.addProperty("tutorial-already-completed",
+                "&cThat tutorial was already completed and does not allow replays (use --force).");
+        o.addProperty("tutorial-requirements-not-met",
+                "&cThe requirements for tutorial &f{tutorial} &care not met.");
+        o.addProperty("tutorial-start-error", "&cThe tutorial could not be started. See the server log.");
+        o.addProperty("tutorial-stopped", "&7Tutorial stopped. Your character has been restored.");
+        o.addProperty("tutorial-stopped-other", "&aStopped the tutorial for &f{player}&a.");
+        o.addProperty("tutorial-not-in", "&cYou are not in a tutorial.");
+        o.addProperty("tutorial-not-in-other", "&f{player} &cis not in a tutorial.");
+        o.addProperty("tutorial-skipped", "&7Tutorial skipped.");
+        o.addProperty("tutorial-reset-done", "&aReset tutorial &f{tutorial} &afor &f{player}&a.");
+        o.addProperty("tutorial-complete-done", "&aMarked tutorial &f{tutorial} &acompleted for &f{player}&a.");
+        o.addProperty("tutorial-status-active",
+                "&d{player} &7is in tutorial &f{tutorial} &7({state}, {seconds}s).");
+        o.addProperty("tutorial-status-idle", "&d{player} &7is not in a tutorial.");
+        o.addProperty("tutorial-status-completed", "&7Completed ({count}): &f{tutorials}");
+        o.addProperty("tutorial-list-header", "&d&lTutorials &7({count}):");
+        o.addProperty("tutorial-list-empty", "&7No tutorials are defined.");
+        o.addProperty("tutorial-page-unknown", "&cUnknown tutorial page: &f{page}");
+        o.addProperty("tutorial-page-opened", "&aOpened page &f{page} &afor &f{player}&a.");
+        o.addProperty("tutorial-reloaded",
+                "&aTutorial module reloaded: &f{tutorials} &atutorial(s), &f{pages} &apage(s).");
+        o.addProperty("tutorial-debug-on", "&aTutorial debug logging enabled.");
+        o.addProperty("tutorial-debug-off", "&7Tutorial debug logging disabled.");
+        o.addProperty("tutorial-chat-blocked", "&cChat is disabled during the tutorial.");
+        o.addProperty("customcommands-unknown", "&cUnknown custom command: &f{command}");
+        o.addProperty("customcommands-command-disabled", "&cThat command is currently disabled.");
+        o.addProperty("customcommands-cooldown",
+                "&cPlease wait {seconds}s before using &f/{command} &cagain.");
+        o.addProperty("customcommands-usage", "&cUsage: &f/{command} {usage}");
+        o.addProperty("customcommands-arg-missing", "&cMissing argument &f{arg} &7({expected})");
+        o.addProperty("customcommands-arg-invalid",
+                "&cInvalid value for &f{arg}&c: &f{value} &7(expected {expected})");
+        o.addProperty("customcommands-player-not-online",
+                "&cArgument &f{arg}&c: player &f{value} &cis not online.");
+        o.addProperty("customcommands-condition-failed", "&cYou cannot use that command right now.");
+        o.addProperty("customcommands-reloaded",
+                "&aCustom commands reloaded: &f{count} &aactive, &f{errors} &aissue(s).");
+        o.addProperty("vault-no-access", "&cYou do not have access to vault &f#{vault}&c.");
+        o.addProperty("vault-invalid-number", "&cVault numbers must be between 1 and {max}.");
+        o.addProperty("vault-locked-elsewhere",
+                "&cThat vault is currently open on &f{server}&c. Try again shortly.");
+        o.addProperty("vault-locked-local", "&cThat vault is already open.");
+        o.addProperty("vault-storage-unavailable",
+                "&cVault storage is temporarily unavailable. No changes were made.");
+        o.addProperty("vault-conflict",
+                "&cVault changed during save. The latest data was preserved and a recovery snapshot was created.");
+        o.addProperty("vault-saved", "&aVault &f#{vault} &asaved.");
+        o.addProperty("vault-save-failed", "&cCould not save vault &f#{vault}&c. Your items are still in the vault session.");
+        o.addProperty("vault-readonly", "&7This vault is open in read-only mode.");
+        o.addProperty("vault-readonly-downgrade",
+                "&cThe vault lock could not be renewed; the vault is now read-only.");
+        o.addProperty("vault-overflow-notice",
+                "&eYour current rank allows {rows} row(s). Items beyond that remain safe but unavailable.");
+        o.addProperty("vault-item-blocked", "&cThat item cannot be stored in a vault.");
+        o.addProperty("vault-full", "&cThis vault has no free slots within your allowed rows.");
+        o.addProperty("vault-deposit-failed", "&cCould not deposit that item. It was returned to you.");
+        o.addProperty("vault-admin-opened", "&7Opened &f{player}&7's vault &f#{vault} &7({mode}).");
+        o.addProperty("vault-admin-viewing", "&eStaff member {player} is viewing your vault #{vault}.");
+        o.addProperty("vault-admin-unlocked", "&aForce-unlocked vault &f#{vault} &afor &f{player}&a.");
+        o.addProperty("vault-admin-unlock-none", "&7No lock is held on that vault.");
+        o.addProperty("vault-admin-target-required", "&cEnter a player name to view their vaults.");
+        o.addProperty("vault-restored", "&aRestored vault &f#{vault} &afor &f{player} &afrom backup &f{backup}&a.");
+        o.addProperty("vault-restore-unknown-backup", "&cUnknown backup id: &f{backup}");
+        o.addProperty("vault-player-never-joined", "&cNo vault data found for &f{player}&c.");
+        o.addProperty("vault-metadata-updated", "&aVault &f#{vault} &aupdated.");
+        o.addProperty("vault-name-invalid", "&cThat vault name is not allowed.");
+        o.addProperty("vault-icon-invalid", "&cThat item cannot be used as a vault icon.");
+        o.addProperty("vault-icon-consumed", "&7One &f{item} &7was consumed for the vault icon.");
+        o.addProperty("vault-logs-header", "&d&lVault Logs &7- &f{player} &7({count} entries)");
+        o.addProperty("vault-logs-entry", "&8[{time}] &7{actor} &f{action} &7vault #{vault} on {server}");
+        o.addProperty("vault-logs-empty", "&7No vault log entries for that player.");
+        o.addProperty("vault-reloaded", "&aPlayer Vaults configuration reloaded.");
+
+        // ----- Patch Notes -----
+        o.addProperty("patchnotes-notify-join",
+                "&e{count} &7new patch note(s)! Use &f/{command} &7to read them.");
+        o.addProperty("patchnotes-reloaded", "&aPatch notes reloaded. &7{count} loaded, {errors} error(s).");
+        o.addProperty("patchnotes-marked-read", "&aMarked all patch notes as read.");
+        o.addProperty("patchnotes-marked-read-other", "&aMarked all patch notes as read for &f{player}&a.");
+        o.addProperty("patchnotes-opened-other", "&7Opened patch notes for &f{player}&7.");
+        o.addProperty("patchnotes-none", "&7There are no patch notes yet.");
+        o.addProperty("patchnotes-list-header", "&d&lPatch Notes &7({count})");
+        o.addProperty("patchnotes-list-entry", "{pin}&f{title} &7v{version} &8- &7{date}");
+
         return o;
     }
 }

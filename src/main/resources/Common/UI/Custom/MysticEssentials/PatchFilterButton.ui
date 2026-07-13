@@ -1,0 +1,33 @@
+$C = "../Common.ui";
+
+// Category filter chip for the Patch Notes viewer. Appended per filter:
+//   cmd.append("#FilterBar", "MysticEssentials/PatchFilterButton.ui")
+// then: cmd.set("#FilterBar[i] #Label.Text", ...) and toggle the active
+// underline via cmd.set("#FilterBar[i] #Active.Visible", true).
+
+Button #Row {
+  Anchor: (Width: 118, Right: 6);
+  LayoutMode: Top;
+  Padding: (Left: 4, Right: 4);
+  Style: (
+    Default: (Background: #000000(0.16)),
+    Hovered: (Background: #7fa8d6(0.16)),
+    Pressed: (Background: #7fa8d6(0.26))
+  );
+
+  Group {
+    FlexWeight: 1;
+
+    Label #Label {
+      Anchor: (Full: 0);
+      Style: (FontSize: 13, TextColor: #c9d6e5, RenderBold: true, HorizontalAlignment: Center, VerticalAlignment: Center);
+      Text: "All";
+    }
+  }
+
+  Group #Active {
+    Anchor: (Height: 3);
+    Background: #f0b429;
+    Visible: false;
+  }
+}

@@ -110,6 +110,19 @@ public final class HytalePlatform {
         }
     }
 
+    /** @return the name of the player's current world, if resolvable. */
+    public Optional<String> worldNameOf(PlayerRef player) {
+        if (player == null) {
+            return Optional.empty();
+        }
+        try {
+            World world = Universe.get().getWorld(player.getWorldUuid());
+            return world == null ? Optional.empty() : Optional.ofNullable(world.getName());
+        } catch (Throwable t) {
+            return Optional.empty();
+        }
+    }
+
     /**
      * @return {@code true} if the player's current world is temporary — flagged
      *         delete-on-restart or delete-on-remove — and therefore unsafe to
@@ -380,25 +393,89 @@ public final class HytalePlatform {
 
     // ----- Registration ------------------------------------------------------
 
-    /** Registers a command through the plugin's command registry. */
-    public void registerCommand(AbstractCommand command) {
-        plugin.getCommandRegistry().registerCommand(command);
+    /**
+     * Registers a command through the plugin's command registry.
+     *
+     * @return the registration handle — its public {@code unregister()} fully
+     *         removes the command again (verified 0.5.6: the handle's teardown
+     *         runnable removes the name from {@code CommandManager}'s command
+     *         map and every alias from its alias map). {@code null} if the
+     *         engine rejected the registration. Callers that never unregister
+     *         may ignore the return value.
+     */
+    public com.hypixel.hytale.server.core.command.system.CommandRegistration registerCommand(
+            AbstractCommand command) {
+        return plugin.getCommandRegistry().registerCommand(command);
     }
 
-    /** Registers a listener for a Hytale server event. */
-    public <E extends IBaseEvent<Void>> void onEvent(Class<? super E> eventType, Consumer<E> listener) {
-        plugin.getEventRegistry().register(eventType, listener);
+    /**
+     * Executes a command as the console (full permissions). {@code command}
+     * must not include a leading slash.
+     *
+     * @return {@code true} if the command was handed to the command manager.
+     */
+    public boolean dispatchConsoleCommand(String command) {
+        if (command == null || command.isBlank()) {
+            return false;
+        }
+        try {
+            com.hypixel.hytale.server.core.command.system.CommandManager.get()
+                    .handleCommand(com.hypixel.hytale.server.core.console.ConsoleSender.INSTANCE, command);
+            return true;
+        } catch (Throwable t) {
+            core.log(Level.WARNING, "Console command failed: '" + command + "': " + t);
+            return false;
+        }
+    }
+
+    /**
+     * Executes a command <b>as the player</b> (their permissions apply).
+     * {@code command} must not include a leading slash. Uses the verified
+     * {@code CommandManager.handleCommand(CommandSender, String)} —
+     * {@code PlayerRef} implements {@code CommandSender}.
+     *
+     * @return {@code true} if the command was handed to the command manager.
+     */
+    public boolean dispatchPlayerCommand(PlayerRef player, String command) {
+        if (player == null || command == null || command.isBlank()) {
+            return false;
+        }
+        try {
+            com.hypixel.hytale.server.core.command.system.CommandManager.get()
+                    .handleCommand(player, command);
+            return true;
+        } catch (Throwable t) {
+            core.log(Level.WARNING, "Player command failed for " + player.getUsername()
+                    + ": '" + command + "': " + t);
+            return false;
+        }
+    }
+
+    /**
+     * Registers a listener for a Hytale server event.
+     *
+     * @return the registration handle — its public {@code unregister()} removes
+     *         the listener again. Callers that never unregister may ignore the
+     *         return value.
+     */
+    public <E extends IBaseEvent<Void>> com.hypixel.hytale.event.EventRegistration<Void, E> onEvent(
+            Class<? super E> eventType, Consumer<E> listener) {
+        return plugin.getEventRegistry().register(eventType, listener);
     }
 
     /**
      * Registers a global async listener for a Hytale async event (e.g. chat). The
      * handler receives a future of the event and returns a (possibly transformed)
      * future, letting listeners mutate the event before it is applied.
+     *
+     * @return the registration handle — its public {@code unregister()} removes
+     *         the listener again. Callers that never unregister may ignore the
+     *         return value.
      */
-    public <K, E extends com.hypixel.hytale.event.IAsyncEvent<K>> void onAsyncEvent(
+    public <K, E extends com.hypixel.hytale.event.IAsyncEvent<K>> com.hypixel.hytale.event.EventRegistration<K, E> onAsyncEvent(
             Class<? super E> eventType,
             java.util.function.Function<java.util.concurrent.CompletableFuture<E>,
                     java.util.concurrent.CompletableFuture<E>> handler) {
-        plugin.getEventRegistry().registerAsyncGlobal(eventType, handler);
+        return plugin.getEventRegistry().registerAsyncGlobal(eventType, handler);
     }
 }

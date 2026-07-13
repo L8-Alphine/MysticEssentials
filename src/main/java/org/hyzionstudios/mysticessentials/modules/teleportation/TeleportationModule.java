@@ -7,14 +7,17 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.hyzionstudios.mysticessentials.api.Permissions;
 import org.hyzionstudios.mysticessentials.api.model.MysticLocation;
+import org.hyzionstudios.mysticessentials.api.model.PlayerProfile;
 import org.hyzionstudios.mysticessentials.api.model.TeleportRequest;
 import org.hyzionstudios.mysticessentials.api.service.TeleportService;
 import org.hyzionstudios.mysticessentials.core.module.AbstractMysticModule;
+import org.hyzionstudios.mysticessentials.core.teleport.TeleportServiceImpl;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommand;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommandSender;
 
@@ -44,9 +47,11 @@ public final class TeleportationModule extends AbstractMysticModule {
 
     private static final String DATA_KEY = "teleportation";
     private static final String FAVORITES_KEY = "favorites";
+    private static final String TPA_DISABLED_KEY = "tpaDisabled";
 
     /** target UUID -> (requester UUID -> pending request), insertion-ordered. */
     private final Map<UUID, LinkedHashMap<UUID, PendingRequest>> pending = new ConcurrentHashMap<>();
+    private final Set<UUID> tpaDisabled = ConcurrentHashMap.newKeySet();
 
     private TeleportationConfig config = new TeleportationConfig();
 
@@ -66,13 +71,14 @@ public final class TeleportationModule extends AbstractMysticModule {
 
     @Override
     public void onEnable() {
-        config = core.configManager().loadModuleConfig(id(), TeleportationConfig.class,
-                new TeleportationConfig());
+        loadConfig();
+        registerCommand(new TpCommand());
         registerCommand(new TpaCommand());
         registerCommand(new TpaHereCommand());
         registerCommand(new TpAcceptCommand());
         registerCommand(new TpDenyCommand());
         registerCommand(new TpCancelCommand());
+        registerCommand(new TpToggleCommand());
         registerCommand(new TpHereForceCommand());
         registerCommand(new TpAllCommand());
         registerCommand(new TopCommand());
@@ -81,13 +87,21 @@ public final class TeleportationModule extends AbstractMysticModule {
 
     @Override
     public void onReload() {
-        config = core.configManager().loadModuleConfig(id(), TeleportationConfig.class,
-                new TeleportationConfig());
+        loadConfig();
     }
 
     @Override
     public void onDisable() {
         pending.clear();
+        tpaDisabled.clear();
+    }
+
+    private void loadConfig() {
+        config = core.configManager().loadModuleConfig(id(), TeleportationConfig.class,
+                new TeleportationConfig());
+        if (core.getTeleportService() instanceof TeleportServiceImpl service) {
+            service.configure(config);
+        }
     }
 
     // ----- Request state (shared by commands and the UI) ----------------------
@@ -106,7 +120,12 @@ public final class TeleportationModule extends AbstractMysticModule {
     }
 
     /** Sends a request; replaces any previous one from the same requester. */
-    void sendRequest(PlayerRef requester, PlayerRef target, boolean requesterTeleports) {
+    boolean sendRequest(PlayerRef requester, PlayerRef target, boolean requesterTeleports) {
+        if (!acceptsTeleportRequests(target.getUuid())) {
+            core.getMessageService().sendKey(requester, "teleport-requests-disabled-target",
+                    Map.of("player", target.getUsername()));
+            return false;
+        }
         LinkedHashMap<UUID, PendingRequest> inbound =
                 pending.computeIfAbsent(target.getUuid(), uuid -> new LinkedHashMap<>());
         synchronized (inbound) {
@@ -117,6 +136,7 @@ public final class TeleportationModule extends AbstractMysticModule {
         core.getMessageService().sendKey(target, requesterTeleports
                 ? "teleport-request-incoming-to-you"
                 : "teleport-request-incoming-to-them", Map.of("player", requester.getUsername()));
+        return true;
     }
 
     /**
@@ -192,53 +212,108 @@ public final class TeleportationModule extends AbstractMysticModule {
     /** The player's favourite players: UUID &rarr; last-known name, insertion-ordered. */
     Map<UUID, String> favorites(UUID owner) {
         Map<UUID, String> result = new LinkedHashMap<>();
-        JsonObject favorites = favoritesObject(owner, false);
-        if (favorites != null) {
-            for (String key : favorites.keySet()) {
-                try {
-                    result.put(UUID.fromString(key), favorites.get(key).getAsString());
-                } catch (RuntimeException ignored) {
-                    // Skip malformed entries rather than breaking the whole list.
+        core.getPlayerProfileService().getCached(owner).ifPresent(profile -> {
+            synchronized (profile) {
+                JsonObject favorites = favoritesObject(profile, false);
+                if (favorites == null) {
+                    return;
+                }
+                for (String key : favorites.keySet()) {
+                    try {
+                        result.put(UUID.fromString(key), favorites.get(key).getAsString());
+                    } catch (RuntimeException ignored) {
+                        // Skip malformed entries rather than breaking the whole list.
+                    }
                 }
             }
-        }
+        });
         return result;
     }
 
     boolean isFavorite(UUID owner, UUID target) {
-        JsonObject favorites = favoritesObject(owner, false);
-        return favorites != null && favorites.has(target.toString());
+        return core.getPlayerProfileService().getCached(owner)
+                .map(profile -> {
+                    synchronized (profile) {
+                        JsonObject favorites = favoritesObject(profile, false);
+                        return favorites != null && favorites.has(target.toString());
+                    }
+                })
+                .orElse(false);
     }
 
     boolean addFavorite(UUID owner, UUID target, String targetName) {
         if (owner.equals(target)) {
             return false;
         }
-        JsonObject favorites = favoritesObject(owner, true);
-        if (favorites == null) {
-            return false;
-        }
-        favorites.addProperty(target.toString(), targetName);
-        core.getPlayerProfileService().getCached(owner).ifPresent(core.getPlayerProfileService()::save);
-        return true;
+        return core.getPlayerProfileService().getCached(owner)
+                .map(profile -> {
+                    synchronized (profile) {
+                        favoritesObject(profile, true).addProperty(target.toString(), targetName);
+                    }
+                    core.getPlayerProfileService().save(profile);
+                    return true;
+                })
+                .orElse(false);
     }
 
     boolean removeFavorite(UUID owner, UUID target) {
-        JsonObject favorites = favoritesObject(owner, false);
-        if (favorites == null || !favorites.has(target.toString())) {
-            return false;
-        }
-        favorites.remove(target.toString());
-        core.getPlayerProfileService().getCached(owner).ifPresent(core.getPlayerProfileService()::save);
-        return true;
+        return core.getPlayerProfileService().getCached(owner)
+                .map(profile -> {
+                    synchronized (profile) {
+                        JsonObject favorites = favoritesObject(profile, false);
+                        if (favorites == null || !favorites.has(target.toString())) {
+                            return false;
+                        }
+                        favorites.remove(target.toString());
+                    }
+                    core.getPlayerProfileService().save(profile);
+                    return true;
+                })
+                .orElse(false);
     }
 
-    private JsonObject favoritesObject(UUID owner, boolean create) {
-        var profile = core.getPlayerProfileService().getCached(owner).orElse(null);
-        if (profile == null) {
+    private boolean acceptsTeleportRequests(UUID owner) {
+        if (tpaDisabled.contains(owner)) {
+            return false;
+        }
+        return core.getPlayerProfileService().getCached(owner)
+                .map(profile -> {
+                    synchronized (profile) {
+                        JsonObject data = profile.getModuleData().get(DATA_KEY);
+                        boolean disabled = jsonBoolean(data, TPA_DISABLED_KEY, false);
+                        if (disabled) {
+                            tpaDisabled.add(owner);
+                        }
+                        return !disabled;
+                    }
+                })
+                .orElse(true);
+    }
+
+    private boolean setAcceptsTeleportRequests(UUID owner, boolean accepts) {
+        if (accepts) {
+            tpaDisabled.remove(owner);
+        } else {
+            tpaDisabled.add(owner);
+        }
+        core.getPlayerProfileService().getCached(owner).ifPresent(profile -> {
+            synchronized (profile) {
+                moduleData(profile, true).addProperty(TPA_DISABLED_KEY, !accepts);
+            }
+            core.getPlayerProfileService().save(profile);
+        });
+        return accepts;
+    }
+
+    private boolean toggleAcceptsTeleportRequests(UUID owner) {
+        return setAcceptsTeleportRequests(owner, !acceptsTeleportRequests(owner));
+    }
+
+    private JsonObject favoritesObject(PlayerProfile profile, boolean create) {
+        JsonObject data = moduleData(profile, create);
+        if (data == null) {
             return null;
         }
-        JsonObject data = profile.getModuleData().computeIfAbsent(DATA_KEY, k -> new JsonObject());
         if (!data.has(FAVORITES_KEY)) {
             if (!create) {
                 return null;
@@ -246,6 +321,24 @@ public final class TeleportationModule extends AbstractMysticModule {
             data.add(FAVORITES_KEY, new JsonObject());
         }
         return data.getAsJsonObject(FAVORITES_KEY);
+    }
+
+    private JsonObject moduleData(PlayerProfile profile, boolean create) {
+        if (!create) {
+            return profile.getModuleData().get(DATA_KEY);
+        }
+        return profile.getModuleData().computeIfAbsent(DATA_KEY, k -> new JsonObject());
+    }
+
+    private static boolean jsonBoolean(JsonObject data, String key, boolean fallback) {
+        if (data == null || !data.has(key)) {
+            return fallback;
+        }
+        try {
+            return data.get(key).getAsBoolean();
+        } catch (RuntimeException ignored) {
+            return fallback;
+        }
     }
 
     void openTpaUi(PlayerRef player) {
@@ -265,8 +358,9 @@ public final class TeleportationModule extends AbstractMysticModule {
             sender.replyKey("teleport-request-self");
             return;
         }
-        sendRequest(sender.player().orElseThrow(), target, requesterTeleports);
-        sender.replyKey("teleport-request-sent", Map.of("player", target.getUsername()));
+        if (sendRequest(sender.player().orElseThrow(), target, requesterTeleports)) {
+            sender.replyKey("teleport-request-sent", Map.of("player", target.getUsername()));
+        }
     }
 
     /** Suggests usernames of players with a pending request to the sender. */
@@ -292,6 +386,66 @@ public final class TeleportationModule extends AbstractMysticModule {
     }
 
     // ----- Commands ----------------------------------------------------------
+
+    /** {@code /tp} opens the UI; {@code /tp <player>} force-teleports the executor to a player. */
+    private final class TpCommand extends MysticCommand {
+        TpCommand() {
+            super(TeleportationModule.this.core, "tp", "Teleport to a player.");
+            requirePermission(Permissions.TELEPORT_TP);
+            addUsageVariant(new TpTargetVariant());
+        }
+
+        @Override
+        protected void run(MysticCommandSender sender) {
+            if (!sender.isPlayer()) {
+                sender.replyKey("player-only");
+                return;
+            }
+            openTpaUi(sender.player().orElseThrow());
+        }
+    }
+
+    private final class TpTargetVariant extends MysticCommand {
+        private final RequiredArg<String> target = withRequiredArg("player", "Target player",
+                ArgTypes.STRING).suggest(visiblePlayerSuggestions());
+
+        TpTargetVariant() {
+            super(TeleportationModule.this.core, "Teleport to a player.");
+            requirePermission(Permissions.TELEPORT_TP);
+        }
+
+        @Override
+        protected void run(MysticCommandSender sender) {
+            if (!sender.isPlayer()) {
+                sender.replyKey("player-only");
+                return;
+            }
+            PlayerRef targetPlayer = core.platform().findPlayerByName(sender.get(target))
+                    .filter(ref -> core.vanish().canSee(sender.uuid(), ref.getUuid()))
+                    .orElse(null);
+            if (targetPlayer == null) {
+                sender.replyKey("player-not-found");
+                return;
+            }
+            if (targetPlayer.getUuid().equals(sender.uuid())) {
+                sender.replyKey("teleport-here-self");
+                return;
+            }
+            core.getTeleportService().teleport(sender.player().orElseThrow(), TeleportRequest.builder()
+                    .type("tp")
+                    .targetPlayer(targetPlayer.getUuid())
+                    .warmupSeconds(0)
+                    .cooldownSeconds(0)
+                    .build())
+                    .thenAccept(result -> {
+                        if (result != TeleportService.Result.SUCCESS) {
+                            sender.replyKey("teleport-to-failed", Map.of(
+                                    "player", targetPlayer.getUsername(),
+                                    "reason", result.name().toLowerCase(java.util.Locale.ROOT).replace('_', ' ')));
+                        }
+                    });
+        }
+    }
 
     /** {@code /tpa} opens the UI; {@code /tpa <player>} sends a request (positional variant). */
     private final class TpaCommand extends MysticCommand {
@@ -470,6 +624,24 @@ public final class TeleportationModule extends AbstractMysticModule {
                 }
             }
             sender.replyKey(removed ? "teleport-request-cancelled" : "teleport-request-none-outgoing");
+        }
+    }
+
+    /** {@code /tptoggle} toggles whether other players may send you TPA requests. */
+    private final class TpToggleCommand extends MysticCommand {
+        TpToggleCommand() {
+            super(TeleportationModule.this.core, "tptoggle", "Toggle incoming teleport requests.");
+            requirePermission(Permissions.TELEPORT_TPA);
+        }
+
+        @Override
+        protected void run(MysticCommandSender sender) {
+            if (!sender.isPlayer()) {
+                sender.replyKey("player-only");
+                return;
+            }
+            boolean accepting = toggleAcceptsTeleportRequests(sender.uuid());
+            sender.replyKey(accepting ? "teleport-requests-enabled" : "teleport-requests-disabled");
         }
     }
 

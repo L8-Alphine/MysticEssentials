@@ -25,6 +25,9 @@ public interface StorageProvider {
 
     CompletableFuture<Boolean> exists(String namespace, String key);
 
+    /** Lists every key stored under {@code namespace} (empty if none). */
+    CompletableFuture<java.util.List<String>> listKeys(String namespace);
+
     /** Flushes and closes the provider. Called during Core shutdown. */
     void shutdown();
 }

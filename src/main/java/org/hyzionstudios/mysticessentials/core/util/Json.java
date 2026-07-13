@@ -4,8 +4,10 @@ import java.io.IOException;
 import java.io.Reader;
 import java.io.Writer;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -65,13 +67,28 @@ public final class Json {
         return element == null ? null : GSON.fromJson(element, type);
     }
 
-    /** Writes a value as pretty JSON, creating parent directories as needed. */
+    /**
+     * Writes a value as pretty JSON, creating parent directories as needed. The
+     * write is atomic: the JSON is fully written to a sibling temp file which is
+     * then moved into place, so a crash mid-write can never leave a truncated
+     * (unparseable) target file behind.
+     */
     public static void writeFile(Path file, Object value) throws IOException {
         if (file.getParent() != null) {
             Files.createDirectories(file.getParent());
         }
-        try (Writer writer = Files.newBufferedWriter(file, StandardCharsets.UTF_8)) {
+        Path tmp = file.resolveSibling(file.getFileName() + ".tmp");
+        try (Writer writer = Files.newBufferedWriter(tmp, StandardCharsets.UTF_8)) {
             GSON.toJson(value, writer);
+        }
+        try {
+            Files.move(tmp, file, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+        } catch (AtomicMoveNotSupportedException e) {
+            // Some filesystems can't do an atomic replace; fall back to a plain
+            // replace, which still avoids a partially written target file.
+            Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING);
+        } finally {
+            Files.deleteIfExists(tmp);
         }
     }
 

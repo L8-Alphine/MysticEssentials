@@ -47,6 +47,19 @@ public abstract class MysticPage extends CustomUIPage {
         }
     }
 
+    /** Closes the currently open page (must be called from {@code handleDataEvent}). */
+    protected static void close(Ref<EntityStore> ref, Store<EntityStore> store) {
+        try {
+            Player entity = store.getComponent(ref, Player.getComponentType());
+            if (entity != null) {
+                entity.getPageManager().setPage(ref, store,
+                        com.hypixel.hytale.protocol.packets.interface_.Page.None);
+            }
+        } catch (Throwable ignored) {
+            // The player can close the page manually.
+        }
+    }
+
     /** Parses the {@code handleDataEvent} payload, returning an empty object on malformed input. */
     protected static JsonObject parse(String data) {
         try {

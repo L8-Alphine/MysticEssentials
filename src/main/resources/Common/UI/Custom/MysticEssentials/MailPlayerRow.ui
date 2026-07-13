@@ -1,0 +1,28 @@
+$C = "../Common.ui";
+
+// Online-player row in the Mail compose view. Appended per player:
+//   cmd.append("#MailList", "MysticEssentials/MailPlayerRow.ui").
+// Clicking the row fills the compose "To" field with that player's name.
+
+Button #Row {
+  Anchor: (Height: 42, Bottom: 6);
+  LayoutMode: Left;
+  Padding: (Left: 12, Right: 12);
+  Style: (
+    Default: (Background: #000000(0.18)),
+    Hovered: (Background: #7a9cc6(0.16)),
+    Pressed: (Background: #7a9cc6(0.26))
+  );
+
+  Label #Name {
+    FlexWeight: 1;
+    Style: (FontSize: 15, TextColor: #ffffff, RenderBold: true, VerticalAlignment: Center);
+    Text: "Player";
+  }
+
+  Label #Pick {
+    Anchor: (Width: 72);
+    Style: (FontSize: 12, TextColor: #f0b429, HorizontalAlignment: End, VerticalAlignment: Center);
+    Text: "Select";
+  }
+}

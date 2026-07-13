@@ -1,0 +1,16 @@
+$C = "../Common.ui";
+
+// Addition line (green) in the Patch Notes viewer content.
+//   cmd.append("#SectionContent", "MysticEssentials/PatchLineAdd.ui")
+//   cmd.set("#SectionContent[i] #Line.Text", ...)
+
+Group #Row {
+  LayoutMode: Top;
+  Anchor: (Height: 20);
+
+  Label #Line {
+    Anchor: (Full: 0);
+    Style: (FontSize: 14, TextColor: #7bd88f, VerticalAlignment: Center);
+    Text: "";
+  }
+}

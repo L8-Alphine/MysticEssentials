@@ -5,7 +5,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Level;
 
 import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.platform.ui.MysticPage;
@@ -15,7 +14,6 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.protocol.packets.interface_.CustomPageLifetime;
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
-import com.hypixel.hytale.server.core.command.system.CommandManager;
 import com.hypixel.hytale.server.core.ui.builder.EventData;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
@@ -110,11 +108,9 @@ final class ChannelPages {
             String password = field(payload, "password");
             switch (action) {
                 case "select" -> reopen(ref, store, new ChannelsPage(core, channels, player, channel));
-                case "switch" -> runAndRefresh(ref, store, "channel switch " + channel
-                        + (password.isBlank() ? "" : " " + password), channel);
-                case "join" -> runAndRefresh(ref, store, "channel join " + channel
-                        + (password.isBlank() ? "" : " " + password), channel);
-                case "leave" -> runAndRefresh(ref, store, "channel leave " + channel, channel);
+                case "switch" -> switchAndRefresh(ref, store, channel, password);
+                case "join" -> joinAndRefresh(ref, store, channel, password);
+                case "leave" -> leaveAndRefresh(ref, store, channel);
                 case "opentemp" -> channels.openTempChannelUi(player);
                 case "managetemp" -> channels.openTempManageUi(player);
                 default -> {
@@ -122,9 +118,20 @@ final class ChannelPages {
             }
         }
 
-        private void runAndRefresh(Ref<EntityStore> ref, Store<EntityStore> store, String command,
-                String channel) {
-            runCommand(core, player, command);
+        private void switchAndRefresh(Ref<EntityStore> ref, Store<EntityStore> store, String channel,
+                String password) {
+            channels.switchChannelWithFeedback(player, channel, password);
+            reopen(ref, store, new ChannelsPage(core, channels, player, channel));
+        }
+
+        private void joinAndRefresh(Ref<EntityStore> ref, Store<EntityStore> store, String channel,
+                String password) {
+            channels.joinChannelWithFeedback(player, channel, password);
+            reopen(ref, store, new ChannelsPage(core, channels, player, channel));
+        }
+
+        private void leaveAndRefresh(Ref<EntityStore> ref, Store<EntityStore> store, String channel) {
+            channels.leaveChannelWithFeedback(player, channel);
             reopen(ref, store, new ChannelsPage(core, channels, player, channel));
         }
 
@@ -313,11 +320,4 @@ final class ChannelPages {
                 .replaceAll("(?i)<(?:#[0-9a-f]{3,6}|/?(?:gradient|rainbow|color|c|bold|b|italic|i))[^>]*>", "");
     }
 
-    private static void runCommand(MysticCore core, PlayerRef player, String command) {
-        try {
-            CommandManager.get().handleCommand(player, command);
-        } catch (Throwable t) {
-            core.log(Level.WARNING, "Channel UI command failed ('" + command + "'): " + t);
-        }
-    }
 }

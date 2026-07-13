@@ -17,7 +17,8 @@ All nodes are prefixed `mysticessentials.`.
 
 | Node | Grants |
 |---|---|
-| `mysticessentials.teleport.tpa` | `/tpa`, `/tpahere`, `/tpaccept`, `/tpdeny`, `/tpcancel` + the Teleport Requests UI (incl. favorites) |
+| `mysticessentials.teleport.tpa` | `/tpa`, `/tpahere`, `/tpaccept`, `/tpdeny`, `/tpcancel`, `/tptoggle` + the Teleport Requests UI (incl. favorites) |
+| `mysticessentials.teleport.tp` | `/tp [player]` — teleport yourself to a player; no player opens the Teleport Requests UI |
 | `mysticessentials.teleport.tphere` | `/tphere <player>` — teleport one player to you |
 | `mysticessentials.teleport.tpall` | `/tpall` — teleport every online player to you |
 | `mysticessentials.teleport.top` | `/top` — teleport to the highest block in your current column |
@@ -50,10 +51,12 @@ All nodes are prefixed `mysticessentials.`.
 
 | Node | Grants |
 |---|---|
-| `mysticessentials.mail.use` | `/mail` + the Mail UI (read/delete/clear own inbox) |
+| `mysticessentials.mail.use` | `/mail` + the Mail UI (inbox/sent/archived/deleted folders, read/archive/delete/claim own mail) |
 | `mysticessentials.mail.send` | Sending mail (command + UI compose) |
 | `mysticessentials.mail.send.offline` | Sending to offline players |
-| `mysticessentials.mail.send.all` | `/mail sendall` + the server-wide mail row in the UI |
+| `mysticessentials.mail.send.all` | `/mail sendall` (bulk text mail) |
+| `mysticessentials.mail.attach` | Attach items (consumed from your inventory) to composed mail |
+| `mysticessentials.mail.announce` | `/mailadmin` — the standalone Mail Admin Center (broadcast announcements with item + command rewards, audience targeting, sent history) |
 
 ## Announcements
 
@@ -67,8 +70,10 @@ All nodes are prefixed `mysticessentials.`.
 | Node | Grants |
 |---|---|
 | `mysticessentials.afk.use` | `/afk [reason]` |
-| `mysticessentials.afk.bypass.auto` | Never auto-flagged AFK |
+| `mysticessentials.afk.bypass.auto` | Never auto-flagged AFK (movement still clears an existing AFK state) |
 | `mysticessentials.afk.rewards` | Eligible for AFK rewards (when enabled) |
+| `mysticessentials.afk.zone.admin` | `/afkzone` — create/delete/list AFK reward zones |
+| *custom per-zone node* | Zones may require any node via `/afkzone permission <name> <node>`; it gates teleport-in, staying AFK inside, and earning there |
 
 ## Chat
 
@@ -119,9 +124,101 @@ All nodes are prefixed `mysticessentials.`.
 | `mysticessentials.nick.color` | Colour options in the nick UI / colour codes in `/nick` |
 | `mysticessentials.nick.others` | `/nick <player> <name>` |
 
+## Patch Notes
+
+`mysticessentials.patchnotes.admin` is reserved as the umbrella admin node.
+
+| Node | Grants |
+|---|---|
+| `mysticessentials.patchnotes.view` | `/patchnotes` (+ UI), `/patchnotes open`, `/patchnotes markread`, `/patchnotes list`, and the join notification |
+| `mysticessentials.patchnotes.reload` | `/patchnotes reload` |
+| `mysticessentials.patchnotes.open.others` | `/patchnotes open <player>` |
+| `mysticessentials.patchnotes.markread.others` | `/patchnotes markread <player>` |
+
+## Tutorial
+
+`mysticessentials.tutorial.admin` grants **every** tutorial node below.
+
+| Node | Grants |
+|---|---|
+| `mysticessentials.tutorial.list` | `/tutorial list` |
+| `mysticessentials.tutorial.info` | `/tutorial info <tutorial>` |
+| `mysticessentials.tutorial.play` | `/tutorial play <tutorial>` (self) + the `/tutorial <tutorial>` shortcut |
+| `mysticessentials.tutorial.play.others` | `/tutorial play <tutorial> <player> [--force]` |
+| `mysticessentials.tutorial.stop` | `/tutorial stop` (self) |
+| `mysticessentials.tutorial.stop.others` | `/tutorial stop <player>` |
+| `mysticessentials.tutorial.skip` | `/tutorial skip` (self; also allowed via `defaults.allowSkip` + `defaults.skipPermission`) |
+| `mysticessentials.tutorial.skip.others` | `/tutorial skip <player>` |
+| `mysticessentials.tutorial.reset` | `/tutorial reset <tutorial> <player>` (works for offline players) |
+| `mysticessentials.tutorial.complete` | `/tutorial complete <tutorial> <player>` (works for offline players) |
+| `mysticessentials.tutorial.status` | `/tutorial status` (self) |
+| `mysticessentials.tutorial.status.others` | `/tutorial status <player>` |
+| `mysticessentials.tutorial.page` | `/tutorial page <page>` (self) |
+| `mysticessentials.tutorial.page.others` | `/tutorial page <page> <player>` |
+| `mysticessentials.tutorial.reload` | `/tutorial reload` |
+| `mysticessentials.tutorial.debug` | `/tutorial debug <on\|off>` |
+| `mysticessentials.tutorial.scene` | `/tutorial scene <list\|info\|import\|play\|stop>` (cinematic scene tooling) |
+| `mysticessentials.tutorial.bypassfirstjoin` | Exempt from the first-join tutorial |
+
+## Custom Commands
+
+`mysticessentials.customcommands.admin` grants **every** admin node below.
+Access to the custom commands themselves is defined per command in its JSON
+file (`permission.mode`: `none`, `single`, `all`, `any`).
+
+| Node | Grants |
+|---|---|
+| `mysticessentials.customcommands.list` | `/customcommands list` |
+| `mysticessentials.customcommands.info` | `/customcommands info <command>` |
+| `mysticessentials.customcommands.reload` | `/customcommands reload` |
+| `mysticessentials.customcommands.manage` | `/customcommands enable\|disable <command>` |
+| `mysticessentials.customcommands.test` | `/customcommands test <command> [args...]` |
+| `mysticessentials.customcommands.validate` | `/customcommands validate` |
+| `mysticessentials.customcommands.bypass.cooldown` | Bypass every custom command cooldown |
+| `mysticessentials.customcommands.bypass.cooldown.<name>` | Bypass one command's cooldown |
+| `mysticessentials.customcommands.command.<name>` | Implicit use node for a command with `permission.mode: single` and no explicit `node` |
+
+Per-command definitions may also name arbitrary nodes (e.g. `myserver.vip`) in
+`permission.node` / `permission.nodes` and an extra `cooldown.bypassPermission`.
+
+## Player Vaults
+
+Disabled by default. `mysticessentials.vaults.admin` grants **every**
+`mysticessentials.vaults.admin.*` node below.
+
+| Node | Grants |
+|---|---|
+| `mysticessentials.vaults.command` | Base `/playervault` access (aliases `/pv`, `/vault`, `/vaults`, `/playervaults`) |
+| `mysticessentials.vaults.command.edit` | `/pv edit <n>` (opens the editor) |
+| `mysticessentials.vaults.command.list` | `/pv list` |
+| `mysticessentials.vaults.command.reload` | `/pv reload` |
+| `mysticessentials.vaults.vault.<n>` | Highest accessible vault number (grants vaults `1..n`) |
+| `mysticessentials.vaults.rows.<n>` | Rows exposed per vault (capped by config `maxRows`) |
+| `mysticessentials.vaults.editor` | Access to the vault editor UI |
+| `mysticessentials.vaults.editor.name` | Rename a vault |
+| `mysticessentials.vaults.editor.color` | Change vault colour |
+| `mysticessentials.vaults.editor.color.hex` | Use raw `#RRGGBB` colours |
+| `mysticessentials.vaults.editor.icon` | Change vault icon (any valid item) |
+| `mysticessentials.vaults.editor.description` | Edit vault description |
+| `mysticessentials.vaults.editor.reset` | Reset a vault's metadata to defaults |
+| `mysticessentials.vaults.admin.open` | Open another player's vault (`/pv <n> <player>`) |
+| `mysticessentials.vaults.admin.open.offline` | Open offline players' vaults |
+| `mysticessentials.vaults.admin.edit` | Modify another player's vault contents |
+| `mysticessentials.vaults.admin.readonly` | Open another player's vault read-only |
+| `mysticessentials.vaults.admin.unlock` | `/pv admin unlock <player> <n>` (force-unlock a stuck lock) |
+| `mysticessentials.vaults.admin.restore` | `/pv admin restore <player> <n> <backupId>` |
+| `mysticessentials.vaults.admin.viewlogs` | `/pv admin logs <player>` |
+| `mysticessentials.vaults.admin.bypasslimit` | View/recover overflow items beyond an owner's row/vault limits |
+
+`vaults.vault.<n>` and `vaults.rows.<n>` resolve to the highest granted number
+(see **Dynamic limits**); `vaults.vault.*` / `vaults.rows.*` grant the config
+maximum.
+
 ## Dynamic limits
 
-Numeric limits (`home.limit`, `playerwarp.limit`) are resolved by probing
-`<base>.<n>` for n = 0..128 and taking the highest granted, with
-`<base>.unlimited` meaning no limit. Configure via LuckPerms, e.g.
-`lp group vip permission set mysticessentials.home.limit.10 true`.
+Numeric limits (`home.limit`, `playerwarp.limit`, `vaults.vault`, `vaults.rows`)
+are resolved by probing `<base>.<n>` for n = 0..128/256 and taking the highest
+granted, with `<base>.unlimited` (or `<base>.*` for vaults) meaning the maximum.
+Configure via LuckPerms, e.g.
+`lp group vip permission set mysticessentials.home.limit.10 true` or
+`lp group vip permission set mysticessentials.vaults.vault.5 true`.

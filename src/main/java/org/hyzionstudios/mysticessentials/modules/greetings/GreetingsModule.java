@@ -29,8 +29,8 @@ public final class GreetingsModule extends AbstractMysticModule {
     @Override
     public void onEnable() {
         config = core.configManager().loadModuleConfig(id(), GreetingsConfig.class, new GreetingsConfig());
-        core.platform().onEvent(PlayerConnectEvent.class, (PlayerConnectEvent event) -> onJoin(event.getPlayerRef()));
-        core.platform().onEvent(PlayerDisconnectEvent.class,
+        registerEvent(PlayerConnectEvent.class, (PlayerConnectEvent event) -> onJoin(event.getPlayerRef()));
+        registerEvent(PlayerDisconnectEvent.class,
                 (PlayerDisconnectEvent event) -> onLeave(event.getPlayerRef()));
     }
 

@@ -45,6 +45,7 @@ public final class SqlStorageProvider implements StorageProvider {
     private static final String SELECT = "SELECT data FROM mystic_documents WHERE namespace = ? AND id = ?";
     private static final String DELETE = "DELETE FROM mystic_documents WHERE namespace = ? AND id = ?";
     private static final String EXISTS = "SELECT 1 FROM mystic_documents WHERE namespace = ? AND id = ? LIMIT 1";
+    private static final String LIST_KEYS = "SELECT id FROM mystic_documents WHERE namespace = ?";
 
     private final MysticCore core;
     private final MainConfig.Mysql config;
@@ -161,6 +162,25 @@ public final class SqlStorageProvider implements StorageProvider {
                 }
             } catch (SQLException e) {
                 throw new JsonStorageProvider.StorageException("exists " + namespace + "/" + key, e);
+            }
+        }, executor);
+    }
+
+    @Override
+    public CompletableFuture<java.util.List<String>> listKeys(String namespace) {
+        return CompletableFuture.supplyAsync(() -> {
+            try (Connection connection = dataSource.getConnection();
+                    PreparedStatement statement = connection.prepareStatement(LIST_KEYS)) {
+                statement.setString(1, namespace);
+                try (ResultSet rs = statement.executeQuery()) {
+                    java.util.List<String> keys = new java.util.ArrayList<>();
+                    while (rs.next()) {
+                        keys.add(rs.getString(1));
+                    }
+                    return keys;
+                }
+            } catch (SQLException e) {
+                throw new JsonStorageProvider.StorageException("listKeys " + namespace, e);
             }
         }, executor);
     }

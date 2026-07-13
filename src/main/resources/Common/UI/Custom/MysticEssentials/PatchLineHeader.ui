@@ -1,0 +1,16 @@
+$C = "../Common.ui";
+
+// Section header line in the Patch Notes viewer content.
+//   cmd.append("#SectionContent", "MysticEssentials/PatchLineHeader.ui")
+//   cmd.set("#SectionContent[i] #Line.Text", ...)
+
+Group #Row {
+  LayoutMode: Top;
+  Anchor: (Height: 26, Top: 6, Bottom: 2);
+
+  Label #Line {
+    Anchor: (Full: 0);
+    Style: (FontSize: 15, RenderBold: true, RenderUppercase: true, TextColor: #7fb4f0, VerticalAlignment: Center);
+    Text: "";
+  }
+}

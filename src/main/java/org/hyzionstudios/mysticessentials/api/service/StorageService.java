@@ -28,4 +28,7 @@ public interface StorageService {
 
     /** @return {@code true} if a document exists for the key. */
     CompletableFuture<Boolean> exists(String namespace, String key);
+
+    /** Lists every key stored under {@code namespace} (empty if none). */
+    CompletableFuture<java.util.List<String>> listKeys(String namespace);
 }

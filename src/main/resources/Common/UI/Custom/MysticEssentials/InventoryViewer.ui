@@ -1,0 +1,60 @@
+$C = "../Common.ui";
+
+$C.@PageOverlay {}
+
+$C.@Container {
+  Anchor: (Width: 760, Height: 620);
+
+  #Title {
+    Group {
+      $C.@Title {
+        @Text = "Inventory Viewer";
+      }
+
+      Label #ViewerSubtitle {
+        Anchor: (Top: 8, Right: 14, Width: 320, Height: 24);
+        Style: (FontSize: 14, TextColor: #96a9be, HorizontalAlignment: End, VerticalAlignment: Center);
+        Text: "";
+      }
+    }
+  }
+
+  #Content {
+    LayoutMode: Top;
+
+    Label #ItemCount {
+      Anchor: (Height: 22, Bottom: 6);
+      Style: (FontSize: 13, TextColor: #96a9be, VerticalAlignment: Center);
+      Text: "";
+    }
+
+    Label #ItemsEmpty {
+      Anchor: (Height: 40);
+      Style: (FontSize: 14, TextColor: #9fb0c4, VerticalAlignment: Center);
+      Text: "This snapshot has no items.";
+      Visible: false;
+    }
+
+    Group #ItemList {
+      FlexWeight: 1;
+      LayoutMode: TopScrolling;
+      Padding: (Right: 10);
+      ScrollbarStyle: $C.@DefaultScrollbarStyle;
+    }
+
+    Group {
+      LayoutMode: Left;
+      Anchor: (Height: 44, Top: 10);
+
+      $C.@TextButton #RestoreButton {
+        @Text = "Restore This Snapshot";
+        @Anchor = (Width: 240, Right: 8);
+      }
+
+      $C.@CancelTextButton #BackButton {
+        @Text = "Back";
+        @Anchor = (Width: 130);
+      }
+    }
+  }
+}

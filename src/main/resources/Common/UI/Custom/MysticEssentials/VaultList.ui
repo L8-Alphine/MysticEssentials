@@ -1,0 +1,190 @@
+$C = "../Common.ui";
+
+$C.@PageOverlay {}
+
+$C.@Container {
+  Anchor: (Width: 1040, Height: 700);
+
+  #Title {
+    Group {
+      $C.@Title #HeaderTitle {
+        @Text = "Vault Manager";
+      }
+
+      Label #VaultCount {
+        Anchor: (Top: 8, Right: 14, Width: 220, Height: 24);
+        Style: (FontSize: 14, TextColor: #96a9be, HorizontalAlignment: End, VerticalAlignment: Center);
+        Text: "";
+      }
+    }
+  }
+
+  #Content {
+    LayoutMode: Top;
+
+    // ---------- Tab bar ----------
+    Group #TabBar {
+      LayoutMode: Left;
+      Anchor: (Height: 42, Bottom: 12);
+
+      Button #TabMyVaults {
+        Anchor: (Width: 150, Right: 6);
+        LayoutMode: Top;
+        Style: (
+          Default: (Background: #000000(0.15)),
+          Hovered: (Background: #7a9cc6(0.18)),
+          Pressed: (Background: #7a9cc6(0.28))
+        );
+        Label {
+          Anchor: (Height: 30, Top: 6);
+          Style: (FontSize: 14, RenderBold: true, TextColor: #ffffff, HorizontalAlignment: Center, VerticalAlignment: Center);
+          Text: "My Vaults";
+        }
+        Group #TabMyVaultsAccent { Anchor: (Height: 3); Background: #7a9cc6; }
+      }
+
+      Button #TabSettings {
+        Anchor: (Width: 150, Right: 6);
+        LayoutMode: Top;
+        Style: (
+          Default: (Background: #000000(0.15)),
+          Hovered: (Background: #7a9cc6(0.18)),
+          Pressed: (Background: #7a9cc6(0.28))
+        );
+        Label {
+          Anchor: (Height: 30, Top: 6);
+          Style: (FontSize: 14, RenderBold: true, TextColor: #ffffff, HorizontalAlignment: Center, VerticalAlignment: Center);
+          Text: "Settings";
+        }
+        Group #TabSettingsAccent { Anchor: (Height: 3); Background: #7a9cc6; Visible: false; }
+      }
+
+      Button #TabAdmin {
+        Anchor: (Width: 150, Right: 6);
+        LayoutMode: Top;
+        Style: (
+          Default: (Background: #000000(0.15)),
+          Hovered: (Background: #7a9cc6(0.18)),
+          Pressed: (Background: #7a9cc6(0.28))
+        );
+        Label {
+          Anchor: (Height: 30, Top: 6);
+          Style: (FontSize: 14, RenderBold: true, TextColor: #ffd479, HorizontalAlignment: Center, VerticalAlignment: Center);
+          Text: "Admin";
+        }
+        Group #TabAdminAccent { Anchor: (Height: 3); Background: #ffd479; Visible: false; }
+      }
+    }
+
+    // ---------- My Vaults: toolbar ----------
+    Group #Toolbar {
+      LayoutMode: Left;
+      Anchor: (Height: 38, Bottom: 12);
+
+      $C.@TextField #SearchInput {
+        @Anchor = (Height: 34, Right: 8, Width: 360);
+        PlaceholderText: "Search by name or number...";
+      }
+
+      $C.@SecondaryTextButton #SearchButton {
+        @Text = "Search";
+        @Anchor = (Width: 110, Right: 6);
+      }
+
+      $C.@SecondaryTextButton #ClearButton {
+        @Text = "Clear";
+        @Anchor = (Width: 90, Right: 6);
+      }
+
+      Group { FlexWeight: 1; }
+
+      Label {
+        Anchor: (Width: 40, Height: 34, Right: 8);
+        Style: (FontSize: 12, TextColor: #96a9be, HorizontalAlignment: End, VerticalAlignment: Center);
+        Text: "Sort";
+      }
+
+      $C.@DropdownBox #SortBox {
+        @Anchor = ();
+      }
+    }
+
+    Label #VaultEmpty {
+      Anchor: (Height: 40);
+      Style: (FontSize: 14, TextColor: #9fb0c4, VerticalAlignment: Center, Wrap: true);
+      Text: "No vaults match your search.";
+      Visible: false;
+    }
+
+    Group #VaultList {
+      FlexWeight: 1;
+      LayoutMode: TopScrolling;
+      Padding: (Right: 10);
+      ScrollbarStyle: $C.@DefaultScrollbarStyle;
+    }
+
+    // ---------- Settings panel ----------
+    Group #SettingsPanel {
+      FlexWeight: 1;
+      LayoutMode: Top;
+      Visible: false;
+
+      Label {
+        Anchor: (Height: 26, Bottom: 8);
+        Style: (FontSize: 16, RenderBold: true, TextColor: #ffffff, VerticalAlignment: Center);
+        Text: "Your Vault Allowance";
+      }
+      Label #SetAllowance {
+        Anchor: (Height: 22, Bottom: 4);
+        Style: (FontSize: 14, TextColor: #cddbe8, VerticalAlignment: Center);
+        Text: "";
+      }
+      Label #SetUsage {
+        Anchor: (Height: 22, Bottom: 4);
+        Style: (FontSize: 14, TextColor: #cddbe8, VerticalAlignment: Center);
+        Text: "";
+      }
+      Label #SetCustom {
+        Anchor: (Height: 22, Bottom: 4);
+        Style: (FontSize: 14, TextColor: #cddbe8, VerticalAlignment: Center);
+        Text: "";
+      }
+      Label #SetHint {
+        Anchor: (Height: 60, Top: 12);
+        Style: (FontSize: 12, TextColor: #96a9be, VerticalAlignment: Start, Wrap: true);
+        Text: "";
+      }
+    }
+
+    // ---------- Admin panel ----------
+    Group #AdminPanel {
+      FlexWeight: 1;
+      LayoutMode: Top;
+      Visible: false;
+
+      Label {
+        Anchor: (Height: 26, Bottom: 8);
+        Style: (FontSize: 16, RenderBold: true, TextColor: #ffffff, VerticalAlignment: Center);
+        Text: "View Another Player's Vaults";
+      }
+      Group {
+        LayoutMode: Left;
+        Anchor: (Height: 38, Bottom: 8);
+
+        $C.@TextField #AdminPlayerInput {
+          @Anchor = (Height: 34, Right: 8, Width: 360);
+          PlaceholderText: "Player name (online)...";
+        }
+        $C.@TextButton #AdminViewButton {
+          @Text = "View Vaults";
+          @Anchor = (Width: 160);
+        }
+      }
+      Label #AdminHint {
+        Anchor: (Height: 60, Top: 4);
+        Style: (FontSize: 12, TextColor: #96a9be, VerticalAlignment: Start, Wrap: true);
+        Text: "";
+      }
+    }
+  }
+}

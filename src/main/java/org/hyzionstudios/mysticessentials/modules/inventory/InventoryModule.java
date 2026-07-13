@@ -66,14 +66,14 @@ public final class InventoryModule extends AbstractMysticModule {
         config = core.configManager().loadModuleConfig(id(), InventoryConfig.class, new InventoryConfig());
         registerCommand(new ClearInventoryCommand());
         registerCommand(new InventoryCommand());
-        core.platform().onEvent(
+        registerEvent(
                 com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent.class,
                 (com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent event) -> {
                     if (config.snapshotOnJoin) {
                         snapshot(event.getPlayerRef(), "Join");
                     }
                 });
-        core.platform().onEvent(
+        registerEvent(
                 com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent.class,
                 (com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent event) -> {
                     deathHandled.remove(event.getPlayerRef().getUuid());
@@ -212,9 +212,19 @@ public final class InventoryModule extends AbstractMysticModule {
 
     public CompletableFuture<List<InventorySnapshot>> snapshots(UUID player) {
         return core.getStorageService().load(NAMESPACE, player.toString()).thenApply(element -> {
-            List<InventorySnapshot> list = element == null ? null
-                    : Json.gson().fromJson(element, SNAPSHOT_LIST_TYPE);
-            return list != null ? list : new ArrayList<>();
+            if (element == null) {
+                return new ArrayList<InventorySnapshot>();
+            }
+            List<InventorySnapshot> list = Json.gson().fromJson(element, SNAPSHOT_LIST_TYPE);
+            return list != null ? list : new ArrayList<InventorySnapshot>();
+        }).exceptionally(t -> {
+            // A truncated/corrupt file makes the load future itself fail (the
+            // parse happens upstream, in the storage provider), so the guard has
+            // to sit here rather than only around fromJson. Corrupt or
+            // incompatible stored data must not stall the restore UI.
+            core.log(Level.WARNING, "[inventory] Ignoring corrupt snapshot data for "
+                    + player + ": " + t);
+            return new ArrayList<InventorySnapshot>();
         });
     }
 
@@ -325,8 +335,21 @@ public final class InventoryModule extends AbstractMysticModule {
     // ----- UI ------------------------------------------------------------------
 
     void openRestoreUi(PlayerRef viewer, UUID targetUuid, String targetName) {
-        snapshots(targetUuid).thenAccept(snapshots -> core.platform().openPage(viewer,
-                new InventoryPages.RestorePage(core, this, viewer, targetUuid, targetName, snapshots)));
+        snapshots(targetUuid).thenAccept(snapshots -> {
+            boolean opened = core.platform().openPage(viewer,
+                    new InventoryPages.RestorePage(core, this, viewer, targetUuid, targetName, snapshots));
+            if (!opened) {
+                core.getMessageService().send(viewer,
+                        "&cCould not open the restore UI for " + targetName + " — see the server log.");
+            }
+        }).exceptionally(t -> {
+            // Without this, a failed snapshot load would leave the UI silently
+            // never opening ("doesn't open or crash").
+            core.log(Level.WARNING, "[inventory] Failed to open restore UI for " + targetName + ": " + t);
+            core.getMessageService().send(viewer,
+                    "&cCould not load " + targetName + "'s snapshots — see the server log.");
+            return null;
+        });
     }
 
     private SuggestionProvider onlinePlayerSuggestions() {

@@ -1,0 +1,39 @@
+// Row template for the Inventory Viewer's item list.
+// Appended per occupied slot: cmd.append("#ItemList", "MysticEssentials/InventoryItemRow.ui")
+// and populated by index: cmd.set("#ItemList[i] #Icon.ItemId", "<itemId>").
+
+Group #Row {
+  Anchor: (Height: 46, Bottom: 6);
+  LayoutMode: Left;
+  Padding: (Left: 10, Right: 10, Top: 4, Bottom: 4);
+  Background: #000000(0.18);
+
+  ItemSlot #Icon {
+    Anchor: (Width: 38, Height: 38, Right: 12);
+    ShowQualityBackground: true;
+    ShowQuantity: false;
+  }
+
+  Group {
+    LayoutMode: Top;
+    FlexWeight: 1;
+
+    Label #Name {
+      Anchor: (Height: 20);
+      Style: (FontSize: 14, TextColor: #ffffff, RenderBold: true, VerticalAlignment: Center);
+      Text: "item";
+    }
+
+    Label #Meta {
+      Anchor: (Height: 16);
+      Style: (FontSize: 11, TextColor: #96a9be, VerticalAlignment: Center);
+      Text: "";
+    }
+  }
+
+  Label #Qty {
+    Anchor: (Width: 80);
+    Style: (FontSize: 15, TextColor: #d7e1ee, HorizontalAlignment: End, VerticalAlignment: Center, RenderBold: true);
+    Text: "x1";
+  }
+}

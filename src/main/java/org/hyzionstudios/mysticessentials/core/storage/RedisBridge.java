@@ -1,5 +1,6 @@
 package org.hyzionstudios.mysticessentials.core.storage;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
@@ -192,6 +193,106 @@ public final class RedisBridge {
             jedis.del(namespaced);
         } catch (Throwable t) {
             core.log(Level.WARNING, "Redis cacheDelete failed: " + t);
+        }
+    }
+
+    // ----- Distributed locks ---------------------------------------------------
+
+    /**
+     * Lua: renew/release only when the stored value still equals the exact
+     * payload the caller wrote — the payload embeds a random token, so a lock
+     * that expired and was re-acquired by another server can never be touched.
+     */
+    private static final String LOCK_RENEW_SCRIPT =
+            "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('expire', KEYS[1], ARGV[2]) else return 0 end";
+    private static final String LOCK_RELEASE_SCRIPT =
+            "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end";
+
+    /**
+     * Atomically acquires a distributed lock ({@code SET NX EX}). Lock keys are
+     * used <b>as given</b> (not namespace-prefixed) so modules can define
+     * network-wide key layouts; callers should embed a unique token in
+     * {@code payload} and keep it for renew/release.
+     *
+     * @return {@code true} if this call created the lock; {@code false} if the
+     *         key already exists or Redis is unavailable.
+     */
+    public boolean lockAcquire(String key, String payload, long ttlSeconds) {
+        if (!enabled) {
+            return false;
+        }
+        try (Jedis jedis = pool.getResource()) {
+            String reply = jedis.set(key, payload,
+                    redis.clients.jedis.params.SetParams.setParams().nx().ex(Math.max(1, ttlSeconds)));
+            return "OK".equals(reply);
+        } catch (Throwable t) {
+            core.log(Level.WARNING, "Redis lockAcquire '" + key + "' failed: " + t);
+            return false;
+        }
+    }
+
+    /** @return the raw payload of a held lock, or {@code null} when free/unavailable. */
+    public String lockPeek(String key) {
+        if (!enabled) {
+            return null;
+        }
+        try (Jedis jedis = pool.getResource()) {
+            return jedis.get(key);
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    /**
+     * Extends a lock's TTL, but only while the stored payload still matches
+     * {@code payload} (i.e. we still own it).
+     *
+     * @return {@code true} if the lock was renewed.
+     */
+    public boolean lockRenew(String key, String payload, long ttlSeconds) {
+        if (!enabled) {
+            return false;
+        }
+        try (Jedis jedis = pool.getResource()) {
+            Object result = jedis.eval(LOCK_RENEW_SCRIPT, List.of(key),
+                    List.of(payload, Long.toString(Math.max(1, ttlSeconds))));
+            return result instanceof Long value && value == 1L;
+        } catch (Throwable t) {
+            core.log(Level.WARNING, "Redis lockRenew '" + key + "' failed: " + t);
+            return false;
+        }
+    }
+
+    /**
+     * Releases a lock, but only while the stored payload still matches
+     * {@code payload}. A lock lost to TTL expiry and re-acquired elsewhere is
+     * left untouched.
+     *
+     * @return {@code true} if this call deleted the lock.
+     */
+    public boolean lockRelease(String key, String payload) {
+        if (!enabled) {
+            return false;
+        }
+        try (Jedis jedis = pool.getResource()) {
+            Object result = jedis.eval(LOCK_RELEASE_SCRIPT, List.of(key), List.of(payload));
+            return result instanceof Long value && value == 1L;
+        } catch (Throwable t) {
+            core.log(Level.WARNING, "Redis lockRelease '" + key + "' failed: " + t);
+            return false;
+        }
+    }
+
+    /** Unconditionally deletes a lock (admin force unlock). @return {@code true} if it existed. */
+    public boolean lockForceRelease(String key) {
+        if (!enabled) {
+            return false;
+        }
+        try (Jedis jedis = pool.getResource()) {
+            return jedis.del(key) > 0;
+        } catch (Throwable t) {
+            core.log(Level.WARNING, "Redis lockForceRelease '" + key + "' failed: " + t);
+            return false;
         }
     }
 

@@ -26,7 +26,8 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
  * toggled — never granted on first join.
  *
  * <p>With {@code paidFlight} enabled and a VaultUnlocked economy detected,
- * flying costs {@code costPerMinute} charged once a minute; players with
+ * flying costs {@code costPerMinute} charged once a minute — each successful
+ * withdrawal sends the player a {@code flight-charged} receipt; players with
  * {@code mysticessentials.fly.free} or {@code .unlimited} fly free. World
  * changes rebuild movement settings from defaults, so flight is re-applied on
  * {@code AddPlayerToWorldEvent}.</p>
@@ -50,7 +51,7 @@ public final class FlightModule extends AbstractMysticModule {
         // defaults (no usable plugin event exposes them in 0.5.6), so flight is
         // re-applied on a short loop for players who have it enabled.
         reapplyTask = core.scheduler().runRepeating(this::reapplyFlight, 10, 10, TimeUnit.SECONDS);
-        core.platform().onEvent(PlayerDisconnectEvent.class, (PlayerDisconnectEvent event) ->
+        registerEvent(PlayerDisconnectEvent.class, (PlayerDisconnectEvent event) ->
                 flying.remove(event.getPlayerRef().getUuid()));
         startChargeTask();
     }
@@ -106,17 +107,24 @@ public final class FlightModule extends AbstractMysticModule {
                 flying.remove(uuid);
                 continue;
             }
-            if (player.hasPermission(Permissions.FLY_FREE)
-                    || player.hasPermission(Permissions.FLY_UNLIMITED)) {
+            if (isCostExempt(player)) {
                 continue;
             }
-            if (core.getEconomyService().has(uuid, config.costPerMinute)) {
-                core.getEconomyService().withdraw(uuid, config.costPerMinute);
+            if (core.getEconomyService().withdraw(uuid, config.costPerMinute)) {
+                core.getMessageService().sendKey(player, "flight-charged", Map.of(
+                        "cost", core.getEconomyService().format(config.costPerMinute),
+                        "balance", core.getEconomyService().format(core.getEconomyService().balance(uuid))));
             } else {
                 setFlying(player, false);
                 core.getMessageService().sendKey(player, "flight-out-of-money");
             }
         }
+    }
+
+    /** True when the player is exempt from paid-flight charges. */
+    private boolean isCostExempt(PlayerRef player) {
+        return player.hasPermission(Permissions.FLY_FREE)
+                || player.hasPermission(Permissions.FLY_UNLIMITED);
     }
 
     // ----- Flight state ---------------------------------------------------------
@@ -166,10 +174,10 @@ public final class FlightModule extends AbstractMysticModule {
     private void toggleFor(MysticCommandSender sender, PlayerRef target, boolean announceToTarget) {
         boolean enable = !isFlying(target.getUuid());
         if (enable && config.paidFlight && core.getEconomyService().isAvailable()
-                && !target.hasPermission(Permissions.FLY_FREE)
-                && !target.hasPermission(Permissions.FLY_UNLIMITED)
+                && !isCostExempt(target)
                 && !core.getEconomyService().has(target.getUuid(), config.costPerMinute)) {
-            sender.replyKey("flight-not-enough-money", Map.of("cost", Double.toString(config.costPerMinute)));
+            sender.replyKey("flight-not-enough-money",
+                    Map.of("cost", core.getEconomyService().format(config.costPerMinute)));
             return;
         }
         setFlying(target, enable);
@@ -181,10 +189,9 @@ public final class FlightModule extends AbstractMysticModule {
             sender.replyKey("flight-state-other", Map.of("state", state, "player", target.getUsername()));
         }
         if (enable && config.paidFlight && core.getEconomyService().isAvailable()
-                && !target.hasPermission(Permissions.FLY_FREE)
-                && !target.hasPermission(Permissions.FLY_UNLIMITED)) {
+                && !isCostExempt(target)) {
             core.getMessageService().sendKey(target, "flight-cost",
-                    Map.of("cost", Double.toString(config.costPerMinute)));
+                    Map.of("cost", core.getEconomyService().format(config.costPerMinute)));
         }
     }
 

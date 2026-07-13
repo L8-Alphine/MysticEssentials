@@ -45,7 +45,7 @@ public final class ChatModule extends AbstractMysticModule implements ChatServic
         channels.enable(config.channels, this::registerCommand);
 
         if (config.formatChat) {
-            core.platform().onAsyncEvent(PlayerChatEvent.class,
+            registerAsyncEvent(PlayerChatEvent.class,
                     future -> future.thenApply(this::applyChatPipeline));
         }
         log("Enabled chat submodules: privateMessaging=" + config.privateMessaging.enabled

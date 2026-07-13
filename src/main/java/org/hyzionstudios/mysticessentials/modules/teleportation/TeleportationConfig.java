@@ -1,5 +1,8 @@
 package org.hyzionstudios.mysticessentials.modules.teleportation;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /** Persisted teleportation settings for {@code modules/teleportation/config.json}. */
 public final class TeleportationConfig {
 
@@ -17,4 +20,13 @@ public final class TeleportationConfig {
 
     /** Cooldown between /back uses. */
     public int backCooldownSeconds = 5;
+
+    /**
+     * Destination-world whitelist. Empty means every world is allowed unless it
+     * appears in {@link #worldBlacklist}.
+     */
+    public List<String> worldWhitelist = new ArrayList<>();
+
+    /** Destination worlds blocked for every teleport routed through the module. */
+    public List<String> worldBlacklist = new ArrayList<>();
 }

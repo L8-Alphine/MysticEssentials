@@ -3,7 +3,10 @@ package org.hyzionstudios.mysticessentials.core.storage;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Stream;
 
 import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.core.util.Json;
@@ -79,6 +82,25 @@ public final class JsonStorageProvider implements StorageProvider {
     @Override
     public CompletableFuture<Boolean> exists(String namespace, String key) {
         return CompletableFuture.supplyAsync(() -> Files.exists(fileFor(namespace, key)));
+    }
+
+    @Override
+    public CompletableFuture<List<String>> listKeys(String namespace) {
+        return CompletableFuture.supplyAsync(() -> {
+            Path dir = dataRoot.resolve(namespace);
+            if (!Files.isDirectory(dir)) {
+                return List.of();
+            }
+            try (Stream<Path> stream = Files.list(dir)) {
+                List<String> keys = new ArrayList<>();
+                stream.map(path -> path.getFileName().toString())
+                        .filter(name -> name.endsWith(".json"))
+                        .forEach(name -> keys.add(name.substring(0, name.length() - ".json".length())));
+                return keys;
+            } catch (IOException e) {
+                throw new StorageException("listKeys " + namespace, e);
+            }
+        });
     }
 
     @Override

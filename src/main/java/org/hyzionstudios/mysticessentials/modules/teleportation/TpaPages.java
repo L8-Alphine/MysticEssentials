@@ -139,8 +139,7 @@ final class TpaPages {
                             : core.platform().findPlayer(target).orElse(null);
                     if (targetRef == null) {
                         core.getMessageService().sendKey(player, "teleport-target-offline");
-                    } else {
-                        teleport.sendRequest(player, targetRef, "tpa".equals(action));
+                    } else if (teleport.sendRequest(player, targetRef, "tpa".equals(action))) {
                         core.getMessageService().send(player,
                                 "&7Teleport request sent to &e" + targetRef.getUsername());
                     }

@@ -68,6 +68,7 @@ public final class ChannelsSubModule {
     private Map<String, ChatConfig.Channel> configuredChannels = Map.of();
     private Map<String, String> aliasToChannel = Map.of();
     private Consumer<MysticCommand> commandRegistrar;
+    private com.hypixel.hytale.registry.Registration disconnectListener;
 
     public ChannelsSubModule(MysticCore core, ChatModule chat) {
         this.core = core;
@@ -79,7 +80,7 @@ public final class ChannelsSubModule {
         reload(config);
         commandRegistrar.accept(new ChannelCommand());
         registerConfiguredAliasCommands(commandRegistrar);
-        core.platform().onEvent(PlayerDisconnectEvent.class, (PlayerDisconnectEvent event) ->
+        disconnectListener = core.platform().onEvent(PlayerDisconnectEvent.class, (PlayerDisconnectEvent event) ->
                 handleDisconnect(event.getPlayerRef()));
     }
 
@@ -112,6 +113,14 @@ public final class ChannelsSubModule {
     }
 
     public void disable() {
+        if (disconnectListener != null) {
+            try {
+                disconnectListener.unregister();
+            } catch (Throwable ignored) {
+                // One-shot handle; already gone or engine shutting down.
+            }
+            disconnectListener = null;
+        }
         speakChannels.clear();
         listeningChannels.clear();
         temporaryChannels.clear();
@@ -218,6 +227,46 @@ public final class ChannelsSubModule {
         core.platform().openPage(player, new ChannelPages.TempChannelManagePage(core, this, player));
     }
 
+    void switchChannelWithFeedback(PlayerRef player, String channelId, String password) {
+        SwitchResult result = switchChannel(player, channelId, password);
+        ChatConfig.Channel target = findChannel(channelId).orElse(null);
+        switch (result) {
+            case SWITCHED -> core.getMessageService().sendKey(player, "chat-channel-switched",
+                    Map.of("channel", displayName(target)));
+            case PASSWORD_REQUIRED -> core.getMessageService().sendKey(player, "chat-channel-password-required");
+            case NO_LISTEN_PERMISSION -> core.getMessageService().sendKey(player, "chat-channel-no-listen");
+            case NO_SPEAK_PERMISSION -> core.getMessageService().sendKey(player, "chat-channel-no-speak");
+            case UNKNOWN -> core.getMessageService().sendKey(player, "chat-channel-unknown");
+        }
+    }
+
+    void joinChannelWithFeedback(PlayerRef player, String channelId, String password) {
+        ChatConfig.Channel target = findChannel(channelId).orElse(null);
+        JoinResult result = joinChannel(player, target, password);
+        switch (result) {
+            case JOINED -> core.getMessageService().sendKey(player, "chat-channel-joined",
+                    Map.of("channel", displayName(target)));
+            case ALREADY_LISTENING -> core.getMessageService().sendKey(player, "chat-channel-already-listening",
+                    Map.of("channel", displayName(target)));
+            case PASSWORD_REQUIRED -> core.getMessageService().sendKey(player, "chat-channel-password-required");
+            case NO_LISTEN_PERMISSION -> core.getMessageService().sendKey(player, "chat-channel-no-listen");
+            case UNKNOWN -> core.getMessageService().sendKey(player, "chat-channel-unknown");
+        }
+    }
+
+    void leaveChannelWithFeedback(PlayerRef player, String channelId) {
+        ChatConfig.Channel target = findChannel(channelId).orElse(null);
+        LeaveResult result = leaveChannel(player, target);
+        switch (result) {
+            case LEFT -> core.getMessageService().sendKey(player, "chat-channel-left",
+                    Map.of("channel", displayName(target)));
+            case NOT_LISTENING -> core.getMessageService().sendKey(player, "chat-channel-not-listening",
+                    Map.of("channel", displayName(target)));
+            case CURRENT_CHANNEL -> core.getMessageService().sendKey(player, "chat-channel-current");
+            case UNKNOWN -> core.getMessageService().sendKey(player, "chat-channel-unknown");
+        }
+    }
+
     /** The temporary channel owned by {@code owner}, if any. */
     public Optional<ChatConfig.Channel> ownedTemporaryChannel(UUID owner) {
         pruneExpired();
@@ -245,9 +294,8 @@ public final class ChannelsSubModule {
             TemporaryChannel temp = entry.getValue();
             if (owner.equals(temp.owner)) {
                 temp.channel.password = blankToNull(password);
-                if (blankToNull(prefix) != null) {
-                    temp.channel.prefix = prefix;
-                }
+                temp.channel.prefix = temporaryPrefix(entry.getKey(), prefix);
+                temp.channel.format = temporaryFormat(entry.getKey(), temp.channel.prefix);
                 saveRedisTemporaryChannel(entry.getKey(), temp);
                 return true;
             }
@@ -298,9 +346,10 @@ public final class ChannelsSubModule {
         if (id.isBlank() || configuredChannels.containsKey(id) || temporaryChannels.containsKey(id)) {
             return false;
         }
+        String resolvedPrefix = temporaryPrefix(id, prefix);
         ChatConfig.Channel channel = new ChatConfig.Channel(id, id, "permission",
-                "&8[&d" + id + "&8] &f{display_name}: &f{message}");
-        channel.prefix = blankToNull(prefix) == null ? "&8[&d" + id + "&8]" : prefix;
+                temporaryFormat(id, resolvedPrefix));
+        channel.prefix = resolvedPrefix;
         channel.password = blankToNull(password);
         channel.aliases = aliases == null ? new ArrayList<>() : new ArrayList<>(aliases);
         channel.joinPermission = blankToNull(permissionGate);
@@ -322,6 +371,14 @@ public final class ChannelsSubModule {
         }
         saveRedisTemporaryChannel(id, temp);
         return true;
+    }
+
+    private static String temporaryPrefix(String id, String prefix) {
+        return blankToNull(prefix) == null ? "&8[&d" + id + "&8]" : prefix;
+    }
+
+    private static String temporaryFormat(String id, String prefix) {
+        return temporaryPrefix(id, prefix) + " &f{display_name}: &f{message}";
     }
 
     boolean canCreateTemporaryChannel(PlayerRef player) {
@@ -769,6 +826,33 @@ public final class ChannelsSubModule {
         return aliasToChannel.getOrDefault(normalized, normalized);
     }
 
+    private ChannelInput parseChannelInput(String[] args, int startIndex, boolean allowPassword) {
+        if (args.length <= startIndex) {
+            return new ChannelInput("", null);
+        }
+        String full = joinArgs(args, startIndex, args.length);
+        if (findChannel(full).isPresent() || !allowPassword || args.length - startIndex == 1) {
+            return new ChannelInput(full, null);
+        }
+        String channel = joinArgs(args, startIndex, args.length - 1);
+        if (findChannel(channel).isPresent()) {
+            return new ChannelInput(channel, args[args.length - 1]);
+        }
+        String fallbackPassword = args.length > startIndex + 1 ? args[startIndex + 1] : null;
+        return new ChannelInput(args[startIndex], fallbackPassword);
+    }
+
+    private static String joinArgs(String[] args, int startInclusive, int endExclusive) {
+        StringBuilder joined = new StringBuilder();
+        for (int i = startInclusive; i < endExclusive; i++) {
+            if (joined.length() > 0) {
+                joined.append(' ');
+            }
+            joined.append(args[i]);
+        }
+        return joined.toString();
+    }
+
     private List<String> parseAliases(String raw) {
         if (raw == null || raw.isBlank() || "-".equals(raw)) {
             return List.of();
@@ -860,6 +944,9 @@ public final class ChannelsSubModule {
         CURRENT_CHANNEL
     }
 
+    private record ChannelInput(String channelId, String password) {
+    }
+
     private record TemporaryChannel(ChatConfig.Channel channel, UUID owner, Instant expiresAt) {
     }
 
@@ -879,7 +966,22 @@ public final class ChannelsSubModule {
                 });
     }
 
-    private final class ChannelCommand extends MysticCommand {
+    private abstract class PublicChannelCommand extends MysticCommand {
+        PublicChannelCommand(MysticCore core, String name, String description) {
+            super(core, name, description);
+        }
+
+        PublicChannelCommand(MysticCore core, String description) {
+            super(core, description);
+        }
+
+        @Override
+        protected boolean canGeneratePermission() {
+            return false;
+        }
+    }
+
+    private final class ChannelCommand extends PublicChannelCommand {
         ChannelCommand() {
             super(ChannelsSubModule.this.core, "channel", "Show, switch, or create chat channels.");
             allowExtraArguments();
@@ -915,7 +1017,8 @@ public final class ChannelsSubModule {
                     sender.replyKey("chat-channel-join-usage");
                     return;
                 }
-                replyJoin(sender, player, args[1], args.length >= 3 ? args[2] : null);
+                ChannelInput input = parseChannelInput(args, 1, true);
+                replyJoin(sender, player, input.channelId(), input.password());
                 return;
             }
             if ("leave".equals(action) || "mute".equals(action) || "unlisten".equals(action)) {
@@ -923,7 +1026,7 @@ public final class ChannelsSubModule {
                     sender.replyKey("chat-channel-leave-usage");
                     return;
                 }
-                replyLeave(sender, player, args[1]);
+                replyLeave(sender, player, parseChannelInput(args, 1, false).channelId());
                 return;
             }
             if ("switch".equals(action) || "speak".equals(action) || "use".equals(action)) {
@@ -931,7 +1034,8 @@ public final class ChannelsSubModule {
                     sender.replyKey("chat-channel-switch-usage");
                     return;
                 }
-                replySwitch(sender, player, args[1], args.length >= 3 ? args[2] : null);
+                ChannelInput input = parseChannelInput(args, 1, true);
+                replySwitch(sender, player, input.channelId(), input.password());
                 return;
             }
             if ("manage".equals(action)) {
@@ -962,7 +1066,8 @@ public final class ChannelsSubModule {
                 }
                 return;
             }
-            replySwitch(sender, player, action, args.length >= 2 ? args[1] : null);
+            ChannelInput input = parseChannelInput(args, 0, true);
+            replySwitch(sender, player, input.channelId(), input.password());
         }
 
         private String[] stripCommandToken(String[] raw) {
@@ -979,7 +1084,7 @@ public final class ChannelsSubModule {
         }
     }
 
-    private final class ChannelJoinSubCommand extends MysticCommand {
+    private final class ChannelJoinSubCommand extends PublicChannelCommand {
         private final RequiredArg<String> channel = withRequiredArg("channel", "Channel", ArgTypes.STRING)
                 .suggest(visibleChannelSuggestions());
 
@@ -1004,7 +1109,7 @@ public final class ChannelsSubModule {
         }
     }
 
-    private final class ChannelJoinPasswordVariant extends MysticCommand {
+    private final class ChannelJoinPasswordVariant extends PublicChannelCommand {
         private final RequiredArg<String> channel = withRequiredArg("channel", "Channel", ArgTypes.STRING)
                 .suggest(visibleChannelSuggestions());
         private final RequiredArg<String> password = withRequiredArg("password", "Password", ArgTypes.STRING);
@@ -1028,7 +1133,7 @@ public final class ChannelsSubModule {
         }
     }
 
-    private final class ChannelLeaveSubCommand extends MysticCommand {
+    private final class ChannelLeaveSubCommand extends PublicChannelCommand {
         private final RequiredArg<String> channel = withRequiredArg("channel", "Channel", ArgTypes.STRING)
                 .suggest(listeningChannelSuggestions());
 
@@ -1053,7 +1158,7 @@ public final class ChannelsSubModule {
         }
     }
 
-    private final class ChannelSwitchSubCommand extends MysticCommand {
+    private final class ChannelSwitchSubCommand extends PublicChannelCommand {
         private final RequiredArg<String> channel = withRequiredArg("channel", "Channel", ArgTypes.STRING)
                 .suggest(visibleChannelSuggestions());
 
@@ -1079,7 +1184,7 @@ public final class ChannelsSubModule {
         }
     }
 
-    private final class ChannelSwitchPasswordVariant extends MysticCommand {
+    private final class ChannelSwitchPasswordVariant extends PublicChannelCommand {
         private final RequiredArg<String> channel = withRequiredArg("channel", "Channel", ArgTypes.STRING)
                 .suggest(visibleChannelSuggestions());
         private final RequiredArg<String> password = withRequiredArg("password", "Password", ArgTypes.STRING);
@@ -1103,7 +1208,7 @@ public final class ChannelsSubModule {
         }
     }
 
-    private final class ChannelAliasCommand extends MysticCommand {
+    private final class ChannelAliasCommand extends PublicChannelCommand {
         private final String alias;
 
         ChannelAliasCommand(String alias) {

@@ -33,7 +33,43 @@ public final class MysticCommandSender {
         if (input == null || input.isBlank()) {
             return new String[0];
         }
-        return input.trim().split("\\s+");
+        String[] tokens = input.trim().split("\\s+");
+        int skip = leadingCommandTokens(context, tokens);
+        return skip == 0 ? tokens : java.util.Arrays.copyOfRange(tokens, skip, tokens.length);
+    }
+
+    /**
+     * How many leading tokens of the input belong to the command itself rather
+     * than its arguments. Verified against 0.5.6: both the console path and the
+     * client chat path hand {@code CommandManager.handleCommand} the <b>whole
+     * command line</b>, and {@code ParserContext.inputString} joins all of its
+     * tokens — so the input starts with the called command's name path (as
+     * typed, possibly an alias). Defensive: if the input does not actually
+     * start with the command's name/alias at the expected depth, nothing is
+     * stripped.
+     */
+    private static int leadingCommandTokens(CommandContext context, String[] tokens) {
+        try {
+            var called = context.getCalledCommand();
+            if (called == null) {
+                return 0;
+            }
+            int depth = called.countParents() + 1;
+            if (tokens.length < depth) {
+                return 0;
+            }
+            String expected = tokens[depth - 1];
+            if (expected.equalsIgnoreCase(called.getName())) {
+                return depth;
+            }
+            var aliases = called.getAliases();
+            if (aliases != null && aliases.stream().anyMatch(expected::equalsIgnoreCase)) {
+                return depth;
+            }
+            return 0;
+        } catch (Throwable t) {
+            return 0;
+        }
     }
 
     /** Underlying Hytale context, for handlers needing the full command API. */
@@ -82,6 +118,11 @@ public final class MysticCommandSender {
     /** Simple whitespace-split arguments (argument-token portion of the input). */
     public String[] args() {
         return args;
+    }
+
+    /** The argument portion of the input re-joined as one string (may be empty). */
+    public String argString() {
+        return String.join(" ", args);
     }
 
     public Optional<String> arg(int index) {

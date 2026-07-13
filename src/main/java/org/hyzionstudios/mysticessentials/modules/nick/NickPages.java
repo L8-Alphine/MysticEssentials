@@ -71,8 +71,17 @@ final class NickPages {
                         return;
                     }
                     boolean colorsAllowed = player.hasPermission(Permissions.NICK_COLOR);
-                    String color = colorsAllowed ? field(payload, "color") : "";
-                    String raw = colorsAllowed ? colorTag(color) + name.trim() : name.trim();
+                    // A colour typed directly in the name field wins; otherwise use the
+                    // colour picker (its value is normalized to #RRGGBB). setNickname
+                    // applies the config default colour when neither is present.
+                    String typed = name.trim();
+                    String raw;
+                    if (!colorsAllowed || nick.hasColorMarkup(typed)) {
+                        raw = typed;
+                    } else {
+                        String picked = nick.resolveColor(field(payload, "color"));
+                        raw = picked != null ? "<" + picked + ">" + typed : typed;
+                    }
                     NickModule.NickError error = nick.setNickname(player, raw, colorsAllowed);
                     if (error != null) {
                         core.getMessageService().sendKey(player, error.key(), error.params());
@@ -90,11 +99,6 @@ final class NickPages {
                 default -> {
                 }
             }
-        }
-
-        private static String colorTag(String value) {
-            String color = value == null ? "" : value.trim();
-            return color.matches("#[0-9a-fA-F]{6}") ? "<" + color.toUpperCase(java.util.Locale.ROOT) + ">" : "";
         }
     }
 }

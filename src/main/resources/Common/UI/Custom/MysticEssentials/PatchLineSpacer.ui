@@ -1,0 +1,8 @@
+$C = "../Common.ui";
+
+// Blank spacer line between sections in the Patch Notes viewer content.
+//   cmd.append("#SectionContent", "MysticEssentials/PatchLineSpacer.ui")
+
+Group #Row {
+  Anchor: (Height: 10);
+}

@@ -1,9 +1,13 @@
 package org.hyzionstudios.mysticessentials.core.teleport;
 
 import java.time.Instant;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledFuture;
@@ -17,6 +21,7 @@ import org.hyzionstudios.mysticessentials.api.model.MysticLocation;
 import org.hyzionstudios.mysticessentials.api.model.TeleportRequest;
 import org.hyzionstudios.mysticessentials.api.service.TeleportService;
 import org.hyzionstudios.mysticessentials.core.MysticCore;
+import org.hyzionstudios.mysticessentials.modules.teleportation.TeleportationConfig;
 import org.hyzionstudios.mysticessentials.platform.Conversions;
 
 import com.hypixel.hytale.server.core.universe.PlayerRef;
@@ -44,9 +49,16 @@ public final class TeleportServiceImpl implements TeleportService {
     private static final double MOVE_EPSILON_SQ = 0.2 * 0.2;
 
     private final MysticCore core;
+    private final AtomicReference<WorldAccessRules> worldAccess =
+            new AtomicReference<>(WorldAccessRules.allowAll());
 
     public TeleportServiceImpl(MysticCore core) {
         this.core = core;
+    }
+
+    /** Replaces world allow/deny rules with an immutable, thread-safe snapshot. */
+    public void configure(TeleportationConfig config) {
+        worldAccess.set(WorldAccessRules.from(config));
     }
 
     @Override
@@ -70,6 +82,11 @@ public final class TeleportServiceImpl implements TeleportService {
         MysticLocation destination = resolveDestination(request);
         if (destination == null || destination.getWorld() == null) {
             core.getMessageService().sendKey(player, "teleport-invalid-destination");
+            return CompletableFuture.completedFuture(Result.INVALID_DESTINATION);
+        }
+        if (!worldAccess.get().allows(destination.getWorld())) {
+            core.getMessageService().sendKey(player, "teleport-world-disabled",
+                    Map.of("world", destination.getWorld()));
             return CompletableFuture.completedFuture(Result.INVALID_DESTINATION);
         }
 
@@ -215,6 +232,13 @@ public final class TeleportServiceImpl implements TeleportService {
 
     @Override
     public CompletableFuture<Result> teleportNow(PlayerRef player, MysticLocation destination) {
+        if (destination == null || destination.getWorld() == null
+                || !worldAccess.get().allows(destination.getWorld())) {
+            core.getMessageService().sendKey(player, "teleport-world-disabled",
+                    Map.of("world", destination == null || destination.getWorld() == null
+                            ? "unknown" : destination.getWorld()));
+            return CompletableFuture.completedFuture(Result.INVALID_DESTINATION);
+        }
         CompletableFuture<Result> outcome = new CompletableFuture<>();
         dispatchMove(player, destination, outcome);
         return outcome;
@@ -264,5 +288,49 @@ public final class TeleportServiceImpl implements TeleportService {
     private void recordBackLocation(UUID uuid, PlayerRef player) {
         core.getPlayerProfileService().getCached(uuid).ifPresent(profile ->
                 profile.setLastTeleportedLocation(Conversions.capture(player)));
+    }
+
+    private record WorldAccessRules(Set<String> whitelist, Set<String> blacklist) {
+        static WorldAccessRules allowAll() {
+            return new WorldAccessRules(Set.of(), Set.of());
+        }
+
+        static WorldAccessRules from(TeleportationConfig config) {
+            if (config == null) {
+                return allowAll();
+            }
+            return new WorldAccessRules(
+                    normalize(config.worldWhitelist),
+                    normalize(config.worldBlacklist));
+        }
+
+        boolean allows(String world) {
+            String key = normalize(world);
+            if (key.isEmpty()) {
+                return false;
+            }
+            if (blacklist.contains(key)) {
+                return false;
+            }
+            return whitelist.isEmpty() || whitelist.contains(key);
+        }
+
+        private static Set<String> normalize(Collection<String> worlds) {
+            if (worlds == null || worlds.isEmpty()) {
+                return Set.of();
+            }
+            Set<String> normalized = new HashSet<>();
+            for (String world : worlds) {
+                String key = normalize(world);
+                if (!key.isEmpty()) {
+                    normalized.add(key);
+                }
+            }
+            return Set.copyOf(normalized);
+        }
+
+        private static String normalize(String world) {
+            return world == null ? "" : world.trim().toLowerCase(Locale.ROOT);
+        }
     }
 }

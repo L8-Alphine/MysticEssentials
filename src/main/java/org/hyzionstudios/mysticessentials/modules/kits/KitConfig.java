@@ -22,6 +22,8 @@ public final class KitConfig {
     public Map<String, Kit> kits = defaultKits();
 
     public static final class Kit {
+        /** Optional pretty name shown in menus; blank falls back to the title-cased kit id. */
+        public String displayName;
         /** Items given, in order. Items that no longer resolve are skipped with a log line. */
         public List<KitItem> items = new ArrayList<>();
         /** Seconds between claims; 0 = no cooldown, -1 = single-use (once ever). */
@@ -53,18 +55,20 @@ public final class KitConfig {
         Map<String, Kit> kits = new LinkedHashMap<>();
 
         Kit starter = new Kit();
+        starter.displayName = "Starter Kit";
         starter.description = "Basic tools for new players";
         starter.cooldownSeconds = -1;
         starter.items.add(new KitItem("Tool_Pickaxe_Copper", 1));
         starter.items.add(new KitItem("Tool_Hatchet_Copper", 1));
-        starter.items.add(new KitItem("Food_Apple", 8));
+        starter.items.add(new KitItem("Plant_Fruit_Apple", 8));
         kits.put("starter", starter);
 
         Kit daily = new Kit();
+        daily.displayName = "Daily Bundle";
         daily.description = "A small daily bundle";
         daily.cooldownSeconds = 86400;
         daily.requiredOnlineSeconds = 3600;
-        daily.items.add(new KitItem("Food_Apple", 4));
+        daily.items.add(new KitItem("Plant_Fruit_Apple", 4));
         kits.put("daily", daily);
 
         return kits;

@@ -1,0 +1,42 @@
+$C = "../Common.ui";
+
+// One item in the kit preview. Appended per item:
+//   cmd.append("#PreviewList", "MysticEssentials/KitPreviewRow.ui")
+// then set #Icon.ItemId (item icon + quality background), #Name.Text (display
+// name), #Meta.Text (id / sub-category) and #Qty.Text (given quantity).
+
+Group #Row {
+  Anchor: (Height: 48, Bottom: 6);
+  LayoutMode: Left;
+  Padding: (Left: 10, Right: 10, Top: 5, Bottom: 5);
+  Background: #000000(0.18);
+
+  ItemSlot #Icon {
+    Anchor: (Width: 36, Height: 36, Right: 12);
+    ShowQualityBackground: true;
+    ShowQuantity: false;
+  }
+
+  Group {
+    LayoutMode: Top;
+    FlexWeight: 1;
+
+    Label #Name {
+      Anchor: (Height: 20, Bottom: 2);
+      Style: (FontSize: 15, TextColor: #ffffff, RenderBold: true, VerticalAlignment: Center);
+      Text: "Item";
+    }
+
+    Label #Meta {
+      Anchor: (Height: 16);
+      Style: (FontSize: 12, TextColor: #9fb0c4, VerticalAlignment: Center);
+      Text: "";
+    }
+  }
+
+  Label #Qty {
+    Anchor: (Width: 80);
+    Style: (FontSize: 15, TextColor: #d7e1ee, RenderBold: true, HorizontalAlignment: End, VerticalAlignment: Center);
+    Text: "";
+  }
+}

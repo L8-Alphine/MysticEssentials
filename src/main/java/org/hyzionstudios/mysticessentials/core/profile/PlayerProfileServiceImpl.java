@@ -93,6 +93,21 @@ public final class PlayerProfileServiceImpl implements PlayerProfileService {
         });
     }
 
+    @Override
+    public CompletableFuture<java.util.List<UUID>> knownPlayerUuids() {
+        return core.getStorageService().listKeys(NAMESPACE).thenApply(keys -> {
+            java.util.LinkedHashSet<UUID> ids = new java.util.LinkedHashSet<>(cache.keySet());
+            for (String key : keys) {
+                try {
+                    ids.add(UUID.fromString(key));
+                } catch (IllegalArgumentException ignored) {
+                    // Skip non-UUID keys defensively.
+                }
+            }
+            return new java.util.ArrayList<>(ids);
+        });
+    }
+
     private PlayerProfile fromStorage(JsonElement element, UUID uuid, String username) {
         if (element == null) {
             return PlayerProfile.create(uuid, username);

@@ -94,7 +94,20 @@ public final class NickModule extends AbstractMysticModule {
         if (impersonation) {
             return new NickError("nick-error-impersonation", Map.of());
         }
-        String toStore = allowColors ? stripLeadingMarker(rawNick).trim() : stripped;
+        String toStore;
+        if (!allowColors) {
+            toStore = stripped;
+        } else {
+            // Preserve any colour markup the player typed; translate config preset
+            // names (<red>) to hex so MysticText renders them, and if they chose no
+            // colour at all, fall back to the configured default colour.
+            String raw = translateNamedColors(stripLeadingMarker(rawNick).trim());
+            if (!hasColorMarkup(raw)) {
+                String fallback = resolveColor(config.defaultColor);
+                raw = fallback != null ? "<" + fallback + ">" + raw : raw;
+            }
+            toStore = raw;
+        }
         var profile = core.getPlayerProfileService().getCached(target.getUuid()).orElse(null);
         if (profile == null) {
             return new NickError("nick-error-profile", Map.of());
@@ -109,6 +122,133 @@ public final class NickModule extends AbstractMysticModule {
             profile.getMetadata().remove(METADATA_KEY);
             core.getPlayerProfileService().save(profile);
         });
+    }
+
+    /** @return {@code true} if the string carries any legacy/hex/tag colour markup. */
+    boolean hasColorMarkup(String value) {
+        return value != null && value.matches("(?is).*(&[0-9a-fk-or]|&#[0-9a-f]{3,6}|<[^>]+>).*");
+    }
+
+    /** Replaces {@code <presetName>} tokens with their configured hex so they render. */
+    String translateNamedColors(String value) {
+        if (value == null || config.colors == null || config.colors.isEmpty()) {
+            return value;
+        }
+        String out = value;
+        for (Map.Entry<String, String> entry : config.colors.entrySet()) {
+            String hex = resolveHexOnly(entry.getValue());
+            if (hex != null) {
+                out = out.replaceAll("(?i)<" + java.util.regex.Pattern.quote(entry.getKey()) + ">", "<" + hex + ">");
+            }
+        }
+        return out;
+    }
+
+    /**
+     * Canonicalizes a colour token from many shapes — {@code #RRGGBB},
+     * {@code #RGB}, {@code #RRGGBBAA} (alpha dropped), {@code &#RRGGBB}, legacy
+     * {@code &c}, {@code <#hex>}, {@code <color:#hex>}, {@code r,g,b}, a config
+     * preset name, or a built-in colour name — into {@code #RRGGBB}, or null.
+     * Also normalizes whatever the colour-picker widget returns.
+     */
+    String resolveColor(String token) {
+        if (token == null) {
+            return null;
+        }
+        String t = token.trim();
+        if (t.isEmpty()) {
+            return null;
+        }
+        if (t.startsWith("<") && t.endsWith(">") && t.length() >= 2) {
+            t = t.substring(1, t.length() - 1).trim();
+        }
+        int colon = t.indexOf(':');
+        if (colon > 0) {
+            String prefix = t.substring(0, colon).trim().toLowerCase(Locale.ROOT);
+            if (prefix.equals("color") || prefix.equals("c")) {
+                t = t.substring(colon + 1).trim();
+            }
+        }
+        if (t.startsWith("&")) {
+            String rest = t.substring(1);
+            if (rest.length() == 1) {
+                String legacy = legacyColor(rest.charAt(0));
+                if (legacy != null) {
+                    return legacy;
+                }
+            }
+            t = rest; // e.g. "&#RRGGBB" -> "#RRGGBB"
+        }
+        String hex = resolveHexOnly(t);
+        if (hex != null) {
+            return hex;
+        }
+        String name = t.toLowerCase(Locale.ROOT);
+        if (config.colors != null) {
+            String preset = config.colors.get(name);
+            if (preset != null) {
+                return resolveHexOnly(preset);
+            }
+        }
+        return builtinNamed(name);
+    }
+
+    /** Hex/RGB-only normalization (no names): {@code #RRGGBB}/{@code #RGB}/8-digit/{@code r,g,b}. */
+    private static String resolveHexOnly(String value) {
+        if (value == null) {
+            return null;
+        }
+        String t = value.trim();
+        java.util.regex.Matcher rgb = java.util.regex.Pattern
+                .compile("^(\\d{1,3})\\s*,\\s*(\\d{1,3})\\s*,\\s*(\\d{1,3})$").matcher(t);
+        if (rgb.matches()) {
+            int r = clampByte(Integer.parseInt(rgb.group(1)));
+            int g = clampByte(Integer.parseInt(rgb.group(2)));
+            int b = clampByte(Integer.parseInt(rgb.group(3)));
+            return String.format(Locale.ROOT, "#%02X%02X%02X", r, g, b);
+        }
+        String hex = t.startsWith("#") ? t.substring(1) : t;
+        if (hex.matches("(?i)[0-9a-f]{8}")) {
+            hex = hex.substring(0, 6); // drop trailing alpha
+        }
+        if (hex.matches("(?i)[0-9a-f]{6}")) {
+            return "#" + hex.toUpperCase(Locale.ROOT);
+        }
+        if (hex.matches("(?i)[0-9a-f]{3}")) {
+            StringBuilder sb = new StringBuilder("#");
+            for (int i = 0; i < 3; i++) {
+                sb.append(hex.charAt(i)).append(hex.charAt(i));
+            }
+            return sb.toString().toUpperCase(Locale.ROOT);
+        }
+        return null;
+    }
+
+    private static int clampByte(int value) {
+        return Math.max(0, Math.min(255, value));
+    }
+
+    private static String builtinNamed(String name) {
+        return switch (name) {
+            case "black" -> "#000000";
+            case "darkblue", "dark_blue" -> "#0000AA";
+            case "darkgreen", "dark_green" -> "#00AA00";
+            case "darkaqua", "dark_aqua", "cyan" -> "#00AAAA";
+            case "darkred", "dark_red" -> "#AA0000";
+            case "darkpurple", "dark_purple" -> "#AA00AA";
+            case "gold", "orange" -> "#FFAA00";
+            case "gray", "grey" -> "#AAAAAA";
+            case "darkgray", "dark_gray", "darkgrey" -> "#555555";
+            case "blue" -> "#5555FF";
+            case "green", "lime" -> "#55FF55";
+            case "aqua" -> "#55FFFF";
+            case "red" -> "#FF5555";
+            case "lightpurple", "light_purple", "pink", "magenta" -> "#FF55FF";
+            case "yellow" -> "#FFFF55";
+            case "white" -> "#FFFFFF";
+            case "purple" -> "#AA00AA";
+            default -> null;
+        };
     }
 
     static String stripColors(String value) {

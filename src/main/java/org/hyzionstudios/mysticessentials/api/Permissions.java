@@ -29,6 +29,7 @@ public final class Permissions {
     // ----- Teleportation -------------------------------------------------------
 
     public static final String TELEPORT_TPA = "mysticessentials.teleport.tpa";
+    public static final String TELEPORT_TP = "mysticessentials.teleport.tp";
     public static final String TELEPORT_TPHERE = "mysticessentials.teleport.tphere";
     public static final String TELEPORT_TPALL = "mysticessentials.teleport.tpall";
     public static final String TELEPORT_TOP = "mysticessentials.teleport.top";
@@ -61,6 +62,20 @@ public final class Permissions {
     public static final String MAIL_SEND = "mysticessentials.mail.send";
     public static final String MAIL_SEND_OFFLINE = "mysticessentials.mail.send.offline";
     public static final String MAIL_SEND_ALL = "mysticessentials.mail.send.all";
+    /** Attach items (consumed from the sender's inventory) to normal mail. */
+    public static final String MAIL_ATTACH_ITEMS = "mysticessentials.mail.attach";
+    /** Send admin announcements carrying item and command rewards. */
+    public static final String MAIL_ANNOUNCE = "mysticessentials.mail.announce";
+
+    // ----- Patch Notes -----------------------------------------------------------
+
+    /** Open and read patch notes. */
+    public static final String PATCHNOTES_VIEW = "mysticessentials.patchnotes.view";
+    /** Grants every {@code mysticessentials.patchnotes.*} admin node. */
+    public static final String PATCHNOTES_ADMIN = "mysticessentials.patchnotes.admin";
+    public static final String PATCHNOTES_RELOAD = "mysticessentials.patchnotes.reload";
+    public static final String PATCHNOTES_OPEN_OTHERS = "mysticessentials.patchnotes.open.others";
+    public static final String PATCHNOTES_MARKREAD_OTHERS = "mysticessentials.patchnotes.markread.others";
 
     // ----- Announcements ---------------------------------------------------------
 
@@ -72,6 +87,7 @@ public final class Permissions {
     public static final String AFK_USE = "mysticessentials.afk.use";
     public static final String AFK_BYPASS_AUTO = "mysticessentials.afk.bypass.auto";
     public static final String AFK_REWARDS = "mysticessentials.afk.rewards";
+    public static final String AFK_ZONE_ADMIN = "mysticessentials.afk.zone.admin";
 
     // ----- Chat ------------------------------------------------------------------
 
@@ -123,6 +139,76 @@ public final class Permissions {
     public static final String NICK_COLOR = "mysticessentials.nick.color";
     public static final String NICK_OTHERS = "mysticessentials.nick.others";
 
+    // ----- Tutorial -------------------------------------------------------------------
+
+    /** Grants every {@code mysticessentials.tutorial.*} node. */
+    public static final String TUTORIAL_ADMIN = "mysticessentials.tutorial.admin";
+    public static final String TUTORIAL_LIST = "mysticessentials.tutorial.list";
+    public static final String TUTORIAL_INFO = "mysticessentials.tutorial.info";
+    public static final String TUTORIAL_PLAY = "mysticessentials.tutorial.play";
+    public static final String TUTORIAL_PLAY_OTHERS = "mysticessentials.tutorial.play.others";
+    public static final String TUTORIAL_STOP = "mysticessentials.tutorial.stop";
+    public static final String TUTORIAL_STOP_OTHERS = "mysticessentials.tutorial.stop.others";
+    public static final String TUTORIAL_SKIP = "mysticessentials.tutorial.skip";
+    public static final String TUTORIAL_SKIP_OTHERS = "mysticessentials.tutorial.skip.others";
+    public static final String TUTORIAL_RESET = "mysticessentials.tutorial.reset";
+    public static final String TUTORIAL_COMPLETE = "mysticessentials.tutorial.complete";
+    public static final String TUTORIAL_STATUS = "mysticessentials.tutorial.status";
+    public static final String TUTORIAL_STATUS_OTHERS = "mysticessentials.tutorial.status.others";
+    public static final String TUTORIAL_PAGE = "mysticessentials.tutorial.page";
+    public static final String TUTORIAL_PAGE_OTHERS = "mysticessentials.tutorial.page.others";
+    public static final String TUTORIAL_RELOAD = "mysticessentials.tutorial.reload";
+    public static final String TUTORIAL_DEBUG = "mysticessentials.tutorial.debug";
+    public static final String TUTORIAL_SCENE = "mysticessentials.tutorial.scene";
+    public static final String TUTORIAL_BYPASS_FIRSTJOIN = "mysticessentials.tutorial.bypassfirstjoin";
+
+    // ----- Custom Commands ---------------------------------------------------------------
+
+    /** Grants every {@code mysticessentials.customcommands.*} admin node. */
+    public static final String CUSTOMCOMMANDS_ADMIN = "mysticessentials.customcommands.admin";
+    public static final String CUSTOMCOMMANDS_LIST = "mysticessentials.customcommands.list";
+    public static final String CUSTOMCOMMANDS_INFO = "mysticessentials.customcommands.info";
+    public static final String CUSTOMCOMMANDS_RELOAD = "mysticessentials.customcommands.reload";
+    /** Gates {@code /customcommands enable|disable}. */
+    public static final String CUSTOMCOMMANDS_MANAGE = "mysticessentials.customcommands.manage";
+    public static final String CUSTOMCOMMANDS_TEST = "mysticessentials.customcommands.test";
+    public static final String CUSTOMCOMMANDS_VALIDATE = "mysticessentials.customcommands.validate";
+    /** Bypasses every custom command cooldown. */
+    public static final String CUSTOMCOMMANDS_BYPASS_COOLDOWN =
+            "mysticessentials.customcommands.bypass.cooldown";
+    /** Dynamic: {@code mysticessentials.customcommands.command.<name>} — implicit per-command node. */
+    public static final String CUSTOMCOMMANDS_COMMAND_BASE = "mysticessentials.customcommands.command";
+
+    // ----- Player Vaults ---------------------------------------------------------------
+
+    public static final String VAULTS_COMMAND = "mysticessentials.vaults.command";
+    public static final String VAULTS_COMMAND_OPEN = "mysticessentials.vaults.command.open";
+    public static final String VAULTS_COMMAND_EDIT = "mysticessentials.vaults.command.edit";
+    public static final String VAULTS_COMMAND_LIST = "mysticessentials.vaults.command.list";
+    public static final String VAULTS_COMMAND_RELOAD = "mysticessentials.vaults.command.reload";
+    /** Dynamic: {@code mysticessentials.vaults.vault.<n>} — highest accessible vault number. */
+    public static final String VAULTS_VAULT_BASE = "mysticessentials.vaults.vault";
+    /** Dynamic: {@code mysticessentials.vaults.rows.<n>} — rows per vault (capped by config maxRows). */
+    public static final String VAULTS_ROWS_BASE = "mysticessentials.vaults.rows";
+    public static final String VAULTS_EDITOR = "mysticessentials.vaults.editor";
+    public static final String VAULTS_EDITOR_NAME = "mysticessentials.vaults.editor.name";
+    public static final String VAULTS_EDITOR_COLOR = "mysticessentials.vaults.editor.color";
+    public static final String VAULTS_EDITOR_COLOR_HEX = "mysticessentials.vaults.editor.color.hex";
+    public static final String VAULTS_EDITOR_ICON = "mysticessentials.vaults.editor.icon";
+    public static final String VAULTS_EDITOR_DESCRIPTION = "mysticessentials.vaults.editor.description";
+    public static final String VAULTS_EDITOR_RESET = "mysticessentials.vaults.editor.reset";
+    /** Grants every {@code mysticessentials.vaults.admin.*} node. */
+    public static final String VAULTS_ADMIN = "mysticessentials.vaults.admin";
+    public static final String VAULTS_ADMIN_OPEN = "mysticessentials.vaults.admin.open";
+    public static final String VAULTS_ADMIN_OPEN_OFFLINE = "mysticessentials.vaults.admin.open.offline";
+    public static final String VAULTS_ADMIN_EDIT = "mysticessentials.vaults.admin.edit";
+    public static final String VAULTS_ADMIN_READONLY = "mysticessentials.vaults.admin.readonly";
+    public static final String VAULTS_ADMIN_UNLOCK = "mysticessentials.vaults.admin.unlock";
+    public static final String VAULTS_ADMIN_RESTORE = "mysticessentials.vaults.admin.restore";
+    public static final String VAULTS_ADMIN_VIEWLOGS = "mysticessentials.vaults.admin.viewlogs";
+    /** View/recover storage beyond the owner's current row/vault limits (overflow). */
+    public static final String VAULTS_ADMIN_BYPASSLIMIT = "mysticessentials.vaults.admin.bypasslimit";
+
     // ----- Dynamic node builders ------------------------------------------------------
 
     /** {@code mysticessentials.home.limit.<n>} — numeric home limit. */
@@ -143,5 +229,28 @@ public final class Permissions {
     /** {@code mysticessentials.chat.channel.<id>} — join a specific channel. */
     public static String chatChannel(String channelId) {
         return CHAT_CHANNEL_BASE + "." + channelId.toLowerCase(java.util.Locale.ROOT);
+    }
+
+    /**
+     * {@code mysticessentials.customcommands.command.<name>} — implicit use node
+     * for a custom command with permission mode {@code single} and no explicit node.
+     */
+    public static String customCommand(String commandName) {
+        return CUSTOMCOMMANDS_COMMAND_BASE + "." + commandName.toLowerCase(java.util.Locale.ROOT);
+    }
+
+    /** {@code mysticessentials.customcommands.bypass.cooldown.<name>} — per-command cooldown bypass. */
+    public static String customCommandCooldownBypass(String commandName) {
+        return CUSTOMCOMMANDS_BYPASS_COOLDOWN + "." + commandName.toLowerCase(java.util.Locale.ROOT);
+    }
+
+    /** {@code mysticessentials.vaults.vault.<n>} — highest accessible vault number. */
+    public static String vaultNumber(int n) {
+        return VAULTS_VAULT_BASE + "." + n;
+    }
+
+    /** {@code mysticessentials.vaults.rows.<n>} — rows exposed per vault. */
+    public static String vaultRows(int n) {
+        return VAULTS_ROWS_BASE + "." + n;
     }
 }

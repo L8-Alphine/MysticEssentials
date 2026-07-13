@@ -3,7 +3,7 @@ $C = "../Common.ui";
 $C.@PageOverlay {}
 
 $C.@Container {
-  Anchor: (Width: 960, Height: 660);
+  Anchor: (Width: 1240, Height: 740);
 
   #Title {
     Group {
@@ -11,8 +11,8 @@ $C.@Container {
         @Text = "Mail";
       }
 
-      Label #MailCount {
-        Anchor: (Top: 8, Right: 14, Width: 180, Height: 24);
+      Label #HeaderInfo {
+        Anchor: (Top: 8, Right: 14, Width: 260, Height: 24);
         Style: (FontSize: 14, TextColor: #96a9be, HorizontalAlignment: End, VerticalAlignment: Center);
         Text: "";
       }
@@ -22,21 +22,101 @@ $C.@Container {
   #Content {
     LayoutMode: Left;
 
+    // ===================== Sidebar =====================
     Group {
-      Anchor: (Width: 340);
+      Anchor: (Width: 208);
       LayoutMode: Top;
       Padding: (Right: 12);
 
       Label {
-        Anchor: (Height: 26, Bottom: 6);
-        Style: (...$C.@DefaultLabelStyle, FontSize: 14, RenderBold: true, RenderUppercase: true);
+        Anchor: (Height: 26, Bottom: 10);
+        Style: (...$C.@DefaultLabelStyle, FontSize: 15, RenderBold: true, RenderUppercase: true, TextColor: #f0b429);
+        Text: "Mail";
+      }
+
+      Group #NavTop {
+        LayoutMode: Top;
+        Anchor: (Bottom: 8);
+      }
+
+      $C.@PanelSeparatorFancy {
+        @Anchor = (Bottom: 8);
+      }
+
+      Group #NavBottom {
+        LayoutMode: Top;
+      }
+
+      Group {
+        FlexWeight: 1;
+      }
+
+      Label {
+        Anchor: (Height: 20);
+        Style: (FontSize: 11, TextColor: #5b6b7d, RenderUppercase: true, VerticalAlignment: Center);
+        Text: "Mystic Essentials";
+      }
+    }
+
+    // ===================== Mail list =====================
+    Group {
+      Anchor: (Width: 380);
+      LayoutMode: Top;
+      Padding: (Left: 12, Right: 12);
+
+      Label #ListTitle {
+        Anchor: (Height: 26, Bottom: 8);
+        Style: (...$C.@DefaultLabelStyle, FontSize: 16, RenderBold: true, RenderUppercase: true);
         Text: "Inbox";
       }
 
-      Label #MailEmpty {
+      Group {
+        LayoutMode: Left;
+        Anchor: (Height: 34, Bottom: 8);
+
+        $C.@TextField #SearchInput {
+          @Anchor = (Right: 6);
+          FlexWeight: 1;
+          PlaceholderText: "Search mail...";
+        }
+
+        $C.@SecondaryTextButton #SearchButton {
+          @Text = "Search";
+          @Anchor = (Width: 112);
+        }
+      }
+
+      Group {
+        LayoutMode: Left;
+        Anchor: (Height: 30, Bottom: 6);
+
+        Label #PageInfo {
+          FlexWeight: 1;
+          Style: (FontSize: 12, TextColor: #96a9be, VerticalAlignment: Center);
+          Text: "";
+        }
+
+        $C.@SecondaryTextButton #PrevButton {
+          @Text = "<";
+          @Anchor = (Width: 34, Right: 4);
+        }
+
+        Label #PageLabel {
+          Anchor: (Width: 34, Height: 26);
+          Style: (FontSize: 13, TextColor: #d7e1ee, HorizontalAlignment: Center, VerticalAlignment: Center);
+          Text: "1";
+        }
+
+        $C.@SecondaryTextButton #NextButton {
+          @Text = ">";
+          @Anchor = (Width: 34, Left: 4);
+        }
+      }
+
+      Label #ListEmpty {
         Anchor: (Height: 40);
         Style: (FontSize: 14, TextColor: #9fb0c4, VerticalAlignment: Center, Wrap: true);
-        Text: "Your inbox is empty.";
+        Text: "Nothing here.";
         Visible: false;
       }
 
@@ -47,120 +127,230 @@ $C.@Container {
         ScrollbarStyle: $C.@DefaultScrollbarStyle;
       }
 
-      Group {
-        LayoutMode: Left;
-        Anchor: (Height: 40, Top: 8);
-
-        $C.@CancelTextButton #ClearButton {
-          @Text = "Clear Inbox";
-          @Anchor = (Width: 160);
-        }
+      $C.@SecondaryTextButton #MarkAllButton {
+        @Text = "Mark All As Read";
+        @Anchor = (Height: 38, Top: 8);
       }
     }
 
+    // ===================== Right pane =====================
     Group {
       FlexWeight: 1;
-      LayoutMode: TopScrolling;
+      LayoutMode: Top;
       Padding: (Left: 12);
-      ScrollbarStyle: $C.@DefaultScrollbarStyle;
 
-      Group {
-        Background: (TexturePath: "../Common/ContainerPanelPatch.png", Border: 4);
+      // ----- Reading pane -----
+      Group #ReadPane {
+        FlexWeight: 1;
         LayoutMode: Top;
-        Padding: (Full: 16);
-        Anchor: (Bottom: 12);
 
-        Label #ReadFrom {
-          Anchor: (Bottom: 4);
-          Style: (FontSize: 18, RenderBold: true, TextColor: #ffffff);
+        Label #ReadSubject {
+          Anchor: (Height: 28, Bottom: 4);
+          Style: (FontSize: 20, RenderBold: true, TextColor: #ffffff);
           Text: "Select a message";
         }
 
+        Label #ReadFrom {
+          Anchor: (Height: 18, Bottom: 2);
+          Style: (FontSize: 13, TextColor: #96a9be);
+          Text: "";
+        }
+
         Label #ReadDate {
-          Anchor: (Bottom: 8);
+          Anchor: (Height: 16, Bottom: 8);
           Style: (FontSize: 12, TextColor: #96a9be);
           Text: "";
         }
-
-        Label #ReadBody {
-          Anchor: (Height: 120, Bottom: 8);
-          Style: (FontSize: 14, TextColor: #d7e1ee, Wrap: true);
-          Text: "";
-        }
-
-        Group {
-          LayoutMode: Left;
-          Anchor: (Height: 40);
-
-          $C.@CancelTextButton #DeleteButton {
-            @Text = "Delete";
-            @Anchor = (Width: 130);
-          }
-        }
-      }
-
-      $C.@PanelSeparatorFancy {
-        @Anchor = (Bottom: 10);
-      }
-
-      Label {
-        Anchor: (Bottom: 6);
-        Style: (...$C.@DefaultLabelStyle, FontSize: 13, RenderBold: true);
-        Text: "Send Mail";
-      }
-
-      Group {
-        LayoutMode: Left;
-        Anchor: (Height: 38, Bottom: 8);
-
-        $C.@TextField #RecipientInput {
-          @Anchor = (Right: 8);
-          Anchor: (Width: 220);
-          PlaceholderText: "Player name";
-        }
-
-        $C.@TextField #MessageInput {
-          @Anchor = (Right: 8);
-          FlexWeight: 1;
-          PlaceholderText: "Message";
-        }
-
-        $C.@SecondaryTextButton #SendButton {
-          @Text = "Send";
-          @Anchor = (Width: 110);
-        }
-      }
-
-      Group #AdminSection {
-        LayoutMode: Top;
-        Visible: false;
 
         $C.@PanelSeparatorFancy {
           @Anchor = (Bottom: 10);
         }
 
-        Label {
-          Anchor: (Bottom: 6);
-          Style: (...$C.@DefaultLabelStyle, FontSize: 13, RenderBold: true);
-          Text: "Server Mail (sent to every player)";
+        Label #ReadBody {
+          FlexWeight: 1;
+          Style: (FontSize: 14, TextColor: #d7e1ee, Wrap: true);
+          Text: "";
+        }
+
+        Label #RewardsLabel {
+          Anchor: (Height: 20, Top: 8, Bottom: 6);
+          Style: (...$C.@DefaultLabelStyle, FontSize: 12, RenderBold: true, RenderUppercase: true);
+          Text: "Rewards";
+          Visible: false;
+        }
+
+        Group #RewardList {
+          Anchor: (Height: 66, Bottom: 8);
+          LayoutMode: Left;
         }
 
         Group {
           LayoutMode: Left;
-          Anchor: (Height: 38);
+          Anchor: (Height: 42);
 
-          $C.@TextField #AdminInput {
-            @Anchor = (Right: 8);
+          Group {
             FlexWeight: 1;
-            PlaceholderText: "Announcement mail for all players";
           }
 
-          $C.@SecondaryTextButton #SendAllButton {
-            @Text = "Send to All";
+          $C.@TextButton #ClaimButton {
+            @Text = "Claim";
+            @Anchor = (Width: 130, Right: 8);
+          }
+
+          $C.@SecondaryTextButton #ArchiveButton {
+            @Text = "Archive";
+            @Anchor = (Width: 120, Right: 8);
+          }
+
+          $C.@SecondaryTextButton #RestoreButton {
+            @Text = "Restore";
+            @Anchor = (Width: 120, Right: 8);
+          }
+
+          $C.@CancelTextButton #DeleteButton {
+            @Text = "Delete";
+            @Anchor = (Width: 120);
+          }
+        }
+      }
+
+      // ----- Compose pane -----
+      Group #ComposePane {
+        FlexWeight: 1;
+        LayoutMode: Top;
+        Visible: false;
+
+        Label #ComposeTitle {
+          Anchor: (Height: 26, Bottom: 8);
+          Style: (FontSize: 18, RenderBold: true, TextColor: #ffffff);
+          Text: "New Message";
+        }
+
+        Label #ToLabel {
+          Anchor: (Height: 16, Bottom: 4);
+          Style: (...$C.@DefaultLabelStyle, FontSize: 12, RenderBold: true, RenderUppercase: true);
+          Text: "To (Player name)";
+        }
+
+        $C.@TextField #ToInput {
+          @Anchor = (Height: 34, Bottom: 8);
+          PlaceholderText: "Player name...";
+        }
+
+        Label #SubjectLabel {
+          Anchor: (Height: 16, Bottom: 4);
+          Style: (...$C.@DefaultLabelStyle, FontSize: 12, RenderBold: true, RenderUppercase: true);
+          Text: "Subject";
+          Visible: false;
+        }
+
+        $C.@TextField #SubjectInput {
+          @Anchor = (Height: 34, Bottom: 8);
+          PlaceholderText: "Announcement title...";
+          Visible: false;
+        }
+
+        Label {
+          Anchor: (Height: 16, Bottom: 2);
+          Style: (...$C.@DefaultLabelStyle, FontSize: 12, RenderBold: true, RenderUppercase: true);
+          Text: "Message";
+        }
+
+        $C.@MultilineTextField #BodyInput {
+          @Anchor = (Height: 160, Bottom: 8);
+          PlaceholderText: "Write your message...";
+        }
+
+        Label #CommandLabel {
+          Anchor: (Height: 16, Bottom: 4);
+          Style: (...$C.@DefaultLabelStyle, FontSize: 12, RenderBold: true, RenderUppercase: true);
+          Text: "Reward commands (; separated) — {player} {uuid}";
+          Visible: false;
+        }
+
+        $C.@TextField #CommandInput {
+          @Anchor = (Height: 34, Bottom: 8);
+          PlaceholderText: "give {player} 1 Diamond; xp add {player} 100";
+          Visible: false;
+        }
+
+        Label #RewardHeader {
+          Anchor: (Height: 18, Bottom: 4);
+          Style: (...$C.@DefaultLabelStyle, FontSize: 12, RenderBold: true, RenderUppercase: true, TextColor: #f0b429);
+          Text: "Rewards (max 9)";
+        }
+
+        Group {
+          LayoutMode: Left;
+          Anchor: (Height: 38, Bottom: 6);
+
+          $C.@DropdownBox #ItemDropdown {
+            @Anchor = (Right: 8);
+            FlexWeight: 1;
+          }
+
+          Label {
+            Anchor: (Width: 28, Height: 34);
+            Style: (FontSize: 12, TextColor: #96a9be, VerticalAlignment: Center);
+            Text: "Qty";
+          }
+
+          $C.@TextField #QtyInput {
+            @Anchor = (Width: 56, Right: 8);
+            Value: "1";
+          }
+
+          $C.@SecondaryTextButton #AddButton {
+            @Text = "Add";
+            @Anchor = (Width: 96, Right: 10);
+          }
+
+          $C.@CancelTextButton #ClearRewardsButton {
+            @Text = "Clear";
+            @Anchor = (Width: 108);
+          }
+        }
+
+        Label #NoItemsLabel {
+          Anchor: (Height: 30, Bottom: 6);
+          Style: (FontSize: 13, TextColor: #9fb0c4, VerticalAlignment: Center);
+          Text: "No Items in Inventory";
+          Visible: false;
+        }
+
+        Label #DraftLabel {
+          Anchor: (Height: 16, Bottom: 4);
+          Style: (FontSize: 12, TextColor: #9fb0c4);
+          Text: "Attached (0)";
+        }
+
+        Group #DraftList {
+          FlexWeight: 1;
+          LayoutMode: TopScrolling;
+          Padding: (Right: 10);
+          ScrollbarStyle: $C.@DefaultScrollbarStyle;
+        }
+
+        Group {
+          LayoutMode: Left;
+          Anchor: (Height: 44, Top: 8);
+
+          Group {
+            FlexWeight: 1;
+          }
+
+          $C.@CancelTextButton #ComposeCancel {
+            @Text = "Cancel";
+            @Anchor = (Width: 120, Right: 8);
+          }
+
+          $C.@TextButton #ComposeSend {
+            @Text = "Send";
             @Anchor = (Width: 150);
           }
         }
       }
+
     }
   }
 }

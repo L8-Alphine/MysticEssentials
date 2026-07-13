@@ -1,29 +1,51 @@
 $C = "../Common.ui";
 
-// Row template for the inbox list in the Mail UI.
+// Row template for the mail list in the Mail UI.
 // Appended per message: cmd.append("#MailList", "MysticEssentials/MailRow.ui").
 // The row root is a Button so the whole row is clickable (select + mark read).
 
 Button #Row {
-  Anchor: (Height: 52, Bottom: 8);
+  Anchor: (Height: 56, Bottom: 8);
   LayoutMode: Left;
   Padding: (Left: 10, Right: 10, Top: 6, Bottom: 6);
-  Background: #000000(0.18);
+  Style: (
+    Default: (Background: #000000(0.18)),
+    Hovered: (Background: #7a9cc6(0.16)),
+    Pressed: (Background: #7a9cc6(0.26))
+  );
 
-  Label #Unread {
-    Anchor: (Width: 14);
-    Style: (FontSize: 16, TextColor: #ffd97a, VerticalAlignment: Center);
-    Text: "";
+  Group #Envelope {
+    Anchor: (Width: 40, Height: 40, Right: 10);
+    Background: #1a2530;
+    Padding: 2;
+
+    ItemSlot #RewardIcon {
+      Anchor: (Full: 0);
+      ShowQualityBackground: true;
+      ShowQuantity: false;
+      Visible: false;
+    }
   }
 
   Group {
     FlexWeight: 1;
     LayoutMode: Top;
 
-    Label #From {
+    Group {
+      LayoutMode: Left;
       Anchor: (Height: 20);
-      Style: (FontSize: 15, TextColor: #ffffff, RenderBold: true);
-      Text: "Sender";
+
+      Label #Unread {
+        Anchor: (Width: 14);
+        Style: (FontSize: 16, TextColor: #ffd97a, VerticalAlignment: Center);
+        Text: "";
+      }
+
+      Label #From {
+        FlexWeight: 1;
+        Style: (FontSize: 15, TextColor: #ffffff, RenderBold: true, VerticalAlignment: Center);
+        Text: "Sender";
+      }
     }
 
     Label #Preview {
@@ -33,9 +55,20 @@ Button #Row {
     }
   }
 
-  Label #Date {
+  Group {
     Anchor: (Width: 84);
-    Style: (FontSize: 11, TextColor: #96a9be, VerticalAlignment: Center, HorizontalAlignment: End);
-    Text: "";
+    LayoutMode: Top;
+
+    Label #Date {
+      Anchor: (Height: 20);
+      Style: (FontSize: 11, TextColor: #96a9be, VerticalAlignment: Center, HorizontalAlignment: End);
+      Text: "";
+    }
+
+    Label #Reward {
+      Anchor: (Height: 16);
+      Style: (FontSize: 11, TextColor: #f0b429, HorizontalAlignment: End, VerticalAlignment: Center);
+      Text: "";
+    }
   }
 }

@@ -19,10 +19,10 @@ public final class GreetingsConfig {
     public boolean firstJoinEnabled = true;
     public String firstJoinMessage = "&e&lWelcome &f{player_name} &e&lto the server for the first time!";
 
-    public boolean joinEnabled = true;
+    public boolean joinEnabled = false;
     public String joinMessage = "&8[&a+&8] &7{player_name}";
 
-    public boolean leaveEnabled = true;
+    public boolean leaveEnabled = false;
     public String leaveMessage = "&8[&c-&8] &7{player_name}";
 
     private static List<String> defaultMotd() {

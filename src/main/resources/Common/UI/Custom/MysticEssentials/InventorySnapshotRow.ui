@@ -22,13 +22,18 @@ Group #Row {
   }
 
   Label #Items {
-    Anchor: (Width: 90);
+    Anchor: (Width: 84);
     Style: (FontSize: 12, TextColor: #9fb0c4, VerticalAlignment: Center);
     Text: "";
   }
 
+  $C.@SmallSecondaryTextButton #ViewButton {
+    @Text = "VIEW";
+    @Anchor = (Width: 84, Right: 6);
+  }
+
   $C.@SmallSecondaryTextButton #RestoreButton {
     @Text = "RESTORE";
-    @Anchor = (Width: 110);
+    @Anchor = (Width: 104);
   }
 }

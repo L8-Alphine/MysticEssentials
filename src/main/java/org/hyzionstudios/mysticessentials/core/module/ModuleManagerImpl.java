@@ -133,12 +133,60 @@ public final class ModuleManagerImpl implements ModuleManager {
         Collections.reverse(ordered);
         for (MysticModule module : ordered) {
             if (Boolean.TRUE.equals(enabled.get(module.id()))) {
+                disableModule(module);
+            }
+        }
+    }
+
+    /** Disables one module: {@code onDisable}, then drops its registered commands. */
+    private void disableModule(MysticModule module) {
+        try {
+            module.onDisable();
+        } catch (Throwable t) {
+            core.log(Level.SEVERE, "Error disabling module '" + module.id() + "': " + t);
+        }
+        if (module instanceof AbstractMysticModule base) {
+            base.unregisterCommands();
+            base.unregisterEventListeners();
+        }
+        enabled.put(module.id(), false);
+        core.log(Level.INFO, "Disabled module '" + module.id() + "'.");
+    }
+
+    /**
+     * Reconciles running modules with the current {@code config.json} module
+     * flags — the hot enable/disable path used by {@code /mysticessentials reload}.
+     * Modules newly enabled in config are started (in dependency order), modules
+     * newly disabled are stopped (reverse order, dependents first), and modules
+     * that stay enabled are reloaded. This is what lets an operator toggle a
+     * module and reload without restarting the server.
+     */
+    public void syncFromConfig() {
+        List<MysticModule> ordered = orderedByDependencies();
+
+        // Stop modules turned off in config — dependents before dependencies.
+        List<MysticModule> reversed = new ArrayList<>(ordered);
+        Collections.reverse(reversed);
+        for (MysticModule module : reversed) {
+            if (isEnabled(module.id()) && !moduleEnabledInConfig(module.id())) {
+                disableModule(module);
+            }
+        }
+
+        // Start newly-enabled modules and reload the rest — dependencies first.
+        for (MysticModule module : ordered) {
+            String id = module.id();
+            if (!moduleEnabledInConfig(id)) {
+                continue;
+            }
+            if (isEnabled(id)) {
                 try {
-                    module.onDisable();
+                    module.onReload();
                 } catch (Throwable t) {
-                    core.log(Level.SEVERE, "Error disabling module '" + module.id() + "': " + t);
+                    core.log(Level.SEVERE, "Error reloading module '" + id + "': " + t);
                 }
-                enabled.put(module.id(), false);
+            } else {
+                enableModule(module);
             }
         }
     }

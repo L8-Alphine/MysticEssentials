@@ -1,0 +1,16 @@
+$C = "../Common.ui";
+
+// Neutral body / bullet line in the Patch Notes viewer content.
+//   cmd.append("#SectionContent", "MysticEssentials/PatchLineText.ui")
+//   cmd.set("#SectionContent[i] #Line.Text", ...)
+
+Group #Row {
+  LayoutMode: Top;
+  Anchor: (Height: 20);
+
+  Label #Line {
+    Anchor: (Full: 0);
+    Style: (FontSize: 14, TextColor: #d7e1ee, VerticalAlignment: Center);
+    Text: "";
+  }
+}

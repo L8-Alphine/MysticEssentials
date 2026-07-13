@@ -1,0 +1,40 @@
+$C = "../Common.ui";
+
+// Sent-announcement history row in the Mail Admin Center.
+// Appended per entry: cmd.append("#HistoryList", "MysticEssentials/MailHistoryRow.ui").
+// #Resend re-broadcasts the announcement to its original audience.
+
+Group #Row {
+  Anchor: (Height: 64, Bottom: 8);
+  LayoutMode: Left;
+  Padding: (Left: 10, Right: 10, Top: 6, Bottom: 6);
+  Background: #000000(0.18);
+
+  Group {
+    FlexWeight: 1;
+    LayoutMode: Top;
+
+    Label #Subject {
+      Anchor: (Height: 20);
+      Style: (FontSize: 14, TextColor: #ffffff, RenderBold: true, VerticalAlignment: Center);
+      Text: "Announcement";
+    }
+
+    Label #Meta {
+      Anchor: (Height: 15);
+      Style: (FontSize: 11, TextColor: #f0b429, VerticalAlignment: Center);
+      Text: "";
+    }
+
+    Label #Preview {
+      Anchor: (Height: 15);
+      Style: (FontSize: 11, TextColor: #9fb0c4, VerticalAlignment: Center);
+      Text: "";
+    }
+  }
+
+  $C.@SecondaryTextButton #Resend {
+    @Text = "Resend";
+    @Anchor = (Width: 96, Left: 8);
+  }
+}

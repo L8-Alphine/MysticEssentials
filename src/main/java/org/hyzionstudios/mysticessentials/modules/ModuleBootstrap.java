@@ -4,14 +4,18 @@ import org.hyzionstudios.mysticessentials.core.module.ModuleManagerImpl;
 import org.hyzionstudios.mysticessentials.modules.afk.AfkModule;
 import org.hyzionstudios.mysticessentials.modules.announcements.AnnouncementModule;
 import org.hyzionstudios.mysticessentials.modules.chat.ChatModule;
+import org.hyzionstudios.mysticessentials.modules.customcommands.CustomCommandsModule;
 import org.hyzionstudios.mysticessentials.modules.flight.FlightModule;
 import org.hyzionstudios.mysticessentials.modules.greetings.GreetingsModule;
 import org.hyzionstudios.mysticessentials.modules.inventory.InventoryModule;
 import org.hyzionstudios.mysticessentials.modules.kits.KitModule;
 import org.hyzionstudios.mysticessentials.modules.mail.MailModule;
 import org.hyzionstudios.mysticessentials.modules.nick.NickModule;
+import org.hyzionstudios.mysticessentials.modules.patchnotes.PatchNotesModule;
+import org.hyzionstudios.mysticessentials.modules.playervaults.PlayerVaultModule;
 import org.hyzionstudios.mysticessentials.modules.spawn.SpawnModule;
 import org.hyzionstudios.mysticessentials.modules.teleportation.TeleportationModule;
+import org.hyzionstudios.mysticessentials.modules.tutorial.TutorialModule;
 import org.hyzionstudios.mysticessentials.modules.warps.WarpModule;
 
 /**
@@ -38,5 +42,9 @@ public final class ModuleBootstrap {
         manager.register(new FlightModule());
         manager.register(new InventoryModule());
         manager.register(new NickModule());
+        manager.register(new PatchNotesModule());
+        manager.register(new TutorialModule());
+        manager.register(new CustomCommandsModule());
+        manager.register(new PlayerVaultModule());
     }
 }

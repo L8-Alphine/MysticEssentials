@@ -80,6 +80,11 @@ public final class StorageServiceImpl implements StorageService {
         return provider.exists(namespace, key);
     }
 
+    @Override
+    public CompletableFuture<java.util.List<String>> listKeys(String namespace) {
+        return provider.listKeys(namespace);
+    }
+
     public void shutdown() {
         if (provider != null) {
             provider.shutdown();
