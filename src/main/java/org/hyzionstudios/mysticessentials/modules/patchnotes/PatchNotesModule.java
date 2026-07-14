@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 import org.hyzionstudios.mysticessentials.api.Permissions;
 import org.hyzionstudios.mysticessentials.api.service.StorageService;
@@ -187,7 +188,10 @@ public final class PatchNotesModule extends AbstractMysticModule {
     // ----- Join notification -------------------------------------------------
 
     private void notifyOnJoin(PlayerRef player) {
-        if (!config.showOnJoin || notes.isEmpty() || !player.hasPermission(Permissions.PATCHNOTES_VIEW)) {
+        // Nothing to surface if both join behaviours are off, there are no notes,
+        // or the player cannot view patch notes at all.
+        if ((!config.showOnJoin && !config.openOnJoin) || notes.isEmpty()
+                || !player.hasPermission(Permissions.PATCHNOTES_VIEW)) {
             return;
         }
         readState(player.getUuid()).thenAccept(state -> {
@@ -201,11 +205,34 @@ public final class PatchNotesModule extends AbstractMysticModule {
                 }
                 count++;
             }
-            if (count > 0) {
+            if (count <= 0) {
+                return;
+            }
+            // Auto-open takes precedence over the chat notice: showing the UI
+            // makes a "you have N unread notes" chat line redundant.
+            if (config.openOnJoin) {
+                scheduleOpenOnJoin(player);
+                return;
+            }
+            if (config.showOnJoin) {
                 core.getMessageService().sendKey(player, "patchnotes-notify-join",
                         Map.of("count", Integer.toString(count), "command", config.openCommand));
             }
         });
+    }
+
+    /**
+     * Opens the Patch Notes UI shortly after join. A delay is required because
+     * the player entity is not ready to receive a Custom UI page the instant
+     * {@code PlayerConnectEvent} fires; the player is re-resolved after the delay
+     * so a fast disconnect is a no-op.
+     */
+    private void scheduleOpenOnJoin(PlayerRef player) {
+        long delayMillis = Math.max(0, config.openOnJoinDelayTicks) * 50L;
+        UUID uuid = player.getUuid();
+        core.scheduler().runLater(() ->
+                core.platform().findPlayer(uuid).ifPresent(this::openUi),
+                delayMillis, TimeUnit.MILLISECONDS);
     }
 
     // ----- UI opening --------------------------------------------------------

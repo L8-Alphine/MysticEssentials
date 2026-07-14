@@ -71,6 +71,27 @@ public final class TutorialModuleConfig {
         public double pitchOffsetDegrees = 0.0;
         /** Hold the last frame for this long before ending (lets the final shot land). */
         public double holdEndSeconds = 0.5;
+        /**
+         * Freeze the player's world for the duration of the shot (via
+         * {@code SetTimeDilation}) so mobs, day/night and physics stop moving —
+         * the cinematic look. This is the technique the Replay mod uses to make
+         * cutscenes read as cutscenes. The unfreeze always fires in the reset
+         * path, so the tutorial failsafe can never leave a player frozen.
+         */
+        public boolean freezeWorld = true;
+        /**
+         * Client time-dilation while frozen: {@code 0.0101} ≈ stopped, {@code 1.0}
+         * = normal, up to {@code 4.0}. Clamped to that range before sending.
+         */
+        public float freezeTimeDilation = 0.0101f;
+        /**
+         * Vertical offset (blocks) added to every camera position. The machinima
+         * editor may author a camera actor at foot level while the client renders
+         * the camera at eye height; Replay adds {@code 1.6} for this reason. Left
+         * at {@code 0.0} by default (camera-actor keyframes are usually already the
+         * camera point); set to {@code 1.6} if shots sit too low.
+         */
+        public double eyeHeightOffset = 0.0;
     }
 
     /** Per-tutorial player-state defaults, used when a tutorial omits {@code playerState}. */

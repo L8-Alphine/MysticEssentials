@@ -11,10 +11,11 @@
     }
   ],
   "Dependencies": {
-    "HelpChat:PlaceholderAPI": ">=1.0.8",
     "TheNewEconomy:VaultUnlocked": "*",
     "LuckPerms:LuckPerms": "*"
   },
-  "OptionalDependencies": {},
+  "OptionalDependencies": {
+    "HelpChat:PlaceholderAPI": ">=1.0.8"
+  },
   "IncludesAssetPack": true
 }

@@ -1,0 +1,45 @@
+$C = "../Common.ui";
+
+// Card template for the Random Teleport selection UI.
+// Appended per profile: cmd.append("#ProfileList", "MysticEssentials/RtpProfileRow.ui").
+
+Group #Row {
+  Anchor: (Height: 96, Bottom: 8);
+  LayoutMode: Top;
+  Padding: (Left: 12, Right: 12, Top: 8, Bottom: 8);
+  Background: #000000(0.18);
+
+  Group {
+    Anchor: (Height: 30);
+    LayoutMode: Left;
+
+    Label #Name {
+      FlexWeight: 1;
+      Style: (FontSize: 17, TextColor: #ffffff, RenderBold: true, VerticalAlignment: Center);
+      Text: "Profile";
+    }
+
+    $C.@SmallSecondaryTextButton #TeleportButton {
+      @Text = "TELEPORT";
+      @Anchor = (Width: 130);
+    }
+  }
+
+  Label #World {
+    Anchor: (Height: 20);
+    Style: (FontSize: 13, TextColor: #9fb0c4);
+    Text: "world";
+  }
+
+  Label #Details {
+    Anchor: (Height: 20);
+    Style: (FontSize: 13, TextColor: #9fb0c4);
+    Text: "range - cost - cooldown";
+  }
+
+  Label #Status {
+    Anchor: (Height: 20);
+    Style: (FontSize: 13, TextColor: #8fd694);
+    Text: "Ready";
+  }
+}

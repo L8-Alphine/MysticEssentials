@@ -86,7 +86,6 @@ All nodes are prefixed `mysticessentials.`.
 | `mysticessentials.chat.channel.create.temp` | `/channel temp` — temporary channels |
 | `mysticessentials.chat.channel.<id>[.speak/.listen/.moderator]` | Dynamic per-channel gates (configured per channel) |
 | `mysticessentials.chat.color.legacy/hex/gradient/rainbow/minimessage/links` | Colour/markup styles in chat messages |
-| `mysticessentials.chat.emoji.use/custom/staff`, `mysticessentials.chat.unicode.symbols` | Glyph/emoji tiers |
 
 ## Kits
 

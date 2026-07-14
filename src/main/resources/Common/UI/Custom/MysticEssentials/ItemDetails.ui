@@ -1,0 +1,119 @@
+$C = "../Common.ui";
+
+// Read-only Item Details page. Renders the shared item's data directly (custom-UI
+// ItemSlots do NOT get the native hover tooltip, so we can't defer to hover): a
+// rarity-accented header, cleaned lore (Hytale <color is=…> markup stripped, since
+// Labels render plain text only), single-line stat rows, and share info.
+
+$C.@PageOverlay {}
+
+$C.@Container {
+  Anchor: (Width: 680, Height: 660);
+
+  #Title {
+    Group {
+      $C.@Title {
+        @Text = "Item Details";
+      }
+    }
+  }
+
+  #Content {
+    LayoutMode: Top;
+
+    Group {
+      LayoutMode: Left;
+      Anchor: (Height: 118, Bottom: 12);
+      Background: (TexturePath: "../Common/ContainerPanelPatch.png", Border: 4);
+      Padding: (Full: 14);
+
+      Group #RarityAccent {
+        Anchor: (Width: 6, Height: 84, Right: 14);
+        Background: #7a9cc6;
+      }
+
+      // ItemSlotButton parent auto-detects the ItemSlot child and shows the FULL
+      // native item tooltip (description with colours, quality, durability) on hover,
+      // dynamically from #Icon.ItemId (config-based mode, per the element docs).
+      ItemSlotButton #IconButton {
+        Anchor: (Width: 76, Height: 76, Right: 18);
+
+        ItemSlot #Icon {
+          Anchor: (Full: 0);
+          ShowQualityBackground: true;
+          ShowQuantity: false;
+        }
+      }
+
+      Group {
+        LayoutMode: Top;
+        FlexWeight: 1;
+
+        Label #ItemName {
+          Anchor: (Height: 30, Bottom: 4);
+          Style: (FontSize: 23, RenderBold: true, TextColor: #ffffff, VerticalAlignment: Center);
+          Text: "Item";
+        }
+
+        Label #ItemSubtitle {
+          Anchor: (Height: 20, Bottom: 3);
+          Style: (FontSize: 14, TextColor: #96a9be, VerticalAlignment: Center);
+          Text: "";
+        }
+
+        Label #ItemId {
+          Anchor: (Height: 16);
+          Style: (FontSize: 12, TextColor: #6f7f93, VerticalAlignment: Center);
+          Text: "";
+        }
+      }
+    }
+
+    Label {
+      Anchor: (Height: 32, Bottom: 8);
+      Style: (FontSize: 13, TextColor: #8a9bb0, Wrap: true, HorizontalAlignment: Center, VerticalAlignment: Center);
+      Text: "Hover the item icon for full lore, quality and stats.";
+    }
+
+    Label {
+      Anchor: (Height: 22, Bottom: 4);
+      Style: (FontSize: 14, RenderBold: true, TextColor: #E8A93B);
+      Text: "Statistics";
+    }
+
+    Label #StatsEmpty {
+      Anchor: (Height: 22, Bottom: 6);
+      Style: (FontSize: 13, TextColor: #9fb0c4, VerticalAlignment: Center);
+      Text: "No additional statistics.";
+      Visible: false;
+    }
+
+    Group #StatList {
+      FlexWeight: 1;
+      LayoutMode: TopScrolling;
+      Padding: (Right: 10, Bottom: 8);
+      ScrollbarStyle: $C.@DefaultScrollbarStyle;
+    }
+
+    Label #ShareInfo {
+      Anchor: (Height: 22, Bottom: 8);
+      Style: (FontSize: 12, TextColor: #7f8ea3, Wrap: true);
+      Text: "";
+    }
+
+    Group {
+      LayoutMode: Left;
+      Anchor: (Height: 44);
+
+      $C.@SecondaryTextButton #ReportButton {
+        @Text = "Report";
+        @Anchor = (Width: 160, Right: 8);
+      }
+
+      $C.@TextButton #CloseButton {
+        @Text = "Close";
+        @Anchor = (Width: 180);
+      }
+    }
+  }
+}

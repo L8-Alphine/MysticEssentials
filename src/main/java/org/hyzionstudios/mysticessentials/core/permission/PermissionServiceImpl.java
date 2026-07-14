@@ -2,6 +2,7 @@ package org.hyzionstudios.mysticessentials.core.permission;
 
 import java.util.OptionalInt;
 import java.util.UUID;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 
 import org.hyzionstudios.mysticessentials.api.service.PermissionService;
@@ -9,6 +10,8 @@ import org.hyzionstudios.mysticessentials.core.MysticCore;
 
 import net.luckperms.api.LuckPerms;
 import net.luckperms.api.LuckPermsProvider;
+import net.luckperms.api.event.EventSubscription;
+import net.luckperms.api.event.user.UserDataRecalculateEvent;
 import net.luckperms.api.model.user.User;
 
 /**
@@ -98,6 +101,36 @@ public final class PermissionServiceImpl implements PermissionService {
         } catch (Throwable t) {
             core.log(Level.WARNING, "LuckPerms meta lookup failed: " + t);
             return "";
+        }
+    }
+
+    @Override
+    public String metaValue(UUID player, String key) {
+        if (luckPerms == null || player == null || key == null) {
+            return null;
+        }
+        try {
+            User user = luckPerms.getUserManager().getUser(player);
+            return user == null ? null : user.getCachedData().getMetaData().getMetaValue(key);
+        } catch (Throwable t) {
+            core.log(Level.WARNING, "LuckPerms meta lookup for '" + key + "' failed: " + t);
+            return null;
+        }
+    }
+
+    @Override
+    public AutoCloseable onUserDataRecalculated(Consumer<UUID> listener) {
+        if (luckPerms == null) {
+            return null;
+        }
+        try {
+            EventSubscription<UserDataRecalculateEvent> subscription = luckPerms.getEventBus()
+                    .subscribe(UserDataRecalculateEvent.class,
+                            event -> listener.accept(event.getUser().getUniqueId()));
+            return subscription::close;
+        } catch (Throwable t) {
+            core.log(Level.WARNING, "LuckPerms event subscription failed: " + t);
+            return null;
         }
     }
 

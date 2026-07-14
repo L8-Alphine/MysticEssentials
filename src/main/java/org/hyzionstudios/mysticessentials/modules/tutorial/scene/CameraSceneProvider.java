@@ -20,6 +20,7 @@ import com.hypixel.hytale.protocol.PositionType;
 import com.hypixel.hytale.protocol.RotationType;
 import com.hypixel.hytale.protocol.ServerCameraSettings;
 import com.hypixel.hytale.protocol.packets.camera.SetServerCamera;
+import com.hypixel.hytale.protocol.packets.setup.SetTimeDilation;
 import com.hypixel.hytale.server.core.entity.entities.player.CameraManager;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 
@@ -36,10 +37,16 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
  * locked, {@code PositionType.Custom} + absolute {@code Position},
  * {@code RotationType.Custom} + {@code Direction} in radians.</p>
  *
+ * <p>While a shot plays it optionally <b>freezes the player's world</b> with
+ * {@code SetTimeDilation} (the technique the Replay mod uses for cutscenes) so
+ * mobs, day/night and physics stop moving; only the tutorial player is affected
+ * since it is a per-client packet.</p>
+ *
  * <p>Every path always ends by resetting the camera
- * ({@code CameraManager.resetCamera}) and sending an unlock packet, and
- * {@link #stopScene} is idempotent, so the tutorial failsafe can never leave a
- * player stuck in a locked camera.</p>
+ * ({@code CameraManager.resetCamera}), sending an unlock packet, and restoring
+ * time dilation to {@code 1.0}; {@link #stopScene} is idempotent, so the
+ * tutorial failsafe can never leave a player stuck in a locked camera or a
+ * frozen world.</p>
  */
 public final class CameraSceneProvider implements TutorialSceneProvider {
 
@@ -102,6 +109,13 @@ public final class CameraSceneProvider implements TutorialSceneProvider {
 
         CompletableFuture<TutorialSceneResult> completion = new CompletableFuture<>();
         long startNanos = System.nanoTime();
+
+        // Freeze the player's world (time dilation) for the shot so nothing
+        // moves during the cutscene — the cinematic look the Replay mod uses. The
+        // unfreeze is unconditional in resetCamera(), so this always heals.
+        if (cfg.freezeWorld) {
+            sendTimeDilation(request.player, cfg.freezeTimeDilation);
+        }
 
         // Push the first frame immediately so the camera snaps into the shot
         // before the player notices, then drive the rest on the tick loop.
@@ -176,7 +190,9 @@ public final class CameraSceneProvider implements TutorialSceneProvider {
         settings.allowPitchControls = false;
         settings.sendMouseMotion = false;
         settings.positionType = PositionType.Custom;
-        settings.position = new Position(sample.x(), sample.y(), sample.z());
+        // Eye-height offset: recorded/authored positions may be at foot level
+        // while the client renders the camera at eye height (Replay adds 1.6).
+        settings.position = new Position(sample.x(), sample.y() + cfg.eyeHeightOffset, sample.z());
         settings.rotationType = RotationType.Custom;
         // Direction(yaw, pitch, roll) — radians (builtin top-down demo uses pitch = -PI/2).
         settings.rotation = new Direction(sample.yaw(), sample.pitch(), 0f);
@@ -189,8 +205,22 @@ public final class CameraSceneProvider implements TutorialSceneProvider {
         }
     }
 
+    /** Sends a time-dilation packet (clamped to the client's accepted range). */
+    private void sendTimeDilation(PlayerRef player, float dilation) {
+        float clamped = Math.min(Math.max(0.0101f, dilation), 4.0f);
+        try {
+            player.getPacketHandler().writeNoCache(new SetTimeDilation(clamped));
+        } catch (Throwable t) {
+            core.log(Level.WARNING, "[tutorial] SetTimeDilation write failed for "
+                    + player.getUsername() + ": " + t);
+        }
+    }
+
     /** Releases the camera back to the player (component reset + unlock packet). */
     private void resetCamera(PlayerRef player) {
+        // Unfreeze the world unconditionally (idempotent) so a failsafe/stop can
+        // never leave a player in a frozen world, even if the config changed.
+        sendTimeDilation(player, 1.0f);
         core.platform().runOnEntityThread(player, (store, ref, world) -> {
             try {
                 player.getPacketHandler().writeNoCache(

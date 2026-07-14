@@ -25,7 +25,7 @@ Mystic Essentials works without the optional integrations. Missing integrations 
 5. Edit the generated files under `mods/MysticEssentials/`.
 6. Run `/mystic reload` or restart the server.
 
-The mod includes an asset pack for its custom UI and chat glyph resources, so keep `IncludesAssetPack` enabled in the manifest.
+The mod includes an asset pack for its custom UI resources, so keep `IncludesAssetPack` enabled in the manifest.
 
 ## First-run checklist
 
@@ -38,7 +38,7 @@ After first start, confirm:
 | `mods/MysticEssentials/modules/` | Per-module config folders exist |
 | `/mystic` | Shows core information |
 | `/mystic reload` | Works for staff with `mysticessentials.reload` |
-| `/spawn`, `/tpa`, `/warps`, `/mail`, `/channel`, `/kit` | Commands exist when their modules are enabled |
+| `/spawn`, `/tpa`, `/rtp`, `/warps`, `/mail`, `/channel`, `/kit`, `/patchnotes` | Commands exist when their modules are enabled |
 
 ## Recommended setup order
 
@@ -49,4 +49,6 @@ After first start, confirm:
 5. Decide home and player-warp limits using dynamic permissions.
 6. Configure chat formats and channels.
 7. Configure kits, flight costs, AFK rewards, and mail limits.
-8. Review the command and permission references before opening the server to players.
+8. Set up Random Teleport profiles in `modules/teleportation/rtp.json` if you want `/rtp`.
+9. Add your first patch notes and, if desired, enable Player Vaults.
+10. Review the command and permission references before opening the server to players.

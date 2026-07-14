@@ -1,0 +1,33 @@
+$C = "../Common.ui";
+
+$C.@PageOverlay {}
+
+$C.@Container {
+  Anchor: (Width: 720, Height: 620);
+
+  #Title {
+    Group {
+      $C.@Title {
+        @Text = "Random Teleport";
+      }
+    }
+  }
+
+  #Content {
+    LayoutMode: Top;
+
+    Label #Empty {
+      Anchor: (Height: 40);
+      Style: (FontSize: 14, TextColor: #9fb0c4, VerticalAlignment: Center);
+      Text: "No random teleport destinations are available to you.";
+      Visible: false;
+    }
+
+    Group #ProfileList {
+      FlexWeight: 1;
+      LayoutMode: TopScrolling;
+      Padding: (Right: 10);
+      ScrollbarStyle: $C.@DefaultScrollbarStyle;
+    }
+  }
+}

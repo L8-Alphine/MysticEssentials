@@ -59,6 +59,62 @@ public final class DefaultMessages {
         o.addProperty("teleport-all-started", "&aTeleporting &f{count} &aplayer{plural} to you.");
         o.addProperty("teleport-top-unavailable", "&cCould not find a safe top location here.");
         o.addProperty("teleport-back-none", "&cNo previous location to return to.");
+        // Random Teleport
+        o.addProperty("rtp-disabled", "&cRandom teleport is disabled on this server.");
+        o.addProperty("rtp-no-destination", "&cCould not find a safe place to teleport you. Try again.");
+        o.addProperty("rtp-profile-disabled", "&cThat random-teleport profile is disabled.");
+        o.addProperty("rtp-world-disabled", "&cRandom teleport is disabled in world &f{world}&c.");
+        o.addProperty("rtp-no-permission", "&cYou do not have permission to use that random teleport.");
+        o.addProperty("rtp-already-active", "&cYou already have a random teleport in progress.");
+        o.addProperty("rtp-on-cooldown", "&cYou must wait {seconds}s before using random teleport again.");
+        o.addProperty("rtp-limit-reached", "&cYou have reached your random-teleport usage limit.");
+        o.addProperty("rtp-not-enough-money", "&cYou cannot afford that random teleport ({cost}).");
+        o.addProperty("rtp-warmup", "&7Searching for a destination in {seconds}s. Do not move.");
+        o.addProperty("rtp-searching", "&7Searching for a safe destination...");
+        o.addProperty("rtp-success", "&aTeleported to &f{profile} &7at &f{x}, {y}, {z}&a.");
+        o.addProperty("rtp-cancelled", "&cRandom teleport cancelled.");
+        o.addProperty("rtp-cancel-ok", "&7Random teleport cancelled.");
+        o.addProperty("rtp-cancel-none", "&cYou have no random teleport in progress.");
+        o.addProperty("rtp-other-success", "&aRandomly teleported &f{player}&a.");
+        o.addProperty("rtp-other-failed", "&cCould not random-teleport &f{player}&c: {reason}");
+        o.addProperty("rtp-status-header", "&d&lRandom Teleport Status");
+        o.addProperty("rtp-status-active", "&7Phase: &f{phase} &7| Profile: &f{profile} &7| Queue: &f{queue}");
+        o.addProperty("rtp-status-idle", "&7No random teleport in progress.");
+        o.addProperty("rtp-status-profile", "&7 - &f{profile}&7: {cooldown}");
+        o.addProperty("rtp-info",
+                "&7{profile} &8» &7world &f{world}&7, {shape} &f{min}-{max}&7 blocks, cost &f{cost}&7, "
+                        + "warmup &f{warmup}s&7, cooldown &f{cooldown}s");
+        o.addProperty("rtp-info-unknown", "&cUnknown random-teleport profile: &f{name}");
+        o.addProperty("rtp-usage-world", "&7Usage: &f/rtp world <world> [player]");
+        o.addProperty("rtp-usage-profile", "&7Usage: &f/rtp profile <profile> [player]");
+        o.addProperty("rtp-usage-biome", "&7Usage: &f/rtp biome <biome>");
+        o.addProperty("rtp-admin-reloaded", "&aReloaded random teleport ({count} profiles).");
+        o.addProperty("rtp-admin-test-start", "&7Testing profile &f{profile}&7...");
+        o.addProperty("rtp-admin-test-found", "&aFound: &f{x}, {y}, {z} &7in {attempts} attempts.");
+        o.addProperty("rtp-admin-test-none", "&cNo destination after {attempts} attempts ({reason}).");
+        o.addProperty("rtp-admin-preview",
+                "&7{profile} &8» &7{shape} in &f{world}&7, center &f{center}&7, radius &f{min}-{max}&7, Y &f{y}");
+        o.addProperty("rtp-admin-debug-start", "&7Debugging profile &f{profile}&7...");
+        o.addProperty("rtp-admin-debug-summary", "&7Found: &f{found} &7| Attempts: &f{attempts} &7| Rejections:");
+        o.addProperty("rtp-admin-debug-line", "&7 - &f{reason}&7: &c{count}");
+        o.addProperty("rtp-admin-usage-world", "&7Usage: &f/rtpadmin enable|disable <world>");
+        o.addProperty("rtp-admin-world-enabled", "&aRandom teleport enabled for world &f{world}&a.");
+        o.addProperty("rtp-admin-world-disabled", "&7Random teleport disabled for world &f{world}&7.");
+        o.addProperty("rtp-admin-setcenter", "&aProfile &f{profile} &acenter set to &f{x}, {z}&a.");
+        o.addProperty("rtp-admin-cache-cleared", "&7Cleared cached destinations for &f{profile}&7.");
+        o.addProperty("rtp-admin-queue-header", "&d&lRTP Queue &7- active &f{active}&7, queued &f{queued}");
+        o.addProperty("rtp-admin-queue-empty", "&7No active or queued searches.");
+        o.addProperty("rtp-admin-cancel-ok", "&aCancelled &f{player}&a's random teleport.");
+        o.addProperty("rtp-admin-cancel-none", "&c{player} has no random teleport in progress.");
+        o.addProperty("rtp-admin-usage-cancel", "&7Usage: &f/rtpadmin cancel <player>");
+        o.addProperty("rtp-admin-spread", "&aSpreading &f{count} &aplayers with profile &f{profile}&a.");
+        o.addProperty("rtp-admin-usage-spread", "&7Usage: &f/rtpadmin spread <profile> <all|world:name>");
+        o.addProperty("rtp-admin-queuelogin-ok", "&aQueued &f{player} &afor profile &f{profile} &aon next login.");
+        o.addProperty("rtp-admin-usage-queuelogin", "&7Usage: &f/rtpadmin queue-login <player> <profile>");
+        o.addProperty("rtp-admin-usage-profile", "&7Usage: &f/rtpadmin <test|preview|debug|setcenter> <profile>");
+        o.addProperty("rtp-admin-help",
+                "&7/rtpadmin &f<reload|test|preview|debug|enable|disable|setcenter|clearcache|queue|"
+                        + "cancel|spread|queue-login>");
         o.addProperty("warp-unknown", "&cUnknown warp: &f{warp}");
         o.addProperty("warp-none", "&7There are no warps available.");
         o.addProperty("warp-list", "&7Warps: &f{warps}");

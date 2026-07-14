@@ -1,0 +1,64 @@
+$C = "../Common.ui";
+
+$C.@PageOverlay {}
+
+$C.@Container {
+  Anchor: (Width: 460, Height: 340);
+
+  #Title {
+    Group {
+      $C.@Title {
+        @Text = "Confirm Random Teleport";
+      }
+    }
+  }
+
+  #Content {
+    LayoutMode: Top;
+
+    Label #ProfileName {
+      Anchor: (Height: 30);
+      Style: (FontSize: 18, TextColor: #ffffff, RenderBold: true);
+      Text: "Profile";
+    }
+
+    Label #World {
+      Anchor: (Height: 24);
+      Style: (FontSize: 14, TextColor: #9fb0c4);
+      Text: "World:";
+    }
+
+    Label #Range {
+      Anchor: (Height: 24);
+      Style: (FontSize: 14, TextColor: #9fb0c4);
+      Text: "Range:";
+    }
+
+    Label #Cost {
+      Anchor: (Height: 24);
+      Style: (FontSize: 14, TextColor: #9fb0c4);
+      Text: "Cost:";
+    }
+
+    Label #Timing {
+      Anchor: (Height: 24);
+      Style: (FontSize: 14, TextColor: #9fb0c4);
+      Text: "Warmup / Cooldown:";
+    }
+
+    Group {
+      Anchor: (Height: 46, Top: 14);
+      LayoutMode: Left;
+
+      $C.@SmallTertiaryTextButton #CancelButton {
+        @Text = "CANCEL";
+        @Anchor = (Width: 140, Right: 10);
+      }
+
+      $C.@SmallSecondaryTextButton #ConfirmButton {
+        @Text = "BEGIN TELEPORT";
+        @Anchor = (Width: 180);
+      }
+    }
+  }
+}

@@ -1,0 +1,39 @@
+$C = "../Common.ui";
+
+$C.@PageOverlay {}
+
+$C.@Container {
+  Anchor: (Width: 820, Height: 640);
+
+  #Title {
+    Group {
+      $C.@Title {
+        @Text = "Random Teleport Admin";
+      }
+    }
+  }
+
+  #Content {
+    LayoutMode: Top;
+
+    Label #Summary {
+      Anchor: (Height: 28, Bottom: 6);
+      Style: (FontSize: 14, TextColor: #9fb0c4);
+      Text: "Queue: 0 active, 0 queued";
+    }
+
+    Label #Empty {
+      Anchor: (Height: 40);
+      Style: (FontSize: 14, TextColor: #9fb0c4, VerticalAlignment: Center);
+      Text: "No profiles configured. Edit modules/teleportation/rtp.json.";
+      Visible: false;
+    }
+
+    Group #ProfileList {
+      FlexWeight: 1;
+      LayoutMode: TopScrolling;
+      Padding: (Right: 10);
+      ScrollbarStyle: $C.@DefaultScrollbarStyle;
+    }
+  }
+}

@@ -15,9 +15,11 @@ import org.hyzionstudios.mysticessentials.api.Permissions;
 import org.hyzionstudios.mysticessentials.api.model.MysticLocation;
 import org.hyzionstudios.mysticessentials.api.model.PlayerProfile;
 import org.hyzionstudios.mysticessentials.api.model.TeleportRequest;
+import org.hyzionstudios.mysticessentials.api.rtp.RandomTeleportService;
 import org.hyzionstudios.mysticessentials.api.service.TeleportService;
 import org.hyzionstudios.mysticessentials.core.module.AbstractMysticModule;
 import org.hyzionstudios.mysticessentials.core.teleport.TeleportServiceImpl;
+import org.hyzionstudios.mysticessentials.modules.teleportation.rtp.RtpSubsystem;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommand;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommandSender;
 
@@ -54,6 +56,7 @@ public final class TeleportationModule extends AbstractMysticModule {
     private final Set<UUID> tpaDisabled = ConcurrentHashMap.newKeySet();
 
     private TeleportationConfig config = new TeleportationConfig();
+    private RtpSubsystem rtp;
 
     public TeleportationModule() {
         super("teleportation", "Teleportation", "1.0.0");
@@ -83,17 +86,36 @@ public final class TeleportationModule extends AbstractMysticModule {
         registerCommand(new TpAllCommand());
         registerCommand(new TopCommand());
         registerCommand(new BackCommand());
+
+        // Random Teleport subsystem: registers /rtp and /rtpadmin through the
+        // module's tracked registerCommand so they drop on module disable.
+        rtp = new RtpSubsystem(core);
+        rtp.enable(this::registerCommand);
+        registerEvent(com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent.class,
+                (com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent event) ->
+                        rtp.onPlayerConnect(event.getPlayerRef()));
     }
 
     @Override
     public void onReload() {
         loadConfig();
+        if (rtp != null) {
+            rtp.reload();
+        }
     }
 
     @Override
     public void onDisable() {
         pending.clear();
         tpaDisabled.clear();
+        if (rtp != null) {
+            rtp.disable();
+        }
+    }
+
+    /** @return the Random Teleport service, or {@code null} if the module is not enabled. */
+    public RandomTeleportService getRandomTeleportService() {
+        return rtp == null ? null : rtp.service();
     }
 
     private void loadConfig() {

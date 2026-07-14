@@ -445,13 +445,12 @@ Notable per-module settings:
 - **spawn** — `defaultHomeLimit`, `teleportOnFirstJoin`, `teleportOnJoin`.
 - **chat** — `defaultFormat`, priority-ordered `formats` (permission-gated),
   per-colour-style permissions, private messaging, channel definitions, temporary
-  channels, configurable channel prefixes/aliases/passwords, and `glyphs`
-  settings. `/channel` opens the packaged channel browser UI
+  channels, and configurable channel prefixes/aliases/passwords.
+  `/channel` opens the packaged channel browser UI
   (`Common/UI/Custom/MysticEssentials/ChatChannels.ui`).
   Temporary channels are session channels: without Redis they stay open until
   the server is empty or restarts; with Redis enabled they can be restored after
   restart for `temporaryChannelDefaultMinutes` (default `120`) minutes.
-  `modules/chat/glyphs.json` is generated from the bundled glyph catalog.
 - **announcements** — `autoBroadcastEnabled`, `intervalSeconds`, `randomOrder`,
   and `messages`. Message entries may be legacy strings or JSON objects:
   `{"lines":["&7Line one","&fLine two"],"click":{"action":"command","value":"/spawn"}}`.
@@ -530,19 +529,7 @@ Config files are **versioned**: each carries a `configVersion` and is migrated
 Cross-server (multiple servers on one network) broadcasts and private messages
 work when Redis is enabled in `config.json`.
 
-Chat channel cross-server delivery also requires Redis. Custom chat glyph PNGs
-ship in `Common/Resources/MysticEssentials/Chat/Glyphs/`, mirroring Hytale's
-`Assets.zip` layout, and are registered as Hytale CommonAssets. The bundled
-`font_binding.example.json` maps private-use codepoints to those PNGs for the
-final Hytale text/font atlas binding step.
-
-Emoji and Unicode coverage is broader than the custom PNG set:
-`Common/Resources/MysticEssentials/Chat/Unicode/emoji-sequences.json` is
-generated from Unicode's official `emoji-test.txt` sample data, while
-`unicode-symbol-policy.json` documents the all-valid-Unicode chat policy and
-symbol-category ranges. Mystic preserves emoji variation selectors, zero-width
-joiners, and emoji tag sequences so complex emojis do not get broken by chat
-normalization.
+Chat channel cross-server delivery also requires Redis.
 
 ---
 

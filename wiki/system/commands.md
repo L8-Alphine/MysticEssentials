@@ -27,6 +27,20 @@ Optional arguments use `[brackets]`. Required arguments use `<angle brackets>`.
 | `/top` | Teleport to the highest available position above you | `mysticessentials.teleport.top` |
 | `/back` | Return to your previous location | `mysticessentials.teleport.back` |
 
+## Random Teleport
+
+See the [Random Teleport](rtp-module) page for full details.
+
+| Command | Description | Permission |
+| --- | --- | --- |
+| `/rtp` | Teleport to a random safe location (or open the RTP UI) | `mysticessentials.teleport.rtp.use` |
+| `/rtp world <world> [player]` | RTP into a specific world | `mysticessentials.teleport.rtp.use` |
+| `/rtp profile <profile> [player]` | RTP using a named profile | `mysticessentials.teleport.rtp.use` |
+| `/rtp biome <biome>` | RTP into a biome | `mysticessentials.teleport.rtp.biome` |
+| `/rtp <player>` | RTP another online player | `mysticessentials.teleport.rtp.others` |
+| `/rtp cancel` / `status` / `info [profile]` | Cancel, check status, or inspect a profile | `mysticessentials.teleport.rtp.use` |
+| `/rtpadmin`, `/rtpa` | Administer profiles, queue, and search (reload/test/preview/debug/enable/disable/setcenter/clearcache/queue/ui/cancel/spread/queue-login) | `mysticessentials.teleport.rtp.admin` |
+
 ## Spawn and homes
 
 | Command | Description | Permission |
@@ -67,6 +81,7 @@ Optional arguments use `[brackets]`. Required arguments use `<angle brackets>`.
 | `/mail sendall <message>` | Send mail to all known players | `mysticessentials.mail.send.all` |
 | `/mail delete <id>` | Delete a mail item | `mysticessentials.mail.use` |
 | `/mail clear` | Clear your inbox | `mysticessentials.mail.use` |
+| `/mailadmin` | Open the mail admin center (announcements, item/command rewards) | `mysticessentials.mail.announce` |
 
 ## Chat
 
@@ -83,6 +98,10 @@ Optional arguments use `[brackets]`. Required arguments use `<angle brackets>`.
 | `/channel temp <id> [password|-] [prefix|-] [alias1,alias2|-] [permission]` | Create a temporary channel | `mysticessentials.chat.channel.create.temp` |
 | `/channel manage` | Manage your temporary channel | Owner/moderator rules apply |
 | Configured aliases such as `/g`, `/global`, `/sc`, `/schat`, `/staffchat` | Switch channel quickly | Channel permissions may apply |
+| `[item]` (chat tag) | Share your held item in chat as an [item link](itemlinks-module) | `mysticessentials.chat.itemlink.use` |
+| `/itemview <code>` | Open the item viewer for a shared [item link](itemlinks-module) | None by default |
+| `/iteminspect [latest\|<number>\|<code>]` | Inspect the latest, nth, or a specific shared item (alias `/inspectitem`) | None by default |
+| `/itemlinks`, `/recentitems` | Browse items recently shared in chat | None by default |
 
 ## Announcements, AFK, and greetings
 
@@ -126,3 +145,48 @@ Optional arguments use `[brackets]`. Required arguments use `<angle brackets>`.
 | `/nick <name>` | Set your nickname | `mysticessentials.nick.use`; color needs `mysticessentials.nick.color` |
 | `/nick reset` | Remove your nickname | `mysticessentials.nick.use` |
 | `/nick <player> <name>` | Set another player's nickname | `mysticessentials.nick.others` |
+
+## Player Vaults
+
+See the [Player Vaults](playervaults-module) page. The module is disabled by default.
+
+| Command | Description | Permission |
+| --- | --- | --- |
+| `/pv`, `/playervault`, `/vault`, `/vaults` | Open your vault list | `mysticessentials.vaults.command.open` |
+| `/pv <number>` | Open a specific vault | `mysticessentials.vaults.command.open` |
+| `/pv edit <number>` | Edit vault name/color/icon/description | `mysticessentials.vaults.command.edit` |
+| `/pv list` | List your vaults | `mysticessentials.vaults.command.list` |
+| `/pv <number> <player>` | Open another player's vault | `mysticessentials.vaults.admin.open` |
+| `/pv reload` | Reload the vault config | `mysticessentials.vaults.command.reload` |
+
+## Patch Notes
+
+See the [Patch Notes](patchnotes-module) page.
+
+| Command | Description | Permission |
+| --- | --- | --- |
+| `/patchnotes`, `/patches`, `/updates`, `/changelog` | Open the Patch Notes viewer | `mysticessentials.patchnotes.view` |
+| `/patchnotes open [player]` | Open the viewer (optionally for another player) | `mysticessentials.patchnotes.view` (others: `mysticessentials.patchnotes.open.others`) |
+| `/patchnotes list` | List patch notes in chat | `mysticessentials.patchnotes.view` |
+| `/patchnotes markread` | Mark all notes read | `mysticessentials.patchnotes.view` (others: `mysticessentials.patchnotes.markread.others`) |
+| `/patchnotes reload` | Reload patch notes from disk | `mysticessentials.patchnotes.reload` |
+
+## Tutorial
+
+See the [Tutorial module](tutorial-module) page for the full command tree.
+
+| Command | Description | Permission |
+| --- | --- | --- |
+| `/tutorial play [player]` | Start the tutorial | `mysticessentials.tutorial.play` (others: `...play.others`) |
+| `/tutorial stop`, `skip`, `status`, `page`, `list`, `info` | Control and inspect tutorial sessions | Matching `mysticessentials.tutorial.*` nodes |
+| `/tutorial reload`, `reset`, `complete`, `debug`, `scene` | Admin tools | `mysticessentials.tutorial.admin` |
+
+## Custom Commands
+
+See the [Custom Commands module](customcommands-module) page. Operator-defined commands are also registered dynamically.
+
+| Command | Description | Permission |
+| --- | --- | --- |
+| `/customcommands list`, `info`, `test`, `validate` | Inspect and test custom commands | Matching `mysticessentials.customcommands.*` nodes |
+| `/customcommands enable`, `disable` | Toggle a custom command | `mysticessentials.customcommands.manage` |
+| `/customcommands reload` | Reload custom command definitions | `mysticessentials.customcommands.reload` |

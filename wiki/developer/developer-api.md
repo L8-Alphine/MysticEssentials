@@ -82,6 +82,34 @@ api.getTeleportService().teleport(player, request)
 
 Use `teleportNow(player, destination)` only for admin or system moves where checks should be skipped.
 
+## Random Teleport
+
+The Teleportation module exposes `RandomTeleportService` (obtain it from the Teleportation module; it is `null` when the module is disabled). Use it to trigger RTP, search destinations without moving anyone, and register custom safety logic.
+
+```java
+RtpRequest request = RtpRequest.builder(playerUuid)
+        .profileId("default-wilderness")
+        .force(false)
+        .build();
+
+randomTeleportService.teleport(request)
+        .thenAccept(result -> {
+            if (result.isSuccess()) {
+                // Player was moved.
+            }
+        });
+
+// Find a spot without teleporting:
+randomTeleportService.findDestination(RtpDestinationRequest.of("default-wilderness"));
+```
+
+The service never completes exceptionally for an expected outcome (no safe spot, on cooldown, insufficient funds) — inspect `RtpResult.status()` instead. Extend the search with:
+
+- `registerValidator(RtpDestinationValidator)` — reject or accept candidate locations with custom rules.
+- `registerExclusionProvider(RtpExclusionProvider)` — contribute claim/region keep-out areas (e.g. from another mod).
+
+RTP publishes a set of events through the event bus for the full lifecycle: `RtpRequestEvent`, `RtpSearchStartEvent`, `RtpDestinationFoundEvent`, `RtpCandidateRejectedEvent`, `RtpWarmupStartEvent`, `RtpPreTeleportEvent`, `RtpCompleteEvent`, `RtpCancelledEvent`, and `RtpFailedEvent`.
+
 ## Storage
 
 `StorageService` stores JSON documents by namespace and key:

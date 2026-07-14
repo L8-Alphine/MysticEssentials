@@ -4,29 +4,32 @@ import java.util.Comparator;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.UnaryOperator;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.hyzionstudios.mysticessentials.api.service.ChatService;
 import org.hyzionstudios.mysticessentials.core.module.AbstractMysticModule;
+import org.hyzionstudios.mysticessentials.modules.chat.itemlink.ItemLinkSubModule;
+import org.hyzionstudios.mysticessentials.modules.chat.itemlink.ItemSnapshot;
 
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.event.events.player.PlayerChatEvent;
+import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 
 /**
  * Root chat module. Owns the original public chat event pipeline and delegates
- * private messaging, channel routing, and custom glyph replacement to focused
- * submodules.
+ * private messaging and channel routing to focused submodules.
  */
 public final class ChatModule extends AbstractMysticModule implements ChatService {
 
     private static final Pattern PLAIN_URL = Pattern.compile("(?i)(?<!:)\\bhttps?://[^\\s<>]+");
 
     private ChatConfig config;
-    private ChatGlyphSubModule glyphs;
     private PrivateMessagingSubModule privateMessaging;
     private ChannelsSubModule channels;
+    private ItemLinkSubModule itemLinks;
 
     public ChatModule() {
         super("chat", "Chat", "1.0.0");
@@ -36,37 +39,37 @@ public final class ChatModule extends AbstractMysticModule implements ChatServic
     public void onEnable() {
         config = core.configManager().loadModuleConfig(id(), ChatConfig.class, new ChatConfig());
         normalizeConfig();
-        glyphs = new ChatGlyphSubModule(core);
         privateMessaging = new PrivateMessagingSubModule(core, this);
         channels = new ChannelsSubModule(core, this);
 
-        glyphs.reload(config.glyphs);
+        itemLinks = new ItemLinkSubModule(core);
+
         privateMessaging.enable(config.privateMessaging, this::registerCommand);
         channels.enable(config.channels, this::registerCommand);
+        itemLinks.enable(this::registerCommand);
+        registerEvent(PlayerDisconnectEvent.class, event ->
+                itemLinks.invalidate(event.getPlayerRef().getUuid()));
 
         if (config.formatChat) {
             registerAsyncEvent(PlayerChatEvent.class,
                     future -> future.thenApply(this::applyChatPipeline));
         }
         log("Enabled chat submodules: privateMessaging=" + config.privateMessaging.enabled
-                + ", channels=" + config.channels.enabled
-                + ", glyphs=" + config.glyphs.enabled
-                + " (assetsRegistered=" + glyphs.assetsRegistered()
-                + ", emojiSequences=" + glyphs.emojiSequenceCount() + ")");
+                + ", channels=" + config.channels.enabled);
     }
 
     @Override
     public void onReload() {
         config = core.configManager().loadModuleConfig(id(), ChatConfig.class, new ChatConfig());
         normalizeConfig();
-        if (glyphs != null) {
-            glyphs.reload(config.glyphs);
-        }
         if (privateMessaging != null) {
             privateMessaging.reload(config.privateMessaging);
         }
         if (channels != null) {
             channels.reload(config.channels);
+        }
+        if (itemLinks != null) {
+            itemLinks.reload();
         }
     }
 
@@ -99,13 +102,6 @@ public final class ChatModule extends AbstractMysticModule implements ChatServic
         }
         if (config.privateMessaging == null) {
             config.privateMessaging = defaults.privateMessaging;
-        }
-        if (config.glyphs == null) {
-            config.glyphs = defaults.glyphs;
-        } else if (config.glyphs.permissions == null) {
-            config.glyphs.permissions = defaults.glyphs.permissions;
-        } else {
-            defaults.glyphs.permissions.forEach(config.glyphs.permissions::putIfAbsent);
         }
         if (config.channels == null) {
             config.channels = defaults.channels;
@@ -146,19 +142,57 @@ public final class ChatModule extends AbstractMysticModule implements ChatServic
             return event;
         }
         PlayerRef sender = event.getSender();
-        event.setContent(preparePlayerMessage(sender, event.getContent()));
+        String prepared = preparePlayerMessage(sender, event.getContent());
+        // Expand [item] tags into formatted, clickable display names (no inline
+        // icon — that render branch is a verified 0.5.6 dead-end). The captured
+        // snapshot, if any, feeds each recipient's recent-links history below.
+        ItemSnapshot pendingSnapshot = null;
+        if (itemLinks != null) {
+            ItemLinkSubModule.ExpandResult expanded =
+                    itemLinks.expand(sender, prepared, senderChannelName(sender));
+            prepared = expanded.content();
+            pendingSnapshot = expanded.snapshot();
+        }
+        event.setContent(prepared);
         if (channels != null) {
             event = channels.route(event);
         }
         if (!event.isCancelled()) {
             event.setFormatter(this::renderChatLine);
+            if (pendingSnapshot != null && itemLinks != null) {
+                itemLinks.recordHistory(pendingSnapshot, recipients(event, sender));
+            }
         }
         return event;
     }
 
+    /** Recipients of a routed chat event (routed targets, or all online), including the sender. */
+    private java.util.List<PlayerRef> recipients(PlayerChatEvent event, PlayerRef sender) {
+        java.util.List<PlayerRef> targets = event.getTargets();
+        java.util.Map<UUID, PlayerRef> byUuid = new java.util.LinkedHashMap<>();
+        java.util.Collection<PlayerRef> source = targets != null
+                ? targets : core.platform().onlinePlayers();
+        for (PlayerRef target : source) {
+            if (target != null) {
+                byUuid.put(target.getUuid(), target);
+            }
+        }
+        if (sender != null) {
+            byUuid.put(sender.getUuid(), sender);
+        }
+        return new java.util.ArrayList<>(byUuid.values());
+    }
+
+    private String senderChannelName(PlayerRef sender) {
+        if (channels == null) {
+            return "Global";
+        }
+        return channels.displayNameFor(sender.getUuid())
+                .orElse(channels.currentChannel(sender.getUuid()));
+    }
+
     String preparePlayerMessage(PlayerRef sender, String raw) {
-        String result = glyphs == null ? raw : glyphs.apply(sender, raw);
-        result = sanitizeColors(sender, result);
+        String result = sanitizeColors(sender, raw);
         return enforceLength(result);
     }
 
@@ -173,19 +207,24 @@ public final class ChatModule extends AbstractMysticModule implements ChatServic
                 .map(p -> p.getMetadata().get("nickname"))
                 .filter(nick -> nick != null && !nick.isBlank())
                 .orElse(sender.getUsername());
-        template = template
-                .replace("{player_name}", sender.getUsername())
-                .replace("{display_name}", displayName)
-                .replace("{channel}", channels == null
-                        ? "global"
-                        : channels.displayNameFor(uuid).orElse(channels.currentChannel(uuid)));
-        String resolved = core.getMessageService().resolvePlaceholders(uuid, template);
+        String channelName = channels == null
+                ? "global"
+                : channels.displayNameFor(uuid).orElse(channels.currentChannel(uuid));
         String message = content == null ? "" : content;
         if (Boolean.TRUE.equals(config.autoLinkPlainUrls) && allows(sender, config.autoLinkPermission)) {
             message = autoLinkPlainUrls(message);
         }
-        String line = resolved.replace("{message}", message);
-        return core.getMessageService().colorize(line);
+        // The player message is substituted after placeholder resolution so
+        // player content is never parsed for placeholders (design bible §17.3).
+        String finalMessage = message;
+        UnaryOperator<String> literalPipe = literal -> core.getMessageService()
+                .resolvePlaceholders(uuid, literal
+                        .replace("{player_name}", sender.getUsername())
+                        .replace("{display_name}", displayName)
+                        .replace("{channel}", channelName))
+                .replace("{message}", finalMessage);
+
+        return core.getMessageService().colorize(literalPipe.apply(template));
     }
 
     private String sanitizeColors(PlayerRef sender, String content) {
@@ -268,11 +307,6 @@ public final class ChatModule extends AbstractMysticModule implements ChatServic
     @Override
     public boolean setChannel(UUID player, String channelId) {
         return channels != null && channels.setChannel(player, channelId);
-    }
-
-    @Override
-    public String applyGlyphs(UUID player, String raw) {
-        return glyphs == null ? raw : glyphs.apply(player, raw);
     }
 
     @Override

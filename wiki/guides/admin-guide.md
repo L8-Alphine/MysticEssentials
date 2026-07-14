@@ -32,12 +32,16 @@ Default modules:
     "kits": true,
     "flight": true,
     "inventory": true,
-    "nick": true
+    "nick": true,
+    "patchnotes": true,
+    "tutorial": true,
+    "customcommands": true,
+    "playervaults": false
   }
 }
 ```
 
-Some modules depend on others. Warps and spawn features route movement through the teleport service, so keep `teleportation` enabled when you use spawn, homes, warps, player warps, or AFK rewards.
+Some modules depend on others. Warps and spawn features route movement through the teleport service, so keep `teleportation` enabled when you use spawn, homes, warps, player warps, RTP, or AFK rewards. **Player Vaults ships disabled** — set `"playervaults": true` here and `enabled: true` in its own config to turn it on.
 
 ## Staff setup checklist
 
@@ -93,6 +97,29 @@ Player warps are globally named. Two players cannot own a player warp with the s
 Owners can use `/pwarp manage` to rename, describe, price, move, or delete their own warps. Staff with `mysticessentials.playerwarp.admin` can delete any player warp.
 
 Player warps are stored in `data/modules/warps/playerwarps.json`.
+
+## Random Teleport setup
+
+RTP is configured in `modules/teleportation/rtp.json`. A worked-example `default-wilderness` profile is generated on first run.
+
+1. Edit or add profiles under `profiles` — set each profile's `world`, `shape`, `center`, `minimumRadius`/`maximumRadius`, and `cooldownSeconds`.
+2. Use `/rtpadmin test <profile>` to run a search and confirm it finds safe spots, and `/rtpadmin debug <profile>` to see why candidates are rejected.
+3. Use `/rtpadmin setcenter <profile>` to set a profile's centre to your current position, and `/rtpadmin preview <profile>` to review its bounds.
+4. Gate premium worlds/profiles with `mysticessentials.teleport.rtp.world.<world>` and `...rtp.profile.<profile>`.
+5. `/rtpadmin reload` applies config changes; `/rtpadmin clearcache` drops cached destinations after big edits.
+
+See the [Random Teleport](rtp-module) page for the full profile field list.
+
+## Rank icons setup
+
+Rank icons (`modules/chat/rank-icons.json`) map LuckPerms groups to inline chat images. They are disabled by default and require LuckPerms.
+
+1. Set `enabled: true` and add `{rank_icon}` (and optionally `{rank_icon_space}`) to your chat formats.
+2. Drop PNGs into the rank-icon uploads directory, then `/rankicon import <icon> <file> <group>`.
+3. `/rankicon validate` and `/rankicon status` confirm files, hashes, and mappings are healthy.
+4. `/rankicon previewrank <player>` shows what a given player resolves to; `/rankicon debug <player>` prints the full resolution trace.
+
+Newly staged assets may report `pending restart` until `/rankicon rebuild` or a restart registers them. See the [Rank Icons](rankicons-module) page.
 
 ## Mail operations
 

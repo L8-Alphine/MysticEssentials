@@ -26,6 +26,21 @@ public final class PatchNotesConfig {
     /** When notifying on join, only count patches the player has not read yet. */
     public boolean showOnlyUnreadOnJoin = true;
 
+    /**
+     * Automatically open the Patch Notes UI on join when there are qualifying
+     * login patches (see {@link #showOnlyUnreadOnJoin}). When this opens the UI,
+     * the chat notification is suppressed for that join so players are not told
+     * about notes the viewer is already showing them.
+     */
+    public boolean openOnJoin = false;
+    /**
+     * Ticks to wait after a player connects before auto-opening the UI. The
+     * player entity is not ready to receive a Custom UI page the instant
+     * {@code PlayerConnectEvent} fires, so a short delay is required (1 tick =
+     * 50&nbsp;ms). Values &le; 0 are treated as "next tick".
+     */
+    public int openOnJoinDelayTicks = 40;
+
     /** Mark a patch read as soon as the player opens it in the viewer. */
     public boolean markReadOnView = true;
 

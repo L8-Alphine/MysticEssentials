@@ -37,6 +37,41 @@ public final class Permissions {
     public static final String TELEPORT_BYPASS_WARMUP = "mysticessentials.teleport.bypass.warmup";
     public static final String TELEPORT_BYPASS_COOLDOWN = "mysticessentials.teleport.bypass.cooldown";
 
+    // ----- Random Teleport (Teleportation subsystem) --------------------------
+
+    public static final String RTP_USE = "mysticessentials.teleport.rtp.use";
+    public static final String RTP_CANCEL = "mysticessentials.teleport.rtp.cancel";
+    public static final String RTP_STATUS = "mysticessentials.teleport.rtp.status";
+    public static final String RTP_BIOME = "mysticessentials.teleport.rtp.biome";
+    public static final String RTP_OTHERS = "mysticessentials.teleport.rtp.others";
+    public static final String RTP_BYPASS_WARMUP = "mysticessentials.teleport.rtp.bypass.warmup";
+    public static final String RTP_BYPASS_COOLDOWN = "mysticessentials.teleport.rtp.bypass.cooldown";
+    public static final String RTP_BYPASS_COST = "mysticessentials.teleport.rtp.bypass.cost";
+    public static final String RTP_BYPASS_COMBAT = "mysticessentials.teleport.rtp.bypass.combat";
+    public static final String RTP_BYPASS_QUEUE = "mysticessentials.teleport.rtp.bypass.queue";
+    public static final String RTP_BYPASS_LIMITS = "mysticessentials.teleport.rtp.bypass.limits";
+    /** Grants every {@code mysticessentials.teleport.rtp.admin.*} node. */
+    public static final String RTP_ADMIN = "mysticessentials.teleport.rtp.admin";
+    public static final String RTP_ADMIN_RELOAD = "mysticessentials.teleport.rtp.admin.reload";
+    public static final String RTP_ADMIN_EDIT = "mysticessentials.teleport.rtp.admin.edit";
+    public static final String RTP_ADMIN_TEST = "mysticessentials.teleport.rtp.admin.test";
+    public static final String RTP_ADMIN_DEBUG = "mysticessentials.teleport.rtp.admin.debug";
+    public static final String RTP_ADMIN_CANCEL = "mysticessentials.teleport.rtp.admin.cancel";
+    public static final String RTP_ADMIN_FORCE = "mysticessentials.teleport.rtp.admin.force";
+    public static final String RTP_ADMIN_SPREAD = "mysticessentials.teleport.rtp.admin.spread";
+    /** Dynamic: {@code mysticessentials.teleport.rtp.world.<world>}. */
+    public static final String RTP_WORLD_BASE = "mysticessentials.teleport.rtp.world";
+    /** Dynamic: {@code mysticessentials.teleport.rtp.profile.<profile>}. */
+    public static final String RTP_PROFILE_BASE = "mysticessentials.teleport.rtp.profile";
+    /** Dynamic: {@code mysticessentials.teleport.rtp.cooldown.<seconds>}. */
+    public static final String RTP_COOLDOWN_BASE = "mysticessentials.teleport.rtp.cooldown";
+    /** Dynamic: {@code mysticessentials.teleport.rtp.limit.daily.<n>}. */
+    public static final String RTP_LIMIT_DAILY_BASE = "mysticessentials.teleport.rtp.limit.daily";
+    /** Dynamic: {@code mysticessentials.teleport.rtp.limit.hourly.<n>}. */
+    public static final String RTP_LIMIT_HOURLY_BASE = "mysticessentials.teleport.rtp.limit.hourly";
+    /** Dynamic: {@code mysticessentials.teleport.rtp.priority.<n>} — queue/profile priority. */
+    public static final String RTP_PRIORITY_BASE = "mysticessentials.teleport.rtp.priority";
+
     // ----- Spawn & Homes -------------------------------------------------------
 
     public static final String SPAWN_USE = "mysticessentials.spawn.use";
@@ -104,10 +139,6 @@ public final class Permissions {
     public static final String CHAT_COLOR_RAINBOW = "mysticessentials.chat.color.rainbow";
     public static final String CHAT_COLOR_MINIMESSAGE = "mysticessentials.chat.color.minimessage";
     public static final String CHAT_COLOR_LINKS = "mysticessentials.chat.color.links";
-    public static final String CHAT_EMOJI_USE = "mysticessentials.chat.emoji.use";
-    public static final String CHAT_EMOJI_CUSTOM = "mysticessentials.chat.emoji.custom";
-    public static final String CHAT_EMOJI_STAFF = "mysticessentials.chat.emoji.staff";
-    public static final String CHAT_UNICODE_SYMBOLS = "mysticessentials.chat.unicode.symbols";
 
     // ----- Kits ------------------------------------------------------------------
 
@@ -252,5 +283,15 @@ public final class Permissions {
     /** {@code mysticessentials.vaults.rows.<n>} — rows exposed per vault. */
     public static String vaultRows(int n) {
         return VAULTS_ROWS_BASE + "." + n;
+    }
+
+    /** {@code mysticessentials.teleport.rtp.world.<world>} — permission to RTP in a world. */
+    public static String rtpWorld(String world) {
+        return RTP_WORLD_BASE + "." + world.toLowerCase(java.util.Locale.ROOT);
+    }
+
+    /** {@code mysticessentials.teleport.rtp.profile.<profile>} — permission to use a profile. */
+    public static String rtpProfile(String profile) {
+        return RTP_PROFILE_BASE + "." + profile.toLowerCase(java.util.Locale.ROOT);
     }
 }

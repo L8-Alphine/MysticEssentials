@@ -1,0 +1,47 @@
+$C = "../Common.ui";
+
+// The "Recently Shared Items" browser. Built by RecentItemLinksPage: one row per
+// remembered item link (RecentItemLinkRow.ui appended into #RecentList), each row
+// carrying an #Icon (ItemSlot) and an #InspectButton that opens ItemDetails.
+
+$C.@PageOverlay {}
+
+$C.@Container {
+  Anchor: (Width: 760, Height: 620);
+
+  #Title {
+    Group {
+      $C.@Title {
+        @Text = "Recently Shared Items";
+      }
+    }
+  }
+
+  #Content {
+    LayoutMode: Top;
+
+    Label #RecentEmpty {
+      Anchor: (Height: 40);
+      Style: (FontSize: 14, TextColor: #9fb0c4, VerticalAlignment: Center);
+      Text: "No items have been shared recently.";
+      Visible: false;
+    }
+
+    Group #RecentList {
+      FlexWeight: 1;
+      LayoutMode: TopScrolling;
+      Padding: (Right: 10);
+      ScrollbarStyle: $C.@DefaultScrollbarStyle;
+    }
+
+    Group {
+      LayoutMode: Left;
+      Anchor: (Height: 44, Top: 10);
+
+      $C.@TextButton #CloseButton {
+        @Text = "Close";
+        @Anchor = (Width: 180);
+      }
+    }
+  }
+}

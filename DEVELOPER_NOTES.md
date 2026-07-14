@@ -73,13 +73,13 @@ MysticessentialsPlugin (Hytale entry) → MysticCore (non-disableable) implement
 - **Integrations**: LuckPerms (groups/prefix/suffix), PlaceholderAPI (consume +
   expose `%mystic_...%`), VaultUnlocked economy — all guarded/optional.
 - **Chat module**: root chat event pipeline plus focused submodules for private
-  messaging, channel routing, and glyph replacement. Channels track both the
+  messaging and channel routing. Channels track both the
   channel a player speaks in and the channels they listen to, filter
   `PlayerChatEvent` targets from that state plus permissions, support
   configurable aliases/prefixes/passwords, support temporary channels, and
   publish cross-server envelopes over Redis when a channel is `crossServer=true`.
 - **Chat formatting**: rank/permission formats via `PlayerChatEvent` with
-  per-permission colour gating and glyph replacement before formatting.
+  per-permission colour gating before formatting.
 - **Auto-AFK**: idle detection from movement (position polling), clicks
   (`PlayerMouseButtonEvent`), and chat, with a bypass permission and AFK
   announcements. Manual `/afk` too.
@@ -222,35 +222,13 @@ All three are `compileOnly` and guarded (provider lookup in try/catch on start; 
 
 `ChatModule` registers an **async** `PlayerChatEvent` handler
 (`registerAsyncGlobal`, via `HytalePlatform.onAsyncEvent`) that runs the original
-chat pipeline: glyph replacement, colour permission filtering, channel routing,
+chat pipeline: colour permission filtering, channel routing,
 and formatter installation. The formatter resolves the highest-priority
 permission-gated format or channel format from `modules/chat/config.json`,
 expands placeholders on the template only, then splices in the player's message
 (so user text is never placeholder-expanded). Colour styles the sender lacks
 permission for (legacy / hex / gradient / rainbow / MiniMessage / links) are
 stripped from their message first (`ChatColors`).
-
-`ChatGlyphSubModule` generates `modules/chat/glyphs.json` from the bundled
-catalog at `Common/Resources/MysticEssentials/Chat/Glyphs/glyphs.json`,
-registers each PNG as a Hytale CommonAsset, and maps aliases/raw symbols to
-Private Use Area codepoints. That path mirrors the real `Assets.zip`
-`Common/Resources/...` layout. The included `font_binding.example.json` is the
-data handoff for the client text/font atlas binding once Hytale's final glyph
-binding format is verified.
-
-For full coverage requests, Mystic does **not** generate a PNG for every Unicode
-character. Instead, `Common/Resources/MysticEssentials/Chat/Unicode` ships:
-
-- `emoji-sequences.json`, generated from Unicode's official
-  `emoji-test.txt` sample column (Emoji 17.0, 5,225 chart rows / 3,944
-  fully-qualified rows).
-- `unicode-symbol-policy.json`, documenting the all-valid-Unicode scalar policy
-  and symbol-category ranges for permission/audit/future font coverage work.
-
-The sanitizer preserves emoji-critical format controls (`U+200D`, `U+FE0E`,
-`U+FE0F`, and emoji tag codepoints) while still removing unsafe control
-characters. This keeps ZWJ family/profession emojis, variation-selector emojis,
-and tag-sequence flags intact.
 
 ### Custom UI system (verified, template-row based)
 
@@ -284,8 +262,7 @@ warps), `PlayerWarpManager.ui` (manage own player warps), `Homes.ui` +
 GOTCHA: `ResourceCommonAsset.of(clazz, name, path)` resolves the resource from
 its SECOND argument via `Class.getResourceAsStream`, so pass the absolute
 `"/Common/..."` form there; the third argument is only stored as the asset
-path. (This was the cause of the historic "Missing bundled glyph asset"
-warnings.)
+path.
 
 ### Player warp storage
 

@@ -20,7 +20,6 @@ public final class ChatConfig {
     public List<Format> formats = defaultFormats();
     public Map<String, String> messageColorPermissions = defaultColorPermissions();
     public PrivateMessaging privateMessaging = new PrivateMessaging();
-    public Glyphs glyphs = new Glyphs();
     public Channels channels = new Channels();
 
     public static final class Format {
@@ -49,16 +48,6 @@ public final class ChatConfig {
         public String replyPermission = "mysticessentials.chat.private.reply";
         public String socialSpyPermission = "mysticessentials.chat.socialspy";
         public String socialSpyExemptPermission = "mysticessentials.chat.socialspy.exempt";
-    }
-
-    public static final class Glyphs {
-        public boolean enabled = true;
-        public boolean registerCommonAssets = true;
-        public boolean emitPrivateUseCodepoints = true;
-        public boolean allowRawUnicodeSymbols = true;
-        public boolean stripUnsafeInvisibleCharacters = true;
-        public String fallbackWhenMissing = "text";
-        public Map<String, String> permissions = defaultGlyphPermissions();
     }
 
     public static final class Channels {
@@ -120,15 +109,6 @@ public final class ChatConfig {
         map.put("rainbow", "mysticessentials.chat.color.rainbow");
         map.put("minimessage", "mysticessentials.chat.color.minimessage");
         map.put("links", "mysticessentials.chat.color.links");
-        return map;
-    }
-
-    private static Map<String, String> defaultGlyphPermissions() {
-        Map<String, String> map = new LinkedHashMap<>();
-        map.put("emoji", "mysticessentials.chat.emoji.use");
-        map.put("custom", "mysticessentials.chat.emoji.custom");
-        map.put("unicode", "mysticessentials.chat.unicode.symbols");
-        map.put("staff", "mysticessentials.chat.emoji.staff");
         return map;
     }
 

@@ -305,6 +305,100 @@ public final class HytalePlatform {
                 blockX + 0.5d, topY + 1.0d, blockZ + 0.5d, yaw, pitch)));
     }
 
+    // ----- Random-teleport ground sampling -----------------------------------
+
+    /**
+     * Loads (or generates) the chunk containing {@code (blockX, blockZ)} in
+     * {@code worldName} and evaluates the column for a safe standing position:
+     * the surface must be solid ground, not void, within {@code [minY, maxY]},
+     * with {@code requiredHeadroom} air blocks above it, and (unless
+     * {@code allowLiquids}) no fluid at the feet or surface.
+     *
+     * <p>This is the low-level block-safety probe behind the Random Teleport
+     * destination search. All chunk/block API access stays here in the platform
+     * layer; higher-level rules (distance from spawn, region/claim exclusion,
+     * biome filters) live in the RTP service on top of this result.</p>
+     *
+     * <p>Runs the block reads on the target world's thread via the verified
+     * {@code World.getChunkAsync} + world-executor continuation, mirroring
+     * {@link #topLocation}. The result completes with a centred
+     * {@link MysticLocation} (feet at {@code surface + 1}, looking straight
+     * ahead) or empty when the column is unsafe or the chunk cannot load.</p>
+     */
+    public CompletableFuture<Optional<MysticLocation>> sampleGround(String worldName, int blockX, int blockZ,
+            int requiredHeadroom, boolean allowLiquids, int minY, int maxY) {
+        CompletableFuture<Optional<MysticLocation>> outcome = new CompletableFuture<>();
+        World world = world(worldName).orElse(null);
+        if (world == null) {
+            outcome.complete(Optional.empty());
+            return outcome;
+        }
+        try {
+            long chunkIndex = ChunkUtil.indexChunkFromBlock(blockX, blockZ);
+            world.getChunkAsync(chunkIndex)
+                    .thenAcceptAsync(chunk -> completeGroundSample(outcome, world, chunk, blockX, blockZ,
+                            requiredHeadroom, allowLiquids, minY, maxY), world)
+                    .exceptionally(error -> {
+                        outcome.complete(Optional.empty());
+                        return null;
+                    });
+        } catch (Throwable t) {
+            outcome.complete(Optional.empty());
+        }
+        return outcome;
+    }
+
+    /** Block id returned by {@link WorldChunk#getBlock} for empty space (air). */
+    private static final int AIR_BLOCK_ID = 0;
+
+    private void completeGroundSample(CompletableFuture<Optional<MysticLocation>> outcome, World world,
+            WorldChunk chunk, int blockX, int blockZ, int requiredHeadroom, boolean allowLiquids,
+            int minY, int maxY) {
+        try {
+            if (chunk == null) {
+                outcome.complete(Optional.empty());
+                return;
+            }
+            int localX = ChunkUtil.localCoordinate(blockX);
+            int localZ = ChunkUtil.localCoordinate(blockZ);
+            int surfaceY = chunk.getHeight(localX, localZ);
+            if (surfaceY < ChunkUtil.MIN_Y) {
+                // No terrain in this column (void).
+                outcome.complete(Optional.empty());
+                return;
+            }
+            int feetY = surfaceY + 1;
+            if (feetY < minY || feetY > maxY) {
+                outcome.complete(Optional.empty());
+                return;
+            }
+            // The surface block must be solid ground to stand on.
+            if (chunk.getBlock(localX, surfaceY, localZ) == AIR_BLOCK_ID) {
+                outcome.complete(Optional.empty());
+                return;
+            }
+            // Require clear air for the player's body.
+            int headroom = Math.max(1, requiredHeadroom);
+            for (int dy = 0; dy < headroom; dy++) {
+                if (chunk.getBlock(localX, feetY + dy, localZ) != AIR_BLOCK_ID) {
+                    outcome.complete(Optional.empty());
+                    return;
+                }
+            }
+            // Reject standing in or on fluids (deep water, lava) unless allowed.
+            if (!allowLiquids
+                    && (chunk.getFluidId(localX, surfaceY, localZ) != 0
+                            || chunk.getFluidId(localX, feetY, localZ) != 0)) {
+                outcome.complete(Optional.empty());
+                return;
+            }
+            outcome.complete(Optional.of(new MysticLocation(world.getName(),
+                    blockX + 0.5d, feetY, blockZ + 0.5d, 0.0f, 0.0f)));
+        } catch (Throwable t) {
+            outcome.complete(Optional.empty());
+        }
+    }
+
     /**
      * Opens a custom UI page for the player, on their world thread. Resolves the
      * {@link Player} entity from the store and drives
@@ -371,6 +465,34 @@ public final class HytalePlatform {
                     + " (offline or invalid entity ref).");
         }
         return dispatched;
+    }
+
+    /**
+     * Grants the player temporary damage immunity for {@code seconds}, then
+     * removes it. Backed by the verified {@code Invulnerable} marker component
+     * (the same one behind the builtin {@code /entity invulnerable}). Used for
+     * Random Teleport arrival protection — a single invulnerability window covers
+     * both the "invulnerability" and "prevent fall damage" arrival settings.
+     *
+     * <p>The grant runs on the entity thread; removal is scheduled off-thread and
+     * re-dispatched onto the entity thread. If the player logs out before removal
+     * the component is dropped with their entity, so no cleanup leak occurs.</p>
+     */
+    public void applyArrivalProtection(PlayerRef player, int seconds) {
+        if (seconds <= 0) {
+            return;
+        }
+        boolean dispatched = runOnEntityThread(player, (store, entity, world) ->
+                store.ensureComponent(entity,
+                        com.hypixel.hytale.server.core.modules.entity.component.Invulnerable.getComponentType()));
+        if (!dispatched) {
+            return;
+        }
+        UUID uuid = player.getUuid();
+        core.scheduler().runLater(() -> findPlayer(uuid).ifPresent(live ->
+                runOnEntityThread(live, (store, entity, world) -> store.tryRemoveComponent(entity,
+                        com.hypixel.hytale.server.core.modules.entity.component.Invulnerable.getComponentType()))),
+                seconds, java.util.concurrent.TimeUnit.SECONDS);
     }
 
     /**

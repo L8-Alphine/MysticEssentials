@@ -21,9 +21,6 @@ public interface ChatService {
     /** Moves the player into a channel. @return {@code true} on success. */
     boolean setChannel(UUID player, String channelId);
 
-    /** Applies configured emoji, custom glyph, and unicode-symbol replacements. */
-    String applyGlyphs(UUID player, String raw);
-
     /** Creates an in-memory temporary channel owned by a player. */
     boolean createTemporaryChannel(UUID owner, String channelId, String permissionGate);
 }

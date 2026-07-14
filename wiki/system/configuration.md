@@ -53,6 +53,48 @@ modules/teleportation/config.json
 
 Players with `mysticessentials.teleport.bypass.warmup` skip warmups. Players with `mysticessentials.teleport.bypass.cooldown` skip cooldowns.
 
+### Random Teleport
+
+RTP has its own file:
+
+```text
+modules/teleportation/rtp.json
+```
+
+Top-level structure:
+
+| Path | Default | Description |
+| --- | --- | --- |
+| `enabled` | `true` | Master switch for the RTP subsystem |
+| `randomTeleport.defaultSelectionMode` | `DEFAULT_WORLD` | How a bare `/rtp` picks a destination (`DEFAULT_WORLD`, `CURRENT_WORLD`, `PER_WORLD_PROFILE`, `PERMISSION_PROFILE`) |
+| `randomTeleport.defaultWorld` | `"default"` | Default destination world |
+| `randomTeleport.defaultProfile` | `"default-wilderness"` | Default profile id |
+| `randomTeleport.openUiOnRtp` | `false` | Open the selection UI instead of teleporting on bare `/rtp` |
+| `randomTeleport.worldProfiles` | `{}` | World → profile map for the per-world modes |
+| `randomTeleport.enabledWorlds` / `disabledWorlds` | `[]` | World allow/deny lists (disabled wins) |
+| `searchEngine.*` | see below | Background safe-search worker budgets and cache |
+| `warmup.*` | see below | Warmup cancellation rules |
+| `profiles` | one example | Named destination profiles |
+
+Search engine and warmup blocks:
+
+| Setting | Default | Description |
+| --- | --- | --- |
+| `searchEngine.maximumConcurrentSearches` | `4` | Global in-flight search cap |
+| `searchEngine.maximumConcurrentSearchesPerWorld` | `2` | Per-world in-flight cap |
+| `searchEngine.maximumQueueSize` | `200` | Pending queue cap |
+| `searchEngine.candidateChecksPerTick` | `8` | Candidates checked per tick |
+| `searchEngine.tickIntervalMillis` | `100` | Milliseconds between ticks |
+| `searchEngine.cache.enabled` | `true` | Pre-warm/reuse destinations |
+| `searchEngine.cache.targetLocationsPerProfile` | `20` | Cache depth per profile |
+| `searchEngine.cache.expirationMinutes` | `30` | Cache entry lifetime |
+| `searchEngine.cache.revalidateBeforeTeleport` | `true` | Re-check a cached spot before use |
+| `warmup.cancelOnMovement` | `true` | Cancel warmup on movement |
+| `warmup.movementTolerance` | `0.25` | Blocks a player may drift before movement counts |
+| `warmup.cancelOnDamage` / `cancelOnCombat` / `cancelOnWorldChange` / `cancelOnLogout` | `true` | Other cancellation triggers |
+
+Each profile in `profiles` controls its own region (`shape`, `center`, `minimumRadius`, `maximumRadius`, `minimumY`/`maximumY`, …), `warmupSeconds`, `cooldownSeconds`, `cost`, `safety`, `arrivalProtection`, and `filters`. See the [Random Teleport](rtp-module) page for the complete field list and shape/selection reference.
+
 ## Spawn and homes
 
 File:
@@ -128,17 +170,6 @@ Private messaging settings:
 | `privateMessaging.offlineToMail` | `true` | Can fall back to mail for offline players |
 | `privateMessaging.socialSpyEnabled` | `true` | Enables social spy |
 
-Glyph settings:
-
-| Setting | Default | Description |
-| --- | --- | --- |
-| `glyphs.enabled` | `true` | Enables glyph processing |
-| `glyphs.registerCommonAssets` | `true` | Registers bundled PNG glyphs as Hytale common assets |
-| `glyphs.emitPrivateUseCodepoints` | `true` | Emits private-use codepoints for custom glyphs |
-| `glyphs.allowRawUnicodeSymbols` | `true` | Allows raw Unicode symbols |
-| `glyphs.stripUnsafeInvisibleCharacters` | `true` | Removes unsafe control characters while preserving emoji controls |
-| `glyphs.fallbackWhenMissing` | `"text"` | How missing glyphs degrade |
-
 Channel settings:
 
 | Setting | Default | Description |
@@ -156,6 +187,31 @@ Default channels:
 | --- | --- | --- | --- |
 | `global` | `server` | `g`, `global` | Default public channel |
 | `staff` | `permission` | `sc`, `schat`, `staffchat` | Cross-server capable staff channel |
+
+### Item links
+
+Item links use a separate file:
+
+```text
+modules/chat/item-links.json
+```
+
+| Setting | Default | Description |
+| --- | --- | --- |
+| `enabled` | `true` | Master toggle for the `[item]` tag |
+| `tag` | `"[item]"` | The tag players type to share their held item |
+| `usePermission` | `mysticessentials.chat.itemlink.use` | Permission to use the tag (blank = everyone) |
+| `maxTagsPerMessage` | `3` | Max tags expanded per message |
+| `linkChatNameToInspect` | `true` | Wrap the chat name in a click-to-open link |
+| `showViewCommandInChat` | `true` | Append the visible, typeable `(/itemview <code>)` hint |
+| `viewCommand` | `"itemview"` | Command shown/used to open the viewer (also an alias) |
+| `underlineChatName` / `showQuantityInChat` | `true` | Chat name styling |
+| `snapshot.retentionSeconds` | `600` | How long a shared item stays inspectable |
+| `snapshot.maximumSnapshots` | `500` | Cap on live snapshots in memory |
+| `history.maximumEntries` | `25` | Recent shared-item entries kept per player |
+| `rarityRules` | keyword rules | Item-id → rarity (name + color) rules |
+
+See the [Item Links](itemlinks-module) page for the full workflow, commands, and rarity rules.
 
 ## Announcements
 
@@ -235,9 +291,9 @@ modules/greetings/config.json
 | `motd` | Mystic Essentials welcome lines | MOTD lines |
 | `firstJoinEnabled` | `true` | Enables first-join message |
 | `firstJoinMessage` | Welcome message | First-join broadcast |
-| `joinEnabled` | `true` | Enables join message |
+| `joinEnabled` | `false` | Enables join message (off by default to avoid duplicates) |
 | `joinMessage` | `&8[&a+&8] &7{player_name}` | Join broadcast |
-| `leaveEnabled` | `true` | Enables leave message |
+| `leaveEnabled` | `false` | Enables leave message (off by default to avoid duplicates) |
 | `leaveMessage` | `&8[&c-&8] &7{player_name}` | Leave broadcast |
 
 ## Kits
@@ -310,3 +366,61 @@ modules/nick/config.json
 | `blockedNames` | `admin`, `owner`, `server`, `console` | Names players cannot take |
 | `nickMarker` | `~` | Staff-visible marker prefix |
 | `nickFormat` | `{marker}{nickname}` | Stored/displayed nickname format |
+
+## Patch Notes
+
+File:
+
+```text
+modules/patchnotes/config.json
+```
+
+| Setting | Default | Description |
+| --- | --- | --- |
+| `openCommand` | `"patchnotes"` | Primary command label |
+| `aliases` | `patches`, `updates`, `changelog` | Command aliases |
+| `showOnJoin` | `true` | Chat notice about unread notes on join |
+| `showOnlyUnreadOnJoin` | `true` | Only count unread notes for the notice |
+| `openOnJoin` | `false` | Auto-open the viewer on join (suppresses the chat notice) |
+| `openOnJoinDelayTicks` | `40` | Ticks to wait before auto-opening (1 tick = 50 ms) |
+| `markReadOnView` | `true` | Mark a note read when opened |
+| `defaultFilter` | `"all"` | Default category filter |
+| `defaultSort` | `"newest"` | `newest` or `oldest` (pinned first) |
+| `maxPatchNotesShown` | `50` | Cap on listed notes; `0` = unlimited |
+| `categories` | Additions/Fixes/Changes/Removals | Filter categories, in display order |
+| `generateExamples` | `true` | Generate example patches on first startup |
+
+## Player Vaults
+
+File:
+
+```text
+modules/playervaults/config.json
+```
+
+The module is disabled by default: set `enabled: true` here **and** `"playervaults": true` in the main config's `modules` map.
+
+| Setting | Default | Description |
+| --- | --- | --- |
+| `enabled` | `false` | Master switch |
+| `defaultVaults` | `1` | Vaults with no `vaults.vault.<n>` permission |
+| `defaultRows` | `3` | Rows with no `vaults.rows.<n>` permission |
+| `maxVaults` | `100` | Hard ceiling on vault numbers |
+| `maxRows` | `6` | Hard ceiling on rows per vault (platform-safe cap) |
+| `slotsPerRow` | `9` | Slots per row |
+| `showLockedVaults` | `true` | Show inaccessible vaults as locked cards |
+| `preventStorageOfBlacklistedItems` | `true` | Enforce `blockedItemIds` |
+| `blockedItemIds` / `blockedIconItemIds` | `[]` | Item / icon blacklists |
+| `defaultIconItemId` | `Furniture_Crude_Chest_Small` | Default card icon |
+| `maxNameLength` / `maxDescriptionLength` | `32` / `96` | Metadata length caps |
+
+Grouped blocks control more behavior:
+
+| Block | Controls |
+| --- | --- |
+| `crossServer` | Redis locks, cache, and pub/sub (`enabled`, `requireRedis`, `lockTtlSeconds`, `lockRenewSeconds`, `cacheTtlSeconds`, `pubSubChannel`) |
+| `saving` | `saveOnClose`, `saveIntervalSeconds`, `writeThrough`, `saveBackups`, `maxBackupsPerVault`, `conflictSnapshots` |
+| `ui` | Custom list/editor UI and stats toggles |
+| `admin` | Admin logging, owner notification, `defaultAdminMode`, `maxLogEntriesPerPlayer` |
+
+See the [Player Vaults](playervaults-module) page for the full breakdown.
