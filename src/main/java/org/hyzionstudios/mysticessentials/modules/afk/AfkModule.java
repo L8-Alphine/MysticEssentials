@@ -796,27 +796,27 @@ public final class AfkModule extends AbstractMysticModule implements AfkService 
                 state.rollsToday = 0;
             }
             if (r.maxRollsPerDay > 0 && state.rollsToday >= r.maxRollsPerDay) {
-                ZoneSession session = zoneSessions.get(uuid);
-                if (session != null) {
-                    showZoneHud(player, session, now);
-                }
                 continue;
             }
             AfkConfig.Zone zone = zoneFor(player, safeCapture(player)).orElse(null);
             if (r.requireInZone && zone == null) {
                 continue;
             }
+            // The zone HUD is owned solely by the tick() task, which refreshes it
+            // every second for in-zone players. This task must not show/remove it:
+            // running on a separate scheduler thread, its HUD dispatch can overtake
+            // tick()'s removeHud when a player leaves a zone, re-adding a HUD that
+            // then never updates or clears (it freezes on-screen). Here we only
+            // advance the reward clock; tick() reflects the new countdown next poll.
             ZoneSession session = zoneSessions.get(uuid);
             if (session != null) {
                 if (session.nextRewardAtMillis <= 0) {
                     session.nextRewardAtMillis = now + rewardIntervalMillis;
                 }
                 if (now < session.nextRewardAtMillis) {
-                    showZoneHud(player, session, now);
                     continue;
                 }
                 session.nextRewardAtMillis = now + rewardIntervalMillis;
-                showZoneHud(player, session, now);
             } else {
                 // Earning outside a zone: no ZoneSession clock, so pace rolls on
                 // the RewardState timer instead of granting on every 1s poll.
