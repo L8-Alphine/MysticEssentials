@@ -135,6 +135,19 @@ TPA / TPA HERE buttons and offline favorites stay listed.
 | `/pwarp manage` | Open your Player Warp Manager (rename / describe / price / move / delete) | `mysticessentials.playerwarp.use` |
 | `/pwarp delete <name>` | Delete your player warp (admins: any) | `mysticessentials.playerwarp.use` (+ `.admin`) |
 
+### Portals
+Any block asset that references the `MysticPortal` interaction becomes a portal:
+walking in teleports the player to another world (spawn or exact position + facing),
+refers them to another server, or runs a command sequence. Portals are configured
+in-game — press Use (F) on the portal block — and can require a per-portal
+permission and show a world-map marker.
+
+| Command | Description | Permission |
+|---|---|---|
+| `/portal list` | List every portal (type, target, location) | `mysticessentials.portal.admin` |
+| `/portal edit` | Open the config page for the nearest portal (8 blocks) | `mysticessentials.portal.admin` |
+| `/portal remove <id>` | Delete a portal by id | `mysticessentials.portal.admin` |
+
 ### Mail
 | Command | Description | Permission |
 |---|---|---|
@@ -426,6 +439,14 @@ logs/
 Redis for cross-server), integrations (LuckPerms / PlaceholderAPI / VaultUnlocked),
 and which modules are enabled. New modules added in updates are merged into your
 existing config automatically.
+
+The core update notifier checks the published MysticEssentials CurseForge file
+metadata through CFWidget's keyless JSON API at startup and every
+`updateNotifier.checkIntervalHours` (12 by default). When a newer version is
+published, operators and players granted
+`mysticessentials.update.notify` receive a clickable CurseForge link on join.
+Set `updateNotifier.enabled` or `updateNotifier.notifyOnJoin` to `false` to turn
+off checking or join messages.
 
 Notable per-module settings:
 - **teleportation** — `requestExpirySeconds` (pending /tpa lifetime),
