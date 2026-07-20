@@ -20,6 +20,7 @@ Developers should start with [Developer API](developer-api). Mystic Essentials e
 | Random Teleport | `/rtp` and `/rtpadmin`, named profiles, shape-based safe search with caching, warmups, cooldowns, costs, per-world/profile permissions, admin editor UI |
 | Spawn and homes | Global spawn, per-world spawn, first-join and join teleport options, `/home`, `/homes`, `/sethome`, `/delhome`, `/renamehome`, permission-based home limits |
 | Warps | Server warps, in-game warp browser, admin warp editor, visibility rules, paid warps, player warps, player warp manager UI |
+| Portals | Block-anchored portals via the `MysticPortal` interaction: world teleports, cross-server transfers, command sequences, per-portal permissions, map markers, in-game config UI |
 | Mail | Online and offline mail, inbox UI, read/delete/clear, server-wide mail, unread join notices |
 | Chat | Rank formats, PlaceholderAPI and LuckPerms placeholders, private messages, reply, social spy, channel browser, staff channels, temporary channels, `[item]` held-item links |
 | Announcements | Manual `/broadcast` and `/alert`, auto-broadcast rotation, multi-line and clickable announcements |
