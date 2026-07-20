@@ -37,6 +37,7 @@ import org.hyzionstudios.mysticessentials.core.scheduler.SchedulerService;
 import org.hyzionstudios.mysticessentials.core.storage.RedisBridge;
 import org.hyzionstudios.mysticessentials.core.storage.StorageServiceImpl;
 import org.hyzionstudios.mysticessentials.core.teleport.TeleportServiceImpl;
+import org.hyzionstudios.mysticessentials.core.update.UpdateNotifier;
 import org.hyzionstudios.mysticessentials.modules.ModuleBootstrap;
 import org.hyzionstudios.mysticessentials.platform.HytalePlatform;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommand;
@@ -69,6 +70,7 @@ public final class MysticCore implements MysticEssentialsAPI {
     private PlaceholderServiceImpl placeholderService;
     private EconomyServiceImpl economyService;
     private TeleportServiceImpl teleportService;
+    private UpdateNotifier updateNotifier;
     private ModuleManagerImpl moduleManager;
 
     public MysticCore(MysticessentialsPlugin plugin) {
@@ -122,6 +124,8 @@ public final class MysticCore implements MysticEssentialsAPI {
         messageService.load();
         playerProfileService = new PlayerProfileServiceImpl(this);
         teleportService = new TeleportServiceImpl(this);
+        updateNotifier = new UpdateNotifier(this);
+        updateNotifier.start();
 
         // Core commands + player lifecycle listeners (always available).
         registerCoreCommands();
@@ -139,6 +143,9 @@ public final class MysticCore implements MysticEssentialsAPI {
     public void disable() {
         log(Level.INFO, "Shutting down Mystic Essentials...");
         MysticEssentialsProvider.unregister();
+        if (updateNotifier != null) {
+            updateNotifier.stop();
+        }
         if (moduleManager != null) {
             moduleManager.disableAll();
         }
@@ -175,6 +182,7 @@ public final class MysticCore implements MysticEssentialsAPI {
                 (com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent event) -> {
                     var ref = event.getPlayerRef();
                     playerProfileService.load(ref.getUuid(), ref.getUsername());
+                    updateNotifier.notifyOnJoin(ref);
                 });
         platform.onEvent(com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent.class,
                 (com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent event) -> {
@@ -212,6 +220,7 @@ public final class MysticCore implements MysticEssentialsAPI {
         protected void run(MysticCommandSender sender) {
             configManager.load();
             messageService.load();
+            updateNotifier.reload();
             // Honour module enable/disable changes in config, not just reload the
             // already-running ones — this is the hot load/unload path.
             moduleManager.syncFromConfig();
