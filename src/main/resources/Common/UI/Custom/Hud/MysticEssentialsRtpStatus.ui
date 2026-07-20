@@ -1,0 +1,19 @@
+// Mystic Essentials random-teleport status indicator.
+//
+// Sits just above the shared teleport/AFK status position so concurrent HUDs
+// remain readable instead of drawing over one another.
+Group #RtpStatusHudRoot {
+  Anchor: (Bottom: 280, Left: 0, Right: 0, Height: 40);
+  LayoutMode: CenterMiddle;
+
+  Group #RtpStatusPanel {
+    Background: #000000(0.35);
+    Padding: (Horizontal: 18, Vertical: 6);
+    LayoutMode: CenterMiddle;
+
+    Label #Status {
+      Style: (FontSize: 18, TextColor: #55ffff, RenderBold: true, Alignment: Center, VerticalAlignment: Center);
+      Text: "Searching for a safe location...";
+    }
+  }
+}
