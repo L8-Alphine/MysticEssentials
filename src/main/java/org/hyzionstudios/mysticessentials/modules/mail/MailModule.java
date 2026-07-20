@@ -115,10 +115,26 @@ public final class MailModule extends AbstractMysticModule implements MailServic
             enforceInboxCap(inbox);
             inbox.add(mail);
             CompletableFuture<Void> saved = saveInbox(recipient, inbox);
-            String senderName = mail.getSenderName();
-            core.platform().findPlayer(recipient).ifPresent(ref ->
-                    core.getMessageService().sendKey(ref, "mail-notify-new",
-                            Map.of("sender", senderName == null || senderName.isBlank() ? "Server" : senderName)));
+            String senderName = mail.getSenderName() == null || mail.getSenderName().isBlank()
+                    ? "Server" : mail.getSenderName();
+            var online = core.platform().findPlayer(recipient);
+            online.ifPresent(ref -> {
+                // This future completes on the storage thread; sendMessage only renders
+                // reliably from the player's world thread, so hop before notifying.
+                Runnable notify = () -> core.getMessageService().sendKey(ref, "mail-notify-new",
+                        Map.of("sender", senderName));
+                if (!core.platform().runOnEntityThread(ref, (store, entity, world) -> notify.run())) {
+                    notify.run(); // Best effort when the world lookup fails.
+                }
+            });
+            String body = mail.getBody() == null ? "" : mail.getBody();
+            core.getEventBus().publish(new org.hyzionstudios.mysticessentials.api.event.MailReceivedEvent(
+                    recipient,
+                    senderName,
+                    body.length() > 140 ? body.substring(0, 140) + "…" : body,
+                    mail.hasRewards(),
+                    online.isPresent()
+            ));
             return saved;
         });
     }
