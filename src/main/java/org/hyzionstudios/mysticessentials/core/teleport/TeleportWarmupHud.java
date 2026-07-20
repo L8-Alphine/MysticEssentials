@@ -9,7 +9,7 @@ final class TeleportWarmupHud extends CustomUIHud {
     static final String KEY = "mysticessentials:teleport_warmup";
 
     private static final String UI_FILE = "Hud/MysticEssentialsTeleportWarmup.ui";
-    private static final int Z_ORDER = 1;
+    private static final int Z_ORDER = 2;
 
     private final String text;
 
