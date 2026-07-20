@@ -12,6 +12,7 @@ All nodes are prefixed `mysticessentials.`.
 |---|---|
 | `mysticessentials.reload` | `/mystic reload` |
 | `mysticessentials.migrate` | `/mystic migrate scan`, `/mystic migrate import` |
+| `mysticessentials.update.notify` | Receive the clickable outdated-mod notice on join (operators normally inherit this node) |
 
 ## Teleportation
 
@@ -46,6 +47,16 @@ All nodes are prefixed `mysticessentials.`.
 | `mysticessentials.playerwarp.create` | `/pwarp create <name>` |
 | `mysticessentials.playerwarp.admin` | Delete/manage any player warp |
 | `mysticessentials.playerwarp.limit.<n>` | Dynamic player-warp limit (`.unlimited` supported) |
+
+## Portals
+
+| Node | Grants |
+|---|---|
+| `mysticessentials.portal.admin` | `/portal` commands + the Use (F) config page on portal blocks |
+
+Portals may additionally require a per-portal permission node configured in the portal's
+config page (any node, e.g. `mysticessentials.portal.vip`); players without it cannot use
+that portal. Leave the field empty to allow everyone.
 
 ## Mail
 
