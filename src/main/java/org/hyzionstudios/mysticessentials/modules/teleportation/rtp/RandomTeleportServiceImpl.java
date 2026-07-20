@@ -12,6 +12,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.hyzionstudios.mysticessentials.api.Permissions;
 import org.hyzionstudios.mysticessentials.api.model.MysticLocation;
@@ -60,8 +61,12 @@ public final class RandomTeleportServiceImpl implements RandomTeleportService {
 
     /** Poll cadence for the warmup movement/damage watch. */
     private static final long WARMUP_CHECK_MS = 250L;
+    /** How long completion/cancellation feedback remains visible. */
+    private static final long TERMINAL_HUD_MS = 2_500L;
 
     private final Map<UUID, Session> sessions = new ConcurrentHashMap<>();
+    private final Map<UUID, Long> hudOwners = new ConcurrentHashMap<>();
+    private final AtomicLong nextHudToken = new AtomicLong();
 
     public RandomTeleportServiceImpl(MysticCore core, RandomTeleportConfig config, RtpSearchEngine engine,
             RtpAudit audit) {
@@ -168,7 +173,8 @@ public final class RandomTeleportServiceImpl implements RandomTeleportService {
             return complete(out, RtpResult.failure(RtpStatus.NOT_ENOUGH_MONEY, profile.id, "insufficient funds"));
         }
 
-        Session session = new Session(profile, request, out, charge, System.nanoTime());
+        Session session = new Session(profile, request, out, charge, System.nanoTime(),
+                nextHudToken.incrementAndGet());
         sessions.put(uuid, session);
 
         int warmup = (adminForce || player.hasPermission(Permissions.RTP_BYPASS_WARMUP))
@@ -233,6 +239,7 @@ public final class RandomTeleportServiceImpl implements RandomTeleportService {
             if (!session.request.isSilent()) {
                 core.getMessageService().sendKey(p, "rtp-cancelled");
             }
+            showTerminalHud(p, session, "rtp-hud-cancelled", Map.of());
         });
         core.getEventBus().publish(new RtpCancelledEvent(playerId, session.profile.id, reason));
         session.out.complete(RtpResult.cancelled(session.profile.id, reason));
@@ -257,6 +264,8 @@ public final class RandomTeleportServiceImpl implements RandomTeleportService {
         MysticLocation start = safeCapture(player);
         long endAt = System.currentTimeMillis() + warmupSeconds * 1000L;
         double toleranceSq = cfg.warmup.movementTolerance * cfg.warmup.movementTolerance;
+        showHud(player, session, "rtp-hud-warmup",
+                Map.of("seconds", Integer.toString(warmupSeconds)));
 
         java.util.concurrent.atomic.AtomicReference<java.time.Instant> damageBaseline =
                 new java.util.concurrent.atomic.AtomicReference<>();
@@ -285,6 +294,8 @@ public final class RandomTeleportServiceImpl implements RandomTeleportService {
                 beginSearch(ref, session);
                 return;
             }
+            showHud(ref, session, "rtp-hud-warmup",
+                    Map.of("seconds", Integer.toString(remainingSeconds(endAt))));
             if (cfg.warmup.cancelOnMovement && start != null) {
                 MysticLocation now = safeCapture(ref);
                 if (now != null && moved(start, now, toleranceSq, cfg.warmup.cancelOnWorldChange)) {
@@ -325,6 +336,7 @@ public final class RandomTeleportServiceImpl implements RandomTeleportService {
         if (!session.request.isSilent()) {
             core.getMessageService().sendKey(player, "rtp-searching");
         }
+        showHud(player, session, "rtp-hud-searching", Map.of());
         int priority = RtpLimits.priority(player);
         engine.submit(session.profile, uuid, priority)
                 .whenComplete((result, error) -> onSearchDone(uuid, session, result, error));
@@ -394,6 +406,7 @@ public final class RandomTeleportServiceImpl implements RandomTeleportService {
         }
         PlayerRef player = playerOpt.get();
         session.phase = Session.Phase.TELEPORT;
+        showHud(player, session, "rtp-hud-teleporting", Map.of());
         recordBackLocation(uuid, player);
 
         core.platform().teleportEntity(player, destination).whenComplete((moveResult, moveError) -> {
@@ -437,6 +450,8 @@ public final class RandomTeleportServiceImpl implements RandomTeleportService {
 
         core.getEventBus().publish(new RtpCompleteEvent(uuid, p.id, destination, session.attempts, durationMs));
         core.platform().findPlayer(uuid).ifPresent(player -> {
+            showTerminalHud(player, session, "rtp-hud-success",
+                    Map.of("profile", p.displayNameOrId()));
             if (!session.request.isSilent()) {
                 core.getMessageService().sendKey(player, "rtp-success", Map.of(
                         "profile", p.displayNameOrId(),
@@ -458,9 +473,11 @@ public final class RandomTeleportServiceImpl implements RandomTeleportService {
         sessions.remove(uuid, session);
         RtpResult result = RtpResult.failure(status, session.profile.id, detail);
         core.getEventBus().publish(new RtpFailedEvent(uuid, session.profile.id, status, detail));
-        core.platform().findPlayer(uuid).ifPresent(player ->
-                audit.record(uuid, player.getUsername(), session.request.getActorId(),
-                        actorName(session.request), result, 0, session.request.isForce()));
+        core.platform().findPlayer(uuid).ifPresent(player -> {
+            showTerminalHud(player, session, "rtp-hud-failed", Map.of());
+            audit.record(uuid, player.getUsername(), session.request.getActorId(),
+                    actorName(session.request), result, 0, session.request.isForce());
+        });
         session.out.complete(result);
     }
 
@@ -637,6 +654,38 @@ public final class RandomTeleportServiceImpl implements RandomTeleportService {
         core.getMessageService().sendKey(player, key, params);
     }
 
+    private void showHud(PlayerRef player, Session session, String key, Map<String, String> params) {
+        if (session.request.isSilent()) {
+            return;
+        }
+        String text = core.getMessageService().plainFromKey(key, params);
+        if (text.equals(session.lastHudText)) {
+            return;
+        }
+        session.lastHudText = text;
+        hudOwners.put(player.getUuid(), session.hudToken);
+        core.platform().showHud(player, new RtpStatusHud(player, text));
+    }
+
+    private void showTerminalHud(PlayerRef player, Session session, String key, Map<String, String> params) {
+        if (session.request.isSilent()) {
+            return;
+        }
+        showHud(player, session, key, params);
+        UUID uuid = player.getUuid();
+        core.scheduler().runLater(() -> {
+            if (!hudOwners.remove(uuid, session.hudToken)) {
+                return;
+            }
+            core.platform().findPlayer(uuid).ifPresent(live ->
+                    core.platform().removeHud(live, RtpStatusHud.KEY));
+        }, TERMINAL_HUD_MS, TimeUnit.MILLISECONDS);
+    }
+
+    private static int remainingSeconds(long endAt) {
+        return Math.max(1, (int) Math.ceil((endAt - System.currentTimeMillis()) / 1000.0D));
+    }
+
     private String actorName(RtpRequest request) {
         if (request.getActorId() == null) {
             return null;
@@ -666,20 +715,23 @@ public final class RandomTeleportServiceImpl implements RandomTeleportService {
         final CompletableFuture<RtpResult> out;
         final double charge;
         final long startNanos;
+        final long hudToken;
         final AtomicBoolean cancelled = new AtomicBoolean(false);
         volatile Phase phase = Phase.WARMUP;
         volatile RtpCancelReason cancelReason;
         volatile ScheduledFuture<?> warmupTask;
         volatile double reserved;
         volatile int attempts;
+        volatile String lastHudText;
 
         Session(RtpProfile profile, RtpRequest request, CompletableFuture<RtpResult> out, double charge,
-                long startNanos) {
+                long startNanos, long hudToken) {
             this.profile = profile;
             this.request = request;
             this.out = out;
             this.charge = charge;
             this.startNanos = startNanos;
+            this.hudToken = hudToken;
         }
     }
 }
