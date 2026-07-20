@@ -19,6 +19,9 @@ public final class DefaultMessages {
         o.addProperty("core-info-version", "&d&lMystic Essentials &7v{version}");
         o.addProperty("core-info-status", "&7Storage: &f{storage} &7| Modules loaded: &f{modules}");
         o.addProperty("core-info-help", "&7Use &f/mystic reload &7to reload configuration.");
+        o.addProperty("update-notifier-available",
+                "&d&lMystic Essentials update available! &7Running &fv{current}&7, latest &av{latest}&7.\n"
+                        + "&e<link:{url}>Click here to open the new update on CurseForge.</link>");
         o.addProperty("on-cooldown", "&cPlease wait {seconds}s before doing that again.");
         o.addProperty("not-enough-money", "&cYou cannot afford that ({cost}).");
         o.addProperty("teleport-warmup", "&7Teleporting in {seconds}s. Do not move.");
@@ -71,6 +74,12 @@ public final class DefaultMessages {
         o.addProperty("rtp-not-enough-money", "&cYou cannot afford that random teleport ({cost}).");
         o.addProperty("rtp-warmup", "&7Searching for a destination in {seconds}s. Do not move.");
         o.addProperty("rtp-searching", "&7Searching for a safe destination...");
+        o.addProperty("rtp-hud-warmup", "Random teleport in {seconds}s - do not move");
+        o.addProperty("rtp-hud-searching", "Searching for a safe location...");
+        o.addProperty("rtp-hud-teleporting", "Safe location found - teleporting...");
+        o.addProperty("rtp-hud-success", "Teleported to {profile}");
+        o.addProperty("rtp-hud-cancelled", "Random teleport cancelled");
+        o.addProperty("rtp-hud-failed", "Random teleport failed");
         o.addProperty("rtp-success", "&aTeleported to &f{profile} &7at &f{x}, {y}, {z}&a.");
         o.addProperty("rtp-cancelled", "&cRandom teleport cancelled.");
         o.addProperty("rtp-cancel-ok", "&7Random teleport cancelled.");
@@ -125,6 +134,17 @@ public final class DefaultMessages {
         o.addProperty("warp-save-failed", "&cCould not save that warp.");
         o.addProperty("warp-deleted", "&aWarp &f{warp} &adeleted.");
         o.addProperty("warp-delete-failed", "&cCould not delete &f{warp}");
+        o.addProperty("portal-help", "&7Portals: &f/portal list&7, &f/portal edit &7(nearest), &f/portal remove <id>&7. Press F on a portal block to configure it.");
+        o.addProperty("portal-none", "&7No portals are configured yet. Walk into or press F on a portal block to create one.");
+        o.addProperty("portal-none-near", "&cNo portal found within 8 blocks.");
+        o.addProperty("portal-list-header", "&7Portals (&f{count}&7):");
+        o.addProperty("portal-list-entry", "&8- &f{entry}");
+        o.addProperty("portal-unknown", "&cUnknown portal: &f{portal}");
+        o.addProperty("portal-saved", "&aPortal &f{portal} &asaved.");
+        o.addProperty("portal-removed", "&aPortal &f{portal} &aremoved.");
+        o.addProperty("portal-no-permission", "&cYou may not use this portal.");
+        o.addProperty("portal-world-loading", "&7The world &f{world} &7is loading - step in again in a moment.");
+        o.addProperty("portal-world-unknown", "&cThis portal points to an unknown world (&f{world}&c).");
         o.addProperty("pwarp-unknown", "&cUnknown player warp: &f{warp}");
         o.addProperty("pwarp-temp-world", "&cYou cannot create a player warp in a temporary world.");
         o.addProperty("pwarp-created", "&aPlayer warp &f{warp} &acreated.");
