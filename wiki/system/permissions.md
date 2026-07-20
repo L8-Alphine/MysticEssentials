@@ -65,6 +65,15 @@ All permission nodes are prefixed with `mysticessentials.`. Dynamic nodes such a
 | `mysticessentials.playerwarp.limit.<n>` | Numeric player-warp limit; highest granted value wins |
 | `mysticessentials.playerwarp.limit.unlimited` | Unlimited player warps |
 
+## Portals
+
+| Node | Grants |
+| --- | --- |
+| `mysticessentials.portal.admin` | `/portal` commands + the Use (F) portal config page |
+
+Each portal can additionally require its own permission node (free-form, set in the portal
+config page); players without it cannot use that portal.
+
 ## Mail
 
 | Node | Grants |
