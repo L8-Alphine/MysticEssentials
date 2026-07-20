@@ -70,6 +70,16 @@ See the [Random Teleport](rtp-module) page for full details.
 | `/pwarp manage` | Open your Player Warp Manager | `mysticessentials.playerwarp.use` |
 | `/pwarp delete <name>` | Delete your player warp; admins may delete any | `mysticessentials.playerwarp.use`, plus `mysticessentials.playerwarp.admin` for other owners |
 
+## Portals
+
+| Command | Description | Permission |
+| --- | --- | --- |
+| `/portal list` | List every portal with type, target, and location | `mysticessentials.portal.admin` |
+| `/portal edit` | Open the config page for the nearest portal (8 blocks) | `mysticessentials.portal.admin` |
+| `/portal remove <id>` | Delete a portal by id | `mysticessentials.portal.admin` |
+
+Alias: `/portals`. Portals are configured in-game by pressing Use (F) on a portal block.
+
 ## Mail
 
 | Command | Description | Permission |
