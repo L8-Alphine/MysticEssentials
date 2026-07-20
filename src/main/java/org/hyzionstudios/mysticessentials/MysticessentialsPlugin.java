@@ -30,6 +30,17 @@ public class MysticessentialsPlugin extends JavaPlugin {
     }
 
     @Override
+    protected void setup() {
+        // Codec registrations must happen in setup(), before the asset system
+        // parses block definitions that reference them. The interaction stays
+        // inert until the portals module enables and installs itself.
+        getCodecRegistry(com.hypixel.hytale.server.core.modules.interaction.interaction.config.Interaction.CODEC)
+                .register(org.hyzionstudios.mysticessentials.modules.portals.PortalInteraction.TYPE_ID,
+                        org.hyzionstudios.mysticessentials.modules.portals.PortalInteraction.class,
+                        org.hyzionstudios.mysticessentials.modules.portals.PortalInteraction.CODEC);
+    }
+
+    @Override
     protected void start() {
         getLogger().at(Level.INFO).log("MysticEssentials starting...");
         try {
