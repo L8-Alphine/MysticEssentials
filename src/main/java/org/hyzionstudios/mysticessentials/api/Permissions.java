@@ -25,6 +25,8 @@ public final class Permissions {
 
     public static final String RELOAD = "mysticessentials.reload";
     public static final String MIGRATE = "mysticessentials.migrate";
+    /** Receive a clickable update notice on join when this build is outdated. */
+    public static final String UPDATE_NOTIFY = "mysticessentials.update.notify";
 
     // ----- Teleportation -------------------------------------------------------
 
@@ -90,6 +92,11 @@ public final class Permissions {
     public static final String PLAYERWARP_ADMIN = "mysticessentials.playerwarp.admin";
     /** Dynamic: {@code mysticessentials.playerwarp.limit.<n>} / {@code .unlimited}. */
     public static final String PLAYERWARP_LIMIT_BASE = "mysticessentials.playerwarp.limit";
+
+    // ----- Portals -------------------------------------------------------------
+
+    /** Manage portals: {@code /portal} commands and the Use (F) config page on portal blocks. */
+    public static final String PORTAL_ADMIN = "mysticessentials.portal.admin";
 
     // ----- Mail ----------------------------------------------------------------
 
