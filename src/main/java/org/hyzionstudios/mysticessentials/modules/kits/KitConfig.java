@@ -21,6 +21,16 @@ public final class KitConfig {
 
     public Map<String, Kit> kits = defaultKits();
 
+    /**
+     * Defaults merged into an existing config. Kit entries are intentionally
+     * omitted because the map is administrator-managed after first generation.
+     */
+    static KitConfig existingFileDefaults() {
+        KitConfig defaults = new KitConfig();
+        defaults.kits.clear();
+        return defaults;
+    }
+
     public static final class Kit {
         /** Optional pretty name shown in menus; blank falls back to the title-cased kit id. */
         public String displayName;

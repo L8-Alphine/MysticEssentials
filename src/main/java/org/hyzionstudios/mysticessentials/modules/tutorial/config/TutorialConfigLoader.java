@@ -5,6 +5,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Locale;
@@ -24,6 +25,8 @@ import com.google.gson.JsonElement;
  * overwritten.
  */
 public final class TutorialConfigLoader {
+
+    private static final String DEFAULTS_MARKER = ".defaults-generated";
 
     private final MysticCore core;
     private final String moduleId;
@@ -136,8 +139,13 @@ public final class TutorialConfigLoader {
 
     // ----- Default file generation --------------------------------------------
 
-    /** Writes every missing default file; never touches files that already exist. */
+    /**
+     * Seeds the example files once. After that, deleting or renaming an example
+     * is treated as an owner edit and it is not recreated on reload/restart.
+     */
     public void generateDefaults() {
+        Path moduleDir = core.paths().moduleConfigDir(moduleId);
+        Path marker = moduleDir.resolve(DEFAULTS_MARKER);
         try {
             Files.createDirectories(tutorialsDir());
             Files.createDirectories(pagesDir());
@@ -146,13 +154,49 @@ public final class TutorialConfigLoader {
             core.log(Level.SEVERE, "[" + moduleId + "] Failed to create tutorial folders: " + e.getMessage());
             return;
         }
+
+        if (Files.exists(marker)) {
+            return;
+        }
+
+        // Older installations predate the marker. Any generated/owner-managed
+        // artifact proves that initialization already happened, so adopt it
+        // without restoring samples the owner may have intentionally removed.
+        Path readme = moduleDir.resolve("README.md");
+        if (hasJsonFiles(tutorialsDir()) || hasJsonFiles(pagesDir())
+                || Files.exists(localizationFile()) || Files.exists(readme)) {
+            writeDefaultsMarker(marker);
+            return;
+        }
+
         writeIfAbsent(tutorialsDir().resolve("first_join.json"), Json.toString(defaultFirstJoinTutorial()));
         writeIfAbsent(tutorialsDir().resolve("getting_started.json"), Json.toString(defaultGettingStartedTutorial()));
         writeIfAbsent(pagesDir().resolve("getting_started.json"), Json.toString(defaultGettingStartedPage()));
         writeIfAbsent(pagesDir().resolve("rules.json"), Json.toString(defaultRulesPage()));
         writeIfAbsent(pagesDir().resolve("tutorial_error.json"), Json.toString(defaultErrorPage()));
         writeIfAbsent(localizationFile(), Json.toString(defaultLocalization()));
-        writeIfAbsent(core.paths().moduleConfigDir(moduleId).resolve("README.md"), defaultReadme());
+        writeIfAbsent(readme, defaultReadme());
+        writeDefaultsMarker(marker);
+    }
+
+    private boolean hasJsonFiles(Path dir) {
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir, "*.json")) {
+            return stream.iterator().hasNext();
+        } catch (IOException e) {
+            core.log(Level.WARNING, "[" + moduleId + "] Could not inspect " + dir + ": " + e.getMessage());
+            // Preserve owner files when their state cannot be determined.
+            return true;
+        }
+    }
+
+    private void writeDefaultsMarker(Path marker) {
+        try {
+            Files.writeString(marker, "Defaults initialized; owner-managed files are not regenerated.\n",
+                    StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+        } catch (IOException e) {
+            core.log(Level.WARNING, "[" + moduleId + "] Could not record default initialization: "
+                    + e.getMessage());
+        }
     }
 
     private void writeIfAbsent(Path file, String content) {

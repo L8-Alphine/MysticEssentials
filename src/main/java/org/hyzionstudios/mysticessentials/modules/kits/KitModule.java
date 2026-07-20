@@ -47,7 +47,7 @@ public final class KitModule extends AbstractMysticModule {
 
     @Override
     public void onEnable() {
-        config = core.configManager().loadModuleConfig(id(), KitConfig.class, new KitConfig());
+        loadConfig();
         registerCommand(new KitCommand());
         registerEvent(
                 com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent.class,
@@ -57,7 +57,12 @@ public final class KitModule extends AbstractMysticModule {
 
     @Override
     public void onReload() {
-        config = core.configManager().loadModuleConfig(id(), KitConfig.class, new KitConfig());
+        loadConfig();
+    }
+
+    private void loadConfig() {
+        config = core.configManager().loadModuleConfig(
+                id(), KitConfig.class, new KitConfig(), KitConfig.existingFileDefaults());
     }
 
     @Override
