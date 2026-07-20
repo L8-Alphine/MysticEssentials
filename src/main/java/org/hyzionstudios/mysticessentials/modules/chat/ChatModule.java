@@ -162,8 +162,33 @@ public final class ChatModule extends AbstractMysticModule implements ChatServic
             if (pendingSnapshot != null && itemLinks != null) {
                 itemLinks.recordHistory(pendingSnapshot, recipients(event, sender));
             }
+            publishChatMessageEvent(sender, event.getContent());
         }
         return event;
+    }
+
+    /** Origin-server-only publish hook for external bridges (see ChatMessagePublishedEvent). */
+    private void publishChatMessageEvent(PlayerRef sender, String content) {
+        ChatConfig.Channel channel = channels == null
+                ? null
+                : channels.activeChannelFor(sender).orElse(null);
+        UUID uuid = sender.getUuid();
+        String primaryGroup = orEmpty(core.getPermissionService().primaryGroup(uuid));
+        String rankPrefix = orEmpty(core.getPermissionService().prefix(uuid));
+        core.getEventBus().publish(new org.hyzionstudios.mysticessentials.api.event.ChatMessagePublishedEvent(
+                uuid,
+                sender.getUsername(),
+                displayNameOf(sender),
+                channel != null ? channel.id : "global",
+                channel != null ? channels.displayNameOf(channel) : "global",
+                content,
+                channel != null && channel.crossServer,
+                primaryGroup,
+                rankPrefix));
+    }
+
+    private static String orEmpty(String value) {
+        return value == null ? "" : value;
     }
 
     /** Recipients of a routed chat event (routed targets, or all online), including the sender. */
@@ -203,10 +228,7 @@ public final class ChatModule extends AbstractMysticModule implements ChatServic
                 : channels.formatFor(uuid).orElse(resolveFormat(uuid));
         // {display_name} honours a nickname set by the Nick module (profile
         // metadata), falling back to the real username.
-        String displayName = core.getPlayerProfileService().getCached(uuid)
-                .map(p -> p.getMetadata().get("nickname"))
-                .filter(nick -> nick != null && !nick.isBlank())
-                .orElse(sender.getUsername());
+        String displayName = displayNameOf(sender);
         String channelName = channels == null
                 ? "global"
                 : channels.displayNameFor(uuid).orElse(channels.currentChannel(uuid));
@@ -225,6 +247,13 @@ public final class ChatModule extends AbstractMysticModule implements ChatServic
                 .replace("{message}", finalMessage);
 
         return core.getMessageService().colorize(literalPipe.apply(template));
+    }
+
+    private String displayNameOf(PlayerRef sender) {
+        return core.getPlayerProfileService().getCached(sender.getUuid())
+                .map(p -> p.getMetadata().get("nickname"))
+                .filter(nick -> nick != null && !nick.isBlank())
+                .orElse(sender.getUsername());
     }
 
     private String sanitizeColors(PlayerRef sender, String content) {
@@ -312,5 +341,20 @@ public final class ChatModule extends AbstractMysticModule implements ChatServic
     @Override
     public boolean createTemporaryChannel(UUID owner, String channelId, String permissionGate) {
         return channels != null && channels.createTemporaryChannel(owner, channelId, permissionGate);
+    }
+
+    @Override
+    public boolean broadcastToChannel(String channelId, String senderName, String content) {
+        return channels != null && channels.broadcastExternal(channelId, senderName, content, null);
+    }
+
+    @Override
+    public boolean broadcastToChannel(String channelId, String senderName, String content, String format) {
+        return channels != null && channels.broadcastExternal(channelId, senderName, content, format);
+    }
+
+    @Override
+    public java.util.Set<String> temporaryChannelIds() {
+        return channels == null ? java.util.Set.of() : channels.temporaryChannelIds();
     }
 }

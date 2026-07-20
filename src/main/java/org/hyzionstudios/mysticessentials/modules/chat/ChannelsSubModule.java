@@ -154,6 +154,61 @@ public final class ChannelsSubModule {
         return speakChannels.getOrDefault(player, normalize(config.defaultSpeak));
     }
 
+    /** The channel a local chat message from this sender routes to, if any. */
+    public Optional<ChatConfig.Channel> activeChannelFor(PlayerRef sender) {
+        return channelForSender(sender);
+    }
+
+    /** Public counterpart of {@link #displayName(ChatConfig.Channel)} for the publish hook. */
+    public String displayNameOf(ChatConfig.Channel channel) {
+        return displayName(channel);
+    }
+
+    /** The ids of temporary channels currently active on this server. */
+    public Set<String> temporaryChannelIds() {
+        pruneExpired();
+        return Set.copyOf(temporaryChannels.keySet());
+    }
+
+    // ----- Temporary-channel lifecycle events (external bridges) -------------
+
+    private void publishTempCreated(String channelId, UUID owner) {
+        core.getEventBus().publish(
+                new org.hyzionstudios.mysticessentials.api.event.TemporaryChannelCreatedEvent(channelId, owner));
+    }
+
+    /** No-op for configured channels: only temporary channels report membership. */
+    private void publishTempMembership(String channelId, UUID player, boolean joined) {
+        if (!temporaryChannels.containsKey(channelId)) {
+            return;
+        }
+        core.getEventBus().publish(
+                new org.hyzionstudios.mysticessentials.api.event.TemporaryChannelMembershipChangedEvent(
+                        channelId, player, joined));
+    }
+
+    private void publishTempClosed(String channelId) {
+        core.getEventBus().publish(
+                new org.hyzionstudios.mysticessentials.api.event.TemporaryChannelClosedEvent(channelId));
+    }
+
+    /**
+     * Delivers an externally sourced (bridge/system) message to THIS server's listeners
+     * only. Deliberately no cross-server relay: bridge callers (MysticIdentity) already
+     * fan the message out to every server, so a relay here would double-deliver.
+     * Never fires ChatMessagePublishedEvent — see ChatService.broadcastToChannel.
+     *
+     * @param format render line overriding the channel format, or null for the channel's own
+     */
+    public boolean broadcastExternal(String channelId, String senderName, String content, String format) {
+        ChatConfig.Channel channel = findChannel(channelId).orElse(null);
+        if (channel == null || !channel.enabled) {
+            return false;
+        }
+        deliverInbound(channel, null, senderName, "", content, format);
+        return true;
+    }
+
     public boolean setChannel(UUID player, String channelId) {
         String id = resolveChannelId(channelId);
         if (findChannel(id).isEmpty()) {
@@ -330,6 +385,7 @@ public final class ChannelsSubModule {
             }
         }
         rebuildAliasIndex();
+        publishTempClosed(id);
         return true;
     }
 
@@ -363,6 +419,7 @@ public final class ChannelsSubModule {
         temporaryChannels.put(id, temp);
         speakChannels.put(owner, id);
         listeningChannels(owner).add(id);
+        publishTempCreated(id, owner);
         Map<String, String> aliasesNext = new HashMap<>(aliasToChannel);
         indexAliases(aliasesNext, channel);
         aliasToChannel = aliasesNext;
@@ -460,13 +517,17 @@ public final class ChannelsSubModule {
     }
 
     private void publishRemote(ChatConfig.Channel channel, PlayerRef sender, String content) {
+        publishEnvelope(channel, sender.getUuid().toString(), sender.getUsername(), content);
+    }
+
+    private void publishEnvelope(ChatConfig.Channel channel, String senderUuid, String senderName, String content) {
         JsonObject envelope = new JsonObject();
         envelope.addProperty("messageId", UUID.randomUUID().toString());
         envelope.addProperty("networkId", core.redis().networkId());
         envelope.addProperty("originServerId", core.redis().serverId());
         envelope.addProperty("channelId", channel.id);
-        envelope.addProperty("senderUuid", sender.getUuid().toString());
-        envelope.addProperty("senderName", sender.getUsername());
+        envelope.addProperty("senderUuid", senderUuid);
+        envelope.addProperty("senderName", senderName);
         envelope.addProperty("content", content);
         envelope.addProperty("timestamp", Instant.now().toString());
         core.redis().publish(REDIS_PREFIX + redisTopic(channel), Json.toString(envelope));
@@ -489,12 +550,21 @@ public final class ChannelsSubModule {
         String senderName = envelope.has("senderName") ? envelope.get("senderName").getAsString() : "Remote";
         String senderUuid = envelope.has("senderUuid") ? envelope.get("senderUuid").getAsString() : "";
         String content = envelope.has("content") ? envelope.get("content").getAsString() : "";
-        UUID placeholderContext = parseUuid(senderUuid);
-        String line = formatForGroup(placeholderContext, channel)
+        String originServerId = envelope.has("originServerId") ? envelope.get("originServerId").getAsString() : "";
+        deliverInbound(channel, parseUuid(senderUuid), senderName, originServerId, content, null);
+    }
+
+    /** Formats and delivers an inbound (remote or externally injected) message to local listeners. */
+    private void deliverInbound(ChatConfig.Channel channel, UUID placeholderContext, String senderName,
+            String originServerId, String content, String formatOverride) {
+        String template = formatOverride != null && !formatOverride.isBlank()
+                ? formatOverride
+                : formatForGroup(placeholderContext, channel);
+        String line = template
                 .replace("{player_name}", senderName)
                 .replace("{display_name}", senderName)
                 .replace("{channel}", displayName(channel))
-                .replace("{server_id}", envelope.has("originServerId") ? envelope.get("originServerId").getAsString() : "")
+                .replace("{server_id}", originServerId == null ? "" : originServerId)
                 .replace("{message}", content);
         for (PlayerRef recipient : core.platform().onlinePlayers()) {
             if (isListening(recipient, channel)) {
@@ -597,6 +667,7 @@ public final class ChannelsSubModule {
             return JoinResult.PASSWORD_REQUIRED;
         }
         listening.add(id);
+        publishTempMembership(id, player.getUuid(), true);
         return JoinResult.JOINED;
     }
 
@@ -617,6 +688,7 @@ public final class ChannelsSubModule {
             speakChannels.put(player.getUuid(), fallback);
         }
         listening.remove(id);
+        publishTempMembership(id, player.getUuid(), false);
         return LeaveResult.LEFT;
     }
 
@@ -637,21 +709,28 @@ public final class ChannelsSubModule {
 
     private void pruneExpired() {
         Instant now = Instant.now();
-        boolean changed = false;
+        List<String> expired = new ArrayList<>();
         for (Map.Entry<String, TemporaryChannel> entry : temporaryChannels.entrySet()) {
             if (entry.getValue().expiresAt.isBefore(now)) {
                 temporaryChannels.remove(entry.getKey());
-                changed = true;
+                expired.add(entry.getKey());
             }
         }
-        if (changed) {
+        if (!expired.isEmpty()) {
             rebuildAliasIndex();
             saveRedisTemporaryIndex();
+            expired.forEach(this::publishTempClosed);
         }
     }
 
     private void handleDisconnect(PlayerRef player) {
         UUID leaving = player.getUuid();
+        Set<String> wasListening = listeningChannels.get(leaving);
+        if (wasListening != null) {
+            for (String id : List.copyOf(wasListening)) {
+                publishTempMembership(id, leaving, false);
+            }
+        }
         speakChannels.remove(leaving);
         listeningChannels.remove(leaving);
         if (temporaryChannels.isEmpty()) {
@@ -676,12 +755,14 @@ public final class ChannelsSubModule {
             }
             core.redis().cacheDelete(keys.toArray(String[]::new));
         }
+        List<String> cleared = List.copyOf(temporaryChannels.keySet());
         temporaryChannels.clear();
         for (Set<String> listening : listeningChannels.values()) {
             listening.removeIf(id -> !configuredChannels.containsKey(id));
         }
         speakChannels.entrySet().removeIf(entry -> !configuredChannels.containsKey(entry.getValue()));
         rebuildAliasIndex();
+        cleared.forEach(this::publishTempClosed);
     }
 
     private void rebuildAliasIndex() {
@@ -726,6 +807,8 @@ public final class ChannelsSubModule {
                 if (commandRegistrar != null) {
                     registerAliasCommands(temp.channel.aliases, commandRegistrar);
                 }
+                // Restored channels re-announce so external bridges reconcile after restart.
+                publishTempCreated(normalize(temp.channel.id), temp.owner);
             }
         } catch (Throwable t) {
             core.log(Level.WARNING, "Failed to load Redis temporary chat channels: " + t.getMessage());
