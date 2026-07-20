@@ -149,6 +149,13 @@ public final class ConfigManager {
         if (config.integrations == null) {
             config.integrations = new MainConfig.Integrations();
         }
+        if (config.updateNotifier == null) {
+            config.updateNotifier = new MainConfig.UpdateNotifier();
+        }
+        if (config.updateNotifier.checkIntervalHours < 1) {
+            core.log(Level.WARNING, "updateNotifier.checkIntervalHours must be at least 1; using 1 hour.");
+            config.updateNotifier.checkIntervalHours = 1;
+        }
         if (config.modules == null) {
             core.log(Level.WARNING, "config.json has no 'modules' section; enabling defaults.");
             config.modules = new MainConfig().modules;
@@ -164,16 +171,26 @@ public final class ConfigManager {
      * cannot take down the server.
      */
     public <T> T loadModuleConfig(String moduleId, Class<T> type, T defaults) {
+        return loadModuleConfig(moduleId, type, defaults, defaults);
+    }
+
+    /**
+     * Loads a module config with separate defaults for first-time generation and
+     * for merging an existing file. This is useful for user-managed collections:
+     * example entries can be written on first run without being restored after an
+     * administrator removes them from an existing config.
+     */
+    public <T> T loadModuleConfig(String moduleId, Class<T> type, T initialDefaults, T mergeDefaults) {
         Path file = core.paths().moduleConfigFile(moduleId);
         try {
             JsonElement raw = Json.readFile(file);
             if (raw == null) {
-                Json.writeFile(file, defaults);
+                Json.writeFile(file, initialDefaults);
                 core.log(Level.INFO, "Generated default config for module '" + moduleId + "'");
-                return defaults;
+                return initialDefaults;
             }
             JsonObject tree = Json.asObject(raw);
-            boolean changed = migrateTree(moduleId, tree, Json.asObject(Json.toTree(defaults)));
+            boolean changed = migrateTree(moduleId, tree, Json.asObject(Json.toTree(mergeDefaults)));
             T loaded = Json.gson().fromJson(tree, type);
             if (changed) {
                 Json.writeFile(file, loaded);
@@ -182,11 +199,11 @@ public final class ConfigManager {
             return loaded;
         } catch (IOException e) {
             core.log(Level.SEVERE, "Failed to load config for module '" + moduleId + "': " + e.getMessage());
-            return defaults;
+            return initialDefaults;
         } catch (RuntimeException e) {
             core.log(Level.SEVERE, "Invalid config for module '" + moduleId + "' (" + e.getMessage()
                     + "); using defaults. The file was NOT overwritten.");
-            return defaults;
+            return initialDefaults;
         }
     }
 

@@ -13,6 +13,7 @@ public final class MainConfig {
     public int configVersion = 1;
     public Storage storage = new Storage();
     public Integrations integrations = new Integrations();
+    public UpdateNotifier updateNotifier = new UpdateNotifier();
     public Map<String, Boolean> modules = defaultModules();
 
     private static Map<String, Boolean> defaultModules() {
@@ -30,6 +31,7 @@ public final class MainConfig {
         map.put("inventory", true);
         map.put("nick", true);
         map.put("patchnotes", true);
+        map.put("portals", true);
         // Tutorial ships disabled: enable here AND in modules/tutorial/config.json.
         map.put("tutorial", false);
         // Custom Commands ships disabled: enable here AND in modules/customcommands/config.json.
@@ -74,5 +76,12 @@ public final class MainConfig {
         public boolean vaultUnlocked = true;
         public boolean mysticVanish = true;
         public boolean mysticModeration = true;
+    }
+
+    /** Core update checks and permission-gated join notifications. */
+    public static final class UpdateNotifier {
+        public boolean enabled = true;
+        public boolean notifyOnJoin = true;
+        public int checkIntervalHours = 12;
     }
 }

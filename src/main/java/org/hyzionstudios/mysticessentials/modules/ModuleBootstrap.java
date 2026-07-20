@@ -13,6 +13,7 @@ import org.hyzionstudios.mysticessentials.modules.mail.MailModule;
 import org.hyzionstudios.mysticessentials.modules.nick.NickModule;
 import org.hyzionstudios.mysticessentials.modules.patchnotes.PatchNotesModule;
 import org.hyzionstudios.mysticessentials.modules.playervaults.PlayerVaultModule;
+import org.hyzionstudios.mysticessentials.modules.portals.PortalsModule;
 import org.hyzionstudios.mysticessentials.modules.spawn.SpawnModule;
 import org.hyzionstudios.mysticessentials.modules.teleportation.TeleportationModule;
 import org.hyzionstudios.mysticessentials.modules.tutorial.TutorialModule;
@@ -46,5 +47,6 @@ public final class ModuleBootstrap {
         manager.register(new TutorialModule());
         manager.register(new CustomCommandsModule());
         manager.register(new PlayerVaultModule());
+        manager.register(new PortalsModule());
     }
 }
