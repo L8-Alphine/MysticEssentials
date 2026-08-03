@@ -1,0 +1,15 @@
+$C = "../Common.ui";
+
+// One "who may mention you" option. Appended per available scope:
+//   cmd.append("#ScopeList", "MysticEssentials/MentionScopeRow.ui")
+// then #ScopeLabel is set and the row root is bound.
+//
+// One row per registered scope, so a mod that adds "Guild Members Only" gets a
+// row without this file changing. The selected option is marked in its label
+// text rather than by styling, because per-element style is markup-only in 0.5.6
+// and cannot be changed at runtime.
+
+$C.@SecondaryTextButton #ScopeButton {
+  @Text = " ";
+  @Anchor = (Height: 30, Bottom: 4);
+}

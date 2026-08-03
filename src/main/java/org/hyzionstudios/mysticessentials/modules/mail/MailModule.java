@@ -15,10 +15,16 @@ import java.util.logging.Level;
 import org.hyzionstudios.mysticessentials.api.Permissions;
 import org.hyzionstudios.mysticessentials.api.model.MailAttachment;
 import org.hyzionstudios.mysticessentials.api.model.MailMessage;
+import org.hyzionstudios.mysticessentials.api.notification.Notification;
+import org.hyzionstudios.mysticessentials.api.notification.NotificationAction;
+import org.hyzionstudios.mysticessentials.api.notification.NotificationAudience;
+import org.hyzionstudios.mysticessentials.api.notification.NotificationCategory;
+import org.hyzionstudios.mysticessentials.api.notification.NotificationPriority;
 import org.hyzionstudios.mysticessentials.api.service.MailService;
 import org.hyzionstudios.mysticessentials.api.service.StorageService;
 import org.hyzionstudios.mysticessentials.core.module.AbstractMysticModule;
 import org.hyzionstudios.mysticessentials.core.util.Json;
+import org.hyzionstudios.mysticessentials.platform.command.MysticArgTypes;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommand;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommandSender;
 
@@ -79,11 +85,13 @@ public final class MailModule extends AbstractMysticModule implements MailServic
         inbox(player.getUuid()).thenAccept(inbox -> {
             int unread = (int) inbox.stream().filter(m -> !m.isRead()).count();
             if (unread > 0) {
-                core.getMessageService().sendKey(player, "mail-notify-join-unread",
-                        Map.of("unread", Integer.toString(unread)));
+                notifyMail(player, "Unread Mail", "mail-notify-join-unread",
+                        Map.of("unread", Integer.toString(unread)), NotificationPriority.NORMAL,
+                        false);
             } else if (!inbox.isEmpty()) {
-                core.getMessageService().sendKey(player, "mail-notify-join-any",
-                        Map.of("count", Integer.toString(inbox.size())));
+                notifyMail(player, "Mail", "mail-notify-join-any",
+                        Map.of("count", Integer.toString(inbox.size())), NotificationPriority.NORMAL,
+                        false);
             }
         });
     }
@@ -121,8 +129,8 @@ public final class MailModule extends AbstractMysticModule implements MailServic
             online.ifPresent(ref -> {
                 // This future completes on the storage thread; sendMessage only renders
                 // reliably from the player's world thread, so hop before notifying.
-                Runnable notify = () -> core.getMessageService().sendKey(ref, "mail-notify-new",
-                        Map.of("sender", senderName));
+                Runnable notify = () -> notifyMail(ref, "New Mail", "mail-notify-new",
+                        Map.of("sender", senderName), NotificationPriority.IMPORTANT, true);
                 if (!core.platform().runOnEntityThread(ref, (store, entity, world) -> notify.run())) {
                     notify.run(); // Best effort when the world lookup fails.
                 }
@@ -137,6 +145,25 @@ public final class MailModule extends AbstractMysticModule implements MailServic
             ));
             return saved;
         });
+    }
+
+    private void notifyMail(PlayerRef player, String title, String messageKey,
+            Map<String, String> params, NotificationPriority priority, boolean history) {
+        String message = core.getMessageService().plainFromKey(messageKey, params);
+        if (core.notifications() == null) {
+            core.getMessageService().sendKey(player, messageKey, params);
+            return;
+        }
+        core.notifications().send(Notification.builder()
+                .category(NotificationCategory.MAIL)
+                .priority(priority)
+                .title(title)
+                .subtitle(message)
+                .message(message)
+                .action(NotificationAction.command("/mail"))
+                .storeInHistory(history)
+                .source("mysticessentials:mail")
+                .build(), NotificationAudience.player(player.getUuid()));
     }
 
     private String truncateBody(String body) {
@@ -1028,9 +1055,8 @@ public final class MailModule extends AbstractMysticModule implements MailServic
         }
 
         private final class MailSendCommand extends MysticCommand {
-            private final RequiredArg<String> player = withRequiredArg("player", "Recipient player", ArgTypes.STRING)
-                    .suggest((commandSender, input, index, result) ->
-                            core.platform().onlinePlayers().forEach(ref -> result.suggest(ref.getUsername())));
+            private final RequiredArg<String> player = withRequiredArg("player", "Recipient player",
+                    MysticArgTypes.PLAYER_NAME);
             private final RequiredArg<String> message =
                     withRequiredArg("message", "Message", ArgTypes.GREEDY_STRING);
 

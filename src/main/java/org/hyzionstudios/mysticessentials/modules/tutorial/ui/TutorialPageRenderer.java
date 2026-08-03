@@ -1,5 +1,7 @@
 package org.hyzionstudios.mysticessentials.modules.tutorial.ui;
 
+import static org.hyzionstudios.mysticessentials.platform.ui.MysticPage.uiText;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -53,9 +55,9 @@ public final class TutorialPageRenderer extends MysticPage {
     public void build(Ref<EntityStore> ref, UICommandBuilder cmd, UIEventBuilder event,
             Store<EntityStore> store) {
         cmd.append(PAGE_UI);
-        cmd.set("#PageTitle.Text", resolve(page.title));
+        cmd.set("#PageTitle.TextSpans", uiText("#PageTitle.TextSpans", resolve(page.title)));
         String subtitle = resolve(page.subtitle);
-        cmd.set("#PageSubtitle.Text", subtitle);
+        cmd.set("#PageSubtitle.TextSpans", uiText("#PageSubtitle.TextSpans", subtitle));
         cmd.set("#PageSubtitle.Visible", !subtitle.isBlank());
 
         int contentIndex = 0;
@@ -65,7 +67,7 @@ public final class TutorialPageRenderer extends MysticPage {
                     continue; // Only text content in the MVP; unknown types skipped.
                 }
                 cmd.append("#ContentList", TEXT_ROW_UI);
-                cmd.set("#ContentList[" + contentIndex + "] #Text.Text", resolve(item.text));
+                cmd.set("#ContentList[" + contentIndex + "] #Text.TextSpans", uiText("#ContentList[" + contentIndex + "] #Text.TextSpans", resolve(item.text)));
                 contentIndex++;
             }
         }
@@ -85,7 +87,7 @@ public final class TutorialPageRenderer extends MysticPage {
                 renderedButtons.add(button);
                 String row = "#ButtonList[" + index + "]";
                 cmd.append("#ButtonList", BUTTON_ROW_UI);
-                cmd.set(row + " #ButtonLabel.Text", resolve(button.text));
+                cmd.set(row + " #ButtonLabel.TextSpans", uiText(row + " #ButtonLabel.TextSpans", resolve(button.text)));
                 event.addEventBinding(CustomUIEventBindingType.Activating, row,
                         new EventData().put("button", button.id));
             }

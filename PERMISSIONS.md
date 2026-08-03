@@ -12,6 +12,7 @@ All nodes are prefixed `mysticessentials.`.
 |---|---|
 | `mysticessentials.reload` | `/mystic reload` |
 | `mysticessentials.migrate` | `/mystic migrate scan`, `/mystic migrate import` |
+| `mysticessentials.license` | `/mystic license`, `/mystic license reload` |
 | `mysticessentials.update.notify` | Receive the clickable outdated-mod notice on join (operators normally inherit this node) |
 
 ## Teleportation
@@ -20,6 +21,7 @@ All nodes are prefixed `mysticessentials.`.
 |---|---|
 | `mysticessentials.teleport.tpa` | `/tpa`, `/tpahere`, `/tpaccept`, `/tpdeny`, `/tpcancel`, `/tptoggle` + the Teleport Requests UI (incl. favorites) |
 | `mysticessentials.teleport.tp` | `/tp [player]` — teleport yourself to a player; no player opens the Teleport Requests UI |
+| `mysticessentials.teleport.tp.world` | `/tp world <player> <world>` — send a player to another world's spawn |
 | `mysticessentials.teleport.tphere` | `/tphere <player>` — teleport one player to you |
 | `mysticessentials.teleport.tpall` | `/tpall` — teleport every online player to you |
 | `mysticessentials.teleport.top` | `/top` — teleport to the highest block in your current column |
@@ -97,6 +99,46 @@ that portal. Leave the field empty to allow everyone.
 | `mysticessentials.chat.channel.create.temp` | `/channel temp` — temporary channels |
 | `mysticessentials.chat.channel.<id>[.speak/.listen/.moderator]` | Dynamic per-channel gates (configured per channel) |
 | `mysticessentials.chat.color.legacy/hex/gradient/rainbow/minimessage/links` | Colour/markup styles in chat messages |
+| `mysticessentials.chat.itemlink.use` | Share the held item in chat with the `[item]` tag |
+
+## Chat mentions
+
+Mass mentions are gated separately from ordinary ones, and from each other,
+because their cost scales with the player count — being trusted to ping a
+teammate is not the same as being trusted to ping the whole server.
+
+| Node | Grants |
+|---|---|
+| `mysticessentials.chat.mention` | Use `@PlayerName` at all |
+| `mysticessentials.chat.mention.multiple` | More than one mention per message (otherwise capped at one) |
+| `mysticessentials.chat.mention.bypass-cooldown` | Skip the sender cooldowns and per-minute budget |
+| `mysticessentials.chat.mention.bypass-settings` | **Staff override** — reach a player through their own scope, block list, and do-not-disturb (also allows mentioning a vanished player, and delivers the title/sound their preferences would have muted). Kept separate from `bypass-cooldown` so "can contact anyone" and "can ping rapidly" are granted independently. Disable server-wide with `rules.staff-bypass-player-settings: false` in `mentions.json`. |
+| `mysticessentials.chat.mention.offline` | Mention offline players (requires offline mentions to be enabled) |
+| `mysticessentials.chat.mention.staff` | Marks a player as staff for `@staff`, and allows using it |
+| `mysticessentials.chat.mention.everyone` | `@everyone` / `@online` |
+| `mysticessentials.chat.mention.channel` | `@channel` — everyone receiving the current message |
+| `mysticessentials.chat.mention.guild` | `@guild` — resolved by a guild mod through a registered audience resolver |
+
+Players control their own side with `/mentions`: chat highlighting, sound, title
+and action-bar notifications, who may mention them, and do-not-disturb.
+
+The "who may mention you" list is **extensible**. Mystic Essentials ships only
+`Everyone` and `Nobody` — the two it can enforce by itself. Relationship-based
+options (friends, guild members, party members) are contributed by the mod that
+owns that relationship via `ChatService.registerMentionScope(...)`; a scope no
+mod implements is not shown at all, so players are never offered a setting that
+would silently do nothing. See DEVELOPER_NOTES.md.
+
+## Notifications
+
+| Node | Grants |
+|---|---|
+| `mysticessentials.notifications.staff` | Receives notifications addressed to the staff audience |
+| `mysticessentials.notifications.send` | Send an alert at a chosen category and priority |
+| `mysticessentials.notifications.critical` | Send a **critical** alert — the one priority players cannot suppress |
+
+`/notifications` (the Notification Center) and its settings screen need no
+permission; every player has their own history and preferences.
 
 ## Kits
 
@@ -144,6 +186,19 @@ that portal. Leave the field empty to allow everyone.
 | `mysticessentials.patchnotes.reload` | `/patchnotes reload` |
 | `mysticessentials.patchnotes.open.others` | `/patchnotes open <player>` |
 | `mysticessentials.patchnotes.markread.others` | `/patchnotes markread <player>` |
+
+## CustomGUIs & CustomDialogs
+
+`mysticessentials.customcontent.admin` is the combined `/customcontent`
+administration node. Declarative GUI alias commands created with
+`data-custom-command` (or the legacy `data-ql-command`) are
+player-facing and do not require an additional Essentials permission.
+
+| Node | Grants |
+|---|---|
+| `mysticessentials.customcontent.admin` | `/customcontent` and `/customtools` combined administration |
+| `mysticessentials.customdialogs.admin` | `/customdialogs`, dialog editing/export, and NPC assignment |
+| `mysticessentials.customguis.admin` | `/customguis list`, `/customguis open`, and `/customguis reload` |
 
 ## Tutorial
 

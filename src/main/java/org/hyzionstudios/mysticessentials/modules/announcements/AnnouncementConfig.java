@@ -7,6 +7,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
+import org.hyzionstudios.mysticessentials.core.notification.NotificationSounds;
 
 /** Persisted settings for {@code modules/announcements/config.json}. */
 public final class AnnouncementConfig {
@@ -18,6 +19,14 @@ public final class AnnouncementConfig {
     public String broadcastPrefix = "&8[&dBroadcast&8] &f";
     /** Prefix prepended to every {@code /alert} message. Colour codes allowed; empty disables. */
     public String alertPrefix = "&8[&c&lALERT&8] &c";
+    /** Headline shown through Hytale's built-in event-title system. */
+    public String broadcastTitle = "Announcement";
+    /** Vanilla AssetMap id played for broadcasts and rotating announcements. */
+    public String broadcastSound = NotificationSounds.ANNOUNCEMENT;
+    /** Headline shown through Hytale's built-in event-title system. */
+    public String alertTitle = "Alert";
+    /** Vanilla AssetMap id played for alerts. */
+    public String alertSound = NotificationSounds.ALERT;
     public List<JsonElement> messages = defaultMessages();
 
     private static List<JsonElement> defaultMessages() {

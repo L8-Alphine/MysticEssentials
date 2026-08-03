@@ -54,6 +54,12 @@ public final class DefaultMessages {
         o.addProperty("teleport-requests-disabled-target",
                 "&c{player} is not accepting teleport requests.");
         o.addProperty("teleport-to-failed", "&cCould not teleport to &f{player}&c: {reason}");
+        o.addProperty("teleport-world-unknown", "&cThere is no world named &f{world}&c.");
+        o.addProperty("teleport-world-already", "&c{player} is already in &f{world}&c.");
+        o.addProperty("teleport-world-no-spawn", "&cWorld &f{world} &chas no spawn point to teleport to.");
+        o.addProperty("teleport-world-success", "&aTeleported &f{player} &ato &f{world}&a.");
+        o.addProperty("teleport-world-target", "&7You were teleported to &e{world}&7.");
+        o.addProperty("teleport-world-failed", "&cCould not send &f{player} &cto &f{world}&c: {reason}");
         o.addProperty("teleport-here-self", "&cYou are already here.");
         o.addProperty("teleport-here-success", "&aTeleported &f{player} &ato you.");
         o.addProperty("teleport-here-target", "&7You were teleported to &e{player}&7.");
@@ -234,6 +240,7 @@ public final class DefaultMessages {
         o.addProperty("afk-reward-zone-hint", "&7You will only earn AFK rewards inside an AFK reward zone.");
         o.addProperty("afk-zone-teleported", "&7Teleported to AFK zone '&f{name}&7'. You will be sent back when you return.");
         o.addProperty("afk-zone-returned", "&7You have been returned to your previous location.");
+        o.addProperty("afk-zone-no-safe-spot", "&7No safe spot was found in AFK zone '&f{name}&7', so you were left where you are.");
         o.addProperty("afkzone-usage", "&7/afkzone &fpos1&7|&fpos2&7|&fcreate <name>&7|&fdelete <name>&7|&fpermission <name> <node|->&7|&fdefault <name|->&7|&flist&7|&fcheck");
         o.addProperty("afkzone-pos1", "&aAFK zone corner 1 set: &f{pos}");
         o.addProperty("afkzone-pos2", "&aAFK zone corner 2 set: &f{pos}");
@@ -301,6 +308,63 @@ public final class DefaultMessages {
         o.addProperty("chat-channel-temp-updated", "&aTemporary channel updated.");
         o.addProperty("chat-channel-temp-closed", "&aTemporary channel closed.");
         o.addProperty("chat-channel-temp-not-owned", "&cYou do not own a temporary channel.");
+        o.addProperty("chat-channel-roster-disabled", "&cThe channel roster is disabled.");
+        o.addProperty("chat-channel-roster-no-permission", "&cYou cannot view channel members.");
+        // Participation / access enforcement
+        o.addProperty("chat-channel-you-muted", "&cYou are muted in this channel. {reason}");
+        o.addProperty("chat-channel-you-listener", "&cYou are a listener in this channel and cannot speak.");
+        o.addProperty("chat-channel-banned", "&cYou are banned from that channel.");
+        o.addProperty("chat-channel-locked", "&cThat channel is locked.");
+        // Target notifications
+        o.addProperty("chat-channel-mod-assigned", "&aYou are now a moderator of &f{channel}&a.");
+        o.addProperty("chat-channel-mod-removed", "&7You are no longer a moderator of &f{channel}&7.");
+        o.addProperty("chat-channel-set-listener", "&7You were set to listener in &f{channel}&7.");
+        o.addProperty("chat-channel-set-speaker", "&aYou can speak again in &f{channel}&a.");
+        o.addProperty("chat-channel-you-muted-notice", "&cYou were muted in &f{channel}&c. {reason}");
+        o.addProperty("chat-channel-you-unmuted", "&aYou were unmuted in &f{channel}&a.");
+        o.addProperty("chat-channel-you-removed", "&cYou were removed from &f{channel}&c.");
+        o.addProperty("chat-channel-you-banned", "&cYou were banned from &f{channel}&c.");
+        // Ownership transfer
+        o.addProperty("chat-channel-transfer-offer", "&e{player} wants to transfer ownership of &f{channel} &eto you.");
+        o.addProperty("chat-channel-transfer-received", "&aYou are now the owner of &f{channel}&a.");
+        o.addProperty("chat-channel-transfer-done", "&aOwnership of &f{channel} &awas transferred to &f{player}&a.");
+        o.addProperty("chat-channel-transfer-declined", "&c{player} declined ownership of &f{channel}&c.");
+        o.addProperty("chat-channel-transfer-expired", "&7Your ownership transfer of &f{channel} &7to {player} expired.");
+        o.addProperty("chat-channel-transfer-expired-target", "&7The ownership offer for &f{channel} &7expired.");
+        // Command results
+        o.addProperty("chat-channel-not-temp", "&cThis command only works in a temporary channel you are in or own.");
+        o.addProperty("chat-channel-manage-no-permission", "&cYou are not allowed to do that in this channel.");
+        o.addProperty("chat-channel-target-required", "&cYou must specify a player.");
+        o.addProperty("chat-channel-target-offline", "&cPlayer &f{player} &cis not online.");
+        o.addProperty("chat-channel-target-not-member", "&cThat player is not a member of this channel.");
+        o.addProperty("chat-channel-target-owner", "&cYou cannot do that to the channel owner.");
+        o.addProperty("chat-channel-target-staff", "&cYou cannot moderate a staff member using an override.");
+        o.addProperty("chat-channel-target-invalid", "&cThat player cannot be targeted for this action.");
+        o.addProperty("chat-channel-target-not-eligible", "&cThat player is not eligible to own a channel.");
+        o.addProperty("chat-channel-manage-already", "&7That is already the case.");
+        o.addProperty("chat-channel-not-moderator", "&cThat player is not a channel moderator.");
+        o.addProperty("chat-channel-owner-usage", "&cUsage: /channel owner <transfer|accept|decline|force-transfer> [player]");
+        o.addProperty("chat-channel-moderator-usage", "&cUsage: /channel moderator <add|remove> <player>");
+        o.addProperty("chat-channel-member-usage", "&cUsage: /channel member <remove|ban|unban|speaker|listener> <player>");
+        o.addProperty("chat-channel-mute-usage", "&cUsage: /channel mute <player> [duration] [reason]");
+        o.addProperty("chat-channel-transfer-none", "&cYou have no pending ownership transfer.");
+        o.addProperty("chat-channel-transfer-disabled", "&cOwnership transfer is disabled.");
+        o.addProperty("chat-channel-transfer-sent", "&aOwnership transfer request sent to &f{player}&a.");
+        o.addProperty("chat-channel-transfer-accepted", "&aYou accepted the ownership transfer.");
+        o.addProperty("chat-channel-transfer-declined-self", "&7You declined the ownership transfer.");
+        o.addProperty("chat-channel-transfer-forced", "&aOwnership was force-transferred to &f{player}&a.");
+        o.addProperty("chat-channel-transfer-expired-self", "&cThat ownership transfer request has expired.");
+        o.addProperty("chat-channel-manage-mod-added", "&aMade &f{player} &aa channel moderator.");
+        o.addProperty("chat-channel-manage-mod-removed", "&7Removed &f{player} &7as a channel moderator.");
+        o.addProperty("chat-channel-manage-removed", "&aRemoved &f{player} &afrom the channel.");
+        o.addProperty("chat-channel-manage-banned", "&aBanned &f{player} &afrom the channel.");
+        o.addProperty("chat-channel-manage-unbanned", "&aUnbanned &f{player}&a.");
+        o.addProperty("chat-channel-manage-speaker", "&aSet &f{player} &aas a speaker.");
+        o.addProperty("chat-channel-manage-listener", "&7Set &f{player} &7as a listener.");
+        o.addProperty("chat-channel-manage-muted", "&aMuted &f{player} &ain the channel.");
+        o.addProperty("chat-channel-manage-unmuted", "&aUnmuted &f{player}&a.");
+        o.addProperty("chat-channel-manage-locked", "&aChannel locked.");
+        o.addProperty("chat-channel-manage-unlocked", "&aChannel unlocked.");
         o.addProperty("pm-received", "&7[&d{sender} &7-> &dyou&7] &f{message}");
         o.addProperty("pm-sent", "&7[&dyou &7-> &d{target}&7] &f{message}");
         o.addProperty("pm-spy", "&8[spy] &7{sender} -> {target}: {message}");

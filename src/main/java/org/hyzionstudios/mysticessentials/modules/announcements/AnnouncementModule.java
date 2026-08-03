@@ -10,8 +10,14 @@ import java.util.concurrent.ThreadLocalRandom;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import org.hyzionstudios.mysticessentials.api.notification.Notification;
+import org.hyzionstudios.mysticessentials.api.notification.NotificationAction;
+import org.hyzionstudios.mysticessentials.api.notification.NotificationAudience;
+import org.hyzionstudios.mysticessentials.api.notification.NotificationCategory;
+import org.hyzionstudios.mysticessentials.api.notification.NotificationPriority;
 import org.hyzionstudios.mysticessentials.api.service.AnnouncementService;
 import org.hyzionstudios.mysticessentials.core.module.AbstractMysticModule;
+import org.hyzionstudios.mysticessentials.core.notification.NotificationServiceImpl;
 import org.hyzionstudios.mysticessentials.platform.Conversions;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommand;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommandSender;
@@ -78,31 +84,17 @@ public final class AnnouncementModule extends AbstractMysticModule implements An
 
     /** Shows a broadcast to this server's players only. */
     private void broadcastLocal(String message) {
-        Message formatted = core.getMessageService().format(message);
-        for (PlayerRef player : core.platform().onlinePlayers()) {
-            player.sendMessage(formatted);
-        }
+        sendAnnouncement(message, NotificationAudience.all());
     }
 
     @Override
     public void broadcastToWorld(String world, String message) {
-        Message formatted = core.getMessageService().format(message);
-        for (PlayerRef player : core.platform().onlinePlayers()) {
-            String playerWorld = Conversions.resolveWorldName(player.getWorldUuid());
-            if (world.equals(playerWorld)) {
-                player.sendMessage(formatted);
-            }
-        }
+        sendAnnouncement(message, NotificationAudience.world(world));
     }
 
     @Override
     public void broadcastToPermission(String permission, String message) {
-        Message formatted = core.getMessageService().format(message);
-        for (PlayerRef player : core.platform().onlinePlayers()) {
-            if (player.hasPermission(permission)) {
-                player.sendMessage(formatted);
-            }
-        }
+        sendAnnouncement(message, NotificationAudience.permission(permission));
     }
 
     @Override
@@ -140,15 +132,61 @@ public final class AnnouncementModule extends AbstractMysticModule implements An
     }
 
     private void broadcastLocal(AutoAnnouncement announcement) {
-        List<Message> formatted = new ArrayList<>(announcement.lines.size());
-        for (AutoLine line : announcement.lines) {
-            formatted.add(core.getMessageService().format(line.render()));
+        String message = announcement.lines.stream()
+                .map(AutoLine::render)
+                .collect(java.util.stream.Collectors.joining("\n"));
+        Notification.Builder builder = announcement(config.broadcastTitle, message,
+                config.broadcastSound).chatPrefix(orEmpty(config.broadcastPrefix));
+        announcement.lines.stream().map(line -> line.clickTarget)
+                .filter(java.util.Objects::nonNull).findFirst()
+                .map(AnnouncementModule::actionFor)
+                .ifPresent(builder::action);
+        send(builder.build(), NotificationAudience.all());
+    }
+
+    private void sendAnnouncement(String message, NotificationAudience audience) {
+        send(announcement(config.broadcastTitle, message, config.broadcastSound)
+                .chatPrefix(orEmpty(config.broadcastPrefix))
+                .build(), audience);
+    }
+
+    private Notification.Builder announcement(String title, String message, String sound) {
+        return Notification.builder()
+                .category(NotificationCategory.ANNOUNCEMENT)
+                .priority(NotificationPriority.NORMAL)
+                .title(title)
+                .subtitle(message)
+                .message(message)
+                .sound(sound)
+                .showAsTitle(true)
+                .source("mysticessentials:announcements");
+    }
+
+    private void send(Notification notification, NotificationAudience audience) {
+        NotificationServiceImpl notifications = core.notifications();
+        if (notifications != null) {
+            notifications.send(notification, audience);
+            return;
         }
+        // Core normally creates the engine before modules. Preserve chat output
+        // if an unusual partial-startup state leaves it unavailable.
+        Message formatted = core.getMessageService().format(
+                notification.chatPrefix().orElse("") + notification.bestText());
         for (PlayerRef player : core.platform().onlinePlayers()) {
-            for (Message line : formatted) {
-                player.sendMessage(line);
+            if (audience.kind() == NotificationAudience.Kind.ALL
+                    || audience.kind() == NotificationAudience.Kind.PERMISSION
+                            && player.hasPermission(audience.value())
+                    || audience.kind() == NotificationAudience.Kind.WORLD
+                            && audience.value().equals(Conversions.resolveWorldName(player.getWorldUuid()))) {
+                player.sendMessage(formatted);
             }
         }
+    }
+
+    private static NotificationAction actionFor(String target) {
+        return target.startsWith("/")
+                ? NotificationAction.command(target)
+                : NotificationAction.url(target);
     }
 
     private List<AutoAnnouncement> parseAutoAnnouncements(List<JsonElement> configured) {
@@ -302,6 +340,17 @@ public final class AnnouncementModule extends AbstractMysticModule implements An
 
     // ----- Command -----------------------------------------------------------
 
+    /**
+     * {@code /broadcast [category] [priority] <message> [flags]} — a server-wide
+     * notice through the shared notification engine.
+     *
+     * <p>Routing this through the engine rather than a bare chat loop is what
+     * makes a broadcast reach the action bar and the notification history, honour
+     * do-not-disturb, and be targetable at a world or channel — none of which the
+     * old chat-only implementation could do. A plain
+     * {@code /broadcast Hello everyone} still behaves exactly as it always
+     * did.</p>
+     */
     private final class BroadcastCommand extends MysticCommand {
         private final RequiredArg<String> message =
                 withRequiredArg("message", "Message to broadcast", ArgTypes.GREEDY_STRING);
@@ -314,27 +363,108 @@ public final class AnnouncementModule extends AbstractMysticModule implements An
 
         @Override
         protected void run(MysticCommandSender sender) {
-            broadcast(prefixed(config.broadcastPrefix, sender.get(message)));
+            dispatch(sender, sender.get(message), NotificationCategory.ANNOUNCEMENT,
+                    NotificationPriority.NORMAL, config.broadcastPrefix);
         }
     }
 
-    /** {@code /alert} — like {@code /broadcast} but with its own attention-grabbing prefix. */
+    /**
+     * {@code /alert [category] [priority] <message> [flags]} — the same engine at
+     * a higher default priority, so an alert takes the screen instead of scrolling
+     * past in chat.
+     */
     private final class AlertCommand extends MysticCommand {
         private final RequiredArg<String> message =
                 withRequiredArg("message", "Alert message", ArgTypes.GREEDY_STRING);
 
         AlertCommand() {
-            super(AnnouncementModule.this.core, "alert", "Broadcast an alert to the server.");
+            super(AnnouncementModule.this.core, "alert", "Send an alert to the server.");
             requirePermission(org.hyzionstudios.mysticessentials.api.Permissions.ANNOUNCEMENT_ALERT);
         }
 
         @Override
         protected void run(MysticCommandSender sender) {
-            broadcast(prefixed(config.alertPrefix, sender.get(message)));
+            dispatch(sender, sender.get(message), NotificationCategory.WARNING,
+                    NotificationPriority.IMPORTANT, config.alertPrefix);
         }
+    }
+
+    /**
+     * Parses and sends one broadcast or alert.
+     *
+     * <p>Critical priority needs its own permission on top of the command's. A
+     * critical alert bypasses every player's preferences and pins a banner, so
+     * being trusted to announce an event is not the same as being trusted to
+     * override everyone's settings.</p>
+     */
+    private void dispatch(MysticCommandSender sender, String input,
+            NotificationCategory defaultCategory, NotificationPriority defaultPriority,
+            String configuredPrefix) {
+        NotificationServiceImpl notifications = core.notifications();
+        if (notifications == null) {
+            // The engine should always be present, but a broadcast is exactly the
+            // wrong thing to lose to an initialisation edge case — fall back to the
+            // module's own plain chat path so the message still goes out.
+            log("Notification engine unavailable; broadcasting '" + input + "' as plain chat.");
+            broadcast(prefixed(configuredPrefix, input));
+            return;
+        }
+        AlertArguments.Parsed parsed = AlertArguments.parse(input, defaultCategory, defaultPriority,
+                notifications.config().categories.keySet(), "mysticessentials:announcements");
+        if (!parsed.ok()) {
+            sender.reply("&c" + parsed.error());
+            return;
+        }
+        // Gate on the priority the notification will ACTUALLY be sent at, not the
+        // one that was typed. A category configured with a critical floor raises
+        // any send through it, so checking the parsed priority alone would let
+        // `/broadcast emergency ...` reach the critical surfaces ungated.
+        NotificationPriority effective = NotificationPriority.parse(
+                notifications.config().category(parsed.notification().category().id())
+                        .minimumPriority, NotificationPriority.LOW);
+        boolean critical = parsed.notification().priority().atLeast(NotificationPriority.CRITICAL)
+                || effective.atLeast(NotificationPriority.CRITICAL);
+        if (critical && !sender.hasPermission(
+                org.hyzionstudios.mysticessentials.api.Permissions.NOTIFICATIONS_CRITICAL)) {
+            sender.reply("&cSending critical alerts requires "
+                    + org.hyzionstudios.mysticessentials.api.Permissions.NOTIFICATIONS_CRITICAL
+                    + ".");
+            return;
+        }
+        // A server's configured broadcastPrefix/alertPrefix keeps applying to the
+        // plain command form, so upgrading does not silently retag every broadcast
+        // with the category's prefix instead. Naming a category explicitly is a
+        // request for that category's own prefix, so it wins.
+        boolean alert = defaultPriority.atLeast(NotificationPriority.IMPORTANT);
+        Notification.Builder presentation = parsed.notification().toBuilder();
+        if (parsed.notification().title().isEmpty()) {
+            presentation.title(alert ? config.alertTitle : config.broadcastTitle);
+        }
+        if (parsed.notification().subtitle().isEmpty()
+                && parsed.notification().message().isPresent()) {
+            presentation.subtitle(parsed.notification().message().orElseThrow());
+        }
+        if (parsed.notification().sound().isEmpty()) {
+            presentation.sound(alert ? config.alertSound : config.broadcastSound);
+        }
+        // Both commands are intentional screen-level notices. EventTitleUtil in
+        // NotificationDelivery is Hytale's built-in title system.
+        presentation.showAsTitle(true);
+        if (!parsed.categoryExplicit()) {
+            presentation.chatPrefix(orEmpty(configuredPrefix));
+        }
+        Notification notification = presentation.build();
+
+        notifications.send(notification, parsed.audience());
+        sender.reply("&aSent a " + notification.priority().id() + " "
+                + notification.category() + " notification to " + parsed.audience() + ".");
     }
 
     private static String prefixed(String prefix, String message) {
         return prefix == null || prefix.isBlank() ? message : prefix + message;
+    }
+
+    private static String orEmpty(String value) {
+        return value == null ? "" : value;
     }
 }

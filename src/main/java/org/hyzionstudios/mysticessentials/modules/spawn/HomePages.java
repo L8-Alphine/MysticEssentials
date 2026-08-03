@@ -1,5 +1,7 @@
 package org.hyzionstudios.mysticessentials.modules.spawn;
 
+import static org.hyzionstudios.mysticessentials.platform.ui.MysticPage.uiText;
+
 import java.util.List;
 import java.util.Map;
 
@@ -49,21 +51,21 @@ final class HomePages {
                 Store<EntityStore> store) {
             cmd.append(HOMES_UI);
             List<Home> homes = spawn.getHomes(player.getUuid());
-            cmd.set("#HomeCount.Text", homes.size() + " / " + spawn.homeLimit(player.getUuid()));
+            cmd.set("#HomeCount.TextSpans", uiText("#HomeCount.TextSpans", homes.size() + " / " + spawn.homeLimit(player.getUuid())));
             cmd.set("#HomesEmpty.Visible", homes.isEmpty());
             for (int i = 0; i < homes.size(); i++) {
                 Home home = homes.get(i);
                 String row = "#HomeList[" + i + "]";
                 cmd.append("#HomeList", HOME_ROW_UI);
-                cmd.set(row + " #Name.Text", home.getName());
-                cmd.set(row + " #Meta.Text", locationText(home.getLocation()));
+                cmd.set(row + " #Name.TextSpans", uiText(row + " #Name.TextSpans", home.getName()));
+                cmd.set(row + " #Meta.TextSpans", uiText(row + " #Meta.TextSpans", locationText(home.getLocation())));
                 event.addEventBinding(CustomUIEventBindingType.Activating, row,
                         new EventData().put("action", "select").put("home", home.getName()));
             }
 
             Home selected = selectedHome(homes, selectedName);
-            cmd.set("#SelectedHome.Text", selected == null ? "No Home" : selected.getName());
-            cmd.set("#HomeWorld.Text", selected == null ? "-" : locationText(selected.getLocation()));
+            cmd.set("#SelectedHome.TextSpans", uiText("#SelectedHome.TextSpans", selected == null ? "No Home" : selected.getName()));
+            cmd.set("#HomeWorld.TextSpans", uiText("#HomeWorld.TextSpans", selected == null ? "-" : locationText(selected.getLocation())));
             cmd.set("#RenameInput.Value", "");
             cmd.set("#NewHomeName.Value", "");
 

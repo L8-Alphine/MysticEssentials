@@ -1,0 +1,103 @@
+$C = "../Common.ui";
+
+// Per-player mention settings (/mentions).
+//
+// Layout contract: every block except #ScopeList has a FIXED height, and
+// #ScopeList takes FlexWeight: 1. That is what keeps the footer buttons inside
+// the container — an earlier version used a flexible spacer instead, so once the
+// fixed rows above it exceeded the container height the footer was pushed past
+// the bottom edge and rendered outside the panel.
+//
+// The scope rows are NOT declared here: which options exist depends on which
+// mods are installed (this mod ships only Everyone and Nobody), so they are
+// appended at runtime from MentionScopeRow.ui.
+
+$C.@PageOverlay {}
+
+$C.@Container #MysticMentionShell {
+  Anchor: (Width: 560, Height: 640);
+
+  #Title {
+    Group {
+      $C.@Title #HeaderTitle {
+        @Text = "Mention Settings";
+      }
+    }
+  }
+
+  #Content {
+    LayoutMode: Top;
+
+    // Fixed-height budget below totals ~300px, so on the 640px shell the scope
+    // list always has room left over and the footer can never be pushed out.
+    Label #PageSubtitle {
+      Anchor: (Height: 20, Bottom: 8);
+      Style: (FontSize: 13, TextColor: #9fb0c4, Wrap: true);
+    }
+
+    Label #NotifyHeading {
+      Anchor: (Height: 18, Bottom: 4);
+      Style: (FontSize: 14, RenderBold: true, TextColor: #E8A93B);
+      Text: "How you are notified";
+    }
+
+    $C.@SecondaryTextButton #HighlightToggle {
+      @Text = "Chat Highlighting";
+      @Anchor = (Height: 26, Bottom: 4);
+    }
+
+    $C.@SecondaryTextButton #SoundToggle {
+      @Text = "Sound Notifications";
+      @Anchor = (Height: 26, Bottom: 4);
+    }
+
+    $C.@SecondaryTextButton #TitleToggle {
+      @Text = "Title Notifications";
+      @Anchor = (Height: 26, Bottom: 4);
+    }
+
+    $C.@SecondaryTextButton #ActionBarToggle {
+      @Text = "Action-Bar Notifications";
+      @Anchor = (Height: 26, Bottom: 8);
+    }
+
+    Label #ScopeHeading {
+      Anchor: (Height: 18, Bottom: 4);
+      Style: (FontSize: 14, RenderBold: true, TextColor: #E8A93B);
+      Text: "Who may mention you";
+    }
+
+    // Scrolls, because the option count grows with the installed mods.
+    Group #ScopeList {
+      FlexWeight: 1;
+      LayoutMode: TopScrolling;
+      Padding: (Right: 8);
+      ScrollbarStyle: $C.@DefaultScrollbarStyle;
+    }
+
+    $C.@SecondaryTextButton #DndToggle {
+      @Text = "Do Not Disturb";
+      @Anchor = (Height: 26, Top: 6, Bottom: 4);
+    }
+
+    Label #BlockedInfo {
+      Anchor: (Height: 24, Bottom: 6);
+      Style: (FontSize: 12, TextColor: #96a9be, Wrap: true);
+    }
+
+    Group {
+      LayoutMode: Left;
+      Anchor: (Height: 38);
+
+      $C.@SecondaryTextButton #ResetButton {
+        @Text = "Reset Defaults";
+        @Anchor = (Width: 200, Right: 8);
+      }
+
+      $C.@TextButton #CloseButton {
+        @Text = "Done";
+        @Anchor = (Width: 160);
+      }
+    }
+  }
+}

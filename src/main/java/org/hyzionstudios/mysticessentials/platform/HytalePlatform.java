@@ -3,6 +3,7 @@ package org.hyzionstudios.mysticessentials.platform;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
@@ -21,6 +22,8 @@ import com.hypixel.hytale.math.util.ChunkUtil;
 import com.hypixel.hytale.event.IBaseEvent;
 import com.hypixel.hytale.math.vector.Rotation3f;
 import com.hypixel.hytale.math.vector.Transform;
+import com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType;
+import com.hypixel.hytale.server.core.asset.type.fluid.Fluid;
 import com.hypixel.hytale.server.core.command.system.AbstractCommand;
 import com.hypixel.hytale.server.core.entity.damage.DamageDataComponent;
 import com.hypixel.hytale.server.core.entity.entities.Player;
@@ -119,6 +122,37 @@ public final class HytalePlatform {
             World world = Universe.get().getWorld(player.getWorldUuid());
             return world == null ? Optional.empty() : Optional.ofNullable(world.getName());
         } catch (Throwable t) {
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * The spawn point a world would place {@code player} at, taken from the
+     * world's configured spawn provider (the same source the engine uses on
+     * world join).
+     *
+     * @return empty if the world is unknown or has no spawn provider.
+     */
+    public Optional<MysticLocation> worldSpawn(String worldName, UUID player) {
+        World world = world(worldName).orElse(null);
+        if (world == null) {
+            return Optional.empty();
+        }
+        try {
+            var config = world.getWorldConfig();
+            var provider = config == null ? null : config.getSpawnProvider();
+            Transform spawn = provider == null ? null : provider.getSpawnPoint(world, player);
+            if (spawn == null) {
+                return Optional.empty();
+            }
+            org.joml.Vector3d position = spawn.getPosition();
+            Rotation3f rotation = spawn.getRotation();
+            return Optional.of(new MysticLocation(world.getName(),
+                    position.x, position.y, position.z,
+                    rotation == null ? 0.0f : rotation.yaw(),
+                    rotation == null ? 0.0f : rotation.pitch()));
+        } catch (Throwable t) {
+            core.log(Level.WARNING, "Failed to resolve spawn point for world '" + worldName + "': " + t);
             return Optional.empty();
         }
     }
@@ -399,6 +433,143 @@ public final class HytalePlatform {
         }
     }
 
+    // ----- Column scan for a safe standing spot ------------------------------
+
+    /**
+     * Scans the block column at {@code (blockX, blockZ)} and completes with the
+     * spot a player can stand on that sits closest to {@code preferredFeetY}: a
+     * non-air floor block that is not in {@code blockedBlockIds}, with
+     * {@code requiredHeadroom} air blocks above it for the player's body, and no
+     * fluid from {@code blockedFluidIds} in the floor or body blocks.
+     *
+     * <p>Unlike {@link #sampleGround} this trusts no heightmap — it reads the
+     * blocks themselves, so built platforms, overhangs, and terrain the
+     * heightmap disagrees with all resolve to a real surface. Picking the
+     * candidate nearest {@code preferredFeetY} (rather than the topmost one)
+     * keeps enclosed areas working: in a roofed room the room's floor wins over
+     * the roof above it, while on open uneven ground the surface is still the
+     * only candidate near the reference height. Only candidates within
+     * {@code maxVerticalDistance} blocks of {@code preferredFeetY} are
+     * considered, so a cave far below never counts as the same place.</p>
+     *
+     * <p>Runs the block reads on the target world's thread, like the other chunk
+     * probes here. Completes empty when the chunk cannot load or the column has
+     * no spot passing the rules.</p>
+     */
+    public CompletableFuture<Optional<MysticLocation>> findStandingSpot(String worldName, int blockX, int blockZ,
+            int requiredHeadroom, Set<Integer> blockedBlockIds, Set<Integer> blockedFluidIds,
+            int preferredFeetY, int maxVerticalDistance) {
+        CompletableFuture<Optional<MysticLocation>> outcome = new CompletableFuture<>();
+        World world = world(worldName).orElse(null);
+        if (world == null) {
+            outcome.complete(Optional.empty());
+            return outcome;
+        }
+        try {
+            long chunkIndex = ChunkUtil.indexChunkFromBlock(blockX, blockZ);
+            world.getChunkAsync(chunkIndex)
+                    .thenAcceptAsync(chunk -> completeStandingSpot(outcome, world, chunk, blockX, blockZ,
+                            requiredHeadroom, blockedBlockIds, blockedFluidIds, preferredFeetY,
+                            maxVerticalDistance), world)
+                    .exceptionally(error -> {
+                        outcome.complete(Optional.empty());
+                        return null;
+                    });
+        } catch (Throwable t) {
+            outcome.complete(Optional.empty());
+        }
+        return outcome;
+    }
+
+    private void completeStandingSpot(CompletableFuture<Optional<MysticLocation>> outcome, World world,
+            WorldChunk chunk, int blockX, int blockZ, int requiredHeadroom, Set<Integer> blockedBlockIds,
+            Set<Integer> blockedFluidIds, int preferredFeetY, int maxVerticalDistance) {
+        try {
+            if (chunk == null) {
+                outcome.complete(Optional.empty());
+                return;
+            }
+            int localX = ChunkUtil.localCoordinate(blockX);
+            int localZ = ChunkUtil.localCoordinate(blockZ);
+            int headroom = Math.max(1, requiredHeadroom);
+            int range = Math.max(0, maxVerticalDistance);
+            int top = Math.min(ChunkUtil.HEIGHT - headroom, preferredFeetY + range);
+            int bottom = Math.max(ChunkUtil.MIN_Y + 1, preferredFeetY - range);
+            int bestFeetY = Integer.MIN_VALUE;
+            int bestDistance = Integer.MAX_VALUE;
+            for (int feetY = top; feetY >= bottom; feetY--) {
+                // Scanning downwards: once the gap to the preferred height is
+                // wider than the best candidate so far, nothing lower can beat it.
+                if (feetY < preferredFeetY && preferredFeetY - feetY > bestDistance) {
+                    break;
+                }
+                int floorY = feetY - 1;
+                int floor = chunk.getBlock(localX, floorY, localZ);
+                if (floor == AIR_BLOCK_ID || contains(blockedBlockIds, floor)
+                        || contains(blockedFluidIds, chunk.getFluidId(localX, floorY, localZ))) {
+                    continue;
+                }
+                boolean clear = true;
+                for (int dy = 0; dy < headroom && clear; dy++) {
+                    clear = chunk.getBlock(localX, feetY + dy, localZ) == AIR_BLOCK_ID
+                            && !contains(blockedFluidIds, chunk.getFluidId(localX, feetY + dy, localZ));
+                }
+                if (!clear) {
+                    continue;
+                }
+                int distance = Math.abs(feetY - preferredFeetY);
+                if (distance < bestDistance) {
+                    bestDistance = distance;
+                    bestFeetY = feetY;
+                }
+            }
+            outcome.complete(bestFeetY == Integer.MIN_VALUE
+                    ? Optional.empty()
+                    : Optional.of(new MysticLocation(world.getName(),
+                            blockX + 0.5d, bestFeetY, blockZ + 0.5d, 0.0f, 0.0f)));
+        } catch (Throwable t) {
+            outcome.complete(Optional.empty());
+        }
+    }
+
+    private static boolean contains(Set<Integer> ids, int id) {
+        return ids != null && !ids.isEmpty() && ids.contains(id);
+    }
+
+    /**
+     * Resolves a block-type asset id (the file name, e.g. {@code Fluid_Lava}) to
+     * its numeric block id.
+     *
+     * @return the id, or {@code -1} when no such block type is registered.
+     */
+    public int blockTypeId(String assetId) {
+        if (assetId == null || assetId.isBlank()) {
+            return -1;
+        }
+        try {
+            return BlockType.getAssetMap().getIndexOrDefault(assetId, -1);
+        } catch (Throwable t) {
+            return -1;
+        }
+    }
+
+    /**
+     * Resolves a fluid asset id (e.g. {@code Lava}, {@code Water_Source}) to its
+     * numeric fluid id, as returned by {@code WorldChunk.getFluidId}.
+     *
+     * @return the id, or {@code -1} when no such fluid is registered.
+     */
+    public int fluidTypeId(String assetId) {
+        if (assetId == null || assetId.isBlank()) {
+            return -1;
+        }
+        try {
+            return Fluid.getAssetMap().getIndexOrDefault(assetId, -1);
+        } catch (Throwable t) {
+            return -1;
+        }
+    }
+
     /**
      * Opens a custom UI page for the player, on their world thread. Resolves the
      * {@link Player} entity from the store and drives
@@ -513,6 +684,49 @@ public final class HytalePlatform {
         return future;
     }
 
+    // ----- Raw protocol ------------------------------------------------------
+
+    /**
+     * Writes a to-client packet straight to a player's connection. Packets are
+     * queued on the netty channel in call order, so a caller may rely on two
+     * consecutive writes arriving in sequence.
+     *
+     * @return {@code true} if the packet was handed to the player's packet handler.
+     */
+    public boolean sendPacket(PlayerRef player, com.hypixel.hytale.protocol.ToClientPacket packet) {
+        if (player == null || packet == null) {
+            return false;
+        }
+        try {
+            var handler = player.getPacketHandler();
+            if (handler == null) {
+                return false;
+            }
+            handler.write(packet);
+            return true;
+        } catch (Throwable t) {
+            core.log(Level.WARNING, "Failed to send " + packet.getClass().getSimpleName()
+                    + " to " + player.getUsername() + ": " + t);
+            return false;
+        }
+    }
+
+    /**
+     * The round-trip time the engine reports for a player, in milliseconds —
+     * the same average the built-in Server Players list shows.
+     */
+    public int pingMillis(PlayerRef player) {
+        try {
+            var info = player.getPacketHandler()
+                    .getPingInfo(com.hypixel.hytale.protocol.packets.connection.PongType.Direct);
+            double average = info.getPingMetricSet().getAverage(0);
+            return (int) com.hypixel.hytale.server.core.io.PacketHandler.PingInfo.TIME_UNIT
+                    .toMillis((long) Math.ceil(average));
+        } catch (Throwable t) {
+            return 0;
+        }
+    }
+
     // ----- Registration ------------------------------------------------------
 
     /**
@@ -583,6 +797,19 @@ public final class HytalePlatform {
     public <E extends IBaseEvent<Void>> com.hypixel.hytale.event.EventRegistration<Void, E> onEvent(
             Class<? super E> eventType, Consumer<E> listener) {
         return plugin.getEventRegistry().register(eventType, listener);
+    }
+
+    /**
+     * Registers a listener for a Hytale server event at an explicit priority.
+     * {@link com.hypixel.hytale.event.EventPriority#LAST} is how Mystic runs
+     * after the engine's own core modules have handled the same event.
+     *
+     * @return the registration handle — its public {@code unregister()} removes
+     *         the listener again.
+     */
+    public <E extends IBaseEvent<Void>> com.hypixel.hytale.event.EventRegistration<Void, E> onEvent(
+            com.hypixel.hytale.event.EventPriority priority, Class<? super E> eventType, Consumer<E> listener) {
+        return plugin.getEventRegistry().register(priority, eventType, listener);
     }
 
     /**

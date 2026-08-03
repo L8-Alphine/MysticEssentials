@@ -25,7 +25,6 @@ $C.@Container {
       Label #AdminHeading {
         Anchor: (Bottom: 10);
         Style: (FontSize: 20, RenderBold: true, TextColor: #ffffff);
-        Text: "Warp";
       }
 
       Label {

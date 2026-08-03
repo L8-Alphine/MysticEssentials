@@ -1,6 +1,6 @@
 // Row template for warp lists. Appended per entry by the server:
 //   cmd.append("#WarpList", "MysticEssentials/WarpRow.ui")
-// and populated by index: cmd.set("#WarpList[i] #Name.Text", ...).
+// and populated by index: cmd.set("#WarpList[i] #Name.TextSpans", ...).
 
 Button #Row {
   Anchor: (Height: 56, Bottom: 8);
@@ -24,13 +24,11 @@ Button #Row {
     Label #Name {
       Anchor: (Height: 22, Bottom: 2);
       Style: (FontSize: 16, TextColor: #ffffff, RenderBold: true, VerticalAlignment: Center);
-      Text: "Warp";
     }
 
     Label #Meta {
       Anchor: (Height: 17);
       Style: (FontSize: 12, TextColor: #9fb0c4, VerticalAlignment: Center);
-      Text: "";
     }
   }
 }

@@ -70,13 +70,20 @@ public final class GreetingsModule extends AbstractMysticModule {
         if (!config.motdEnabled || config.motd == null) {
             return;
         }
+        // Connect-time greetings must use the event's PlayerRef directly. The
+        // notification engine re-resolves its audience from Universe, where a
+        // player may not be discoverable yet while PlayerConnectEvent is firing.
         for (String line : config.motd) {
-            player.sendMessage(core.getMessageService().formatFor(player.getUuid(), line));
+            if (line != null) {
+                player.sendMessage(core.getMessageService().formatFor(player.getUuid(), line));
+            }
         }
     }
 
     /** Broadcasts a formatted line (resolved for {@code contextPlayer}) to every online player. */
     private void broadcast(String template, UUID contextPlayer) {
+        // Join/leave lines are explicitly enabled by the server owner and are
+        // not player-mutable notifications, so deliver them straight to chat.
         Message message = core.getMessageService().formatFor(contextPlayer, template);
         for (PlayerRef online : core.platform().onlinePlayers()) {
             online.sendMessage(message);

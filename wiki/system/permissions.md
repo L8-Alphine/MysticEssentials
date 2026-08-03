@@ -8,12 +8,15 @@ All permission nodes are prefixed with `mysticessentials.`. Dynamic nodes such a
 | --- | --- |
 | `mysticessentials.reload` | `/mystic reload` |
 | `mysticessentials.migrate` | `/mystic migrate scan`, `/mystic migrate import` |
+| `mysticessentials.license` | `/mystic license`, `/mystic license reload` |
 
 ## Teleportation
 
 | Node | Grants |
 | --- | --- |
 | `mysticessentials.teleport.tpa` | `/tpa`, `/tpahere`, `/tpaccept`, `/tpdeny`, `/tpcancel`, and the Teleport Requests UI |
+| `mysticessentials.teleport.tp` | `/tp [player]` |
+| `mysticessentials.teleport.tp.world` | `/tp world <player> <world>` |
 | `mysticessentials.teleport.tphere` | `/tphere <player>` |
 | `mysticessentials.teleport.tpall` | `/tpall` |
 | `mysticessentials.teleport.top` | `/top` |
@@ -124,6 +127,9 @@ config page); players without it cannot use that portal.
 | `mysticessentials.chat.channel.<id>.speak` | Dynamic speak gate for a channel |
 | `mysticessentials.chat.channel.<id>.listen` | Dynamic listen gate for a channel |
 | `mysticessentials.chat.channel.<id>.moderator` | Dynamic moderation/management gate for a channel |
+| `mysticessentials.channel.members.view` | Open channel member rosters (configurable with `channels.roster.viewPermission`) |
+| `mysticessentials.chat.staff` | Adds the live `STAFF` roster tag (configurable with `channels.roster.staffPermission`) |
+| `mysticessentials.channel.staff.override` | Staff override for temporary-channel management restrictions |
 | `mysticessentials.chat.color.legacy` | Use legacy `&a` style color codes in chat |
 | `mysticessentials.chat.color.hex` | Use hex colors such as `&#ff8800` |
 | `mysticessentials.chat.color.gradient` | Use gradients |
@@ -131,6 +137,28 @@ config page); players without it cannot use that portal.
 | `mysticessentials.chat.color.minimessage` | Use MiniMessage-style tags |
 | `mysticessentials.chat.color.links` | Use clickable links |
 | `mysticessentials.chat.itemlink.use` | Share your held item in chat with the `[item]` tag ([item links](itemlinks-module)) |
+
+### Mentions
+
+| Node | Grants |
+| --- | --- |
+| `mysticessentials.chat.mention` | Use exact, case-insensitive `@PlayerName` mentions |
+| `mysticessentials.chat.mention.multiple` | Mention more than one recipient in a message |
+| `mysticessentials.chat.mention.bypass-cooldown` | Skip sender cooldown and per-minute limits |
+| `mysticessentials.chat.mention.bypass-settings` | Staff override for recipient scope, block list, DND, and vanished-player restrictions |
+| `mysticessentials.chat.mention.offline` | Use offline mentions when enabled |
+| `mysticessentials.chat.mention.staff` | Count as staff and use `@staff` |
+| `mysticessentials.chat.mention.everyone` | Use `@everyone` and `@online` |
+| `mysticessentials.chat.mention.channel` | Use `@channel` |
+| `mysticessentials.chat.mention.guild` | Use `@guild` when an addon provides the audience |
+
+## Notifications
+
+| Node | Grants |
+| --- | --- |
+| `mysticessentials.notifications.staff` | Receive staff-audience notices |
+| `mysticessentials.notifications.send` | Send notifications with a chosen category and priority |
+| `mysticessentials.notifications.critical` | Send critical notices that bypass player suppression |
 
 ## Kits
 
@@ -191,6 +219,18 @@ config page); players without it cannot use that portal.
 | `mysticessentials.tutorial.stop`, `.skip`, `.status`, `.page` (and `.others` variants) | Control and inspect sessions |
 | `mysticessentials.tutorial.list`, `.info`, `.reset`, `.complete`, `.reload`, `.debug`, `.scene` | Management and admin tools |
 | `mysticessentials.tutorial.bypassfirstjoin` | Player is not auto-started on first join |
+
+## CustomGUIs & CustomDialogs
+
+| Node | Grants |
+| --- | --- |
+| `mysticessentials.customcontent.admin` | `/customcontent` and `/customtools` |
+| `mysticessentials.customdialogs.admin` | Dialog builder, export, and NPC assignment |
+| `mysticessentials.customguis.admin` | `/customguis list`, `open`, `hud`, and `reload` |
+
+GUI alias commands declared by a document are player-facing and do not require
+an additional Mystic Essentials permission. This optional module also requires a
+valid CustomContent license; permissions do not bypass its license gate.
 
 ## Custom Commands
 

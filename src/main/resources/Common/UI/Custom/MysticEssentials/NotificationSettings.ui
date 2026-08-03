@@ -1,0 +1,102 @@
+$C = "../Common.ui";
+
+// Per-player notification settings, reached from the Notification Center.
+//
+// Each toggle carries its own state in its label. Critical alerts get a plain
+// informational line rather than a disabled-looking toggle, because a control
+// that cannot be operated is worse than an honest sentence explaining why.
+
+$C.@PageOverlay {}
+
+$C.@Container {
+  Anchor: (Width: 560, Height: 640);
+
+  #Title {
+    Group {
+      $C.@Title #HeaderTitle {
+        @Text = "Notification Settings";
+      }
+    }
+  }
+
+  #Content {
+    LayoutMode: Top;
+
+    // Fixed-height budget totals ~360px on a 640px shell, so the footer stays
+    // inside the container even with every row present.
+    Label #PageSubtitle {
+      Anchor: (Height: 30, Bottom: 8);
+      Style: (FontSize: 13, TextColor: #9fb0c4, Wrap: true);
+    }
+
+    Label #SurfaceHeading {
+      Anchor: (Height: 18, Bottom: 4);
+      Style: (FontSize: 14, RenderBold: true, TextColor: #E8A93B);
+      Text: "Where notifications appear";
+    }
+
+    $C.@SecondaryTextButton #ChatToggle {
+      @Text = "Chat";
+      @Anchor = (Height: 26, Bottom: 4);
+    }
+
+    $C.@SecondaryTextButton #TitlesToggle {
+      @Text = "Titles";
+      @Anchor = (Height: 26, Bottom: 4);
+    }
+
+    $C.@SecondaryTextButton #ActionBarToggle {
+      @Text = "Action Bar";
+      @Anchor = (Height: 26, Bottom: 4);
+    }
+
+    $C.@SecondaryTextButton #ToastToggle {
+      @Text = "Toasts";
+      @Anchor = (Height: 26, Bottom: 4);
+    }
+
+    $C.@SecondaryTextButton #SoundToggle {
+      @Text = "Sounds";
+      @Anchor = (Height: 26, Bottom: 4);
+    }
+
+    $C.@SecondaryTextButton #BannerToggle {
+      @Text = "Banners";
+      @Anchor = (Height: 26, Bottom: 8);
+    }
+
+    $C.@SecondaryTextButton #DndToggle {
+      @Text = "Do Not Disturb";
+      @Anchor = (Height: 26, Bottom: 6);
+    }
+
+    Label #CriticalNote {
+      Anchor: (Height: 30, Bottom: 6);
+      Style: (FontSize: 12, TextColor: #FFCA3A, Wrap: true);
+    }
+
+    Group {
+      FlexWeight: 1;
+    }
+
+    Group {
+      LayoutMode: Left;
+      Anchor: (Height: 38);
+
+      $C.@SecondaryTextButton #ResetButton {
+        @Text = "Reset Defaults";
+        @Anchor = (Width: 180, Right: 8);
+      }
+
+      $C.@SecondaryTextButton #BackButton {
+        @Text = "Back";
+        @Anchor = (Width: 140, Right: 8);
+      }
+
+      $C.@TextButton #CloseButton {
+        @Text = "Done";
+        @Anchor = (Width: 140);
+      }
+    }
+  }
+}

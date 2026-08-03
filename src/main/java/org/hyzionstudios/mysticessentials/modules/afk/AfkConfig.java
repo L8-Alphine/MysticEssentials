@@ -27,9 +27,10 @@ public final class AfkConfig {
     public Rewards rewards = new Rewards();
 
     /**
-     * A named cuboid reward zone spanning two corners in one world. The lowest
-     * corner Y is treated as the zone floor when players are teleported in, so
-     * set a corner at floor level.
+     * A named reward zone: the X/Z footprint spanned by two corners in one
+     * world, at any height (see {@link #contains}). The corner Y values are kept
+     * only as the world reference and the fallback floor used when
+     * {@link Rewards.SafeTeleport} is disabled.
      */
     public static final class Zone {
         public String name;
@@ -49,13 +50,19 @@ public final class AfkConfig {
             this.cornerB = cornerB;
         }
 
+        /**
+         * A zone is its X/Z footprint at any height — corners are captured at
+         * the admin's foot level while walking the perimeter, so their Y values
+         * only ever described where that admin happened to stand, not the height
+         * of the area. Testing Y made players standing on higher ground inside
+         * the footprint read as outside the zone.
+         */
         public boolean contains(MysticLocation pos) {
             if (pos == null || cornerA == null || cornerB == null
                     || pos.getWorld() == null || !pos.getWorld().equals(cornerA.getWorld())) {
                 return false;
             }
             return between(pos.getX(), cornerA.getX(), cornerB.getX())
-                    && between(pos.getY(), cornerA.getY(), cornerB.getY())
                     && between(pos.getZ(), cornerA.getZ(), cornerB.getZ());
         }
 
@@ -134,8 +141,51 @@ public final class AfkConfig {
          * and is restored on the next join.
          */
         public boolean teleportToZoneOnAfk = true;
+        /** Ground-safety probing for the random spot players are dropped on inside a zone. */
+        public SafeTeleport safeTeleport = new SafeTeleport();
         /** No reward if the player took damage / was in combat within this many seconds. */
         public int noRewardWithinCombatSeconds = 15;
+
+        /**
+         * Safety rules for the zone teleport. A random column inside the zone's
+         * footprint is scanned for the spot where the player can stand closest
+         * to the zone's corner height: a solid floor block that is not blocked,
+         * {@link #requiredHeadroom} air blocks above it, and no blocked fluid in
+         * the floor or body. The corner Y is a reference height only, never the
+         * landing Y — corners are captured at foot level while walking, so on
+         * uneven ground they sit below the surface and would drop players
+         * inside terrain.
+         */
+        public static final class SafeTeleport {
+            /** Probe the terrain; when disabled players land on the zone floor Y instead. */
+            public boolean enabled = true;
+            /** Columns tried per teleport before giving up on the zone. */
+            public int attempts = 12;
+            /** Air blocks required above the floor for the player's body. */
+            public int requiredHeadroom = 2;
+            /**
+             * How far above/below the zone's corner height a landing spot may
+             * sit. The column scan keeps the candidate closest to that height,
+             * so a roofed or cave zone lands players on its floor instead of on
+             * top of the structure, while uneven ground inside the footprint
+             * still resolves. Raise it for zones spanning tall terrain.
+             */
+            public int verticalSearchRange = 24;
+            /**
+             * Block-type asset ids that may not be the floor a player lands on
+             * (the file name of the block asset, e.g. {@code Fluid_Lava}).
+             * Unknown ids are reported once at load and ignored.
+             */
+            public List<String> blockedBlocks = new ArrayList<>(List.of(
+                    "Fluid_Lava", "Trap_Spike", "Plant_Cactus"));
+            /**
+             * Fluid asset ids that may not be in the floor or body blocks (e.g.
+             * {@code Lava}, {@code Poison}). Fluids left off this list are
+             * allowed, so water AFK pools still work.
+             */
+            public List<String> blockedFluids = new ArrayList<>(List.of(
+                    "Lava", "Lava_Source", "Fire", "Poison", "Poison_Source", "Tar", "Tar_Source"));
+        }
 
         /** @deprecated pre-zone-list corners; converted into {@link #zones} on load. */
         @Deprecated

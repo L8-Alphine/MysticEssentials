@@ -69,6 +69,9 @@ public final class ModuleManagerImpl implements ModuleManager {
             core.log(Level.INFO, "Module '" + id + "' disabled in config; skipping.");
             return;
         }
+        if (!licensed(module)) {
+            return;
+        }
         if (!hardDependenciesSatisfied(module)) {
             return;
         }
@@ -80,6 +83,38 @@ public final class ModuleManagerImpl implements ModuleManager {
         } catch (Throwable t) {
             core.log(Level.SEVERE, "Failed to enable module '" + id + "': " + t);
         }
+    }
+
+    /**
+     * Checks the module's declared license feature, if it has one.
+     *
+     * <p>A locked module is skipped exactly the way a config-disabled one is:
+     * one log line, everything else carries on. Any failure to answer the
+     * question counts as unlicensed rather than as a reason to stop enabling
+     * modules.
+     *
+     * @see AbstractMysticModule#licensedFeature()
+     */
+    private boolean licensed(MysticModule module) {
+        if (!(module instanceof AbstractMysticModule base)) {
+            return true;
+        }
+        String feature;
+        try {
+            feature = base.licensedFeature();
+        } catch (Throwable t) {
+            return true;
+        }
+        if (feature == null) {
+            return true;
+        }
+        if (core.license().hasFeature(com.mysticlicensing.license.Products.ESSENTIALS, feature)) {
+            return true;
+        }
+        core.log(Level.INFO, "Module '" + module.id() + "' needs the '" + feature
+                + "' license feature, which this server does not have; skipping. "
+                + "Run /mystic license for details. Everything else is unaffected.");
+        return false;
     }
 
     private boolean moduleEnabledInConfig(String id) {

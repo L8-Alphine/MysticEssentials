@@ -16,7 +16,6 @@ Group #Row {
     Label #Name {
       FlexWeight: 1;
       Style: (FontSize: 17, TextColor: #ffffff, RenderBold: true, VerticalAlignment: Center);
-      Text: "Profile";
     }
 
     $C.@SmallSecondaryTextButton #TeleportButton {
@@ -28,18 +27,15 @@ Group #Row {
   Label #World {
     Anchor: (Height: 20);
     Style: (FontSize: 13, TextColor: #9fb0c4);
-    Text: "world";
   }
 
   Label #Details {
     Anchor: (Height: 20);
     Style: (FontSize: 13, TextColor: #9fb0c4);
-    Text: "range - cost - cooldown";
   }
 
   Label #Status {
     Anchor: (Height: 20);
     Style: (FontSize: 13, TextColor: #8fd694);
-    Text: "Ready";
   }
 }

@@ -58,6 +58,102 @@ public final class ChatConfig {
         public int temporaryChannelDefaultMinutes = 120;
         public String createTemporaryPermission = "mysticessentials.chat.channel.create.temp";
         public List<Channel> channels = defaultChannels();
+        public Roster roster = new Roster();
+        public TempManagement tempManagement = new TempManagement();
+    }
+
+    /**
+     * Temporary-channel management settings (design bible §22 {@code temporary-channels}).
+     * Governs ownership transfer, owner-disconnect recovery and what channel
+     * moderators are permitted to do.
+     */
+    public static final class TempManagement {
+        public OwnershipTransfer ownershipTransfer = new OwnershipTransfer();
+        public OwnerDisconnect ownerDisconnect = new OwnerDisconnect();
+        public Moderation moderation = new Moderation();
+    }
+
+    /** Ownership-transfer flow (§9). */
+    public static final class OwnershipTransfer {
+        public boolean enabled = true;
+        public boolean targetMustAccept = true;
+        public int requestExpirationSeconds = 60;
+        /** Role the previous owner takes after a transfer: {@code CHANNEL_MODERATOR|MEMBER|LISTENER|REMOVE}. */
+        public String previousOwnerRole = "CHANNEL_MODERATOR";
+    }
+
+    /** Owner-disconnect grace + succession policy (§10). */
+    public static final class OwnerDisconnect {
+        public int gracePeriodSeconds = 300;
+        /** {@code KEEP_OWNERSHIP|PROMOTE_MODERATOR|PROMOTE_OLDEST_MEMBER|CLOSE_CHANNEL}. */
+        public String successionMode = "PROMOTE_MODERATOR";
+        /** Applied when {@link #successionMode} cannot produce an owner. */
+        public String fallbackMode = "PROMOTE_OLDEST_MEMBER";
+    }
+
+    /** Default channel-moderator abilities (§8.3), each individually configurable. */
+    public static final class Moderation {
+        public boolean moderatorsCanRemoveMembers = true;
+        public boolean moderatorsCanMuteMembers = true;
+        public boolean moderatorsCanChangeParticipation = true;
+        public boolean moderatorsCanPromoteModerators = false;
+        public boolean moderatorsCanCloseChannel = false;
+        public boolean moderatorsCanBanMembers = false;
+    }
+
+    /**
+     * Channel roster settings (design bible §22 {@code channel-roster} + {@code member-tags}).
+     * Phase 1 covers the member list, role/tag resolution and the compact + expanded
+     * views; later phases add activity, transfer and cross-server keys.
+     */
+    public static final class Roster {
+        public boolean enabled = true;
+        /** Node required to open a roster; blank/null means everyone may view. */
+        public String viewPermission = "mysticessentials.channel.members.view";
+        /** Node that marks a player as server staff for the {@code STAFF} tag (resolved live). */
+        public String staffPermission = "mysticessentials.chat.staff";
+        /** Show the member's LuckPerms group / server rank beneath the channel tag (§4.3). */
+        public boolean showServerRanks = true;
+        /** Group channel owners and moderators into a separate management section (§5.3). */
+        public boolean groupAuthorityMembers = true;
+        /** Allow a smaller secondary tag (e.g. an owner who is also staff shows {@code STAFF}) (§4.2). */
+        public boolean allowSecondaryTags = true;
+        public int maximumSecondaryTags = 1;
+        /** Soft cap on rows shown in the compact roster before the "open full list" hint (§25). */
+        public int maximumVisibleMembers = 50;
+
+        public Tag owner = new Tag("OWNER", 100, "#E8A93B");
+        public Tag channelModerator = new Tag("CH MOD", 80, "#3FB6A8");
+        public Tag staff = new Tag("STAFF", 60, "#D46A6A");
+        public Tag member = new Tag("MEMBER", 10, "#7a9cc6");
+        public Activity activity = new Activity();
+    }
+
+    /** Live-activity indicator settings (design bible §22 {@code channel-roster.activity}). */
+    public static final class Activity {
+        public boolean enabled = true;
+        /** Show a member as "Recently active" for this many seconds after their last message. */
+        public int recentTextActivitySeconds = 30;
+        /** Query the voice provider for a live speaking indicator (no-op without a provider). */
+        public boolean activeSpeakerIndicator = true;
+        /** Typing has no client signal in 0.5.6; kept for config compatibility, off by default. */
+        public boolean typingIndicator = false;
+    }
+
+    /** A configurable channel tag: display text, priority and swatch colour (§4.1). */
+    public static final class Tag {
+        public String text;
+        public int priority;
+        public String color;
+
+        public Tag() {
+        }
+
+        public Tag(String text, int priority, String color) {
+            this.text = text;
+            this.priority = priority;
+            this.color = color;
+        }
     }
 
     public static final class Channel {
@@ -82,6 +178,8 @@ public final class ChatConfig {
         public boolean crossServer;
         public String redisTopic;
         public int radiusBlocks = 0;
+        /** When {@code true}, new members cannot join until unlocked (§8.2 lock). */
+        public boolean locked;
 
         public Channel() {
         }

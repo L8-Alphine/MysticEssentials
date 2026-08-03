@@ -17,12 +17,14 @@ import org.hyzionstudios.mysticessentials.api.service.TeleportService;
 import org.hyzionstudios.mysticessentials.core.module.AbstractMysticModule;
 import org.hyzionstudios.mysticessentials.core.util.Json;
 import org.hyzionstudios.mysticessentials.platform.Conversions;
+import org.hyzionstudios.mysticessentials.platform.command.MysticArgTypes;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommand;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommandSender;
 
 import com.google.gson.JsonObject;
 import com.hypixel.hytale.server.core.command.system.arguments.system.RequiredArg;
 import com.hypixel.hytale.server.core.command.system.arguments.types.ArgTypes;
+import com.hypixel.hytale.server.core.command.system.arguments.types.SingleArgumentType;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 
 /**
@@ -39,6 +41,10 @@ public final class SpawnModule extends AbstractMysticModule implements SpawnServ
     private static final String HOME_DATA_KEY = "homes";
 
     private SpawnConfig config;
+
+    /** The sender's own home names. */
+    private final SingleArgumentType<String> homeArg = MysticArgTypes.dynamic(commandSender ->
+            getHomes(commandSender.getUuid()).stream().map(Home::getName).toList());
 
     public SpawnModule() {
         super("spawn", "Spawn", "1.0.0");
@@ -348,12 +354,6 @@ public final class SpawnModule extends AbstractMysticModule implements SpawnServ
         }
     }
 
-    /** Suggests the sender's own home names. */
-    private com.hypixel.hytale.server.core.command.system.suggestion.SuggestionProvider homeSuggestions() {
-        return (commandSender, input, index, result) ->
-                getHomes(commandSender.getUuid()).forEach(h -> result.suggest(h.getName()));
-    }
-
     void openHomesUi(PlayerRef player) {
         openHomesUi(player, null);
     }
@@ -422,7 +422,7 @@ public final class SpawnModule extends AbstractMysticModule implements SpawnServ
 
     private final class HomeNamedVariant extends MysticCommand {
         private final RequiredArg<String> name =
-                withRequiredArg("name", "Home name", ArgTypes.STRING).suggest(homeSuggestions());
+                withRequiredArg("name", "Home name", homeArg);
 
         HomeNamedVariant() {
             super(SpawnModule.this.core, "Teleport to a home.");
@@ -500,8 +500,7 @@ public final class SpawnModule extends AbstractMysticModule implements SpawnServ
     }
 
     private final class DelHomeNamedVariant extends MysticCommand {
-        private final RequiredArg<String> name = withRequiredArg("name", "Home name", ArgTypes.STRING)
-                .suggest(homeSuggestions());
+        private final RequiredArg<String> name = withRequiredArg("name", "Home name", homeArg);
 
         DelHomeNamedVariant() {
             super(SpawnModule.this.core, "Delete a named home.");
@@ -523,7 +522,7 @@ public final class SpawnModule extends AbstractMysticModule implements SpawnServ
 
     private final class RenameHomeCommand extends MysticCommand {
         private final RequiredArg<String> oldName =
-                withRequiredArg("oldname", "Current home name", ArgTypes.STRING).suggest(homeSuggestions());
+                withRequiredArg("oldname", "Current home name", homeArg);
         private final RequiredArg<String> newName =
                 withRequiredArg("newname", "New home name", ArgTypes.STRING);
 

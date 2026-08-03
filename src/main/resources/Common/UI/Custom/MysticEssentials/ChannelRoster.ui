@@ -1,0 +1,71 @@
+$C = "../Common.ui";
+
+// Compact channel roster (design bible §5). A slim member list for the current
+// channel with counts and a jump to the full member-management interface.
+
+$C.@PageOverlay {}
+
+$C.@Container {
+  Anchor: (Width: 380, Height: 580);
+
+  #Title {
+    Group {
+      $C.@Title {
+        @Text = "Channel Roster";
+      }
+    }
+  }
+
+  #Content {
+    LayoutMode: Top;
+
+    Label #RosterChannel {
+      Anchor: (Height: 26, Bottom: 2);
+      Style: (FontSize: 18, TextColor: #ffffff, RenderBold: true, VerticalAlignment: Center);
+    }
+
+    Label #RosterCounts {
+      Anchor: (Height: 18, Bottom: 8);
+      Style: (FontSize: 13, TextColor: #E8A93B, VerticalAlignment: Center);
+    }
+
+    $C.@PanelSeparatorFancy {
+      @Anchor = (Bottom: 8);
+    }
+
+    Label #RosterEmpty {
+      Anchor: (Height: 40);
+      Style: (FontSize: 14, TextColor: #9fb0c4, VerticalAlignment: Center);
+      Text: "No members are online in this channel.";
+      Visible: false;
+    }
+
+    Group #MemberList {
+      FlexWeight: 1;
+      LayoutMode: TopScrolling;
+      Padding: (Right: 10);
+      ScrollbarStyle: $C.@DefaultScrollbarStyle;
+    }
+
+    Label #RosterMore {
+      Anchor: (Height: 18, Top: 4);
+      Style: (FontSize: 12, TextColor: #9fb0c4, VerticalAlignment: Center);
+      Visible: false;
+    }
+
+    Group {
+      LayoutMode: Left;
+      Anchor: (Height: 44, Top: 8);
+
+      $C.@SecondaryTextButton #FullListButton {
+        @Text = "Full Member List";
+        @Anchor = (Width: 230, Right: 8);
+      }
+
+      $C.@CancelTextButton #CloseButton {
+        @Text = "Close";
+        @Anchor = (Width: 120);
+      }
+    }
+  }
+}

@@ -1,6 +1,7 @@
 package org.hyzionstudios.mysticessentials.core.message;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -64,14 +65,27 @@ public final class MysticText {
 
     /** Parses markup into a renderable {@link Message}. Never throws; falls back to raw text. */
     public static Message parse(String input) {
+        return parse(input, null);
+    }
+
+    /**
+     * Parses markup into a renderable {@link Message}, applying {@code defaultColor}
+     * to every segment that does not declare its own colour.
+     *
+     * <p>This overload is intended for Custom UI {@code TextSpans}. Unlike chat,
+     * UI spans do not reliably inherit {@code LabelStyle.TextColor}, so every
+     * emitted span needs an explicit colour.</p>
+     */
+    public static Message parse(String input, String defaultColor) {
         if (input == null || input.isEmpty()) {
-            return Message.empty();
+            return defaultColor == null ? Message.empty() : Message.raw("").color(defaultColor);
         }
         try {
             List<Segment> segments = new Scanner(input).scan();
-            return build(segments, input);
+            return build(segments, input, defaultColor);
         } catch (Throwable t) {
-            return Message.raw(input);
+            Message fallback = Message.raw(input);
+            return defaultColor == null ? fallback : fallback.color(defaultColor);
         }
     }
 
@@ -80,28 +94,32 @@ public final class MysticText {
         return stripColors(text);
     }
 
-    private static Message build(List<Segment> segments, String original) {
+    private static Message build(List<Segment> segments, String original, String defaultColor) {
         if (segments.isEmpty()) {
-            return Message.empty();
+            return defaultColor == null ? Message.empty() : Message.raw("").color(defaultColor);
         }
         if (segments.size() == 1 && segments.get(0).isPlain()) {
-            return toMessage(segments.get(0));
+            return toMessage(segments.get(0), defaultColor);
         }
         Message root = Message.raw("");
+        if (defaultColor != null) {
+            root.color(defaultColor);
+        }
         List<Message> children = new ArrayList<>(segments.size());
         for (Segment segment : segments) {
-            children.add(toMessage(segment));
+            children.add(toMessage(segment, defaultColor));
         }
         root.insertAll(children);
         return root;
     }
 
-    private static Message toMessage(Segment segment) {
+    private static Message toMessage(Segment segment, String defaultColor) {
         Message message = segment.translationKey != null
-                ? Message.translation(segment.translationKey)
+                ? applyParams(Message.translation(segment.translationKey), segment.params)
                 : Message.raw(segment.text);
-        if (segment.color != null) {
-            message.color(segment.color);
+        String color = segment.color == null ? defaultColor : segment.color;
+        if (color != null) {
+            message.color(color);
         }
         if (segment.bold) {
             message.bold(true);
@@ -119,6 +137,29 @@ public final class MysticText {
         return message;
     }
 
+    /**
+     * Applies {@code <lang:key|name=value>} arguments to a translated segment.
+     * A value prefixed with {@code @} is itself a translation key; anything else
+     * (or a {@code ~} prefix) is a literal. Without this, a parameterized item
+     * name renders its raw placeholder (e.g. "{material} Longsword").
+     */
+    private static Message applyParams(Message message, Map<String, String> params) {
+        if (params == null || params.isEmpty()) {
+            return message;
+        }
+        for (Map.Entry<String, String> entry : params.entrySet()) {
+            String value = entry.getValue();
+            Message param;
+            if (value.startsWith("@")) {
+                param = Message.translation(value.substring(1));
+            } else {
+                param = Message.raw(value.startsWith("~") ? value.substring(1) : value);
+            }
+            message.param(entry.getKey(), param);
+        }
+        return message;
+    }
+
     // ----- Parsing -----------------------------------------------------------
 
     private static final class Segment {
@@ -129,9 +170,16 @@ public final class MysticText {
         final boolean underlined;
         final String link;
         final String translationKey;
+        /** Encoded {@code <lang:key|name=value>} arguments, or {@code null}. */
+        final Map<String, String> params;
 
         Segment(String text, String color, boolean bold, boolean italic, boolean underlined,
                 String link, String translationKey) {
+            this(text, color, bold, italic, underlined, link, translationKey, null);
+        }
+
+        Segment(String text, String color, boolean bold, boolean italic, boolean underlined,
+                String link, String translationKey, Map<String, String> params) {
             this.text = text;
             this.color = color;
             this.bold = bold;
@@ -139,6 +187,7 @@ public final class MysticText {
             this.underlined = underlined;
             this.link = link;
             this.translationKey = translationKey;
+            this.params = params;
         }
 
         boolean isPlain() {
@@ -250,12 +299,16 @@ public final class MysticText {
             if (lower.equals("rainbow")) {
                 return handleRainbow(close + 1);
             }
-            // <lang:key> — emit a client-translated segment immediately.
+            // <lang:key> or <lang:key|name=value|…> — emit a client-translated
+            // segment, re-applying any name arguments (e.g. {material}).
             if (lower.startsWith("lang:")) {
-                String key = tag.substring("lang:".length()).trim();
+                String spec = tag.substring("lang:".length()).trim();
+                int bar = spec.indexOf('|');
+                String key = (bar < 0 ? spec : spec.substring(0, bar)).trim();
                 if (!key.isEmpty()) {
                     flush();
-                    out.add(new Segment("", color, bold, italic, underlined, link, key));
+                    Map<String, String> params = bar < 0 ? null : parseLangParams(spec.substring(bar + 1));
+                    out.add(new Segment("", color, bold, italic, underlined, link, key, params));
                     return close + 1;
                 }
                 return -1;
@@ -411,6 +464,23 @@ public final class MysticText {
             }
             return true;
         }
+    }
+
+    /** Parses the {@code name=value|name=value} portion of a {@code <lang:…>} tag. */
+    private static Map<String, String> parseLangParams(String spec) {
+        Map<String, String> params = new LinkedHashMap<>();
+        for (String part : spec.split("\\|")) {
+            int eq = part.indexOf('=');
+            if (eq <= 0) {
+                continue;
+            }
+            String name = part.substring(0, eq).trim();
+            String value = part.substring(eq + 1).trim();
+            if (!name.isEmpty() && !value.isEmpty()) {
+                params.put(name, value);
+            }
+        }
+        return params.isEmpty() ? null : params;
     }
 
     // ----- Colour helpers ----------------------------------------------------

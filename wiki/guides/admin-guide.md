@@ -119,7 +119,7 @@ Rank icons (`modules/chat/rank-icons.json`) map LuckPerms groups to inline chat 
 3. `/rankicon validate` and `/rankicon status` confirm files, hashes, and mappings are healthy.
 4. `/rankicon previewrank <player>` shows what a given player resolves to; `/rankicon debug <player>` prints the full resolution trace.
 
-Newly staged assets may report `pending restart` until `/rankicon rebuild` or a restart registers them. See the [Rank Icons](rankicons-module) page.
+Newly staged assets may report `pending restart` until `/rankicon rebuild` or a restart registers them. See [Chat Formatting](chat-formatting) for how rich chat rendering works.
 
 ## Mail operations
 

@@ -1,0 +1,16 @@
+// Frameless window shell: a flat panel with no title bar, for layouts that
+// draw their own header. #MysticLayoutShell carries the size,
+// #MysticLayoutRoot receives the compiled layout.
+$C = "../Common.ui";
+
+$C.@PageOverlay {}
+
+$C.@SimpleContainer #MysticLayoutShell {
+  Anchor: (Width: 900, Height: 620);
+  LayoutMode: Top;
+
+  Group #MysticLayoutRoot {
+    FlexWeight: 1;
+    LayoutMode: Top;
+  }
+}

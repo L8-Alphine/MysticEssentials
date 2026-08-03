@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadLocalRandom;
@@ -21,12 +22,14 @@ import org.hyzionstudios.mysticessentials.api.service.AfkService;
 import org.hyzionstudios.mysticessentials.core.module.AbstractMysticModule;
 import org.hyzionstudios.mysticessentials.core.util.Json;
 import org.hyzionstudios.mysticessentials.platform.Conversions;
+import org.hyzionstudios.mysticessentials.platform.command.MysticArgTypes;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommand;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommandSender;
 
 import com.google.gson.JsonObject;
 import com.hypixel.hytale.server.core.command.system.arguments.system.RequiredArg;
 import com.hypixel.hytale.server.core.command.system.arguments.types.ArgTypes;
+import com.hypixel.hytale.server.core.command.system.arguments.types.SingleArgumentType;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.event.events.player.PlayerChatEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent;
@@ -110,6 +113,21 @@ public final class AfkModule extends AbstractMysticModule implements AfkService 
     /** In-memory mirror of the persisted return locations (profile is the source of truth). */
     private final Map<UUID, MysticLocation> returnLocations = new ConcurrentHashMap<>();
     private AfkConfig config;
+    /** Numeric ids behind the configured blocked block/fluid names; resolved on first zone teleport. */
+    private volatile Set<Integer> blockedBlockIds = Set.of();
+    private volatile Set<Integer> blockedFluidIds = Set.of();
+    private volatile boolean blockedIdsResolved;
+
+    /** Configured AFK zone names. */
+    private final SingleArgumentType<String> zoneArg = MysticArgTypes.dynamic(commandSender -> zoneNames());
+    /** Configured AFK zone names plus the {@code -} clear literal. */
+    private final SingleArgumentType<String> zoneOrClearArg = MysticArgTypes.dynamic(commandSender -> {
+        List<String> values = new ArrayList<>();
+        values.add("-");
+        values.addAll(zoneNames());
+        return values;
+    });
+
     private ScheduledFuture<?> tickTask;
     private ScheduledFuture<?> rewardTask;
 
@@ -197,8 +215,12 @@ public final class AfkModule extends AbstractMysticModule implements AfkService 
 
     private void loadConfig() {
         config = core.configManager().loadModuleConfig(id(), AfkConfig.class, new AfkConfig());
+        blockedIdsResolved = false;
         if (config.rewards == null) {
             config.rewards = new AfkConfig.Rewards();
+        }
+        if (config.rewards.safeTeleport == null) {
+            config.rewards.safeTeleport = new AfkConfig.Rewards.SafeTeleport();
         }
         if (config.rewards.zones == null) {
             config.rewards.zones = new ArrayList<>();
@@ -527,12 +549,25 @@ public final class AfkModule extends AbstractMysticModule implements AfkService 
                 .filter(zone -> zoneAllows(player, zone));
     }
 
-    /** Saves the return point and sends the player to a random spot in {@code zone}. */
+    /** Saves the return point and sends the player to a safe random spot in {@code zone}. */
     private void enterZone(PlayerRef player, MysticLocation from, AfkConfig.Zone zone) {
         saveReturnLocation(player.getUuid(), from);
-        core.getTeleportService().teleportNow(player, randomPointIn(zone));
-        startOrUpdateZoneSession(player, zone, System.currentTimeMillis());
-        core.getMessageService().sendKey(player, "afk-zone-teleported", Map.of("name", zone.name));
+        // The column scan is asynchronous (chunk loads), so the session clock —
+        // and with it the ZONE_ENTER_GRACE_MILLIS window that stops the tick
+        // reading the move as an exit — only starts once the move is sent.
+        safePointIn(zone).thenAccept(destination -> {
+            if (destination.isEmpty()) {
+                // Better to leave a player standing than to drop them in terrain.
+                core.getMessageService().sendKey(player, "afk-zone-no-safe-spot",
+                        Map.of("name", displayZoneName(zone)));
+                log("No safe landing spot found in AFK zone '" + zone.name + "' for "
+                        + player.getUsername() + "; teleport skipped.");
+                return;
+            }
+            core.getTeleportService().teleportNow(player, destination.get());
+            startOrUpdateZoneSession(player, zone, System.currentTimeMillis());
+            core.getMessageService().sendKey(player, "afk-zone-teleported", Map.of("name", zone.name));
+        });
     }
 
     /**
@@ -643,7 +678,100 @@ public final class AfkModule extends AbstractMysticModule implements AfkService 
         });
     }
 
-    /** A random point inside the zone at floor level (the lowest corner Y). */
+    /**
+     * Picks the spot a player is dropped on inside {@code zone}: random columns
+     * of the zone's footprint are scanned for the standable spot nearest the
+     * zone's reference height — solid floor block, headroom of air above it, and
+     * neither a blocked block id under the feet nor a blocked fluid id in the
+     * floor or body. The corner Y values only set that reference height, never
+     * the landing Y: corners are captured at foot level while walking, so on
+     * uneven ground the lowest one sits several blocks below the surface and
+     * would bury the player. Scanning for the nearest spot rather than the
+     * topmost keeps roofed and underground zones working — the room's floor
+     * wins over the roof above it.
+     *
+     * @return the landing spot, or empty when no column passed in
+     *         {@code attempts} tries (the caller then leaves the player put).
+     */
+    private CompletableFuture<Optional<MysticLocation>> safePointIn(AfkConfig.Zone zone) {
+        AfkConfig.Rewards.SafeTeleport safety = config.rewards.safeTeleport;
+        if (safety == null || !safety.enabled) {
+            return CompletableFuture.completedFuture(Optional.of(randomPointIn(zone)));
+        }
+        resolveBlockedIds();
+        return scanZoneColumn(zone, safety, Math.max(1, safety.attempts));
+    }
+
+    /** One column scan in {@code zone}, retrying a fresh column while attempts remain. */
+    private CompletableFuture<Optional<MysticLocation>> scanZoneColumn(AfkConfig.Zone zone,
+            AfkConfig.Rewards.SafeTeleport safety, int remaining) {
+        if (remaining <= 0) {
+            return CompletableFuture.completedFuture(Optional.empty());
+        }
+        int blockX = (int) Math.floor(randomBetween(zone.cornerA.getX(), zone.cornerB.getX()));
+        int blockZ = (int) Math.floor(randomBetween(zone.cornerA.getZ(), zone.cornerB.getZ()));
+        return core.platform().findStandingSpot(zone.cornerA.getWorld(), blockX, blockZ,
+                        Math.max(1, safety.requiredHeadroom), blockedBlockIds, blockedFluidIds,
+                        referenceFeetY(zone), Math.max(1, safety.verticalSearchRange))
+                .exceptionally(error -> Optional.empty())
+                .thenCompose(found -> found.isPresent()
+                        ? CompletableFuture.completedFuture(found)
+                        : scanZoneColumn(zone, safety, remaining - 1));
+    }
+
+    /**
+     * Resolves the configured blocked block/fluid asset ids into the numeric ids
+     * the chunk reads return, reporting names the server does not know so a typo
+     * is visible instead of silently disabling a rule. Done on first use rather
+     * than at load, so the asset maps are fully populated by then; a config
+     * reload clears the cache.
+     */
+    private void resolveBlockedIds() {
+        if (blockedIdsResolved) {
+            return;
+        }
+        AfkConfig.Rewards.SafeTeleport safety = config.rewards.safeTeleport;
+        blockedBlockIds = resolveIds(safety == null ? null : safety.blockedBlocks,
+                "block", core.platform()::blockTypeId);
+        blockedFluidIds = resolveIds(safety == null ? null : safety.blockedFluids,
+                "fluid", core.platform()::fluidTypeId);
+        blockedIdsResolved = true;
+    }
+
+    private Set<Integer> resolveIds(List<String> names, String kind, java.util.function.ToIntFunction<String> lookup) {
+        if (names == null || names.isEmpty()) {
+            return Set.of();
+        }
+        Set<Integer> ids = new HashSet<>();
+        List<String> unknown = new ArrayList<>();
+        for (String name : names) {
+            if (name == null || name.isBlank()) {
+                continue;
+            }
+            int id = lookup.applyAsInt(name.trim());
+            if (id < 0) {
+                unknown.add(name.trim());
+            } else {
+                ids.add(id);
+            }
+        }
+        if (!unknown.isEmpty()) {
+            log("AFK zone safe teleport: unknown " + kind + " id(s) " + String.join(", ", unknown)
+                    + " — ignored. Use the asset file name (e.g. Fluid_Lava for blocks, Lava for fluids).");
+        }
+        return ids;
+    }
+
+    /**
+     * The height the column scan measures candidates against: the midpoint of
+     * the two corner foot levels, i.e. roughly the ground the admin walked when
+     * marking the zone out.
+     */
+    private static int referenceFeetY(AfkConfig.Zone zone) {
+        return (int) Math.round((zone.cornerA.getY() + zone.cornerB.getY()) / 2.0);
+    }
+
+    /** Pre-scan behaviour, kept for {@code safeTeleport.enabled = false}: the lowest corner Y. */
     private static MysticLocation randomPointIn(AfkConfig.Zone zone) {
         double x = randomBetween(zone.cornerA.getX(), zone.cornerB.getX());
         double z = randomBetween(zone.cornerA.getZ(), zone.cornerB.getZ());
@@ -716,6 +844,14 @@ public final class AfkModule extends AbstractMysticModule implements AfkService 
                 .findFirst();
     }
 
+    /** Names of the configured AFK zones; empty before the module's config loads. */
+    private List<String> zoneNames() {
+        if (config == null || config.rewards == null || config.rewards.zones == null) {
+            return List.of();
+        }
+        return config.rewards.zones.stream().map(zone -> zone.name).filter(java.util.Objects::nonNull).toList();
+    }
+
     private static String formatPos(MysticLocation pos) {
         return pos.getWorld() + " " + Math.round(pos.getX()) + ", "
                 + Math.round(pos.getY()) + ", " + Math.round(pos.getZ());
@@ -749,11 +885,11 @@ public final class AfkModule extends AbstractMysticModule implements AfkService 
         return (int) Math.floor(value);
     }
 
+    /** The zone's X/Z footprint — its height is not part of the zone (see {@code Zone.contains}). */
     static String formatSize(AfkConfig.Zone zone) {
         long dx = Math.round(Math.abs(zone.cornerA.getX() - zone.cornerB.getX())) + 1;
-        long dy = Math.round(Math.abs(zone.cornerA.getY() - zone.cornerB.getY())) + 1;
         long dz = Math.round(Math.abs(zone.cornerA.getZ() - zone.cornerB.getZ())) + 1;
-        return dx + "x" + dy + "x" + dz;
+        return dx + "x" + dz;
     }
 
     private static String formatDuration(long millis, boolean roundUp) {
@@ -1143,9 +1279,7 @@ public final class AfkModule extends AbstractMysticModule implements AfkService 
     }
 
     private final class ZoneDeleteCommand extends MysticCommand {
-        private final RequiredArg<String> name = withRequiredArg("name", "Zone name", ArgTypes.STRING)
-                .suggest((commandSender, input, index, result) ->
-                        config.rewards.zones.forEach(z -> result.suggest(z.name)));
+        private final RequiredArg<String> name = withRequiredArg("name", "Zone name", zoneArg);
 
         ZoneDeleteCommand() {
             super(AfkModule.this.core, "delete", "Delete an AFK zone.");
@@ -1171,9 +1305,7 @@ public final class AfkModule extends AbstractMysticModule implements AfkService 
 
     /** Sets or clears ({@code -}) the permission node required to use a zone. */
     private final class ZonePermissionCommand extends MysticCommand {
-        private final RequiredArg<String> name = withRequiredArg("name", "Zone name", ArgTypes.STRING)
-                .suggest((commandSender, input, index, result) ->
-                        config.rewards.zones.forEach(z -> result.suggest(z.name)));
+        private final RequiredArg<String> name = withRequiredArg("name", "Zone name", zoneArg);
         private final RequiredArg<String> node = withRequiredArg("permission", "Permission node, or - to clear",
                 ArgTypes.STRING);
 
@@ -1205,11 +1337,7 @@ public final class AfkModule extends AbstractMysticModule implements AfkService 
 
     /** Sets or clears ({@code -}) the zone auto-AFK teleports idle players into. */
     private final class ZoneDefaultCommand extends MysticCommand {
-        private final RequiredArg<String> name = withRequiredArg("name", "Zone name, or - to clear",
-                ArgTypes.STRING).suggest((commandSender, input, index, result) -> {
-                    result.suggest("-");
-                    config.rewards.zones.forEach(z -> result.suggest(z.name));
-                });
+        private final RequiredArg<String> name = withRequiredArg("name", "Zone name, or - to clear", zoneOrClearArg);
 
         ZoneDefaultCommand() {
             super(AfkModule.this.core, "default", "Set or clear (-) the default auto-AFK teleport zone.");

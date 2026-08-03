@@ -1,0 +1,139 @@
+<!--
+  Server information hub: three columns inside one window.
+
+  Open with /hub (the command attribute below registers the alias) or with
+  /customguis open hub. Resize the window by editing data-custom-width and
+  data-custom-height, then run /customguis reload — no restart needed.
+
+  Every action here uses a built-in verb, so the menu works on a stock server
+  with no companion plugin: command:<cmd> runs a command as the player,
+  console:<cmd> runs it as the server, opengui:<id> navigates to another
+  document, hud:show/hide <id> toggles an overlay, message:<text> writes to
+  chat, and close closes the window.
+-->
+<gui id="hub"
+     command="hub"
+     title="Server Information Center"
+     data-custom-frame="decorated"
+     data-custom-width="1180"
+     data-custom-height="720">
+
+  <row data-custom-gap="12" data-custom-flex="1">
+
+    <!-- ============================ left sidebar ======================== -->
+    <panel data-custom-width="220" data-custom-scroll="true" data-custom-gap="4">
+      <section>Getting Started</section>
+      <navbutton data-custom-accent="#7fd47f" data-custom-actions="command:homes">Homes</navbutton>
+      <navbutton data-custom-accent="#7fd47f" data-custom-actions="command:mail">Mail</navbutton>
+      <navbutton data-custom-accent="#7fd47f" data-custom-actions="command:kits">Kits</navbutton>
+      <navbutton data-custom-accent="#7fd47f" data-custom-actions="command:warps">Warps</navbutton>
+      <navbutton data-custom-accent="#7fd47f" data-custom-actions="command:spawn">Spawn</navbutton>
+
+      <spacer data-custom-height="10"></spacer>
+
+      <section>Server</section>
+      <navbutton data-custom-accent="#e8a93b" data-custom-actions="command:patchnotes">Patch Notes</navbutton>
+      <navbutton data-custom-accent="#e8a93b" data-custom-actions="command:pv">Player Vaults</navbutton>
+      <navbutton data-custom-accent="#e8a93b" data-custom-actions="command:tpa">Teleport Requests</navbutton>
+      <navbutton data-custom-accent="#e8a93b" data-custom-actions="command:rtp">Random Teleport</navbutton>
+
+      <spacer data-custom-height="10"></spacer>
+
+      <section>Regions</section>
+      <navbutton data-custom-accent="#d4a06a" data-custom-actions="command:warp oasis">Oasis</navbutton>
+      <navbutton data-custom-accent="#d4a06a" data-custom-actions="command:warp harbor">Harbor</navbutton>
+      <navbutton data-custom-accent="#d4a06a" data-custom-actions="command:warp volcano">Volcano</navbutton>
+    </panel>
+
+    <!-- ============================== centre ============================ -->
+    <column data-custom-flex="1" data-custom-gap="10" data-custom-scroll="true">
+
+      <!-- Banner artwork: drop a PNG under Common/UI/Custom/ in your asset
+           pack and uncomment this, pointing data-custom-src at it.
+      <image data-custom-src="MysticEssentials/Layout/Banner.png"
+             data-custom-height="120"></image>
+      -->
+
+      <text class="center muted">Welcome back, %player_name%!</text>
+
+      <search data-custom-name="q"
+              data-custom-placeholder="Search commands, rules, FAQ..."
+              data-custom-label="Search"
+              data-custom-actions="message:&amp;7You searched for &amp;f{q}"></search>
+
+      <panel data-custom-accent="#e8a93b" data-custom-gap="2">
+        <text data-custom-color="#e8a93b" data-custom-bold="true">Latest Update</text>
+        <text class="muted small">Patch notes are available on the website and with /patchnotes.</text>
+      </panel>
+
+      <grid data-custom-columns="2" data-custom-width="640" data-custom-gap="10">
+        <card data-custom-title="Patch Notes"
+              data-custom-subtitle="What changed recently"
+              data-custom-icon="hytale:gold_ingot"
+              data-custom-height="72"
+              data-custom-actions="command:patchnotes"></card>
+        <card data-custom-title="Commands"
+              data-custom-subtitle="Browse every command"
+              data-custom-icon="hytale:torch"
+              data-custom-height="72"
+              data-custom-actions="command:help"></card>
+        <card data-custom-title="Rules"
+              data-custom-subtitle="Sends the rules to chat"
+              data-custom-icon="hytale:feather"
+              data-custom-height="72"
+              data-custom-actions="message:&amp;6Rules&amp;7: be kind, no griefing, no cheating."></card>
+        <card data-custom-title="Server Info"
+              data-custom-subtitle="Module and version status"
+              data-custom-icon="hytale:map"
+              data-custom-height="72"
+              data-custom-actions="command:mystic"></card>
+      </grid>
+
+      <section>Overlays &amp; Navigation</section>
+
+      <grid data-custom-columns="2" data-custom-width="640" data-custom-gap="10">
+        <card data-custom-title="Show Profile Card"
+              data-custom-subtitle="Overlay with live counters"
+              data-custom-icon="hytale:gold_ingot"
+              data-custom-height="72"
+              data-custom-actions="hud:show profilecard"></card>
+        <card data-custom-title="Hide Profile Card"
+              data-custom-subtitle="Removes the overlay"
+              data-custom-icon="hytale:iron_sword"
+              data-custom-height="72"
+              data-custom-actions="hud:hide profilecard"></card>
+        <card data-custom-title="World Portals"
+              data-custom-subtitle="Travel between the realms"
+              data-custom-icon="hytale:diamond"
+              data-custom-height="72"
+              data-custom-actions="command:portals"></card>
+        <card data-custom-title="Close"
+              data-custom-subtitle="Closes this window"
+              data-custom-icon="hytale:emerald"
+              data-custom-height="72"
+              data-custom-actions="close"></card>
+      </grid>
+    </column>
+
+    <!-- =========================== right sidebar ======================== -->
+    <panel data-custom-width="220" data-custom-scroll="true" data-custom-gap="4">
+      <section>Progression</section>
+      <navbutton data-custom-accent="#e8a93b" data-custom-actions="command:afk">Toggle AFK</navbutton>
+      <navbutton data-custom-accent="#e8a93b" data-custom-actions="command:nick">Nickname</navbutton>
+      <navbutton data-custom-accent="#e8a93b" data-custom-actions="command:fly">Flight</navbutton>
+      <navbutton data-custom-accent="#e8a93b" data-custom-actions="command:back">Back</navbutton>
+      <navbutton data-custom-accent="#e8a93b" data-custom-actions="command:tpaccept">Accept Teleport</navbutton>
+      <navbutton data-custom-accent="#e8a93b" data-custom-actions="command:help">Help</navbutton>
+
+      <spacer data-custom-height="10"></spacer>
+
+      <section>Overlays</section>
+      <navbutton data-custom-accent="#c76a9c" data-custom-actions="showhud:profilecard">Show Profile Card</navbutton>
+      <navbutton data-custom-accent="#c76a9c" data-custom-actions="hidehud:profilecard">Hide Profile Card</navbutton>
+      <navbutton data-custom-accent="#c76a9c" data-custom-actions="showhud:nameplate">Show Nameplate</navbutton>
+      <navbutton data-custom-accent="#c76a9c" data-custom-actions="hidehud:nameplate">Hide Nameplate</navbutton>
+      <navbutton data-custom-accent="#c76a9c" data-custom-actions="close">Close Menu</navbutton>
+    </panel>
+
+  </row>
+</gui>

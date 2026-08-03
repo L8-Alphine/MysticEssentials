@@ -25,6 +25,8 @@ public final class Permissions {
 
     public static final String RELOAD = "mysticessentials.reload";
     public static final String MIGRATE = "mysticessentials.migrate";
+    /** View the license status and re-read {@code license.mclicense} from disk. */
+    public static final String LICENSE = "mysticessentials.license";
     /** Receive a clickable update notice on join when this build is outdated. */
     public static final String UPDATE_NOTIFY = "mysticessentials.update.notify";
 
@@ -32,6 +34,7 @@ public final class Permissions {
 
     public static final String TELEPORT_TPA = "mysticessentials.teleport.tpa";
     public static final String TELEPORT_TP = "mysticessentials.teleport.tp";
+    public static final String TELEPORT_TP_WORLD = "mysticessentials.teleport.tp.world";
     public static final String TELEPORT_TPHERE = "mysticessentials.teleport.tphere";
     public static final String TELEPORT_TPALL = "mysticessentials.teleport.tpall";
     public static final String TELEPORT_TOP = "mysticessentials.teleport.top";
@@ -119,6 +122,15 @@ public final class Permissions {
     public static final String PATCHNOTES_OPEN_OTHERS = "mysticessentials.patchnotes.open.others";
     public static final String PATCHNOTES_MARKREAD_OTHERS = "mysticessentials.patchnotes.markread.others";
 
+    // ----- CustomGUIs & CustomDialogs ---------------------------------------------
+
+    /** Grants combined CustomGUIs and CustomDialogs administration. */
+    public static final String CUSTOMCONTENT_ADMIN = "mysticessentials.customcontent.admin";
+    /** Opens and edits CustomDialogs definitions. */
+    public static final String CUSTOMDIALOGS_ADMIN = "mysticessentials.customdialogs.admin";
+    /** Lists, opens for players, and reloads CustomGUIs. */
+    public static final String CUSTOMGUIS_ADMIN = "mysticessentials.customguis.admin";
+
     // ----- Announcements ---------------------------------------------------------
 
     public static final String ANNOUNCEMENT_BROADCAST = "mysticessentials.announcement.broadcast";
@@ -140,12 +152,62 @@ public final class Permissions {
     public static final String CHAT_CHANNEL_CREATE_TEMP = "mysticessentials.chat.channel.create.temp";
     /** Dynamic: {@code mysticessentials.chat.channel.<id>[.speak|.listen|.moderator]}. */
     public static final String CHAT_CHANNEL_BASE = "mysticessentials.chat.channel";
+    /** Open a channel roster / member list. */
+    public static final String CHANNEL_MEMBERS_VIEW = "mysticessentials.channel.members.view";
+    /** Marks a player as server staff for the roster {@code STAFF} tag (resolved live). */
+    public static final String CHAT_STAFF = "mysticessentials.chat.staff";
+    /** Staff moderation override: manage / force-transfer / force-close any temporary channel (§17). */
+    public static final String CHANNEL_STAFF_OVERRIDE = "mysticessentials.channel.staff.override";
     public static final String CHAT_COLOR_LEGACY = "mysticessentials.chat.color.legacy";
     public static final String CHAT_COLOR_HEX = "mysticessentials.chat.color.hex";
     public static final String CHAT_COLOR_GRADIENT = "mysticessentials.chat.color.gradient";
     public static final String CHAT_COLOR_RAINBOW = "mysticessentials.chat.color.rainbow";
     public static final String CHAT_COLOR_MINIMESSAGE = "mysticessentials.chat.color.minimessage";
     public static final String CHAT_COLOR_LINKS = "mysticessentials.chat.color.links";
+
+    // ----- Chat mentions ----------------------------------------------------------
+    // Mass mentions are gated separately from ordinary ones, and from each other,
+    // because their cost scales with the player count: someone trusted to ping a
+    // teammate is not automatically trusted to ping the whole server.
+
+    /** Use {@code @PlayerName} at all. */
+    public static final String CHAT_MENTION = "mysticessentials.chat.mention";
+    /** Mention more than one player in a single message. */
+    public static final String CHAT_MENTION_MULTIPLE = "mysticessentials.chat.mention.multiple";
+    /** Skip the sender-side mention cooldowns and per-minute budget. */
+    public static final String CHAT_MENTION_BYPASS_COOLDOWN =
+            "mysticessentials.chat.mention.bypass-cooldown";
+    /**
+     * Reach a player through their own mention settings — scope, block list, and
+     * do-not-disturb. Kept separate from {@link #CHAT_MENTION_BYPASS_COOLDOWN} so
+     * "can contact anyone" and "can ping rapidly" are granted independently.
+     */
+    public static final String CHAT_MENTION_BYPASS_SETTINGS =
+            "mysticessentials.chat.mention.bypass-settings";
+    /** Mention a player who is offline (requires offline mentions to be enabled). */
+    public static final String CHAT_MENTION_OFFLINE = "mysticessentials.chat.mention.offline";
+    /** Both marks a player as staff for {@code @staff} and allows mentioning them. */
+    public static final String CHAT_MENTION_STAFF = "mysticessentials.chat.mention.staff";
+    /** {@code @everyone} / {@code @online}. */
+    public static final String CHAT_MENTION_EVERYONE = "mysticessentials.chat.mention.everyone";
+    /** {@code @channel} — everyone receiving the current message. */
+    public static final String CHAT_MENTION_CHANNEL = "mysticessentials.chat.mention.channel";
+    /** {@code @guild} — resolved by a guild mod through a registered audience resolver. */
+    public static final String CHAT_MENTION_GUILD = "mysticessentials.chat.mention.guild";
+
+    // ----- Notifications ------------------------------------------------------------
+
+    /** Receives notifications addressed to the staff audience. */
+    public static final String NOTIFICATIONS_STAFF = "mysticessentials.notifications.staff";
+    /** Send an alert at a chosen category and priority. */
+    public static final String NOTIFICATIONS_SEND = "mysticessentials.notifications.send";
+    /** Send a CRITICAL alert — the one priority players cannot suppress. */
+    public static final String NOTIFICATIONS_CRITICAL = "mysticessentials.notifications.critical";
+
+    // ----- Item links ----------------------------------------------------------------
+
+    /** Share the held item in chat with the item tag. */
+    public static final String CHAT_ITEMLINK_USE = "mysticessentials.chat.itemlink.use";
 
     // ----- Kits ------------------------------------------------------------------
 

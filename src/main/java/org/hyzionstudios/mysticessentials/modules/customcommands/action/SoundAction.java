@@ -17,7 +17,7 @@ import com.hypixel.hytale.server.core.universe.world.SoundUtil;
  * {@code /sound play2d} command performs.
  *
  * <pre>
- * { "type": "sound", "sound": "SFX_UI_Notification",
+ * { "type": "sound", "sound": "SFX_Attn_Moderate",
  *   "category": "sfx", "volume": 1.0, "pitch": 1.0, "target": "sender" }
  * </pre>
  *

@@ -6,6 +6,7 @@ import java.util.UUID;
 
 import org.hyzionstudios.mysticessentials.api.Permissions;
 import org.hyzionstudios.mysticessentials.core.module.AbstractMysticModule;
+import org.hyzionstudios.mysticessentials.platform.command.MysticArgTypes;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommand;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommandSender;
 
@@ -436,8 +437,7 @@ public final class NickModule extends AbstractMysticModule {
 
     private final class NickSetOtherVariant extends MysticCommand {
         private final RequiredArg<String> target = withRequiredArg("player", "Target player",
-                ArgTypes.STRING).suggest((commandSender, input, index, result) ->
-                        core.platform().onlinePlayers().forEach(p -> result.suggest(p.getUsername())));
+                MysticArgTypes.PLAYER_NAME);
         private final RequiredArg<String> nick = withRequiredArg("nickname", "New nickname", ArgTypes.STRING);
 
         NickSetOtherVariant() {

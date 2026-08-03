@@ -1,5 +1,7 @@
 package org.hyzionstudios.mysticessentials.modules.teleportation.rtp;
 
+import static org.hyzionstudios.mysticessentials.platform.ui.MysticPage.uiText;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -65,12 +67,12 @@ final class RtpPages {
                 RtpProfile p = profiles.get(i);
                 String row = "#ProfileList[" + i + "]";
                 cmd.append("#ProfileList", PROFILE_ROW_UI);
-                cmd.set(row + " #Name.Text", p.displayNameOrId());
-                cmd.set(row + " #World.Text", "World: " + p.world);
-                cmd.set(row + " #Details.Text", p.minimumRadius + "-" + p.maximumRadius
-                        + " blocks   Cost: " + costText(core, p) + "   Cooldown: " + p.cooldownSeconds + "s");
+                cmd.set(row + " #Name.TextSpans", uiText(row + " #Name.TextSpans", p.displayNameOrId()));
+                cmd.set(row + " #World.TextSpans", uiText(row + " #World.TextSpans", "World: " + p.world));
+                cmd.set(row + " #Details.TextSpans", uiText(row + " #Details.TextSpans", p.minimumRadius + "-" + p.maximumRadius
+                        + " blocks   Cost: " + costText(core, p) + "   Cooldown: " + p.cooldownSeconds + "s"));
                 long cd = rtp.service().cooldownRemaining(player.getUuid(), p.id);
-                cmd.set(row + " #Status.Text", cd > 0 ? "On cooldown: " + cd + "s" : "Ready");
+                cmd.set(row + " #Status.TextSpans", uiText(row + " #Status.TextSpans", cd > 0 ? "On cooldown: " + cd + "s" : "Ready"));
                 boolean ready = cd <= 0;
                 cmd.set(row + " #TeleportButton.Visible", ready);
                 if (ready) {
@@ -113,11 +115,11 @@ final class RtpPages {
                 reopen(ref, store, new SelectPage(core, rtp, player));
                 return;
             }
-            cmd.set("#ProfileName.Text", p.displayNameOrId());
-            cmd.set("#World.Text", "World: " + p.world);
-            cmd.set("#Range.Text", "Range: " + p.minimumRadius + " - " + p.maximumRadius + " blocks");
-            cmd.set("#Cost.Text", "Cost: " + costText(core, p));
-            cmd.set("#Timing.Text", "Warmup: " + p.warmupSeconds + "s   Cooldown: " + p.cooldownSeconds + "s");
+            cmd.set("#ProfileName.TextSpans", uiText("#ProfileName.TextSpans", p.displayNameOrId()));
+            cmd.set("#World.TextSpans", uiText("#World.TextSpans", "World: " + p.world));
+            cmd.set("#Range.TextSpans", uiText("#Range.TextSpans", "Range: " + p.minimumRadius + " - " + p.maximumRadius + " blocks"));
+            cmd.set("#Cost.TextSpans", uiText("#Cost.TextSpans", "Cost: " + costText(core, p)));
+            cmd.set("#Timing.TextSpans", uiText("#Timing.TextSpans", "Warmup: " + p.warmupSeconds + "s   Cooldown: " + p.cooldownSeconds + "s"));
             event.addEventBinding(CustomUIEventBindingType.Activating, "#CancelButton",
                     new EventData().put("action", "cancel"));
             event.addEventBinding(CustomUIEventBindingType.Activating, "#ConfirmButton",
@@ -160,19 +162,19 @@ final class RtpPages {
         public void build(Ref<EntityStore> ref, UICommandBuilder cmd, UIEventBuilder event,
                 Store<EntityStore> store) {
             cmd.append(ADMIN_UI);
-            cmd.set("#Summary.Text", "Queue: " + rtp.engine().activeCount() + " active, "
-                    + rtp.engine().queuedCount() + " queued");
+            cmd.set("#Summary.TextSpans", uiText("#Summary.TextSpans", "Queue: " + rtp.engine().activeCount() + " active, "
+                    + rtp.engine().queuedCount() + " queued"));
             List<RtpProfile> profiles = new ArrayList<>(rtp.config().profiles.values());
             cmd.set("#Empty.Visible", profiles.isEmpty());
             for (int i = 0; i < profiles.size(); i++) {
                 RtpProfile p = profiles.get(i);
                 String row = "#ProfileList[" + i + "]";
                 cmd.append("#ProfileList", ADMIN_ROW_UI);
-                cmd.set(row + " #Name.Text", p.displayNameOrId() + (p.enabled ? "" : " (disabled)"));
-                cmd.set(row + " #World.Text", "World: " + p.world);
-                cmd.set(row + " #Details.Text", p.shape.name().toLowerCase(Locale.ROOT)
-                        + "   " + p.minimumRadius + "-" + p.maximumRadius + " blocks");
-                cmd.set(row + " #Result.Text", results.getOrDefault(p.id, ""));
+                cmd.set(row + " #Name.TextSpans", uiText(row + " #Name.TextSpans", p.displayNameOrId() + (p.enabled ? "" : " (disabled)")));
+                cmd.set(row + " #World.TextSpans", uiText(row + " #World.TextSpans", "World: " + p.world));
+                cmd.set(row + " #Details.TextSpans", uiText(row + " #Details.TextSpans", p.shape.name().toLowerCase(Locale.ROOT)
+                        + "   " + p.minimumRadius + "-" + p.maximumRadius + " blocks"));
+                cmd.set(row + " #Result.TextSpans", uiText(row + " #Result.TextSpans", results.getOrDefault(p.id, "")));
                 event.addEventBinding(CustomUIEventBindingType.Activating, row + " #ToggleButton",
                         new EventData().put("action", "toggle").put("profile", p.id));
                 event.addEventBinding(CustomUIEventBindingType.Activating, row + " #TestButton",

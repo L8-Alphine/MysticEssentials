@@ -1,0 +1,50 @@
+$C = "../Common.ui";
+
+// One row in the Notification Center. Appended per entry:
+//   cmd.append("#NotificationList", "MysticEssentials/NotificationRow.ui")
+// then #Title / #Sub / #Meta are set and #OpenButton / #DismissButton are bound.
+//
+// #Accent is recoloured per category so the list scans by colour at a glance;
+// unread rows say so in #Meta rather than relying on colour alone.
+
+Group #Row {
+  Anchor: (Height: 64, Bottom: 6);
+  LayoutMode: Left;
+  Background: #000000(0.18);
+  Padding: (Horizontal: 10, Vertical: 6);
+
+  Group #Accent {
+    Anchor: (Width: 4, Height: 48, Right: 10);
+    Background: #7a9cc6;
+  }
+
+  Group {
+    LayoutMode: Top;
+    FlexWeight: 1;
+
+    Label #Title {
+      Anchor: (Height: 20, Bottom: 2);
+      Style: (FontSize: 14, RenderBold: true, TextColor: #ffffff, VerticalAlignment: Center);
+    }
+
+    Label #Sub {
+      Anchor: (Height: 18, Bottom: 2);
+      Style: (FontSize: 12, TextColor: #c9d6e5, VerticalAlignment: Center);
+    }
+
+    Label #Meta {
+      Anchor: (Height: 16);
+      Style: (FontSize: 11, TextColor: #96a9be, VerticalAlignment: Center);
+    }
+  }
+
+  $C.@SmallSecondaryTextButton #OpenButton {
+    @Text = "Open";
+    @Anchor = (Width: 90, Right: 6);
+  }
+
+  $C.@SmallSecondaryTextButton #DismissButton {
+    @Text = "Dismiss";
+    @Anchor = (Width: 100);
+  }
+}

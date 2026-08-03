@@ -14,6 +14,7 @@ public final class MainConfig {
     public Storage storage = new Storage();
     public Integrations integrations = new Integrations();
     public UpdateNotifier updateNotifier = new UpdateNotifier();
+    public PlayerList playerList = new PlayerList();
     public Map<String, Boolean> modules = defaultModules();
 
     private static Map<String, Boolean> defaultModules() {
@@ -38,6 +39,8 @@ public final class MainConfig {
         map.put("customcommands", false);
         // Player Vaults ships disabled: enable here AND in modules/playervaults/config.json.
         map.put("playervaults", false);
+        // CustomGUIs & CustomDialogs ships disabled.
+        map.put("customcontent", false);
         return map;
     }
 
@@ -83,5 +86,36 @@ public final class MainConfig {
         public boolean enabled = true;
         public boolean notifyOnJoin = true;
         public int checkIntervalHours = 12;
+    }
+
+    /**
+     * Decoration of the names shown in the client's <b>Server Players</b> list
+     * (the map screen roster). The client renders that field as plain text, so
+     * colour/format markup in the resolved name is stripped before it is sent.
+     */
+    public static final class PlayerList {
+        /** Master switch. When off, the engine's plain usernames are left alone. */
+        public boolean enabled = true;
+        /**
+         * The listed name. {@code {display_name}} is the nickname set through
+         * {@code /nick} falling back to the username; {@code {player_name}} is
+         * always the real username. Any registered Mystic placeholder works,
+         * including {@code {luckperms_prefix}}, {@code {luckperms_suffix}} and
+         * {@code {group}}.
+         */
+        public String format = "{luckperms_prefix}{display_name}{luckperms_suffix}";
+        /** Marks AFK players in the list (requires the {@code afk} module). */
+        public boolean showAfk = true;
+        /** Applied to AFK players; {@code {name}} is the name produced by {@link #format}. */
+        public String afkFormat = "{name} (AFK)";
+        /** How often names are recomputed and changes pushed, in seconds. */
+        public int refreshSeconds = 5;
+        /**
+         * Sends a remove-then-add pair when replacing an entry instead of a bare
+         * add. Keep this on unless a client build is seen to flicker: it is the
+         * only form that is correct whether the client upserts list entries by
+         * UUID or appends them.
+         */
+        public boolean rebuildEntries = true;
     }
 }

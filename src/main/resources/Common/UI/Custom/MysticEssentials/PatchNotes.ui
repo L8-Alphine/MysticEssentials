@@ -14,7 +14,6 @@ $C.@Container {
       Label #HeaderInfo {
         Anchor: (Top: 8, Right: 14, Width: 260, Height: 24);
         Style: (FontSize: 14, TextColor: #7bd88f, HorizontalAlignment: End, VerticalAlignment: Center);
-        Text: "";
       }
     }
   }
@@ -53,7 +52,6 @@ $C.@Container {
       Label #ListEmpty {
         Anchor: (Height: 40);
         Style: (FontSize: 14, TextColor: #9fb0c4, VerticalAlignment: Center, Wrap: true);
-        Text: "No patch notes yet.";
         Visible: false;
       }
 
@@ -74,19 +72,16 @@ $C.@Container {
       Label #PatchTitle {
         Anchor: (Height: 30, Bottom: 4);
         Style: (FontSize: 22, RenderBold: true, TextColor: #ffffff);
-        Text: "Patch Notes";
       }
 
       Label #PatchMeta {
         Anchor: (Height: 18, Bottom: 6);
         Style: (FontSize: 13, TextColor: #96a9be);
-        Text: "";
       }
 
       Label #PatchSummary {
         Anchor: (Height: 34, Bottom: 8);
         Style: (FontSize: 14, TextColor: #c9d6e5, Wrap: true);
-        Text: "";
         Visible: false;
       }
 
@@ -103,7 +98,6 @@ $C.@Container {
       Label #ContentEmpty {
         Anchor: (Height: 30);
         Style: (FontSize: 14, TextColor: #9fb0c4, VerticalAlignment: Center, Wrap: true);
-        Text: "";
         Visible: false;
       }
 

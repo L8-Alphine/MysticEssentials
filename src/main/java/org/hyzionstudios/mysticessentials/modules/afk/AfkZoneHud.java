@@ -1,5 +1,7 @@
 package org.hyzionstudios.mysticessentials.modules.afk;
 
+import static org.hyzionstudios.mysticessentials.platform.ui.MysticPage.uiText;
+
 import com.hypixel.hytale.server.core.entity.entities.player.hud.CustomUIHud;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
@@ -25,6 +27,8 @@ final class AfkZoneHud extends CustomUIHud {
     @Override
     protected void build(UICommandBuilder cmd) {
         cmd.append(UI_FILE);
-        cmd.set("#Status.Text", zoneName + " | " + elapsed + " | " + nextReward);
+        cmd.set("#MysticWarmupStatus.TextSpans",
+                uiText("#MysticWarmupStatus.TextSpans",
+                        zoneName + " | " + elapsed + " | " + nextReward));
     }
 }

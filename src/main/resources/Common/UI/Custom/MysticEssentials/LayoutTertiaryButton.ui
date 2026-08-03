@@ -1,0 +1,12 @@
+// Quiet tertiary button for <button data-custom-variant="tertiary">.
+$C = "../Common.ui";
+
+$C.@TertiaryTextButton {
+  // Required parameter: Common.ui gives @Anchor and @Sounds defaults but not
+  // @Text, so omitting it leaves "Text: @Text" unresolved. That does not just
+  // break this document -- it stops the client resolving documents from OTHER
+  // packs, disconnecting every player at world join.
+  @Text = "";
+  @Anchor = (Height: 40);
+  FlexWeight: 1;
+}

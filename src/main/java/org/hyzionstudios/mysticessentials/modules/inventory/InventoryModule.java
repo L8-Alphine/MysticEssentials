@@ -17,13 +17,13 @@ import java.util.logging.Level;
 import org.hyzionstudios.mysticessentials.api.Permissions;
 import org.hyzionstudios.mysticessentials.core.module.AbstractMysticModule;
 import org.hyzionstudios.mysticessentials.core.util.Json;
+import org.hyzionstudios.mysticessentials.platform.command.MysticArgTypes;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommand;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommandSender;
 
 import com.google.gson.reflect.TypeToken;
 import com.hypixel.hytale.server.core.command.system.arguments.system.RequiredArg;
-import com.hypixel.hytale.server.core.command.system.arguments.types.ArgTypes;
-import com.hypixel.hytale.server.core.command.system.suggestion.SuggestionProvider;
+import com.hypixel.hytale.server.core.command.system.arguments.types.SingleArgumentType;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
@@ -56,6 +56,14 @@ public final class InventoryModule extends AbstractMysticModule {
     private ScheduledFuture<?> timedTask;
     /** Players whose current death has already been snapshotted. */
     private final Set<UUID> deathHandled = ConcurrentHashMap.newKeySet();
+
+    /** Online player names plus the {@code all} literal, for the clear commands. */
+    private final SingleArgumentType<String> playerOrAllArg = MysticArgTypes.dynamic(commandSender -> {
+        List<String> values = new ArrayList<>();
+        values.add("all");
+        values.addAll(MysticArgTypes.visiblePlayerNames(commandSender));
+        return values;
+    });
 
     public InventoryModule() {
         super("inventory", "Inventory", "1.0.0");
@@ -352,11 +360,6 @@ public final class InventoryModule extends AbstractMysticModule {
         });
     }
 
-    private SuggestionProvider onlinePlayerSuggestions() {
-        return (commandSender, input, index, result) ->
-                core.platform().onlinePlayers().forEach(p -> result.suggest(p.getUsername()));
-    }
-
     // ----- Commands ----------------------------------------------------------
 
     /**
@@ -385,10 +388,7 @@ public final class InventoryModule extends AbstractMysticModule {
 
     private final class ClearTargetVariant extends MysticCommand {
         private final RequiredArg<String> target = withRequiredArg("player", "Player name or 'all'",
-                ArgTypes.STRING).suggest((commandSender, input, index, result) -> {
-                    result.suggest("all");
-                    core.platform().onlinePlayers().forEach(p -> result.suggest(p.getUsername()));
-                });
+                playerOrAllArg);
 
         ClearTargetVariant() {
             super(InventoryModule.this.core, "Clear a player's inventory (or all).");
@@ -461,10 +461,7 @@ public final class InventoryModule extends AbstractMysticModule {
 
     private final class InventoryClearTargetVariant extends MysticCommand {
         private final RequiredArg<String> target = withRequiredArg("player", "Player name or 'all'",
-                ArgTypes.STRING).suggest((commandSender, input, index, result) -> {
-                    result.suggest("all");
-                    core.platform().onlinePlayers().forEach(p -> result.suggest(p.getUsername()));
-                });
+                playerOrAllArg);
 
         InventoryClearTargetVariant() {
             super(InventoryModule.this.core, "Clear a player's inventory (or all).");
@@ -479,7 +476,7 @@ public final class InventoryModule extends AbstractMysticModule {
 
     private final class InventoryRestoreSubCommand extends MysticCommand {
         private final RequiredArg<String> target = withRequiredArg("player", "Target player",
-                ArgTypes.STRING).suggest(onlinePlayerSuggestions());
+                MysticArgTypes.PLAYER_NAME);
 
         InventoryRestoreSubCommand() {
             super(InventoryModule.this.core, "restore", "Browse and restore a player's inventory snapshots.");

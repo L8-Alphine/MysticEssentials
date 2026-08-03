@@ -19,31 +19,26 @@ $C.@Container {
     Label #ProfileName {
       Anchor: (Height: 30);
       Style: (FontSize: 18, TextColor: #ffffff, RenderBold: true);
-      Text: "Profile";
     }
 
     Label #World {
       Anchor: (Height: 24);
       Style: (FontSize: 14, TextColor: #9fb0c4);
-      Text: "World:";
     }
 
     Label #Range {
       Anchor: (Height: 24);
       Style: (FontSize: 14, TextColor: #9fb0c4);
-      Text: "Range:";
     }
 
     Label #Cost {
       Anchor: (Height: 24);
       Style: (FontSize: 14, TextColor: #9fb0c4);
-      Text: "Cost:";
     }
 
     Label #Timing {
       Anchor: (Height: 24);
       Style: (FontSize: 14, TextColor: #9fb0c4);
-      Text: "Warmup / Cooldown:";
     }
 
     Group {

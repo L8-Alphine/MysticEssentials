@@ -67,6 +67,23 @@ public abstract class AbstractMysticModule implements MysticModule {
         // Modules with reloadable config override this.
     }
 
+    /**
+     * The {@code mysticessentials} license feature this module needs, or null
+     * when it is free — which is the default and true of almost every module.
+     *
+     * <p>A module that returns a feature id here stays disabled unless the
+     * license grants it. That is the only consequence: nothing else is switched
+     * off, and a missing or broken license never stops the mod or the server
+     * from starting. Ids live in
+     * {@link com.mysticlicensing.license.Products.Essentials} so a typo is a
+     * compile error rather than a module that silently never enables.
+     *
+     * @see org.hyzionstudios.mysticessentials.core.license.LicenseSupport
+     */
+    public String licensedFeature() {
+        return null;
+    }
+
     // ----- Helpers -----------------------------------------------------------
 
     protected void registerCommand(MysticCommand command) {

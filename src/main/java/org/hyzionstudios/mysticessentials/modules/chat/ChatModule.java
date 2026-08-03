@@ -12,6 +12,7 @@ import org.hyzionstudios.mysticessentials.api.service.ChatService;
 import org.hyzionstudios.mysticessentials.core.module.AbstractMysticModule;
 import org.hyzionstudios.mysticessentials.modules.chat.itemlink.ItemLinkSubModule;
 import org.hyzionstudios.mysticessentials.modules.chat.itemlink.ItemSnapshot;
+import org.hyzionstudios.mysticessentials.modules.chat.mention.MentionSubModule;
 
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.event.events.player.PlayerChatEvent;
@@ -30,6 +31,7 @@ public final class ChatModule extends AbstractMysticModule implements ChatServic
     private PrivateMessagingSubModule privateMessaging;
     private ChannelsSubModule channels;
     private ItemLinkSubModule itemLinks;
+    private MentionSubModule mentions;
 
     public ChatModule() {
         super("chat", "Chat", "1.0.0");
@@ -42,13 +44,17 @@ public final class ChatModule extends AbstractMysticModule implements ChatServic
         privateMessaging = new PrivateMessagingSubModule(core, this);
         channels = new ChannelsSubModule(core, this);
 
-        itemLinks = new ItemLinkSubModule(core);
+        itemLinks = new ItemLinkSubModule(core, core.itemInspection());
+        mentions = new MentionSubModule(core);
 
         privateMessaging.enable(config.privateMessaging, this::registerCommand);
         channels.enable(config.channels, this::registerCommand);
         itemLinks.enable(this::registerCommand);
-        registerEvent(PlayerDisconnectEvent.class, event ->
-                itemLinks.invalidate(event.getPlayerRef().getUuid()));
+        mentions.enable(this::registerCommand);
+        registerEvent(PlayerDisconnectEvent.class, event -> {
+            itemLinks.invalidate(event.getPlayerRef().getUuid());
+            mentions.invalidate(event.getPlayerRef().getUuid());
+        });
 
         if (config.formatChat) {
             registerAsyncEvent(PlayerChatEvent.class,
@@ -70,6 +76,9 @@ public final class ChatModule extends AbstractMysticModule implements ChatServic
         }
         if (itemLinks != null) {
             itemLinks.reload();
+        }
+        if (mentions != null) {
+            mentions.reload();
         }
     }
 
@@ -137,15 +146,28 @@ public final class ChatModule extends AbstractMysticModule implements ChatServic
 
     // ----- Chat formatting ---------------------------------------------------
 
+    /**
+     * The chat pipeline: sanitize, tokenize item links, route to a channel,
+     * detect mentions, then render.
+     *
+     * <p>The ordering is load-bearing. Item links are tokenized <b>before</b>
+     * mention detection, so an {@code @} inside an item's name or metadata cannot
+     * be mistaken for a mention — by that point the item is an opaque token.
+     * Routing runs before mentions so the mention scan only sees the players who
+     * will actually receive the line. And nothing is turned into markup until the
+     * final render step, so every intermediate consumer — the relay, the publish
+     * hook, the console echo — sees inert tokens rather than raw
+     * {@code <link>} tags.</p>
+     */
     private PlayerChatEvent applyChatPipeline(PlayerChatEvent event) {
         if (event.isCancelled()) {
             return event;
         }
         PlayerRef sender = event.getSender();
         String prepared = preparePlayerMessage(sender, event.getContent());
-        // Expand [item] tags into formatted, clickable display names (no inline
-        // icon — that render branch is a verified 0.5.6 dead-end). The captured
-        // snapshot, if any, feeds each recipient's recent-links history below.
+
+        // Item tags become structured tokens, not markup. The captured snapshot,
+        // if any, feeds each recipient's recent-links history below.
         ItemSnapshot pendingSnapshot = null;
         if (itemLinks != null) {
             ItemLinkSubModule.ExpandResult expanded =
@@ -154,17 +176,77 @@ public final class ChatModule extends AbstractMysticModule implements ChatServic
             pendingSnapshot = expanded.snapshot();
         }
         event.setContent(prepared);
+
         if (channels != null) {
             event = channels.route(event);
         }
-        if (!event.isCancelled()) {
-            event.setFormatter(this::renderChatLine);
-            if (pendingSnapshot != null && itemLinks != null) {
-                itemLinks.recordHistory(pendingSnapshot, recipients(event, sender));
-            }
-            publishChatMessageEvent(sender, event.getContent());
+        if (event.isCancelled()) {
+            return event;
+        }
+
+        java.util.List<PlayerRef> recipients = recipients(event, sender);
+        MentionSubModule.Result mentionResult = mentions == null
+                ? null
+                : mentions.process(sender, event.getContent(), senderChannelName(sender), recipients);
+        if (mentionResult != null) {
+            event.setContent(mentionResult.content());
+        }
+
+        if (pendingSnapshot != null && itemLinks != null) {
+            itemLinks.recordHistory(pendingSnapshot, recipients);
+        }
+        // External consumers get the plain-text rendering; raw markup and internal
+        // token syntax never leave this module.
+        publishChatMessageEvent(sender, plainTextOf(event.getContent()));
+
+        if (mentionResult != null && mentionResult.perViewer()) {
+            deliverPerViewer(event, sender, recipients, mentionResult);
+        } else {
+            java.util.Set<java.util.UUID> mentioned =
+                    mentionResult == null ? java.util.Set.of() : mentionResult.mentioned();
+            event.setFormatter((from, content) -> renderChatLine(from, content, null, mentioned));
+        }
+
+        if (mentionResult != null && mentionResult.hasMentions() && mentions != null) {
+            mentions.notifyMentioned(sender, mentionResult.mentioned(),
+                    senderChannelName(sender), plainTextOf(event.getContent()));
         }
         return event;
+    }
+
+    /**
+     * Renders and sends the line once per recipient, so only the mentioned player
+     * sees their name highlighted.
+     *
+     * <p>The engine formats a chat line once and sends the same {@link Message} to
+     * every target, so per-viewer highlighting is only possible by taking over
+     * delivery: targets are cleared and each recipient is sent their own render.
+     * The formatter is still set to the neutral form because the server console
+     * echo runs through it before the (now empty) target loop.</p>
+     */
+    private void deliverPerViewer(PlayerChatEvent event, PlayerRef sender,
+            java.util.List<PlayerRef> recipients, MentionSubModule.Result mentionResult) {
+        String content = event.getContent();
+        java.util.Set<java.util.UUID> mentioned = mentionResult.mentioned();
+        event.setFormatter((from, text) -> renderChatLine(from, text, null, mentioned));
+        event.setTargets(java.util.List.of());
+        for (PlayerRef recipient : recipients) {
+            if (recipient == null) {
+                continue;
+            }
+            try {
+                recipient.sendMessage(
+                        renderChatLine(sender, content, recipient.getUuid(), mentioned));
+            } catch (Throwable t) {
+                log("Per-viewer chat delivery failed for " + recipient.getUsername() + ": " + t);
+            }
+        }
+    }
+
+    /** The token-free, markup-free rendering handed to logs, relays, and bridges. */
+    String plainTextOf(String content) {
+        return ChatTokens.toPlainText(content,
+                id -> itemLinks == null ? null : itemLinks.plainLabel(id));
     }
 
     /** Origin-server-only publish hook for external bridges (see ChatMessagePublishedEvent). */
@@ -217,11 +299,44 @@ public final class ChatModule extends AbstractMysticModule implements ChatServic
     }
 
     String preparePlayerMessage(PlayerRef sender, String raw) {
-        String result = sanitizeColors(sender, raw);
+        // Strip any token delimiter the player typed before anything else runs, so
+        // their text can never be mistaken for markup this module emitted.
+        String result = sanitizeColors(sender, ChatTokens.sanitizeInput(raw));
         return enforceLength(result);
     }
 
-    private Message renderChatLine(PlayerRef sender, String content) {
+    /**
+     * Turns structured tokens into the markup a client renders. Every token has a
+     * defined rendering and every failure has a clean fallback, so no code path
+     * here can emit a raw tag or an unresolved token into chat.
+     */
+    private String expandTokens(String message, UUID viewer, java.util.Set<UUID> mentioned) {
+        if (!ChatTokens.hasTokens(message)) {
+            return message;
+        }
+        return ChatTokens.expand(message, token -> {
+            if (token.isItem()) {
+                return itemLinks == null ? null : itemLinks.renderToken(token.value());
+            }
+            if (token.isMention() && mentions != null) {
+                return viewer == null
+                        ? mentions.renderMentionNeutral(token.value())
+                        : mentions.renderMention(token.value(), viewer, mentioned);
+            }
+            return null;
+        });
+    }
+
+    /**
+     * Renders the finished chat line for one viewer.
+     *
+     * <p>This is the <b>only</b> place structured tokens become client-visible
+     * markup. {@code viewer} is null for the shared/console render; when present
+     * it selects the mention highlight, which is why a mentioned player sees
+     * {@code @Aether} while everybody else sees {@code Aether}.</p>
+     */
+    private Message renderChatLine(PlayerRef sender, String content, UUID viewer,
+            java.util.Set<UUID> mentioned) {
         UUID uuid = sender.getUuid();
         String template = channels == null
                 ? resolveFormat(uuid)
@@ -236,6 +351,7 @@ public final class ChatModule extends AbstractMysticModule implements ChatServic
         if (Boolean.TRUE.equals(config.autoLinkPlainUrls) && allows(sender, config.autoLinkPermission)) {
             message = autoLinkPlainUrls(message);
         }
+        message = expandTokens(message, viewer, mentioned);
         // The player message is substituted after placeholder resolution so
         // player content is never parsed for placeholders (design bible §17.3).
         String finalMessage = message;
@@ -305,6 +421,16 @@ public final class ChatModule extends AbstractMysticModule implements ChatServic
         return url;
     }
 
+    /**
+     * Registers the voice-presence adapter used by the channel roster for live
+     * speaking/mute indicators (design bible §11.4). A voice mod or the MysticIdentity
+     * Discord bridge calls this; passing {@code null} restores the no-op provider.
+     */
+    public void registerVoicePresenceProvider(
+            org.hyzionstudios.mysticessentials.api.voice.ChannelVoicePresenceProvider provider) {
+        channels.setVoicePresenceProvider(provider);
+    }
+
     // ----- ChatService -------------------------------------------------------
 
     @Override
@@ -356,5 +482,26 @@ public final class ChatModule extends AbstractMysticModule implements ChatServic
     @Override
     public java.util.Set<String> temporaryChannelIds() {
         return channels == null ? java.util.Set.of() : channels.temporaryChannelIds();
+    }
+
+    // ----- Mention scopes ----------------------------------------------------
+
+    @Override
+    public void registerMentionScope(
+            org.hyzionstudios.mysticessentials.api.mention.MentionScopeProvider provider) {
+        if (mentions != null) {
+            mentions.registerScope(provider);
+        }
+    }
+
+    @Override
+    public boolean unregisterMentionScope(String scopeId) {
+        return mentions != null && mentions.unregisterScope(scopeId);
+    }
+
+    @Override
+    public java.util.List<org.hyzionstudios.mysticessentials.api.mention.MentionScopeProvider>
+            mentionScopes() {
+        return mentions == null ? java.util.List.of() : mentions.availableScopes();
     }
 }

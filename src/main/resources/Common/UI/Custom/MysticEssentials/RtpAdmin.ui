@@ -19,7 +19,6 @@ $C.@Container {
     Label #Summary {
       Anchor: (Height: 28, Bottom: 6);
       Style: (FontSize: 14, TextColor: #9fb0c4);
-      Text: "Queue: 0 active, 0 queued";
     }
 
     Label #Empty {

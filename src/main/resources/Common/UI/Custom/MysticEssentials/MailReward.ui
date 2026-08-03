@@ -2,7 +2,7 @@ $C = "../Common.ui";
 
 // Reward slot template for the mail reading pane.
 // Appended per attachment: cmd.append("#RewardList", "MysticEssentials/MailReward.ui")
-// then cmd.set("#RewardList[i] #Slot.ItemId", ...) and "#RewardList[i] #Qty.Text".
+// then cmd.set("#RewardList[i] #Slot.ItemId", ...) and "#RewardList[i] #Qty.TextSpans".
 
 Group #Cell {
   Anchor: (Width: 52, Height: 60, Right: 8);
@@ -23,6 +23,5 @@ Group #Cell {
   Label #Qty {
     Anchor: (Height: 14);
     Style: (FontSize: 11, TextColor: #d7e1ee, HorizontalAlignment: Center, VerticalAlignment: Center);
-    Text: "x1";
   }
 }

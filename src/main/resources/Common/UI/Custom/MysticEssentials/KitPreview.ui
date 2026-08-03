@@ -19,13 +19,11 @@ $C.@Container {
     Label #PreviewTitle {
       Anchor: (Height: 30, Bottom: 4);
       Style: (FontSize: 22, RenderBold: true, TextColor: #ffffff);
-      Text: "Kit";
     }
 
     Label #PreviewDescription {
       Anchor: (Height: 44, Bottom: 12);
       Style: (FontSize: 14, TextColor: #96a9be, Wrap: true);
-      Text: "";
     }
 
     Label #PreviewEmpty {

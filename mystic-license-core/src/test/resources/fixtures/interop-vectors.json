@@ -1,0 +1,78 @@
+{
+  "warning": "DEVELOPMENT-ONLY TEST VECTORS. The private key and AES key below are published in this repository and MUST NEVER be used in production.",
+  "spec_version": 1,
+  "canonical_json": {
+    "payload": {
+      "format": "mystic-license",
+      "format_version": 1,
+      "license_id": "lic_01K1A2BCDEF3456789ABCDEFGH",
+      "issuer": "Mystic Licensing",
+      "license_type": "patreon",
+      "subject": {
+        "discord_user_id": "123456789012345678",
+        "patreon_user_id": "987654321"
+      },
+      "binding": {
+        "mode": "server_uuid",
+        "server_uuids": [
+          "20bf6b33-b798-43bb-b248-e4162a26ce28"
+        ]
+      },
+      "products": {
+        "mysticboards": [
+          "scoreboards.conditional",
+          "scoreboards.multiple"
+        ]
+      },
+      "issued_at": "2026-07-27T18:00:00.000Z",
+      "not_before": "2026-07-27T18:00:00.000Z",
+      "expires_at": "2026-08-10T18:00:00.000Z",
+      "grace_period_seconds": 259200,
+      "generation": 1,
+      "supersedes_license_id": null,
+      "metadata": {
+        "entitlement_sources": [
+          "patreon_tier:core_architect"
+        ],
+        "product_scope": "single_product"
+      }
+    },
+    "canonical_text": "{\"binding\":{\"mode\":\"server_uuid\",\"server_uuids\":[\"20bf6b33-b798-43bb-b248-e4162a26ce28\"]},\"expires_at\":\"2026-08-10T18:00:00.000Z\",\"format\":\"mystic-license\",\"format_version\":1,\"generation\":1,\"grace_period_seconds\":259200,\"issued_at\":\"2026-07-27T18:00:00.000Z\",\"issuer\":\"Mystic Licensing\",\"license_id\":\"lic_01K1A2BCDEF3456789ABCDEFGH\",\"license_type\":\"patreon\",\"metadata\":{\"entitlement_sources\":[\"patreon_tier:core_architect\"],\"product_scope\":\"single_product\"},\"not_before\":\"2026-07-27T18:00:00.000Z\",\"products\":{\"mysticboards\":[\"scoreboards.conditional\",\"scoreboards.multiple\"]},\"subject\":{\"discord_user_id\":\"123456789012345678\",\"patreon_user_id\":\"987654321\"},\"supersedes_license_id\":null}",
+    "canonical_bytes_base64url": "eyJiaW5kaW5nIjp7Im1vZGUiOiJzZXJ2ZXJfdXVpZCIsInNlcnZlcl91dWlkcyI6WyIyMGJmNmIzMy1iNzk4LTQzYmItYjI0OC1lNDE2MmEyNmNlMjgiXX0sImV4cGlyZXNfYXQiOiIyMDI2LTA4LTEwVDE4OjAwOjAwLjAwMFoiLCJmb3JtYXQiOiJteXN0aWMtbGljZW5zZSIsImZvcm1hdF92ZXJzaW9uIjoxLCJnZW5lcmF0aW9uIjoxLCJncmFjZV9wZXJpb2Rfc2Vjb25kcyI6MjU5MjAwLCJpc3N1ZWRfYXQiOiIyMDI2LTA3LTI3VDE4OjAwOjAwLjAwMFoiLCJpc3N1ZXIiOiJNeXN0aWMgTGljZW5zaW5nIiwibGljZW5zZV9pZCI6ImxpY18wMUsxQTJCQ0RFRjM0NTY3ODlBQkNERUZHSCIsImxpY2Vuc2VfdHlwZSI6InBhdHJlb24iLCJtZXRhZGF0YSI6eyJlbnRpdGxlbWVudF9zb3VyY2VzIjpbInBhdHJlb25fdGllcjpjb3JlX2FyY2hpdGVjdCJdLCJwcm9kdWN0X3Njb3BlIjoic2luZ2xlX3Byb2R1Y3QifSwibm90X2JlZm9yZSI6IjIwMjYtMDctMjdUMTg6MDA6MDAuMDAwWiIsInByb2R1Y3RzIjp7Im15c3RpY2JvYXJkcyI6WyJzY29yZWJvYXJkcy5jb25kaXRpb25hbCIsInNjb3JlYm9hcmRzLm11bHRpcGxlIl19LCJzdWJqZWN0Ijp7ImRpc2NvcmRfdXNlcl9pZCI6IjEyMzQ1Njc4OTAxMjM0NTY3OCIsInBhdHJlb25fdXNlcl9pZCI6Ijk4NzY1NDMyMSJ9LCJzdXBlcnNlZGVzX2xpY2Vuc2VfaWQiOm51bGx9",
+    "canonical_byte_length": 687,
+    "canonical_sha256_hex": "d1f04b966632081e16eb39ea91b4960f3f904d18e3a0028cc8e6eccd05da1cd3"
+  },
+  "keys": {
+    "signing_key_id": "mystic-signing-test-0001",
+    "ed25519_private_key_pkcs8_pem": "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIBHRM8Me01HXItOU2TM0eXlHBzIN3MBQZwRLr7ynXQVM\n-----END PRIVATE KEY-----\n",
+    "ed25519_public_key_spki_base64": "MCowBQYDK2VwAyEAoGbR0+F5BEwK+Ob1FzZztrrWnZCJxIiNdzxXgxgKNBs=",
+    "ed25519_public_key_raw_base64url": "oGbR0-F5BEwK-Ob1FzZztrrWnZCJxIiNdzxXgxgKNBs",
+    "encryption_key_id": "mystic-license-content-test",
+    "aes_256_key_base64url": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8"
+  },
+  "encryption": {
+    "iv_base64url": "AAECAwQFBgcICQoL",
+    "ciphertext_base64url": "PCC0cquBq3XqY63wk4QXCeb0vRaDHi0KXRW68GgAZJAtMt2Z3bd36ivRCoTs9AoCtXtSvTiwlbgMpAd7L9rNw8QPpBj-sxRVJHnPWt65PIkKvKoHRFtxNYDRvKkAgND_rosGh9Bj8jisLAyEZUUZUotXNprb_xWqd89n47LWXlSZfiKg26WmMnzDcoNQoz-2X5fOWVxy9iT_Ospb2LSGnP726kqfmr4Nzgyz2OWxqpn6q6RH-coH1Qqx4v1A6ZWUYS3pn1Kts7teObe5ySS6648ai1QHMo_IQ6Gq62Mh_Ik2RrDwh1QhH3B1iDqDPExmhaGOIawIs5UnUVdDpaxysU7z3rL0qTtLEq1QPZVgQ3mu3antzOLiyh9cBD9t1pZpbWq9LdS2q0j7WBhgKPnJsMf6ahV41f1V23VYUKQJcN_-rUZrySM8rOWnMwJx8XEL8H-59_lL8XE5xlpcr8EpiytKlreneFCmRdvFR_bBAwq-hj0cgIVptfOAWbmyIwZByvayuuJ08eb6Uo4eSjJ36IxUGNL6Umi3UmK7GSyU2D5wDjIIt_MMXoLIrj2bjdPRAhgnfWzmAt_FyoqD4cd6JwoIwbnbNMtfljbCOZ7gijMM7AQgprgkHnH1iIY8z7GZK9h9MK-p7_5rmjSj2Jzd2rKA8-pPwYVV1Hbif_2TcXHYH56R3FOzNjPfkl8ASUPL5N1JXwwUs8brFm5U2Dp62RhmWemNK5InEqc0ybgKOYIn3fNMg6gBCX6OWqzvAtcsX8-5e1ZqUi-kgoz4pvwk9GT57NBK_IKKxFDTwQHiCeyFc6Mf7ECMrwWq7rAkU-BiQbFoD0Tdza1-fWdNqKXCWHq46WKM4SHpIPhYEsENPLYTUavCb1n1njO_24GjuvSk4PApXn0UFziVH6bOdS1P",
+    "authentication_tag_base64url": "gs2QPmUiQq-yYtFFfjvU7g"
+  },
+  "signature": {
+    "context": "mystic-license-envelope-v1",
+    "signing_input_base64url": "bXlzdGljLWxpY2Vuc2UtZW52ZWxvcGUtdjEAAAAJAAAABE1DTDEAAAABMQAAABhteXN0aWMtc2lnbmluZy10ZXN0LTAwMDEAAAAbbXlzdGljLWxpY2Vuc2UtY29udGVudC10ZXN0AAAAC0FFUy0yNTYtR0NNAAAAB0VkMjU1MTkAAAAQQUFFQ0F3UUZCZ2NJQ1FvTAAAA5RQQ0MwY3F1QnEzWHFZNjN3azRRWENlYjB2UmFESGkwS1hSVzY4R2dBWkpBdE10MlozYmQzNml2UkNvVHM5QW9DdFh0U3ZUaXdsYmdNcEFkN0w5ck53OFFQcEJqLXN4UlZKSG5QV3Q2NVBJa0t2S29IUkZ0eE5ZRFJ2S2tBZ05EX3Jvc0doOUJqOGppc0xBeUVaVVVaVW90WE5wcmJfeFdxZDg5bjQ3TFdYbFNaZmlLZzI2V21NbnpEY29OUW96LTJYNWZPV1Z4eTlpVF9Pc3BiMkxTR25QNzI2a3FmbXI0TnpneXoyT1d4cXBuNnE2UkgtY29IMVFxeDR2MUE2WldVWVMzcG4xS3RzN3RlT2JlNXlTUzY2NDhhaTFRSE1vX0lRNkdxNjJNaF9JazJSckR3aDFRaEgzQjFpRHFEUEV4bWhhR09JYXdJczVVblVWZERwYXh5c1U3ejNyTDBxVHRMRXExUVBaVmdRM211M2FudHpPTGl5aDljQkQ5dDFwWnBiV3E5TGRTMnEwajdXQmhnS1BuSnNNZjZhaFY0MWYxVjIzVllVS1FKY05fLXJVWnJ5U004ck9Xbk13Sng4WEVMOEgtNTlfbEw4WEU1eGxwY3I4RXBpeXRLbHJlbmVGQ21SZHZGUl9iQkF3cS1oajBjZ0lWcHRmT0FXYm15SXdaQnl2YXl1dUowOGViNlVvNGVTakozNkl4VUdOTDZVbWkzVW1LN0dTeVUyRDV3RGpJSXRfTU1Yb0xJcmoyYmpkUFJBaGduZld6bUF0X0Z5b3FENGNkNkp3b0l3Ym5iTk10ZmxqYkNPWjdnaWpNTTdBUWdwcmdrSG5IMWlJWTh6N0daSzloOU1LLXA3XzVybWpTajJKemQycktBOC1wUHdZVlYxSGJpZl8yVGNYSFlINTZSM0ZPek5qUGZrbDhBU1VQTDVOMUpYd3dVczhickZtNVUyRHA2MlJobVdlbU5LNUluRXFjMHliZ0tPWUluM2ZOTWc2Z0JDWDZPV3F6dkF0Y3NYOC01ZTFacVVpLWtnb3o0cHZ3azlHVDU3TkJLX0lLS3hGRFR3UUhpQ2V5RmM2TWY3RUNNcndXcTdyQWtVLUJpUWJGb0QwVGR6YTEtZldkTnFLWENXSHE0NldLTTRTSHBJUGhZRXNFTlBMWVRVYXZDYjFuMW5qT18yNEdqdXZTazRQQXBYbjBVRnppVkg2Yk9kUzFQAAAAFmdzMlFQbVVpUXEteVl0RkZmanZVN2c",
+    "signing_input_sha256_hex": "9653a547710b78225491556d2306fb5df715b6a5a5854c205163151074f3abfb",
+    "signature_base64url": "zBQ6xWeC0gGpW_7ztty_HRPh2EXO4t0u8BNaFpp_v2vsEfg4BYRwoait6szeZt2JsjaFZyfVX15TRDYRLuHWAA"
+  },
+  "example_license": {
+    "magic": "MCL1",
+    "version": 1,
+    "signing_key_id": "mystic-signing-test-0001",
+    "encryption_key_id": "mystic-license-content-test",
+    "algorithm": {
+      "encryption": "AES-256-GCM",
+      "signature": "Ed25519"
+    },
+    "iv": "AAECAwQFBgcICQoL",
+    "ciphertext": "PCC0cquBq3XqY63wk4QXCeb0vRaDHi0KXRW68GgAZJAtMt2Z3bd36ivRCoTs9AoCtXtSvTiwlbgMpAd7L9rNw8QPpBj-sxRVJHnPWt65PIkKvKoHRFtxNYDRvKkAgND_rosGh9Bj8jisLAyEZUUZUotXNprb_xWqd89n47LWXlSZfiKg26WmMnzDcoNQoz-2X5fOWVxy9iT_Ospb2LSGnP726kqfmr4Nzgyz2OWxqpn6q6RH-coH1Qqx4v1A6ZWUYS3pn1Kts7teObe5ySS6648ai1QHMo_IQ6Gq62Mh_Ik2RrDwh1QhH3B1iDqDPExmhaGOIawIs5UnUVdDpaxysU7z3rL0qTtLEq1QPZVgQ3mu3antzOLiyh9cBD9t1pZpbWq9LdS2q0j7WBhgKPnJsMf6ahV41f1V23VYUKQJcN_-rUZrySM8rOWnMwJx8XEL8H-59_lL8XE5xlpcr8EpiytKlreneFCmRdvFR_bBAwq-hj0cgIVptfOAWbmyIwZByvayuuJ08eb6Uo4eSjJ36IxUGNL6Umi3UmK7GSyU2D5wDjIIt_MMXoLIrj2bjdPRAhgnfWzmAt_FyoqD4cd6JwoIwbnbNMtfljbCOZ7gijMM7AQgprgkHnH1iIY8z7GZK9h9MK-p7_5rmjSj2Jzd2rKA8-pPwYVV1Hbif_2TcXHYH56R3FOzNjPfkl8ASUPL5N1JXwwUs8brFm5U2Dp62RhmWemNK5InEqc0ybgKOYIn3fNMg6gBCX6OWqzvAtcsX8-5e1ZqUi-kgoz4pvwk9GT57NBK_IKKxFDTwQHiCeyFc6Mf7ECMrwWq7rAkU-BiQbFoD0Tdza1-fWdNqKXCWHq46WKM4SHpIPhYEsENPLYTUavCb1n1njO_24GjuvSk4PApXn0UFziVH6bOdS1P",
+    "authentication_tag": "gs2QPmUiQq-yYtFFfjvU7g",
+    "signature": "zBQ6xWeC0gGpW_7ztty_HRPh2EXO4t0u8BNaFpp_v2vsEfg4BYRwoait6szeZt2JsjaFZyfVX15TRDYRLuHWAA"
+  }
+}

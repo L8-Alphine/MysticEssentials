@@ -16,6 +16,7 @@ import java.util.concurrent.TimeUnit;
 import org.hyzionstudios.mysticessentials.api.Permissions;
 import org.hyzionstudios.mysticessentials.core.module.AbstractMysticModule;
 import org.hyzionstudios.mysticessentials.core.util.Json;
+import org.hyzionstudios.mysticessentials.platform.command.MysticArgTypes;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommand;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommandSender;
 
@@ -23,6 +24,7 @@ import com.google.gson.reflect.TypeToken;
 import com.hypixel.hytale.event.EventRegistration;
 import com.hypixel.hytale.server.core.command.system.arguments.system.RequiredArg;
 import com.hypixel.hytale.server.core.command.system.arguments.types.ArgTypes;
+import com.hypixel.hytale.server.core.command.system.arguments.types.SingleArgumentType;
 import com.hypixel.hytale.server.core.event.events.ecs.BreakBlockEvent;
 import com.hypixel.hytale.server.core.event.events.player.AddPlayerToWorldEvent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
@@ -66,6 +68,10 @@ public final class PortalsModule extends AbstractMysticModule {
     private static volatile PortalsModule active;
 
     private Map<String, Portal> portals = new LinkedHashMap<>();
+
+    /** Ids of every defined portal. */
+    private final SingleArgumentType<String> portalIdArg = MysticArgTypes.dynamic(commandSender ->
+            snapshot().stream().map(Portal::getId).toList());
 
     /** Worlds (by uuid string) that already have break/join listeners attached. */
     private final Set<String> listenedWorlds = ConcurrentHashMap.newKeySet();
@@ -448,11 +454,6 @@ public final class PortalsModule extends AbstractMysticModule {
 
     // ----- Commands ----------------------------------------------------------
 
-    private com.hypixel.hytale.server.core.command.system.suggestion.SuggestionProvider portalIdSuggestions() {
-        return (commandSender, input, index, result) ->
-                snapshot().forEach(portal -> result.suggest(portal.getId()));
-    }
-
     private String describe(Portal portal) {
         String action = switch (portal.getType()) {
             case WORLD -> portal.getTargetWorld().isBlank() ? "world <unset>"
@@ -529,8 +530,7 @@ public final class PortalsModule extends AbstractMysticModule {
     }
 
     private final class PortalRemoveCommand extends MysticCommand {
-        private final RequiredArg<String> id = withRequiredArg("id", "Portal id", ArgTypes.STRING)
-                .suggest(portalIdSuggestions());
+        private final RequiredArg<String> id = withRequiredArg("id", "Portal id", portalIdArg);
 
         PortalRemoveCommand() {
             super(PortalsModule.this.core, "remove", "Delete a portal by id.");

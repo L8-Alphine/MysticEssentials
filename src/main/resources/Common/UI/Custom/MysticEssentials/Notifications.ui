@@ -1,0 +1,80 @@
+$C = "../Common.ui";
+
+// Notification Center (/notifications).
+//
+// Two generated lists here, both for the same reason: neither the entries nor
+// the filter tabs are known at author time. Rows come from NotificationRow.ui;
+// tabs come from NotificationFilterRow.ui, because which tabs exist depends on
+// which mods are installed — this mod ships All / Unread / Mentions / System and
+// anything like "Guild" is registered through the API.
+//
+// Layout contract: only #NotificationList is flexible; every other block has a
+// fixed height, so the footer buttons always stay inside the container.
+
+$C.@PageOverlay {}
+
+$C.@Container #MysticNotificationShell {
+  Anchor: (Width: 760, Height: 660);
+
+  #Title {
+    Group {
+      $C.@Title #HeaderTitle {
+        @Text = "Notifications";
+      }
+    }
+  }
+
+  #Content {
+    LayoutMode: Top;
+
+    Group {
+      LayoutMode: Left;
+      Anchor: (Height: 28, Bottom: 8);
+
+      Label #FooterCounts {
+        FlexWeight: 1;
+        Style: (FontSize: 13, TextColor: #9fb0c4, VerticalAlignment: Center);
+      }
+
+      $C.@SmallSecondaryTextButton #MarkAllButton {
+        @Text = "Mark All Read";
+        @Anchor = (Width: 160);
+      }
+    }
+
+    Label #ListEmpty {
+      Anchor: (Height: 22, Bottom: 6);
+      Style: (FontSize: 13, TextColor: #9fb0c4, VerticalAlignment: Center);
+      Visible: false;
+    }
+
+    Group #NotificationList {
+      FlexWeight: 1;
+      LayoutMode: TopScrolling;
+      Padding: (Right: 10, Bottom: 8);
+      ScrollbarStyle: $C.@DefaultScrollbarStyle;
+    }
+
+    // Wraps onto a second line so a server with several filter-contributing mods
+    // does not push tabs off the edge.
+    Group #FilterRow {
+      LayoutMode: LeftCenterWrap;
+      Anchor: (Height: 72, Top: 6, Bottom: 4);
+    }
+
+    Group {
+      LayoutMode: Left;
+      Anchor: (Height: 40);
+
+      $C.@SecondaryTextButton #SettingsButton {
+        @Text = "Settings";
+        @Anchor = (Width: 180, Right: 8);
+      }
+
+      $C.@TextButton #CloseButton {
+        @Text = "Close";
+        @Anchor = (Width: 160);
+      }
+    }
+  }
+}

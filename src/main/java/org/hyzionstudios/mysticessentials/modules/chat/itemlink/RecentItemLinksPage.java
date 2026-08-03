@@ -1,8 +1,11 @@
 package org.hyzionstudios.mysticessentials.modules.chat.itemlink;
 
+import static org.hyzionstudios.mysticessentials.platform.ui.MysticPage.uiText;
+
 import java.util.List;
 
 import org.hyzionstudios.mysticessentials.core.MysticCore;
+import org.hyzionstudios.mysticessentials.core.item.ItemViewConfig;
 import org.hyzionstudios.mysticessentials.platform.ui.MysticPage;
 
 import com.google.gson.JsonObject;
@@ -10,7 +13,6 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.protocol.packets.interface_.CustomPageLifetime;
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
-import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.ui.builder.EventData;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
@@ -29,10 +31,10 @@ public final class RecentItemLinksPage extends MysticPage {
     static final String ROW_UI = "MysticEssentials/RecentItemLinkRow.ui";
 
     private final ItemSnapshotService snapshots;
-    private final ItemLinkConfig config;
+    private final ItemViewConfig config;
 
     public RecentItemLinksPage(MysticCore core, PlayerRef player, ItemSnapshotService snapshots,
-            ItemLinkConfig config) {
+            ItemViewConfig config) {
         super(core, player, CustomPageLifetime.CanDismiss);
         this.snapshots = snapshots;
         this.config = config;
@@ -49,15 +51,14 @@ public final class RecentItemLinksPage extends MysticPage {
             ItemSnapshot snapshot = recent.get(i);
             String sel = "#RecentList[" + i + "]";
             cmd.append("#RecentList", ROW_UI);
-            cmd.set(sel + " #Icon.ItemId", snapshot.itemId);
-            if (snapshot.customName != null && !snapshot.customName.isBlank()) {
-                cmd.set(sel + " #Name.Text", snapshot.customName);
-            } else if (snapshot.translationKey != null) {
-                cmd.set(sel + " #Name.Text", Message.translation(snapshot.translationKey));
-            } else {
-                cmd.set(sel + " #Name.Text", snapshot.plainName());
-            }
-            cmd.set(sel + " #Meta.Text", meta(snapshot));
+            cmd.set(sel + " #Icon.ItemId", snapshot.itemId());
+            // Translated names go through as a Message so the client resolves
+            // them; everything else is sent pre-resolved, because a raw Message
+            // set on a text span is a known 0.5.6 client disconnect.
+            cmd.set(sel + " #Name.TextSpans", snapshot.view.displayName().isTranslated()
+                    ? uiText(sel + " #Name.TextSpans", snapshot.nameMessage())
+                    : uiText(sel + " #Name.TextSpans", snapshot.plainName()));
+            cmd.set(sel + " #Meta.TextSpans", uiText(sel + " #Meta.TextSpans", meta(snapshot)));
             event.addEventBinding(CustomUIEventBindingType.Activating, sel + " #InspectButton",
                     new EventData().put("action", "inspect").put("id", snapshot.id));
         }
@@ -66,11 +67,12 @@ public final class RecentItemLinksPage extends MysticPage {
     }
 
     private static String meta(ItemSnapshot snapshot) {
-        StringBuilder sb = new StringBuilder(snapshot.sharedByName == null ? "unknown" : snapshot.sharedByName);
-        if (snapshot.channelName != null && !snapshot.channelName.isBlank()) {
+        StringBuilder sb = new StringBuilder(
+                snapshot.senderName.isBlank() ? "unknown" : snapshot.senderName);
+        if (!snapshot.channelName.isBlank()) {
             sb.append(" • ").append(snapshot.channelName);
         }
-        sb.append(" • ").append(ItemDetailsPage.relativeTime(snapshot.capturedAtEpochMs));
+        sb.append(" • ").append(ItemDetailsPage.relativeTime(snapshot.capturedAtEpochMs()));
         return sb.toString();
     }
 

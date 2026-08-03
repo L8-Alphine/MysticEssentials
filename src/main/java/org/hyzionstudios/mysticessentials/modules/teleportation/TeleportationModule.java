@@ -15,18 +15,23 @@ import org.hyzionstudios.mysticessentials.api.Permissions;
 import org.hyzionstudios.mysticessentials.api.model.MysticLocation;
 import org.hyzionstudios.mysticessentials.api.model.PlayerProfile;
 import org.hyzionstudios.mysticessentials.api.model.TeleportRequest;
+import org.hyzionstudios.mysticessentials.api.notification.Notification;
+import org.hyzionstudios.mysticessentials.api.notification.NotificationAction;
+import org.hyzionstudios.mysticessentials.api.notification.NotificationAudience;
+import org.hyzionstudios.mysticessentials.api.notification.NotificationCategory;
+import org.hyzionstudios.mysticessentials.api.notification.NotificationPriority;
 import org.hyzionstudios.mysticessentials.api.rtp.RandomTeleportService;
 import org.hyzionstudios.mysticessentials.api.service.TeleportService;
 import org.hyzionstudios.mysticessentials.core.module.AbstractMysticModule;
 import org.hyzionstudios.mysticessentials.core.teleport.TeleportServiceImpl;
 import org.hyzionstudios.mysticessentials.modules.teleportation.rtp.RtpSubsystem;
+import org.hyzionstudios.mysticessentials.platform.command.MysticArgTypes;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommand;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommandSender;
 
 import com.google.gson.JsonObject;
 import com.hypixel.hytale.server.core.command.system.arguments.system.RequiredArg;
-import com.hypixel.hytale.server.core.command.system.arguments.types.ArgTypes;
-import com.hypixel.hytale.server.core.command.system.suggestion.SuggestionProvider;
+import com.hypixel.hytale.server.core.command.system.arguments.types.SingleArgumentType;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 
 /**
@@ -54,6 +59,13 @@ public final class TeleportationModule extends AbstractMysticModule {
     /** target UUID -> (requester UUID -> pending request), insertion-ordered. */
     private final Map<UUID, LinkedHashMap<UUID, PendingRequest>> pending = new ConcurrentHashMap<>();
     private final Set<UUID> tpaDisabled = ConcurrentHashMap.newKeySet();
+
+    /**
+     * Suggests the usernames of players with a request pending on the sender.
+     * Held as one instance so it keeps a single client-side suggestion id.
+     */
+    private final SingleArgumentType<String> pendingRequesterArg = MysticArgTypes.dynamic(commandSender ->
+            incomingRequests(commandSender.getUuid()).stream().map(PendingRequest::requesterName).toList());
 
     private TeleportationConfig config = new TeleportationConfig();
     private RtpSubsystem rtp;
@@ -155,9 +167,12 @@ public final class TeleportationModule extends AbstractMysticModule {
             inbound.put(requester.getUuid(), new PendingRequest(requester.getUuid(),
                     requester.getUsername(), requesterTeleports, Instant.now()));
         }
-        core.getMessageService().sendKey(target, requesterTeleports
+        String key = requesterTeleports
                 ? "teleport-request-incoming-to-you"
-                : "teleport-request-incoming-to-them", Map.of("player", requester.getUsername()));
+                : "teleport-request-incoming-to-them";
+        notifyTeleport(target, "Teleport Request", key,
+                Map.of("player", requester.getUsername()), NotificationPriority.IMPORTANT,
+                NotificationAction.command("/tpaccept"), true);
         return true;
     }
 
@@ -180,8 +195,9 @@ public final class TeleportationModule extends AbstractMysticModule {
         } else {
             teleportToPlayer(target, request.requester(), "tpahere");
         }
-        core.getMessageService().sendKey(requesterRef.get(), "teleport-request-accepted-by",
-                Map.of("player", target.getUsername()));
+        notifyTeleport(requesterRef.get(), "Teleport Accepted", "teleport-request-accepted-by",
+                Map.of("player", target.getUsername()), NotificationPriority.LOW,
+                NotificationAction.none(), false);
         return Optional.of(request);
     }
 
@@ -190,10 +206,34 @@ public final class TeleportationModule extends AbstractMysticModule {
         PendingRequest request = takeRequest(target.getUuid(), requester);
         if (request != null) {
             core.platform().findPlayer(request.requester()).ifPresent(ref ->
-                    core.getMessageService().sendKey(ref, "teleport-request-denied-by",
-                            Map.of("player", target.getUsername())));
+                    notifyTeleport(ref, "Teleport Denied", "teleport-request-denied-by",
+                            Map.of("player", target.getUsername()), NotificationPriority.LOW,
+                            NotificationAction.none(), false));
         }
         return Optional.ofNullable(request);
+    }
+
+    private void notifyTeleport(PlayerRef player, String title, String messageKey,
+            Map<String, String> params, NotificationPriority priority, NotificationAction action,
+            boolean history) {
+        if (core.notifications() == null) {
+            core.getMessageService().sendKey(player, messageKey, params);
+            return;
+        }
+        String message = core.getMessageService().plainFromKey(messageKey, params);
+        Notification.Builder builder = Notification.builder()
+                .category(NotificationCategory.TELEPORT)
+                .priority(priority)
+                .title(title)
+                .subtitle(message)
+                .message(message)
+                .action(action)
+                .storeInHistory(history)
+                .source("mysticessentials:teleportation");
+        if (history) {
+            builder.expiration(requestTtl());
+        }
+        core.notifications().send(builder.build(), NotificationAudience.player(player.getUuid()));
     }
 
     private PendingRequest takeRequest(UUID target, UUID requester) {
@@ -385,19 +425,6 @@ public final class TeleportationModule extends AbstractMysticModule {
         }
     }
 
-    /** Suggests usernames of players with a pending request to the sender. */
-    private SuggestionProvider pendingRequesterSuggestions() {
-        return (commandSender, input, index, result) ->
-                incomingRequests(commandSender.getUuid()).forEach(r -> result.suggest(r.requesterName()));
-    }
-
-    /** Suggests online players the sender can see (vanish-aware). */
-    private SuggestionProvider visiblePlayerSuggestions() {
-        return (commandSender, input, index, result) ->
-                core.vanish().visiblePlayers(commandSender.getUuid())
-                        .forEach(p -> result.suggest(p.getUsername()));
-    }
-
     private UUID resolveRequesterByName(MysticCommandSender sender, String name) {
         for (PendingRequest request : incomingRequests(sender.uuid())) {
             if (request.requesterName().equalsIgnoreCase(name)) {
@@ -409,12 +436,18 @@ public final class TeleportationModule extends AbstractMysticModule {
 
     // ----- Commands ----------------------------------------------------------
 
-    /** {@code /tp} opens the UI; {@code /tp <player>} force-teleports the executor to a player. */
+    /**
+     * {@code /tp} opens the UI; {@code /tp <player>} force-teleports the executor
+     * to a player; {@code /tp world <player> <world>} sends a player to another
+     * world. Subcommands are matched before usage variants, so the {@code world}
+     * literal never collides with the {@code <player>} variant.
+     */
     private final class TpCommand extends MysticCommand {
         TpCommand() {
             super(TeleportationModule.this.core, "tp", "Teleport to a player.");
             requirePermission(Permissions.TELEPORT_TP);
             addUsageVariant(new TpTargetVariant());
+            addSubCommand(new TpWorldCommand());
         }
 
         @Override
@@ -429,7 +462,7 @@ public final class TeleportationModule extends AbstractMysticModule {
 
     private final class TpTargetVariant extends MysticCommand {
         private final RequiredArg<String> target = withRequiredArg("player", "Target player",
-                ArgTypes.STRING).suggest(visiblePlayerSuggestions());
+                MysticArgTypes.PLAYER_NAME);
 
         TpTargetVariant() {
             super(TeleportationModule.this.core, "Teleport to a player.");
@@ -469,6 +502,67 @@ public final class TeleportationModule extends AbstractMysticModule {
         }
     }
 
+    /**
+     * {@code /tp world <player> <world>} — moves a player to another world,
+     * landing them on that world's configured spawn point. Admin-style: no
+     * warmup, no cooldown, and no consent from the target.
+     */
+    private final class TpWorldCommand extends MysticCommand {
+        private final RequiredArg<String> target = withRequiredArg("player", "Player to move",
+                MysticArgTypes.PLAYER_NAME);
+        private final RequiredArg<String> world = withRequiredArg("world", "Destination world",
+                MysticArgTypes.WORLD_NAME);
+
+        TpWorldCommand() {
+            super(TeleportationModule.this.core, "world", "Teleport a player to another world.");
+            requirePermission(Permissions.TELEPORT_TP_WORLD);
+        }
+
+        @Override
+        protected void run(MysticCommandSender sender) {
+            PlayerRef targetPlayer = core.platform().findPlayerByName(sender.get(target))
+                    .filter(ref -> core.vanish().canSee(sender.uuid(), ref.getUuid()))
+                    .orElse(null);
+            if (targetPlayer == null) {
+                sender.replyKey("player-not-found");
+                return;
+            }
+            String worldName = sender.get(world);
+            if (core.platform().world(worldName).isEmpty()) {
+                sender.replyKey("teleport-world-unknown", Map.of("world", worldName));
+                return;
+            }
+            if (worldName.equalsIgnoreCase(core.platform().worldNameOf(targetPlayer).orElse(""))) {
+                sender.replyKey("teleport-world-already", Map.of(
+                        "player", targetPlayer.getUsername(),
+                        "world", worldName));
+                return;
+            }
+            MysticLocation destination = core.platform().worldSpawn(worldName, targetPlayer.getUuid())
+                    .orElse(null);
+            if (destination == null) {
+                sender.replyKey("teleport-world-no-spawn", Map.of("world", worldName));
+                return;
+            }
+            core.getTeleportService().teleportNow(targetPlayer, destination).thenAccept(result -> {
+                if (result == TeleportService.Result.SUCCESS) {
+                    sender.replyKey("teleport-world-success", Map.of(
+                            "player", targetPlayer.getUsername(),
+                            "world", destination.getWorld()));
+                    if (!targetPlayer.getUuid().equals(sender.uuid())) {
+                        core.getMessageService().sendKey(targetPlayer, "teleport-world-target",
+                                Map.of("world", destination.getWorld()));
+                    }
+                } else {
+                    sender.replyKey("teleport-world-failed", Map.of(
+                            "player", targetPlayer.getUsername(),
+                            "world", destination.getWorld(),
+                            "reason", result.name().toLowerCase(java.util.Locale.ROOT).replace('_', ' ')));
+                }
+            });
+        }
+    }
+
     /** {@code /tpa} opens the UI; {@code /tpa <player>} sends a request (positional variant). */
     private final class TpaCommand extends MysticCommand {
         TpaCommand() {
@@ -489,7 +583,7 @@ public final class TeleportationModule extends AbstractMysticModule {
 
     private final class TpaTargetVariant extends MysticCommand {
         private final RequiredArg<String> target = withRequiredArg("player", "Target player",
-                ArgTypes.STRING).suggest(visiblePlayerSuggestions());
+                MysticArgTypes.PLAYER_NAME);
 
         TpaTargetVariant() {
             super(TeleportationModule.this.core, "Request to teleport to a player.");
@@ -522,7 +616,7 @@ public final class TeleportationModule extends AbstractMysticModule {
 
     private final class TpaHereTargetVariant extends MysticCommand {
         private final RequiredArg<String> target = withRequiredArg("player", "Target player",
-                ArgTypes.STRING).suggest(visiblePlayerSuggestions());
+                MysticArgTypes.PLAYER_NAME);
 
         TpaHereTargetVariant() {
             super(TeleportationModule.this.core, "Request that a player teleports to you.");
@@ -558,7 +652,7 @@ public final class TeleportationModule extends AbstractMysticModule {
 
     private final class TpAcceptNamedVariant extends MysticCommand {
         private final RequiredArg<String> from = withRequiredArg("player", "Requesting player",
-                ArgTypes.STRING).suggest(pendingRequesterSuggestions());
+                pendingRequesterArg);
 
         TpAcceptNamedVariant() {
             super(TeleportationModule.this.core, "Accept a specific teleport request.");
@@ -606,7 +700,7 @@ public final class TeleportationModule extends AbstractMysticModule {
 
     private final class TpDenyNamedVariant extends MysticCommand {
         private final RequiredArg<String> from = withRequiredArg("player", "Requesting player",
-                ArgTypes.STRING).suggest(pendingRequesterSuggestions());
+                pendingRequesterArg);
 
         TpDenyNamedVariant() {
             super(TeleportationModule.this.core, "Deny a specific teleport request.");
@@ -670,7 +764,7 @@ public final class TeleportationModule extends AbstractMysticModule {
     /** {@code /tphere <player>} — force-teleports one player to the executor (admin). */
     private final class TpHereForceCommand extends MysticCommand {
         private final RequiredArg<String> target = withRequiredArg("player", "Target player",
-                ArgTypes.STRING).suggest(visiblePlayerSuggestions());
+                MysticArgTypes.PLAYER_NAME);
 
         TpHereForceCommand() {
             super(TeleportationModule.this.core, "tphere", "Teleport a player to you.");

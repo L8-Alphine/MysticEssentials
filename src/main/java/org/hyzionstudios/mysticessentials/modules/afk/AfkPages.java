@@ -1,5 +1,7 @@
 package org.hyzionstudios.mysticessentials.modules.afk;
 
+import static org.hyzionstudios.mysticessentials.platform.ui.MysticPage.uiText;
+
 import java.util.List;
 
 import org.hyzionstudios.mysticessentials.core.MysticCore;
@@ -51,10 +53,10 @@ final class AfkPages {
                 AfkConfig.Zone zone = zones.get(i);
                 String row = "#ZoneList[" + i + "]";
                 cmd.append("#ZoneList", ZONE_ROW_UI);
-                cmd.set(row + " #Name.Text", zone.name);
-                cmd.set(row + " #Meta.Text",
-                        (zone.cornerA.getWorld() == null ? "?" : zone.cornerA.getWorld())
-                                + "  ·  " + AfkModule.formatSize(zone));
+                cmd.set(row + " #Name.TextSpans", uiText(row + " #Name.TextSpans", zone.name));
+                cmd.set(row + " #Meta.TextSpans",
+                        uiText(row + " #Meta.TextSpans", (zone.cornerA.getWorld() == null ? "?" : zone.cornerA.getWorld())
+                                + "  ·  " + AfkModule.formatSize(zone)));
                 event.addEventBinding(CustomUIEventBindingType.Activating, row,
                         new EventData().put("action", "select").put("zone", zone.name));
             }

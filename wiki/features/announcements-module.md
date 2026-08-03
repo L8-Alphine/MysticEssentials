@@ -1,15 +1,40 @@
 # Announcements
 
-The Announcements module provides manual broadcasts and an automatic broadcast rotation. Announcements can be single lines, multi-line blocks, and clickable.
+The Announcements module sends manual and rotating notices through Mystic's
+shared notification engine. Notices can target audiences, use multiple delivery
+surfaces, store history, play sounds, and carry command or URL actions.
 
 ## Manual broadcasts
 
 | Command | What it does | Permission |
 | --- | --- | --- |
-| `/broadcast <message>`, `/bc <message>` | Broadcast with the broadcast prefix | `mysticessentials.announcement.broadcast` |
-| `/alert <message>` | Broadcast with the alert prefix | `mysticessentials.announcement.alert` |
+| `/broadcast [category] [priority] <message> [flags]`, `/bc ...` | Send a normal notice | `mysticessentials.announcement.broadcast` |
+| `/alert [category] [priority] <message> [flags]` | Send a higher-priority notice | `mysticessentials.announcement.alert` |
 
-The two commands differ only in their configured prefix, so `/alert` can stand out from routine `/broadcast` messages.
+The short forms remain compatible: `/broadcast The market is open` and `/alert
+Restart soon` use the configured prefixes, title and sound. The precise form can
+select a category (`announcement`, `event`, `maintenance`, `warning`, `critical`,
+and others), a `low`, `normal`, `important`, or `critical` priority, and flags:
+
+```text
+/alert critical --title "Server Restart" --subtitle "60 seconds" \
+  --message "Please move somewhere safe." --bossbar --duration 60 --audience all
+```
+
+Supported value flags are `--title`, `--subtitle`, `--message`, `--sound`,
+`--icon`, `--source`, `--command`, `--url`, `--duration`, and `--audience`.
+Surface switches are `--bossbar`/`--banner`, `--toast`, `--actionbar`,
+`--no-chat`, `--no-history`, and `--sticky`.
+
+Audiences include `all`, `staff`, `world:<name>`, `channel:<id>`,
+`permission:<node>`, and `player:<name>`. `guild:<id>`, `party:<id>`, and
+`region:<id>` work when an addon registers the matching audience resolver.
+
+Priority controls the default delivery profile: low is chat-only, normal adds
+action bar/toast/history, important adds a title, and critical also pins a
+non-dismissible banner. Critical sending needs
+`mysticessentials.notifications.critical` and cannot be suppressed by player
+preferences unless the server explicitly changes that policy.
 
 ## Auto-broadcasts
 
@@ -68,6 +93,8 @@ modules/announcements/config.json
 | `randomOrder` | `false` | Shuffle announcement order |
 | `broadcastPrefix` | `&8[&dBroadcast&8] &f` | Prefix for `/broadcast` |
 | `alertPrefix` | `&8[&c&lALERT&8] &c` | Prefix for `/alert` |
+| `broadcastTitle` / `alertTitle` | `Announcement` / `Alert` | Built-in event-title headline |
+| `broadcastSound` / `alertSound` | Hytale attention SFX | Sound used by short-form and rotating notices |
 | `messages` | Welcome/home/TPA examples | Auto-broadcast entries |
 
 ## See also

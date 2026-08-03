@@ -1,5 +1,7 @@
 package org.hyzionstudios.mysticessentials.modules.mail;
 
+import static org.hyzionstudios.mysticessentials.platform.ui.MysticPage.uiText;
+
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -84,13 +86,13 @@ final class MailAdminPages {
 
             Audience audience = draft.audienceEnum();
             int online = core.platform().onlinePlayers().size();
-            cmd.set("#HeaderInfo.Text", online + " online");
+            cmd.set("#HeaderInfo.TextSpans", uiText("#HeaderInfo.TextSpans", online + " online"));
 
             cmd.set("#SubjectInput.Value", draft.subject());
             cmd.set("#BodyInput.Value", draft.body());
 
-            cmd.set("#AudienceLabel.Text", "Delivering to: " + audience.label
-                    + (audience.needsParam() && !draft.param().isBlank() ? " (" + draft.param() + ")" : ""));
+            cmd.set("#AudienceLabel.TextSpans", uiText("#AudienceLabel.TextSpans", "Delivering to: " + audience.label
+                    + (audience.needsParam() && !draft.param().isBlank() ? " (" + draft.param() + ")" : "")));
             cmd.set("#ParamInput.Visible", audience.needsParam());
             cmd.set("#ParamInput.Value", draft.param());
 
@@ -99,7 +101,7 @@ final class MailAdminPages {
             cmd.set("#CommandInput.Visible", commandsEnabled);
             cmd.set("#CommandInput.Value", String.join("; ", draft.commands()));
 
-            cmd.set("#RewardHeader.Text", "Item rewards (max " + mail.maxAttachments() + ")");
+            cmd.set("#RewardHeader.TextSpans", uiText("#RewardHeader.TextSpans", "Item rewards (max " + mail.maxAttachments() + ")"));
             cmd.set("#PickerSearch.Value", draft.pickerSearch());
 
             buildPicker(cmd, event);
@@ -133,8 +135,8 @@ final class MailAdminPages {
                 String row = "#PickerList[" + i + "]";
                 cmd.append("#PickerList", PICKER_ROW_UI);
                 cmd.set(row + " #Icon.ItemId", pick.itemId());
-                cmd.set(row + " #Name.Text", pick.itemId());
-                cmd.set(row + " #Have.Text", "");
+                cmd.set(row + " #Name.TextSpans", uiText(row + " #Name.TextSpans", pick.itemId()));
+                cmd.set(row + " #Have.TextSpans", uiText(row + " #Have.TextSpans", ""));
                 event.addEventBinding(CustomUIEventBindingType.Activating, row,
                         fields(new EventData().put("action", "addreward")
                                 .put("item", pick.itemId()).append("@qty", "#QtyInput.Value")));
@@ -142,14 +144,14 @@ final class MailAdminPages {
         }
 
         private void buildDraftList(UICommandBuilder cmd, UIEventBuilder event) {
-            cmd.set("#DraftLabel.Text", "Attached (" + draft.picks().size() + ")");
+            cmd.set("#DraftLabel.TextSpans", uiText("#DraftLabel.TextSpans", "Attached (" + draft.picks().size() + ")"));
             for (int i = 0; i < draft.picks().size(); i++) {
                 ItemPick pick = draft.picks().get(i);
                 String row = "#DraftList[" + i + "]";
                 cmd.append("#DraftList", DRAFT_ROW_UI);
                 cmd.set(row + " #Icon.ItemId", pick.itemId());
-                cmd.set(row + " #Name.Text", pick.itemId());
-                cmd.set(row + " #Qty.Text", "x" + pick.quantity());
+                cmd.set(row + " #Name.TextSpans", uiText(row + " #Name.TextSpans", pick.itemId()));
+                cmd.set(row + " #Qty.TextSpans", uiText(row + " #Qty.TextSpans", "x" + pick.quantity()));
                 event.addEventBinding(CustomUIEventBindingType.Activating, row + " #Remove",
                         fields(new EventData().put("action", "removereward").put("index", Integer.toString(i))));
             }
@@ -162,9 +164,9 @@ final class MailAdminPages {
                 SentAnnouncement entry = log.get(log.size() - 1 - i);
                 String row = "#HistoryList[" + i + "]";
                 cmd.append("#HistoryList", HISTORY_ROW_UI);
-                cmd.set(row + " #Subject.Text", historyTitle(entry));
-                cmd.set(row + " #Meta.Text", historyMeta(entry));
-                cmd.set(row + " #Preview.Text", preview(entry.body));
+                cmd.set(row + " #Subject.TextSpans", uiText(row + " #Subject.TextSpans", historyTitle(entry)));
+                cmd.set(row + " #Meta.TextSpans", uiText(row + " #Meta.TextSpans", historyMeta(entry)));
+                cmd.set(row + " #Preview.TextSpans", uiText(row + " #Preview.TextSpans", preview(entry.body)));
                 event.addEventBinding(CustomUIEventBindingType.Activating, row + " #Resend",
                         new EventData().put("action", "resend").put("id", entry.id == null ? "" : entry.id));
             }

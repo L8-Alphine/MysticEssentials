@@ -1,5 +1,7 @@
 package org.hyzionstudios.mysticessentials.modules.mail;
 
+import static org.hyzionstudios.mysticessentials.platform.ui.MysticPage.uiText;
+
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -140,14 +142,14 @@ final class MailPages {
             cmd.append(MAIL_UI);
 
             long unread = inbox.stream().filter(m -> !m.isRead() && !m.isDeleted()).count();
-            cmd.set("#HeaderInfo.Text", unread > 0 ? unread + " unread" : "");
+            cmd.set("#HeaderInfo.TextSpans", uiText("#HeaderInfo.TextSpans", unread > 0 ? unread + " unread" : ""));
 
             buildSidebar(cmd, event);
 
             boolean folder = view.isFolder();
             boolean compose = view.isCompose();
 
-            cmd.set("#ListTitle.Text", compose ? "Online Players" : view.title);
+            cmd.set("#ListTitle.TextSpans", uiText("#ListTitle.TextSpans", compose ? "Online Players" : view.title));
             cmd.set("#SearchInput.Visible", folder);
             cmd.set("#SearchButton.Visible", folder);
             cmd.set("#MarkAllButton.Visible", view == View.INBOX || view == View.ANNOUNCEMENTS);
@@ -181,12 +183,12 @@ final class MailPages {
             }
             players.sort(java.util.Comparator.comparing(PlayerRef::getUsername, String.CASE_INSENSITIVE_ORDER));
             cmd.set("#ListEmpty.Visible", players.isEmpty());
-            cmd.set("#ListEmpty.Text", players.isEmpty() ? "No other players online." : "");
+            cmd.set("#ListEmpty.TextSpans", uiText("#ListEmpty.TextSpans", players.isEmpty() ? "No other players online." : ""));
             for (int i = 0; i < players.size(); i++) {
                 String name = players.get(i).getUsername();
                 String row = "#MailList[" + i + "]";
                 cmd.append("#MailList", PLAYER_ROW_UI);
-                cmd.set(row + " #Name.Text", name);
+                cmd.set(row + " #Name.TextSpans", uiText(row + " #Name.TextSpans", name));
                 event.addEventBinding(CustomUIEventBindingType.Activating, row,
                         new EventData().put("action", "pickrecipient").put("name", name)
                                 .append("@body", "#BodyInput.Value"));
@@ -205,7 +207,7 @@ final class MailPages {
                 View entry = entries[i];
                 String row = container + "[" + i + "]";
                 cmd.append(container, NAV_ROW_UI);
-                cmd.set(row + " #Label.Text", navLabel(entry));
+                cmd.set(row + " #Label.TextSpans", uiText(row + " #Label.TextSpans", navLabel(entry)));
                 cmd.set(row + " #Accent.Visible", isActive(entry));
                 event.addEventBinding(CustomUIEventBindingType.Activating, row,
                         new EventData().put("action", "view").put("view", entry.name()));
@@ -268,21 +270,21 @@ final class MailPages {
             int to = Math.min(from + pageSize, messages.size());
 
             cmd.set("#ListEmpty.Visible", messages.isEmpty());
-            cmd.set("#ListEmpty.Text", emptyText());
-            cmd.set("#PageLabel.Text", Integer.toString(current + 1));
-            cmd.set("#PageInfo.Text", messages.isEmpty()
-                    ? "0 of 0" : (from + 1) + "-" + to + " of " + messages.size());
+            cmd.set("#ListEmpty.TextSpans", uiText("#ListEmpty.TextSpans", emptyText()));
+            cmd.set("#PageLabel.TextSpans", uiText("#PageLabel.TextSpans", Integer.toString(current + 1)));
+            cmd.set("#PageInfo.TextSpans", uiText("#PageInfo.TextSpans", messages.isEmpty()
+                    ? "0 of 0" : (from + 1) + "-" + to + " of " + messages.size()));
 
             for (int i = from; i < to; i++) {
                 MailMessage message = messages.get(i);
                 String row = "#MailList[" + (i - from) + "]";
                 cmd.append("#MailList", MAIL_ROW_UI);
-                cmd.set(row + " #Unread.Text", message.isRead() ? "" : "●");
-                cmd.set(row + " #From.Text", listName(message));
-                cmd.set(row + " #Preview.Text", preview(message));
-                cmd.set(row + " #Date.Text", shortDate(message.getSentDate()));
+                cmd.set(row + " #Unread.TextSpans", uiText(row + " #Unread.TextSpans", message.isRead() ? "" : "●"));
+                cmd.set(row + " #From.TextSpans", uiText(row + " #From.TextSpans", listName(message)));
+                cmd.set(row + " #Preview.TextSpans", uiText(row + " #Preview.TextSpans", preview(message)));
+                cmd.set(row + " #Date.TextSpans", uiText(row + " #Date.TextSpans", shortDate(message.getSentDate())));
                 boolean rewards = message.hasRewards();
-                cmd.set(row + " #Reward.Text", rewards ? (message.isClaimed() ? "claimed" : "reward") : "");
+                cmd.set(row + " #Reward.TextSpans", uiText(row + " #Reward.TextSpans", rewards ? (message.isClaimed() ? "claimed" : "reward") : ""));
                 if (rewards && !message.items().isEmpty()) {
                     cmd.set(row + " #RewardIcon.Visible", true);
                     cmd.set(row + " #RewardIcon.ItemId", message.items().get(0).itemId);
@@ -336,10 +338,10 @@ final class MailPages {
         private void buildReadPane(UICommandBuilder cmd, UIEventBuilder event) {
             MailMessage message = selected();
             if (message == null) {
-                cmd.set("#ReadSubject.Text", "Select a message");
-                cmd.set("#ReadFrom.Text", "");
-                cmd.set("#ReadDate.Text", "");
-                cmd.set("#ReadBody.Text", "");
+                cmd.set("#ReadSubject.TextSpans", uiText("#ReadSubject.TextSpans", "Select a message"));
+                cmd.set("#ReadFrom.TextSpans", uiText("#ReadFrom.TextSpans", ""));
+                cmd.set("#ReadDate.TextSpans", uiText("#ReadDate.TextSpans", ""));
+                cmd.set("#ReadBody.TextSpans", uiText("#ReadBody.TextSpans", ""));
                 cmd.set("#RewardsLabel.Visible", false);
                 cmd.set("#ClaimButton.Visible", false);
                 cmd.set("#ArchiveButton.Visible", false);
@@ -348,15 +350,15 @@ final class MailPages {
                 return;
             }
 
-            // Hytale 0.5.6 Custom UI Labels render PLAIN TEXT ONLY — setting a colour/format
-            // Message tree on .Text disconnects the client ("couldn't set value"). So we strip
-            // markup for display: the reader sees clean text, never raw &-codes, never a crash.
-            cmd.set("#ReadSubject.Text", MysticText.stripMarkup(readTitle(message)));
-            cmd.set("#ReadFrom.Text", view == View.SENT
+            // TextSpans accepts the formatted Message tree produced by uiText, so subjects and
+            // bodies retain Mystic colour/style markup without exposing raw formatting codes.
+            cmd.set("#ReadSubject.TextSpans", uiText("#ReadSubject.TextSpans", readTitle(message)));
+            cmd.set("#ReadFrom.TextSpans", uiText("#ReadFrom.TextSpans", view == View.SENT
                     ? "To: " + (message.getRecipientName() == null ? "?" : message.getRecipientName())
-                    : "From: " + senderLabel(message));
-            cmd.set("#ReadDate.Text", "Date: " + shortDate(message.getSentDate()));
-            cmd.set("#ReadBody.Text", MysticText.stripMarkup(message.getBody() == null ? "" : message.getBody()));
+                    : "From: " + senderLabel(message)));
+            cmd.set("#ReadDate.TextSpans", uiText("#ReadDate.TextSpans", "Date: " + shortDate(message.getSentDate())));
+            cmd.set("#ReadBody.TextSpans", uiText("#ReadBody.TextSpans",
+                    message.getBody() == null ? "" : message.getBody()));
 
             boolean rewards = message.hasRewards();
             cmd.set("#RewardsLabel.Visible", rewards);
@@ -365,7 +367,7 @@ final class MailPages {
                 String cell = "#RewardList[" + i + "]";
                 cmd.append("#RewardList", REWARD_UI);
                 cmd.set(cell + " #Slot.ItemId", attachment.itemId);
-                cmd.set(cell + " #Qty.Text", "x" + Math.max(1, attachment.quantity));
+                cmd.set(cell + " #Qty.TextSpans", uiText(cell + " #Qty.TextSpans", "x" + Math.max(1, attachment.quantity)));
             }
 
             boolean sentView = view == View.SENT;
@@ -373,9 +375,9 @@ final class MailPages {
             cmd.set("#ClaimButton.Visible", claimable);
             cmd.set("#ArchiveButton.Visible", !sentView && view != View.ARCHIVED && view != View.DELETED);
             cmd.set("#RestoreButton.Visible", view == View.ARCHIVED || view == View.DELETED);
-            cmd.set("#RestoreButton.Text", view == View.DELETED ? "Restore" : "Unarchive");
+            cmd.set("#RestoreButton.TextSpans", uiText("#RestoreButton.TextSpans", view == View.DELETED ? "Restore" : "Unarchive"));
             cmd.set("#DeleteButton.Visible", !sentView);
-            cmd.set("#DeleteButton.Text", view == View.DELETED ? "Delete Forever" : "Delete");
+            cmd.set("#DeleteButton.TextSpans", uiText("#DeleteButton.TextSpans", view == View.DELETED ? "Delete Forever" : "Delete"));
 
             String id = message.getId();
             if (claimable) {
@@ -402,7 +404,7 @@ final class MailPages {
             boolean canAttach = mail.allowPlayerItemAttachments()
                     && player.hasPermission(Permissions.MAIL_ATTACH_ITEMS);
 
-            cmd.set("#ComposeTitle.Text", "New Message");
+            cmd.set("#ComposeTitle.TextSpans", uiText("#ComposeTitle.TextSpans", "New Message"));
 
             cmd.set("#ToLabel.Visible", true);
             cmd.set("#ToInput.Visible", true);
@@ -416,7 +418,7 @@ final class MailPages {
 
             cmd.set("#BodyInput.Value", draft.body());
 
-            cmd.set("#RewardHeader.Text", "Rewards (max " + mail.maxAttachments() + ")");
+            cmd.set("#RewardHeader.TextSpans", uiText("#RewardHeader.TextSpans", "Rewards (max " + mail.maxAttachments() + ")"));
             cmd.set("#RewardHeader.Visible", canAttach);
 
             // Item picker: a scrollable dropdown of the player's own inventory items.
@@ -426,7 +428,7 @@ final class MailPages {
             cmd.set("#AddButton.Visible", hasItems);
             cmd.set("#ClearRewardsButton.Visible", canAttach);
             cmd.set("#NoItemsLabel.Visible", canAttach && pickerItems.isEmpty());
-            cmd.set("#NoItemsLabel.Text", "No Items in Inventory");
+            cmd.set("#NoItemsLabel.TextSpans", uiText("#NoItemsLabel.TextSpans", "No Items in Inventory"));
             if (hasItems) {
                 List<DropdownEntryInfo> entries = new ArrayList<>();
                 for (ItemPick pick : pickerItems) {
@@ -442,14 +444,14 @@ final class MailPages {
             }
 
             // Chosen attachments.
-            cmd.set("#DraftLabel.Text", "Attached (" + draft.picks().size() + ")");
+            cmd.set("#DraftLabel.TextSpans", uiText("#DraftLabel.TextSpans", "Attached (" + draft.picks().size() + ")"));
             for (int i = 0; i < draft.picks().size(); i++) {
                 ItemPick pick = draft.picks().get(i);
                 String row = "#DraftList[" + i + "]";
                 cmd.append("#DraftList", DRAFT_ROW_UI);
                 cmd.set(row + " #Icon.ItemId", pick.itemId());
-                cmd.set(row + " #Name.Text", pick.itemId());
-                cmd.set(row + " #Qty.Text", "x" + pick.quantity());
+                cmd.set(row + " #Name.TextSpans", uiText(row + " #Name.TextSpans", pick.itemId()));
+                cmd.set(row + " #Qty.TextSpans", uiText(row + " #Qty.TextSpans", "x" + pick.quantity()));
                 event.addEventBinding(CustomUIEventBindingType.Activating, row + " #Remove",
                         composeFields(new EventData().put("action", "removereward")
                                 .put("index", Integer.toString(i))));

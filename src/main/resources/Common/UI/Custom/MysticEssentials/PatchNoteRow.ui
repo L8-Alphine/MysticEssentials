@@ -2,7 +2,7 @@ $C = "../Common.ui";
 
 // Row template for the patch list in the Patch Notes UI. Appended per note:
 //   cmd.append("#NoteList", "MysticEssentials/PatchNoteRow.ui")
-// then populated by index: cmd.set("#NoteList[i] #Title.Text", ...).
+// then populated by index: cmd.set("#NoteList[i] #Title.TextSpans", ...).
 // The row root is a Button so the whole card selects the patch.
 
 Button #Row {
@@ -32,20 +32,17 @@ Button #Row {
       Label #Unread {
         Anchor: (Width: 14);
         Style: (FontSize: 15, TextColor: #7bd88f, VerticalAlignment: Center);
-        Text: "";
       }
 
       Label #Title {
         FlexWeight: 1;
         Style: (FontSize: 15, TextColor: #ffffff, RenderBold: true, VerticalAlignment: Center);
-        Text: "Patch";
       }
     }
 
     Label #Meta {
       Anchor: (Height: 16);
       Style: (FontSize: 12, TextColor: #96a9be);
-      Text: "";
     }
   }
 

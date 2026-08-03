@@ -1,5 +1,7 @@
 package org.hyzionstudios.mysticessentials.modules.teleportation;
 
+import static org.hyzionstudios.mysticessentials.platform.ui.MysticPage.uiText;
+
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -70,8 +72,8 @@ final class TpaPages {
                 String name = online != null ? online.getUsername() : favorite.getValue();
                 String row = "#FavoriteList[" + i + "]";
                 cmd.append("#FavoriteList", FAVORITE_ROW_UI);
-                cmd.set(row + " #Name.Text", name);
-                cmd.set(row + " #Status.Text", online != null ? "" : "offline");
+                cmd.set(row + " #Name.TextSpans", uiText(row + " #Name.TextSpans", name));
+                cmd.set(row + " #Status.TextSpans", uiText(row + " #Status.TextSpans", online != null ? "" : "offline"));
                 boolean visible = online != null;
                 cmd.set(row + " #TpaButton.Visible", visible);
                 cmd.set(row + " #HereButton.Visible", visible);
@@ -99,7 +101,7 @@ final class TpaPages {
                 PlayerRef other = others.get(i);
                 String row = "#PlayerList[" + i + "]";
                 cmd.append("#PlayerList", PLAYER_ROW_UI);
-                cmd.set(row + " #Name.Text", other.getUsername());
+                cmd.set(row + " #Name.TextSpans", uiText(row + " #Name.TextSpans", other.getUsername()));
                 cmd.set(row + " #FavButton.Visible", !favorites.containsKey(other.getUuid()));
                 event.addEventBinding(CustomUIEventBindingType.Activating, row + " #TpaButton",
                         new EventData().put("action", "tpa").put("target", other.getUuid().toString()));
@@ -115,9 +117,9 @@ final class TpaPages {
                 PendingRequest request = requests.get(i);
                 String row = "#RequestList[" + i + "]";
                 cmd.append("#RequestList", REQUEST_ROW_UI);
-                cmd.set(row + " #Text.Text", request.requesterTeleports()
+                cmd.set(row + " #Text.TextSpans", uiText(row + " #Text.TextSpans", request.requesterTeleports()
                         ? request.requesterName() + " wants to teleport to you"
-                        : request.requesterName() + " wants you to teleport to them");
+                        : request.requesterName() + " wants you to teleport to them"));
                 event.addEventBinding(CustomUIEventBindingType.Activating, row + " #AcceptButton",
                         new EventData().put("action", "accept").put("requester", request.requester().toString()));
                 event.addEventBinding(CustomUIEventBindingType.Activating, row + " #DenyButton",

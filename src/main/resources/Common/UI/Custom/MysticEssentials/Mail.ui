@@ -14,7 +14,6 @@ $C.@Container {
       Label #HeaderInfo {
         Anchor: (Top: 8, Right: 14, Width: 260, Height: 24);
         Style: (FontSize: 14, TextColor: #96a9be, HorizontalAlignment: End, VerticalAlignment: Center);
-        Text: "";
       }
     }
   }
@@ -67,7 +66,6 @@ $C.@Container {
       Label #ListTitle {
         Anchor: (Height: 26, Bottom: 8);
         Style: (...$C.@DefaultLabelStyle, FontSize: 16, RenderBold: true, RenderUppercase: true);
-        Text: "Inbox";
       }
 
       Group {
@@ -93,7 +91,6 @@ $C.@Container {
         Label #PageInfo {
           FlexWeight: 1;
           Style: (FontSize: 12, TextColor: #96a9be, VerticalAlignment: Center);
-          Text: "";
         }
 
         $C.@SecondaryTextButton #PrevButton {
@@ -104,7 +101,6 @@ $C.@Container {
         Label #PageLabel {
           Anchor: (Width: 34, Height: 26);
           Style: (FontSize: 13, TextColor: #d7e1ee, HorizontalAlignment: Center, VerticalAlignment: Center);
-          Text: "1";
         }
 
         $C.@SecondaryTextButton #NextButton {
@@ -116,7 +112,6 @@ $C.@Container {
       Label #ListEmpty {
         Anchor: (Height: 40);
         Style: (FontSize: 14, TextColor: #9fb0c4, VerticalAlignment: Center, Wrap: true);
-        Text: "Nothing here.";
         Visible: false;
       }
 
@@ -147,19 +142,16 @@ $C.@Container {
         Label #ReadSubject {
           Anchor: (Height: 28, Bottom: 4);
           Style: (FontSize: 20, RenderBold: true, TextColor: #ffffff);
-          Text: "Select a message";
         }
 
         Label #ReadFrom {
           Anchor: (Height: 18, Bottom: 2);
           Style: (FontSize: 13, TextColor: #96a9be);
-          Text: "";
         }
 
         Label #ReadDate {
           Anchor: (Height: 16, Bottom: 8);
           Style: (FontSize: 12, TextColor: #96a9be);
-          Text: "";
         }
 
         $C.@PanelSeparatorFancy {
@@ -169,7 +161,6 @@ $C.@Container {
         Label #ReadBody {
           FlexWeight: 1;
           Style: (FontSize: 14, TextColor: #d7e1ee, Wrap: true);
-          Text: "";
         }
 
         Label #RewardsLabel {
@@ -223,7 +214,6 @@ $C.@Container {
         Label #ComposeTitle {
           Anchor: (Height: 26, Bottom: 8);
           Style: (FontSize: 18, RenderBold: true, TextColor: #ffffff);
-          Text: "New Message";
         }
 
         Label #ToLabel {
@@ -277,7 +267,6 @@ $C.@Container {
         Label #RewardHeader {
           Anchor: (Height: 18, Bottom: 4);
           Style: (...$C.@DefaultLabelStyle, FontSize: 12, RenderBold: true, RenderUppercase: true, TextColor: #f0b429);
-          Text: "Rewards (max 9)";
         }
 
         Group {
@@ -314,14 +303,12 @@ $C.@Container {
         Label #NoItemsLabel {
           Anchor: (Height: 30, Bottom: 6);
           Style: (FontSize: 13, TextColor: #9fb0c4, VerticalAlignment: Center);
-          Text: "No Items in Inventory";
           Visible: false;
         }
 
         Label #DraftLabel {
           Anchor: (Height: 16, Bottom: 4);
           Style: (FontSize: 12, TextColor: #9fb0c4);
-          Text: "Attached (0)";
         }
 
         Group #DraftList {

@@ -1,7 +1,8 @@
 package org.hyzionstudios.mysticessentials.modules.kits;
 
-import java.time.Instant;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -9,17 +10,19 @@ import java.util.UUID;
 import java.util.logging.Level;
 
 import org.hyzionstudios.mysticessentials.api.Permissions;
-import org.hyzionstudios.mysticessentials.api.model.PlayerProfile;
 import org.hyzionstudios.mysticessentials.core.module.AbstractMysticModule;
+import org.hyzionstudios.mysticessentials.core.util.Durations;
+import org.hyzionstudios.mysticessentials.platform.command.MysticArgTypes;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommand;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommandSender;
 
 import com.google.gson.JsonObject;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.asset.type.item.config.Item;
+import com.hypixel.hytale.server.core.command.system.CommandSender;
 import com.hypixel.hytale.server.core.command.system.arguments.system.RequiredArg;
 import com.hypixel.hytale.server.core.command.system.arguments.types.ArgTypes;
-import com.hypixel.hytale.server.core.command.system.suggestion.SuggestionProvider;
+import com.hypixel.hytale.server.core.command.system.arguments.types.SingleArgumentType;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
@@ -40,6 +43,9 @@ public final class KitModule extends AbstractMysticModule {
     private static final String DATA_KEY = "kits";
 
     private KitConfig config = new KitConfig();
+
+    /** Kit names the sender is allowed to claim. */
+    private final SingleArgumentType<String> kitArg = MysticArgTypes.dynamic(this::claimableKitNames);
 
     public KitModule() {
         super("kits", "Kits", "1.0.0");
@@ -146,9 +152,8 @@ public final class KitModule extends AbstractMysticModule {
      * The item's in-game display name as a client-translated {@link Message}, so the
      * kit preview reads "Copper Pickaxe" rather than "Tool_Pickaxe_Copper". Returns
      * {@code null} when there is no real translation to render — callers must then set
-     * the label with the plain-{@link String} {@link #prettify(String)} fallback,
-     * because a {@link Message#raw(String)} value is rejected by the client's
-     * {@code .Text} setter (it disconnects the session).
+     * the label with the plain-{@link String} {@link #prettify(String)} fallback.
+     * UI callers render either form through {@code TextSpans}.
      */
     static Message itemDisplayName(Item item) {
         if (item == null) {
@@ -293,59 +298,30 @@ public final class KitModule extends AbstractMysticModule {
                 .orElse(null);
     }
 
-    /** Total playtime = persisted playtime + the current session so far. */
+    /** Total playtime, including the part of the current session not yet persisted. */
     long totalOnlineSeconds(UUID player) {
-        PlayerProfile profile = core.getPlayerProfileService().getCached(player).orElse(null);
-        if (profile == null) {
-            return 0;
-        }
-        long session = 0;
-        try {
-            session = Math.max(0, Instant.now().getEpochSecond()
-                    - Instant.parse(profile.getLastJoinDate()).getEpochSecond());
-        } catch (RuntimeException ignored) {
-            // Missing/invalid join date: count persisted playtime only.
-        }
-        return profile.getTotalPlaytimeSeconds() + session;
+        return core.getPlaytimeService().totalPlaytimeSeconds(player);
     }
 
     static String formatDuration(long seconds) {
-        long s = Math.max(0, seconds);
-        long days = s / 86400;
-        long hours = (s % 86400) / 3600;
-        long minutes = (s % 3600) / 60;
-        long secs = s % 60;
-        StringBuilder result = new StringBuilder();
-        if (days > 0) {
-            result.append(days).append("d ");
-        }
-        if (hours > 0) {
-            result.append(hours).append("h ");
-        }
-        if (minutes > 0) {
-            result.append(minutes).append("m ");
-        }
-        if (result.isEmpty() || secs > 0) {
-            result.append(secs).append("s");
-        }
-        return result.toString().trim();
+        return Durations.format(seconds);
     }
 
-    /** Suggests kit names the sender may claim. */
-    private SuggestionProvider kitSuggestions() {
-        return (commandSender, input, index, result) -> {
-            if (config.kits == null) {
-                return;
+    /** Kit names the sender may claim. */
+    private List<String> claimableKitNames(CommandSender commandSender) {
+        if (config.kits == null) {
+            return List.of();
+        }
+        List<String> names = new ArrayList<>();
+        for (Map.Entry<String, KitConfig.Kit> entry : config.kits.entrySet()) {
+            KitConfig.Kit kit = entry.getValue();
+            if (kit == null || (kit.requirePermission
+                    && !commandSender.hasPermission(Permissions.kit(entry.getKey())))) {
+                continue;
             }
-            for (Map.Entry<String, KitConfig.Kit> entry : config.kits.entrySet()) {
-                KitConfig.Kit kit = entry.getValue();
-                if (kit == null || (kit.requirePermission
-                        && !commandSender.hasPermission(Permissions.kit(entry.getKey())))) {
-                    continue;
-                }
-                result.suggest(normalize(entry.getKey()));
-            }
-        };
+            names.add(normalize(entry.getKey()));
+        }
+        return names;
     }
 
     private void listKits(MysticCommandSender sender) {
@@ -455,8 +431,7 @@ public final class KitModule extends AbstractMysticModule {
     }
 
     private final class KitClaimVariant extends MysticCommand {
-        private final RequiredArg<String> kit = withRequiredArg("kit", "Kit name", ArgTypes.STRING)
-                .suggest(kitSuggestions());
+        private final RequiredArg<String> kit = withRequiredArg("kit", "Kit name", kitArg);
 
         KitClaimVariant() {
             super(KitModule.this.core, "Claim a kit.");
@@ -487,10 +462,8 @@ public final class KitModule extends AbstractMysticModule {
     /** Admin: gives a kit to another player, ignoring cooldowns/cost/gating. */
     private final class KitGiveCommand extends MysticCommand {
         private final RequiredArg<String> target = withRequiredArg("player", "Target player",
-                ArgTypes.STRING).suggest((commandSender, input, index, result) ->
-                        core.platform().onlinePlayers().forEach(p -> result.suggest(p.getUsername())));
-        private final RequiredArg<String> kit = withRequiredArg("kit", "Kit name", ArgTypes.STRING)
-                .suggest(kitSuggestions());
+                MysticArgTypes.PLAYER_NAME);
+        private final RequiredArg<String> kit = withRequiredArg("kit", "Kit name", kitArg);
 
         KitGiveCommand() {
             super(KitModule.this.core, "give", "Give a kit to a player.");

@@ -38,6 +38,7 @@ The server is **ECS-based** (components/systems, `Ref<EntityStore>`,
 | Location/pos | `math.vector.Location` (world + joml `Vector3d` + `Rotation3f`), `math.vector.Transform` |
 | Events | `getEventRegistry().register(Class, Consumer)`; `PlayerConnectEvent` / `PlayerDisconnectEvent` (both `Void`-keyed, expose `getPlayerRef()`); `PlayerChatEvent` (async, cancellable) |
 | JSON | Gson (`com.google.gson.*`, bundled on server classpath) |
+| Server Players list | `protocol.packets.interface_.{AddToServerPlayerList, RemoveFromServerPlayerList, UpdateServerPlayerList, UpdateServerPlayerListPing}` + the `ServerPlayerListPlayer` row; written with `PlayerRef.getPacketHandler().write(packet)` |
 
 Everything Hytale-specific is funneled through the **`platform`** package
 (`HytalePlatform`, `Conversions`, `command/MysticCommand`,
@@ -119,6 +120,35 @@ read/write components off the world thread.
 None. Every feature in the design is implemented; `grep -r "TODO("` over `src`
 returns nothing.
 
+### Server Players list decoration (implemented)
+
+`core/playerlist/PlayerListService` puts rank prefixes/suffixes and an AFK
+marker on the map-screen roster. Findings from the 0.5.6 jar and client:
+
+- The engine's `server.core.modules.serverplayerlist.ServerPlayerListModule`
+  builds every row in `createServerPlayerListPlayer(PlayerRef)` as
+  `new ServerPlayerListPlayer(uuid, playerRef.getUsername(), worldUuid, ping)`.
+  The name is a **plain protocol string** with no server-side hook, so the only
+  way to change it is to send a replacement row for the same UUID afterwards.
+- It sends the full roster to a connecting player and that player's single row
+  to everyone else (`PlayerConnectEvent`), a `RemoveFromServerPlayerList` on
+  disconnect, a `UpdateServerPlayerList` (uuid + worldUuid only — never the
+  name) on `AddPlayerToWorldEvent`, and a ping map every 10s.
+- The client has `ProcessAddToServerPlayerListPacket` /
+  `ProcessRemoveFromServerPlayerListPacket` /
+  `ProcessUpdateServerPlayerListPacket` /
+  `ProcessUpdateServerPlayerListPingPacket` handlers, and renders each row from
+  `Data/Game/Interface/InGame/Pages/MapPagePlayerListEntry.ui` — a bare
+  `Label #Username` with a single `TextColor`. **No inline markup**, hence
+  `MysticText.stripMarkup` before sending.
+- Whether the client upserts rows by UUID or appends them was not established
+  from the AOT binary, so `playerList.rebuildEntries` (default on) sends
+  `RemoveFromServerPlayerList` immediately before the add. That pair is correct
+  under either semantic, and netty preserves the write order.
+- Registration is at `EventPriority.LAST` so our rows land after the engine's;
+  a one-shot resync 1.5s after connect repairs the roster if that ordering ever
+  changes.
+
 ### Message & colouring (implemented)
 
 `MysticText` builds a coloured {@code Message} tree from markup. Key facts
@@ -143,6 +173,14 @@ field), hex (`&#rrggbb`, `<#rrggbb>`, 3-digit), MiniMessage-style tags
 Colours are set explicitly per segment, so rendering does not depend on
 client-side markup. `underlined` is set via the public
 `FormattedMessage.underlined` field (no `Message` setter).
+
+All runtime Custom UI text is assigned through `.TextSpans` and
+`MysticPage.uiText(...)`. Do not mix `.Text` and `.TextSpans` on the same
+control, including by declaring `Text:` in a `.ui` template that is later
+updated through `.TextSpans`. UI spans also need an explicit colour on every
+node because they do not reliably inherit `LabelStyle.TextColor`;
+`uiText(...)` supplies the control's semantic fallback colour and preserves
+explicit `MysticText` formatting.
 
 **Hover is not supported** — the 0.5.6 `FormattedMessage` has no hover field, only
 `link`. Only `link` interactivity is representable.
@@ -246,7 +284,7 @@ jar and `Assets.zip`:
 - A separate row-template `.ui` file is appended once per entry:
   `cmd.append("#WarpList", "MysticEssentials/WarpRow.ui")`.
 - Appended rows are addressed by index:
-  `cmd.set("#WarpList[0] #Name.Text", ...)`, and event bindings target either
+  `cmd.set("#WarpList[0] #Name.TextSpans", ...)`, and event bindings target either
   the row root (`#WarpList[0]`) or a child (`#WarpList[0] #TpaButton`).
 - `cmd.appendInline(container, snippet)` / `cmd.clear(container)` also exist.
 
@@ -277,6 +315,181 @@ they have no local countdown and are cleared when the last player leaves or the
 server restarts. When Redis is enabled, each temporary channel and the channel
 index are cached for `temporaryChannelDefaultMinutes` (default `120`) minutes so
 a restarted server can restore them while the Redis TTL is still alive.
+
+## Shared services for other mods
+
+Two services live on Core rather than in a module, because they outlive any one
+module: an ItemView provider registered by MysticRPG must survive the chat
+module being toggled, and a guild warning must send whether or not chat is
+enabled. Both hang off `MysticEssentialsAPI`.
+
+### ItemView providers
+
+Register an `ItemViewProvider` to contribute structured data about your own
+items. Every ItemView on the server picks it up — chat item links, the details
+panel, and any other mod's lookups.
+
+```java
+api.getItemInspectionService().registerProvider(new ItemViewProvider() {
+    public String getProviderId() { return "example_rpg"; }
+    public int getPriority()      { return 100; }
+
+    public boolean supports(ItemStack item, ItemInspectionContext context) {
+        return "example_rpg".equals(ItemNames.namespaceOf(item.getItemId()));
+    }
+
+    public void populate(ItemStack item, ItemInspectionContext ctx, ItemViewBuilder b) {
+        b.quality("example_rpg:null")      // a quality literally named "Null"
+         .rarity("example_rpg:epic")
+         .tier("example_rpg:maelstrom")
+         .category("Weapon").subcategory("One-Handed")
+         .addModifier("haste", 8.1)
+         .addModifier("defense", -4.8)
+         .addSection(ItemViewSection.builder("resonance", "Resonance")
+                 .row("Storm", "2 / 5 pieces")
+                 .build());
+    }
+});
+```
+
+Rules worth knowing before you write one:
+
+- **Providers supply data, never layout.** Section placement is a *hint*; Mystic
+  Essentials clamps it into the fixed order so no mod can push its block above
+  the identity panel or split the statistics table. UI consistency, text
+  sanitization, localization, scrolling, and permission checks stay here.
+- **Scalar setters overwrite, collection methods append.** The generic native
+  inspection runs first, then providers in ascending priority, so the
+  highest-priority provider has the last word on fields it sets and leaves the
+  rest intact. Passing `null` to a setter is a no-op, not a clear — use the
+  `clearQuality()` family to state absence deliberately.
+- **Absence is `null`, never a string.** A quality named `Null`, `None`,
+  `Unknown`, or `Undefined` is real data and is rendered verbatim. Only a
+  missing object means the item has no value on that axis. Do not write
+  `if ("null".equalsIgnoreCase(name))` — that destroys a valid quality.
+- **Failures are contained.** An exception from `populate` is logged
+  (rate-limited per provider) and skipped; the player still gets a working
+  ItemView from everything else. Do not rely on it, but the UI will never fail
+  to open because a third-party mod threw.
+- **Called on the owning world thread.** Component reads are safe; blocking
+  calls are not.
+
+### Notifications
+
+One engine backs mentions, broadcasts, alerts, quest updates, guild warnings,
+economy notices, mail, moderation notices, and restarts. Use it instead of
+sending your own titles and sounds so your notices obey the same profiles,
+player preferences, and history rules as everything else.
+
+```java
+api.getNotificationService().send(
+    Notification.builder()
+        .category(NotificationCategory.GUILD)
+        .priority(NotificationPriority.CRITICAL)
+        .title("Guild Claim Under Attack")
+        .subtitle("Eastern Outpost")
+        .message("Your guild's eastern claim is under attack.")
+        .sound("SFX_Attn_Loud")
+        .showAsBossBar(true)
+        .storeInHistory(true)
+        .source("mysticguilds:claims")
+        .build(),
+    NotificationAudience.guild(guildId));
+```
+
+- Describe **content and intent**; the delivery layer picks the surfaces from
+  the category's profile. The per-surface flags on `Notification` are overrides
+  — leaving them unset is what lets a server admin retune every event
+  notification at once.
+- **Audiences your mod owns** resolve through a registered resolver:
+  `registerAudienceResolver("guild", id -> membersOf(id))`. Without one,
+  `NotificationAudience.guild(...)` delivers to nobody rather than erroring.
+- **History is written even when nothing was shown**, so a player in
+  do-not-disturb still finds the notice in `/notifications`.
+- **Critical notifications bypass player preferences** unless the server sets
+  `notifications.critical.allow-player-disable`. That rule is enforced in one
+  place, not at each call site.
+
+- **Notification Center tabs are registerable.** Mystic Essentials ships only
+  `all`, `unread`, `mentions`, and `system`; anything grouped by a concept it
+  does not own is contributed by the mod that owns it, and a filter nobody
+  registers is not shown — a hardcoded "Guild" tab on a server with no guild mod
+  is a button that can only ever report an empty list.
+
+  ```java
+  notifications.registerFilter(new NotificationFilter() {
+      public String getId()          { return "mysticguilds:guild"; }
+      public String getDisplayName() { return "Guild"; }
+      public int getSortOrder()      { return 40; }
+      public boolean matches(NotificationRecord r) {
+          return "guild".equals(r.category().id());
+      }
+  });
+  ```
+
+  Same contract as mention scopes: namespace the id, `isAvailable()` hides a tab
+  temporarily, re-registering replaces, and a throwing `matches` costs that tab
+  rather than the page.
+- **`chatPrefix(...)`** overrides the category's chat prefix for one send, for
+  senders that already own a configured prefix (this is how the announcements
+  module keeps applying `broadcastPrefix`/`alertPrefix`). Chat surface only —
+  titles, toasts, and history entries are never prefixed. `""` means "no prefix",
+  which is distinct from unset.
+- **Staff override.** `bypassPlayerPreferences(true)` delivers regardless of the
+  recipient's muted categories, disabled surfaces, and do-not-disturb. It is a
+  per-send decision rather than a permission the sender simply holds, so a
+  moderator's contact gets through while their ordinary chatter does not. It
+  still honours `notifications.critical.allow-player-disable`, so a server that
+  has explicitly handed control to players keeps that promise.
+
+### Mention scopes
+
+The "who may mention you" list in `/mentions` is built at runtime. Mystic
+Essentials registers only `everyone` and `nobody` — the two scopes it can
+enforce without help. Anything based on a relationship this mod does not model
+is contributed by the mod that owns it:
+
+```java
+chat.registerMentionScope(new MentionScopeProvider() {
+    public String getId()          { return "mysticguilds:guild"; }
+    public String getDisplayName() { return "Guild Members Only"; }
+    public int getSortOrder()      { return 20; }
+
+    public boolean isAvailable() { return guilds.isLoaded(); }
+
+    public boolean allows(UUID sender, UUID target) {
+        return guilds.shareGuild(sender, target);
+    }
+});
+```
+
+- **Namespace your id** (`mysticguilds:guild`), so two mods cannot collide on
+  `friends`. Re-registering an id replaces the previous provider.
+- **A scope with no provider is not shown.** Offering "Friends Only" on a server
+  with no friend system is a setting that silently does nothing, which is worse
+  than a missing one.
+- **`isAvailable()` hides an option temporarily** while your system is unloaded,
+  without removing it.
+- **A stored choice survives your mod being absent.** If a player selected your
+  scope and it later disappears, their preference is kept (the UI shows it as
+  unavailable) and mentions fall back to *allowed* rather than blocked — the
+  missing provider is a server-side condition the player had no part in. The one
+  exception is `nobody`, which is built in and therefore always enforceable, so
+  the choice that unambiguously means "leave me alone" never degrades.
+- **`allows` runs on the chat path**, once per candidate mention. Keep it to an
+  in-memory lookup; a throw is treated as "no" and logged, never breaking the
+  message.
+
+Config lives in `data/modules/core/notifications.json` (profiles + category
+catalogue), `data/modules/chat/item-view.json` (inspection + panel display), and
+`data/modules/chat/mentions.json` (matching, limits, and
+`rules.staff-bypass-player-settings`).
+
+Mystic Essentials' built-in sounds use vanilla AssetMap ids: routine notices use
+`SFX_Attn_Quiet`, announcements use `SFX_Attn_Moderate`, alerts use
+`SFX_Attn_Loud`, and critical notices use `SFX_Attn_VeryLoud`. The announcement
+module exposes `broadcastTitle`, `broadcastSound`, `alertTitle`, and `alertSound`;
+both commands render through Hytale's `EventTitleUtil` surface.
 
 ## Building
 

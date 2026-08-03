@@ -1,5 +1,7 @@
 package org.hyzionstudios.mysticessentials.modules.patchnotes;
 
+import static org.hyzionstudios.mysticessentials.platform.ui.MysticPage.uiText;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -69,7 +71,7 @@ final class PatchNotesPages {
             cmd.append(PAGE_UI);
 
             int unread = unreadCount();
-            cmd.set("#HeaderInfo.Text", unread > 0 ? unread + " unread" : "");
+            cmd.set("#HeaderInfo.TextSpans", uiText("#HeaderInfo.TextSpans", unread > 0 ? unread + " unread" : ""));
 
             buildList(cmd, event);
             buildViewer(cmd, event);
@@ -93,15 +95,15 @@ final class PatchNotesPages {
 
             cmd.set("#SearchInput.Value", search);
             cmd.set("#ListEmpty.Visible", notes.isEmpty());
-            cmd.set("#ListEmpty.Text", search.isBlank() ? "No patch notes yet." : "No matching patch notes.");
+            cmd.set("#ListEmpty.TextSpans", uiText("#ListEmpty.TextSpans", search.isBlank() ? "No patch notes yet." : "No matching patch notes."));
 
             for (int i = 0; i < notes.size(); i++) {
                 PatchNote note = notes.get(i);
                 String row = "#NoteList[" + i + "]";
                 cmd.append("#NoteList", NOTE_ROW_UI);
-                cmd.set(row + " #Title.Text", note.title == null ? note.safeId() : note.title);
-                cmd.set(row + " #Meta.Text", metaShort(note));
-                cmd.set(row + " #Unread.Text", state.isRead(note.safeId()) ? "" : "●");
+                cmd.set(row + " #Title.TextSpans", uiText(row + " #Title.TextSpans", note.title == null ? note.safeId() : note.title));
+                cmd.set(row + " #Meta.TextSpans", uiText(row + " #Meta.TextSpans", metaShort(note)));
+                cmd.set(row + " #Unread.TextSpans", uiText(row + " #Unread.TextSpans", state.isRead(note.safeId()) ? "" : "●"));
                 cmd.set(row + " #Pinned.Visible", note.pinned);
                 cmd.set(row + " #Accent.Visible", note.safeId().equals(selectedId));
                 event.addEventBinding(CustomUIEventBindingType.Activating, row,
@@ -141,20 +143,20 @@ final class PatchNotesPages {
         private void buildViewer(UICommandBuilder cmd, UIEventBuilder event) {
             PatchNote note = selected();
             if (note == null) {
-                cmd.set("#PatchTitle.Text", "Patch Notes");
-                cmd.set("#PatchMeta.Text", "");
-                cmd.set("#PatchSummary.Text", "There are no patch notes to show yet.");
+                cmd.set("#PatchTitle.TextSpans", uiText("#PatchTitle.TextSpans", "Patch Notes"));
+                cmd.set("#PatchMeta.TextSpans", uiText("#PatchMeta.TextSpans", ""));
+                cmd.set("#PatchSummary.TextSpans", uiText("#PatchSummary.TextSpans", "There are no patch notes to show yet."));
                 cmd.set("#PatchSummary.Visible", true);
                 cmd.set("#FilterBar.Visible", false);
                 cmd.set("#ContentEmpty.Visible", false);
                 return;
             }
 
-            cmd.set("#PatchTitle.Text", note.title == null ? note.safeId() : note.title);
-            cmd.set("#PatchMeta.Text", metaLong(note));
+            cmd.set("#PatchTitle.TextSpans", uiText("#PatchTitle.TextSpans", note.title == null ? note.safeId() : note.title));
+            cmd.set("#PatchMeta.TextSpans", uiText("#PatchMeta.TextSpans", metaLong(note)));
             boolean hasSummary = note.summary != null && !note.summary.isBlank();
             cmd.set("#PatchSummary.Visible", hasSummary);
-            cmd.set("#PatchSummary.Text", hasSummary ? PatchMarkup.stripInline(note.summary) : "");
+            cmd.set("#PatchSummary.TextSpans", uiText("#PatchSummary.TextSpans", hasSummary ? PatchMarkup.stripInline(note.summary) : ""));
 
             buildFilterBar(cmd, event, note);
             buildContent(cmd, note);
@@ -194,7 +196,7 @@ final class PatchNotesPages {
                 String id = ids.get(i);
                 String btn = "#FilterBar[" + i + "]";
                 cmd.append("#FilterBar", FILTER_BTN_UI);
-                cmd.set(btn + " #Label.Text", labels.get(i));
+                cmd.set(btn + " #Label.TextSpans", uiText(btn + " #Label.TextSpans", labels.get(i)));
                 cmd.set(btn + " #Active.Visible", id.equalsIgnoreCase(filter));
                 event.addEventBinding(CustomUIEventBindingType.Activating, btn,
                         new EventData().put("action", "filter").put("filter", id));
@@ -218,8 +220,8 @@ final class PatchNotesPages {
             }
 
             cmd.set("#ContentEmpty.Visible", lines.isEmpty());
-            cmd.set("#ContentEmpty.Text", FILTER_ALL.equalsIgnoreCase(filter)
-                    ? "This patch has no content." : "Nothing in this category.");
+            cmd.set("#ContentEmpty.TextSpans", uiText("#ContentEmpty.TextSpans", FILTER_ALL.equalsIgnoreCase(filter)
+                    ? "This patch has no content." : "Nothing in this category."));
 
             int index = 0;
             for (PatchMarkup.Line line : lines) {
@@ -227,7 +229,7 @@ final class PatchNotesPages {
                 String row = "#SectionContent[" + index + "]";
                 cmd.append("#SectionContent", template);
                 if (line.type() != PatchMarkup.Type.BLANK) {
-                    cmd.set(row + " #Line.Text", line.text());
+                    cmd.set(row + " #Line.TextSpans", uiText(row + " #Line.TextSpans", line.text()));
                 }
                 index++;
             }

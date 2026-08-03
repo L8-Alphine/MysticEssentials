@@ -1,5 +1,7 @@
 package org.hyzionstudios.mysticessentials.modules.playervaults.ui;
 
+import static org.hyzionstudios.mysticessentials.platform.ui.MysticPage.uiText;
+
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -91,9 +93,9 @@ final class VaultListUi extends MysticPage {
         int slotsPerRow = Math.max(1, config.slotsPerRow);
         boolean canAdmin = controller.permissions().canAdminOpen(player) && !adminView;
 
-        cmd.set("#HeaderTitle.Text", adminView
-                ? (ownerName == null ? "Vaults" : ownerName + "'s Vaults") : "Vault Manager");
-        cmd.set("#VaultCount.Text", allowedVaults + " vault" + (allowedVaults == 1 ? "" : "s"));
+        cmd.set("#HeaderTitle.TextSpans", uiText("#HeaderTitle.TextSpans", adminView
+                ? (ownerName == null ? "Vaults" : ownerName + "'s Vaults") : "Vault Manager"));
+        cmd.set("#VaultCount.TextSpans", uiText("#VaultCount.TextSpans", allowedVaults + " vault" + (allowedVaults == 1 ? "" : "s")));
 
         boolean vaultsTab = activeTab.equals("vaults");
         boolean settingsTab = activeTab.equals("settings");
@@ -153,11 +155,11 @@ final class VaultListUi extends MysticPage {
             String row = "#VaultList[" + i + "]";
             cmd.append("#VaultList", CARD_UI);
 
-            cmd.set(row + " #Name.Text", card.name);
-            cmd.set(row + " #Number.Text", "#" + card.number);
+            cmd.set(row + " #Name.TextSpans", uiText(row + " #Name.TextSpans", card.name));
+            cmd.set(row + " #Number.TextSpans", uiText(row + " #Number.TextSpans", "#" + card.number));
             cmd.set(row + " #Icon.ItemId", iconItemId(card.vault));
-            cmd.set(row + " #Meta.Text", card.used + " / " + card.capacity + " slots  |  " + card.rows + " rows");
-            cmd.set(row + " #Status.Text", statusText(card.accessible, card.overflow));
+            cmd.set(row + " #Meta.TextSpans", uiText(row + " #Meta.TextSpans", card.used + " / " + card.capacity + " slots  |  " + card.rows + " rows"));
+            cmd.set(row + " #Status.TextSpans", uiText(row + " #Status.TextSpans", statusText(card.accessible, card.overflow)));
             cmd.set(row + " #Swatch.Background", swatchColor(card.accessible, card.vault));
 
             if (card.accessible) {
@@ -188,20 +190,20 @@ final class VaultListUi extends MysticPage {
         }
         int totalCapacity = perVaultSlots * allowedVaults;
 
-        cmd.set("#SetAllowance.Text", "Vaults: " + allowedVaults + "     Rows each: " + allowedRows
-                + "     Slots per vault: " + perVaultSlots);
-        cmd.set("#SetUsage.Text", "Used: " + usedSlots + " / " + totalCapacity + " slots across all vaults");
-        cmd.set("#SetCustom.Text", "Customized cards: " + customized + " / " + allowedVaults);
-        cmd.set("#SetHint.Text", "Rank up for more vaults and rows. Open a vault from the My Vaults tab to "
+        cmd.set("#SetAllowance.TextSpans", uiText("#SetAllowance.TextSpans", "Vaults: " + allowedVaults + "     Rows each: " + allowedRows
+                + "     Slots per vault: " + perVaultSlots));
+        cmd.set("#SetUsage.TextSpans", uiText("#SetUsage.TextSpans", "Used: " + usedSlots + " / " + totalCapacity + " slots across all vaults"));
+        cmd.set("#SetCustom.TextSpans", uiText("#SetCustom.TextSpans", "Customized cards: " + customized + " / " + allowedVaults));
+        cmd.set("#SetHint.TextSpans", uiText("#SetHint.TextSpans", "Rank up for more vaults and rows. Open a vault from the My Vaults tab to "
                 + "store items (drag them in the chest), or use its Edit button to rename, recolour, "
-                + "pick an icon, and set a description.");
+                + "pick an icon, and set a description."));
     }
 
     private void buildAdminTab(UICommandBuilder cmd, UIEventBuilder event) {
         event.addEventBinding(CustomUIEventBindingType.Activating, "#AdminViewButton",
                 new EventData().put("action", "adminView").append("@player", "#AdminPlayerInput.Value"));
-        cmd.set("#AdminHint.Text", "Enter an online player's name to open their vaults in admin view. "
-                + "You can inspect and (with edit permission) modify their vault contents and cards.");
+        cmd.set("#AdminHint.TextSpans", uiText("#AdminHint.TextSpans", "Enter an online player's name to open their vaults in admin view. "
+                + "You can inspect and (with edit permission) modify their vault contents and cards."));
     }
 
     // ----- Events ---------------------------------------------------------------

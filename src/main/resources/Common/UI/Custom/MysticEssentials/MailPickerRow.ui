@@ -24,12 +24,10 @@ Button #Row {
   Label #Name {
     FlexWeight: 1;
     Style: (FontSize: 13, TextColor: #d7e1ee, VerticalAlignment: Center);
-    Text: "item";
   }
 
   Label #Have {
     Anchor: (Width: 70);
     Style: (FontSize: 12, TextColor: #96a9be, HorizontalAlignment: End, VerticalAlignment: Center);
-    Text: "";
   }
 }

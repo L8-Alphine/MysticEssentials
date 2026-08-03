@@ -1,0 +1,30 @@
+// Window shell with the decorated header and bottom filigree.
+// Same contract as LayoutShell.ui: #MysticLayoutShell carries the size,
+// #MysticLayoutRoot receives the compiled layout.
+$C = "../Common.ui";
+
+$C.@PageOverlay {}
+
+$C.@DecoratedContainer #MysticLayoutShell {
+  Anchor: (Width: 900, Height: 620);
+
+  #Title {
+    Group {
+      $C.@Title #MysticLayoutTitle {
+        @Text = "";
+      }
+    }
+  }
+
+  #CloseButton { Visible: true; }
+
+  #Content {
+    LayoutMode: Top;
+    Padding: (Full: 12);
+
+    Group #MysticLayoutRoot {
+      FlexWeight: 1;
+      LayoutMode: Top;
+    }
+  }
+}

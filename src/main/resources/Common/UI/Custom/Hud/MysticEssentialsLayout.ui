@@ -1,0 +1,12 @@
+// Overlay shell for author-defined HUD documents.
+//
+// #MysticLayoutHudRoot is positioned at runtime from the document's anchor
+// corner and offsets, then filled with inline markup compiled from the
+// document. Every id here is deliberately mod-prefixed: Custom UI selectors are
+// matched by name with nothing scoping them per document, so a generic id like
+// #HudRoot in an always-on overlay is a collision with the next mod that picks
+// the same name.
+Group #MysticLayoutHudRoot {
+  Anchor: (Left: 20, Top: 20);
+  LayoutMode: Top;
+}

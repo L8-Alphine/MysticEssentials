@@ -12,7 +12,6 @@ Group #Row {
   Label #Name {
     FlexWeight: 1;
     Style: (FontSize: 16, TextColor: #ffffff, RenderBold: true, VerticalAlignment: Center);
-    Text: "Player";
   }
 
   $C.@SmallSecondaryTextButton #TpaButton {

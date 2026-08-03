@@ -34,6 +34,43 @@ Important sections:
 | `integrations.vaultUnlocked` | `true` | Auto-detect VaultUnlocked |
 | `integrations.mysticVanish` | `true` | Auto-detect MysticVanish |
 | `integrations.mysticModeration` | `true` | Auto-detect MysticModeration |
+| `updateNotifier.enabled` | `true` | Check CurseForge for newer builds |
+| `updateNotifier.notifyOnJoin` | `true` | Message authorized players on join |
+| `updateNotifier.checkIntervalHours` | `12` | Hours between update checks |
+| `playerList.enabled` | `true` | Decorate the in-game **Server Players** list |
+| `playerList.format` | `"{luckperms_prefix}{display_name}{luckperms_suffix}"` | The listed name |
+| `playerList.showAfk` | `true` | Mark AFK players in the list |
+| `playerList.afkFormat` | `"{name} (AFK)"` | Applied to AFK players; `{name}` is the result of `format` |
+| `playerList.refreshSeconds` | `5` | How often names are recomputed |
+| `playerList.rebuildEntries` | `true` | Remove-then-add each replaced row |
+
+### Server Players list
+
+The roster on the map screen is built by the engine from the raw username. With
+`playerList.enabled`, Mystic replaces each row with the name produced by
+`playerList.format`, so rank prefixes and suffixes show up there the same way
+they do in chat.
+
+`format` accepts any registered Mystic placeholder — `{luckperms_prefix}`,
+`{luckperms_suffix}`, `{group}`, `{player_name}` — plus `{display_name}`, which
+is the `/nick` nickname falling back to the username. `%papi%` placeholders work
+when PlaceholderAPI is installed.
+
+`showAfk` appends the AFK marker from `afkFormat` while the **afk** module has a
+player flagged idle. Set `showAfk` to `false` to leave AFK players undecorated.
+
+Two things worth knowing:
+
+- **The list is plain text.** The client draws each row as an unstyled label, so
+  colour and format markup is stripped from the resolved name — `&c[Admin] `
+  lists as `[Admin] `. Bracketed tags read best here.
+- **Names only change when they have to.** Nothing is sent for a player whose
+  resolved name equals their real username, so a server with no prefixes, no
+  nicknames, and nobody AFK sends no extra packets at all.
+
+`rebuildEntries` sends a remove packet before the replacement row. That is the
+form that is correct whether the client replaces list entries by UUID or appends
+them; turn it off only if a client build is seen to flicker on refresh.
 
 ## Teleportation
 
@@ -180,6 +217,14 @@ Channel settings:
 | `channels.allowTemporaryChannels` | `true` | Allows session channels |
 | `channels.temporaryChannelDefaultMinutes` | `120` | Redis TTL restore window for temporary channels |
 | `channels.createTemporaryPermission` | `mysticessentials.chat.channel.create.temp` | Temporary channel permission |
+| `channels.roster.enabled` | `true` | Enables compact/full member rosters |
+| `channels.roster.viewPermission` | `mysticessentials.channel.members.view` | Permission required to open rosters; blank allows everyone |
+| `channels.roster.showServerRanks` | `true` | Show LuckPerms/server rank below the channel role |
+| `channels.roster.activity.enabled` | `true` | Show recent text and provider-backed voice activity |
+| `channels.tempManagement.ownershipTransfer.enabled` | `true` | Allow ownership transfer requests |
+| `channels.tempManagement.ownershipTransfer.targetMustAccept` | `true` | Require the target to accept a transfer |
+| `channels.tempManagement.ownerDisconnect.gracePeriodSeconds` | `300` | Wait before applying succession |
+| `channels.tempManagement.ownerDisconnect.successionMode` | `PROMOTE_MODERATOR` | Owner-disconnect policy |
 
 Default channels:
 
@@ -206,10 +251,27 @@ modules/chat/item-links.json
 | `showViewCommandInChat` | `true` | Append the visible, typeable `(/itemview <code>)` hint |
 | `viewCommand` | `"itemview"` | Command shown/used to open the viewer (also an alias) |
 | `underlineChatName` / `showQuantityInChat` | `true` | Chat name styling |
-| `snapshot.retentionSeconds` | `600` | How long a shared item stays inspectable |
-| `snapshot.maximumSnapshots` | `500` | Cap on live snapshots in memory |
-| `history.maximumEntries` | `25` | Recent shared-item entries kept per player |
-| `rarityRules` | keyword rules | Item-id → rarity (name + color) rules |
+| `expiredLabel` | `[Item Link Expired]` | Text replacing an expired snapshot |
+| `unavailableLabel` | `[Item Unavailable]` | Text replacing an unknown snapshot |
+
+Inspection and presentation use `modules/chat/item-view.json`:
+
+| Setting | Default | Description |
+| --- | --- | --- |
+| `display` | all user-facing fields on | Classification/source/original-tooltip display switches and compact breakpoint |
+| `sections` | all on | Toggle statistics, modifiers, requirements, lore, durability, custom and technical sections |
+| `snapshots.expirationMinutes` | `30` | Inspectable lifetime |
+| `snapshots.maxPerPlayer` / `maximumSnapshots` | `50` / `500` | Per-player and global live caps |
+| `snapshots.historyEntriesPerPlayer` | `25` | Recent entries stored for each recipient |
+| `qualities` | Common through Mythic | Engine quality-index definitions |
+| `classificationRules` | keyword rules | Item-id rules for rarity/tier/grade the engine does not expose |
+| `providers.catchProviderErrors` | `true` | Contain a failing addon provider without breaking ItemView |
+
+Mention matching and delivery use `modules/chat/mentions.json`. Defaults require
+exact case-insensitive names, cap mentions at 3 per message and 10 per minute,
+apply 5-second sender/15-second same-target cooldowns, throttle recipient sounds
+to 3 seconds, and apply a 300-second mass-mention cooldown. Player preferences
+and block lists are managed with `/mentions`.
 
 See the [Item Links](itemlinks-module) page for the full workflow, commands, and rarity rules.
 
@@ -228,6 +290,8 @@ modules/announcements/config.json
 | `randomOrder` | `false` | Shuffle announcement order |
 | `broadcastPrefix` | `&8[&dBroadcast&8] &f` | Prefix for `/broadcast` |
 | `alertPrefix` | `&8[&c&lALERT&8] &c` | Prefix for `/alert` |
+| `broadcastTitle` / `alertTitle` | `Announcement` / `Alert` | Event-title headline |
+| `broadcastSound` / `alertSound` | Hytale attention SFX | Sounds for short-form and rotating notices |
 | `messages` | Welcome/home/TPA examples | Auto-broadcast entries |
 
 Announcement messages can be strings or JSON objects:
@@ -274,7 +338,13 @@ Rewards:
 | `rewards.maxSessionReward` | `500.0` | Per-session cap; `0` disables |
 | `rewards.maxDailyReward` | `2000.0` | Daily cap; `0` disables |
 | `rewards.requireInZone` | `false` | Require reward zone |
-| `rewards.zoneCornerA` / `zoneCornerB` | `null` | Reward zone corners |
+| `rewards.zones` | `[]` | Named X/Z footprints; height is not bounded |
+| `rewards.teleportToZoneOnAfk` | `true` | Safely move to a permitted zone and restore on return |
+| `rewards.safeTeleport.enabled` | `true` | Probe terrain instead of using a fixed Y |
+| `rewards.safeTeleport.attempts` | `12` | Random columns tried |
+| `rewards.safeTeleport.requiredHeadroom` | `2` | Air blocks needed above the floor |
+| `rewards.safeTeleport.verticalSearchRange` | `24` | Search distance above/below the corner reference height |
+| `rewards.safeTeleport.blockedBlocks` / `blockedFluids` | hazards | Floor/fluid asset ids that cannot be used |
 | `rewards.noRewardWithinCombatSeconds` | `15` | Combat lockout |
 
 ## Greetings
@@ -424,3 +494,27 @@ Grouped blocks control more behavior:
 | `admin` | Admin logging, owner notification, `defaultAdminMode`, `maxLogEntriesPerPlayer` |
 
 See the [Player Vaults](playervaults-module) page for the full breakdown.
+
+## Notifications
+
+File:
+
+```text
+modules/core/notifications.json
+```
+
+The `chat-only`, `broadcast`, `important`, and `critical` profiles define which
+combination of chat, title/subtitle, action bar, toast, banner, sound and history
+is used at each priority. Categories provide names, accents, sounds, chat
+prefixes, a default profile, a minimum priority, and whether players can disable
+them. History keeps 50 records per player for 24 hours by default; critical
+records can persist across reconnects.
+
+## CustomGUIs & CustomDialogs
+
+The licensed module uses `modules/customcontent/config.json` and is also disabled
+by default in the main `modules` map. Key settings toggle CustomDialogs and
+CustomGUIs independently, control standalone-data import, GUI alias commands,
+the 400-element document cap, remote player portraits and their cache, command
+labels, compatibility plugin identity, and QuestLines export directory. See
+[CustomGUIs & CustomDialogs](custom-content-module) for licensing and authoring.

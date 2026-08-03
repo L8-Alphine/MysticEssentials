@@ -14,7 +14,6 @@ $C.@Container {
       Label #ManagerLimit {
         Anchor: (Top: 8, Right: 14, Width: 120, Height: 24);
         Style: (FontSize: 14, TextColor: #96a9be, HorizontalAlignment: End, VerticalAlignment: Center);
-        Text: "0 / 0";
       }
     }
   }
@@ -56,7 +55,6 @@ $C.@Container {
         Label #SelectedName {
           Anchor: (Bottom: 10);
           Style: (FontSize: 20, RenderBold: true, TextColor: #ffffff);
-          Text: "No Warp";
         }
 
         Label {

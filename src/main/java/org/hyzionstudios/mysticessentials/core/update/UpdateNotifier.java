@@ -18,6 +18,11 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.hyzionstudios.mysticessentials.api.Permissions;
+import org.hyzionstudios.mysticessentials.api.notification.Notification;
+import org.hyzionstudios.mysticessentials.api.notification.NotificationAction;
+import org.hyzionstudios.mysticessentials.api.notification.NotificationAudience;
+import org.hyzionstudios.mysticessentials.api.notification.NotificationCategory;
+import org.hyzionstudios.mysticessentials.api.notification.NotificationPriority;
 import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.core.config.MainConfig;
 
@@ -167,10 +172,24 @@ public final class UpdateNotifier {
     }
 
     private void sendNotice(PlayerRef player, Release release) {
-        core.getMessageService().sendKey(player, "update-notifier-available", Map.of(
+        Map<String, String> params = Map.of(
                 "current", core.getVersion(),
                 "latest", release.version,
-                "url", CURSEFORGE_URL));
+                "url", CURSEFORGE_URL);
+        if (core.notifications() == null) {
+            core.getMessageService().sendKey(player, "update-notifier-available", params);
+            return;
+        }
+        String message = core.getMessageService().plainFromKey("update-notifier-available", params);
+        core.notifications().send(Notification.builder()
+                .category(NotificationCategory.UPDATE)
+                .priority(NotificationPriority.IMPORTANT)
+                .title("Mystic Essentials Update")
+                .subtitle("Version " + release.version + " is available")
+                .message(message)
+                .action(NotificationAction.url(CURSEFORGE_URL))
+                .source("mysticessentials:update-notifier")
+                .build(), NotificationAudience.player(player.getUuid()));
     }
 
     private MainConfig.UpdateNotifier config() {

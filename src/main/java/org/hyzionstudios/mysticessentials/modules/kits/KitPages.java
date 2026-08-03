@@ -1,5 +1,7 @@
 package org.hyzionstudios.mysticessentials.modules.kits;
 
+import static org.hyzionstudios.mysticessentials.platform.ui.MysticPage.uiText;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -46,7 +48,7 @@ final class KitPages {
             cmd.append(KITS_UI);
             Map<String, KitConfig.Kit> visible = kits.visibleKits(player);
             List<Map.Entry<String, KitConfig.Kit>> entries = new ArrayList<>(visible.entrySet());
-            cmd.set("#KitCount.Text", entries.size() + " kits");
+            cmd.set("#KitCount.TextSpans", uiText("#KitCount.TextSpans", entries.size() + " kits"));
             cmd.set("#KitEmpty.Visible", entries.isEmpty());
 
             for (int i = 0; i < entries.size(); i++) {
@@ -55,9 +57,9 @@ final class KitPages {
                 String id = entry.getKey();
                 KitConfig.Kit kit = entry.getValue();
                 cmd.append("#KitList", KIT_ROW_UI);
-                cmd.set(row + " #Name.Text", KitModule.displayName(id, kit));
-                cmd.set(row + " #Meta.Text", kitSummary(id, kit));
-                cmd.set(row + " #Status.Text", kits.statusText(player, id, kit));
+                cmd.set(row + " #Name.TextSpans", uiText(row + " #Name.TextSpans", KitModule.displayName(id, kit)));
+                cmd.set(row + " #Meta.TextSpans", uiText(row + " #Meta.TextSpans", kitSummary(id, kit)));
+                cmd.set(row + " #Status.TextSpans", uiText(row + " #Status.TextSpans", kits.statusText(player, id, kit)));
                 cmd.set(row + " #Swatch.Background", statusColor(kits.statusText(player, id, kit)));
                 event.addEventBinding(CustomUIEventBindingType.Activating, row,
                         new EventData().put("action", "select").put("kit", id));
@@ -106,26 +108,26 @@ final class KitPages {
 
         private void applyDetails(UICommandBuilder cmd, Map.Entry<String, KitConfig.Kit> selected) {
             if (selected == null) {
-                cmd.set("#KitName.Text", "No Kits");
-                cmd.set("#KitDescription.Text", "No kits are configured or visible to you.");
-                cmd.set("#KitStatus.Text", "-");
-                cmd.set("#KitCooldown.Text", "-");
-                cmd.set("#KitPlaytime.Text", "-");
-                cmd.set("#KitCost.Text", "-");
-                cmd.set("#KitItems.Text", "-");
+                cmd.set("#KitName.TextSpans", uiText("#KitName.TextSpans", "No Kits"));
+                cmd.set("#KitDescription.TextSpans", uiText("#KitDescription.TextSpans", "No kits are configured or visible to you."));
+                cmd.set("#KitStatus.TextSpans", uiText("#KitStatus.TextSpans", "-"));
+                cmd.set("#KitCooldown.TextSpans", uiText("#KitCooldown.TextSpans", "-"));
+                cmd.set("#KitPlaytime.TextSpans", uiText("#KitPlaytime.TextSpans", "-"));
+                cmd.set("#KitCost.TextSpans", uiText("#KitCost.TextSpans", "-"));
+                cmd.set("#KitItems.TextSpans", uiText("#KitItems.TextSpans", "-"));
                 return;
             }
             String id = selected.getKey();
             KitConfig.Kit kit = selected.getValue();
-            cmd.set("#KitName.Text", KitModule.displayName(id, kit));
-            cmd.set("#KitDescription.Text", kit.description == null || kit.description.isBlank()
-                    ? "No description." : kit.description);
-            cmd.set("#KitStatus.Text", kits.statusText(player, id, kit));
-            cmd.set("#KitCooldown.Text", cooldownText(kit));
-            cmd.set("#KitPlaytime.Text", kit.requiredOnlineSeconds <= 0
-                    ? "none" : KitModule.formatDuration(kit.requiredOnlineSeconds));
-            cmd.set("#KitCost.Text", kit.cost <= 0 ? "Free" : Double.toString(kit.cost));
-            cmd.set("#KitItems.Text", kit.items == null ? "0 items" : kit.items.size() + " items");
+            cmd.set("#KitName.TextSpans", uiText("#KitName.TextSpans", KitModule.displayName(id, kit)));
+            cmd.set("#KitDescription.TextSpans", uiText("#KitDescription.TextSpans", kit.description == null || kit.description.isBlank()
+                    ? "No description." : kit.description));
+            cmd.set("#KitStatus.TextSpans", uiText("#KitStatus.TextSpans", kits.statusText(player, id, kit)));
+            cmd.set("#KitCooldown.TextSpans", uiText("#KitCooldown.TextSpans", cooldownText(kit)));
+            cmd.set("#KitPlaytime.TextSpans", uiText("#KitPlaytime.TextSpans", kit.requiredOnlineSeconds <= 0
+                    ? "none" : KitModule.formatDuration(kit.requiredOnlineSeconds)));
+            cmd.set("#KitCost.TextSpans", uiText("#KitCost.TextSpans", kit.cost <= 0 ? "Free" : Double.toString(kit.cost)));
+            cmd.set("#KitItems.TextSpans", uiText("#KitItems.TextSpans", kit.items == null ? "0 items" : kit.items.size() + " items"));
         }
     }
 
@@ -145,9 +147,9 @@ final class KitPages {
             cmd.append(KIT_PREVIEW_UI);
             KitConfig.Kit kit = kits.findKit(kitName).orElse(null);
             String title = KitModule.displayName(kitName, kit);
-            cmd.set("#PreviewTitle.Text", title.isBlank() ? "Kit Preview" : title);
-            cmd.set("#PreviewDescription.Text", kit == null || kit.description == null || kit.description.isBlank()
-                    ? "No description." : kit.description);
+            cmd.set("#PreviewTitle.TextSpans", uiText("#PreviewTitle.TextSpans", title.isBlank() ? "Kit Preview" : title));
+            cmd.set("#PreviewDescription.TextSpans", uiText("#PreviewDescription.TextSpans", kit == null || kit.description == null || kit.description.isBlank()
+                    ? "No description." : kit.description));
             cmd.set("#PreviewEmpty.Visible", kit == null || kit.items == null || kit.items.isEmpty());
             if (kit != null && kit.items != null) {
                 for (int i = 0; i < kit.items.size(); i++) {
@@ -155,9 +157,9 @@ final class KitPages {
                     String row = "#PreviewList[" + i + "]";
                     cmd.append("#PreviewList", KIT_PREVIEW_ROW_UI);
                     if (item == null || item.itemId == null || item.itemId.isBlank()) {
-                        cmd.set(row + " #Name.Text", "Unknown Item");
-                        cmd.set(row + " #Meta.Text", "");
-                        cmd.set(row + " #Qty.Text", "");
+                        cmd.set(row + " #Name.TextSpans", uiText(row + " #Name.TextSpans", "Unknown Item"));
+                        cmd.set(row + " #Meta.TextSpans", uiText(row + " #Meta.TextSpans", ""));
+                        cmd.set(row + " #Qty.TextSpans", uiText(row + " #Qty.TextSpans", ""));
                         continue;
                     }
                     int quantity = Math.max(1, item.quantity);
@@ -166,15 +168,15 @@ final class KitPages {
                     if (registryItem != null) {
                         cmd.set(row + " #Icon.ItemId", item.itemId);
                     }
-                    // A raw Message on .Text disconnects the client, so unknown items
-                    // fall back to the plain-String prettified id.
+                    // Registered items retain their translated Message; unknown items
+                    // use a prettified raw id. Both are valid TextSpans values.
                     if (name != null) {
-                        cmd.set(row + " #Name.Text", name);
+                        cmd.set(row + " #Name.TextSpans", uiText(row + " #Name.TextSpans", name));
                     } else {
-                        cmd.set(row + " #Name.Text", KitModule.prettify(item.itemId));
+                        cmd.set(row + " #Name.TextSpans", uiText(row + " #Name.TextSpans", KitModule.prettify(item.itemId)));
                     }
-                    cmd.set(row + " #Meta.Text", KitModule.itemMeta(item.itemId));
-                    cmd.set(row + " #Qty.Text", "x" + quantity);
+                    cmd.set(row + " #Meta.TextSpans", uiText(row + " #Meta.TextSpans", KitModule.itemMeta(item.itemId)));
+                    cmd.set(row + " #Qty.TextSpans", uiText(row + " #Qty.TextSpans", "x" + quantity));
                 }
             }
             event.addEventBinding(CustomUIEventBindingType.Activating, "#BackButton",

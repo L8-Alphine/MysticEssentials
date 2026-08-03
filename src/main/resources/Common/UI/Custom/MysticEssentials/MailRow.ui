@@ -38,20 +38,17 @@ Button #Row {
       Label #Unread {
         Anchor: (Width: 14);
         Style: (FontSize: 16, TextColor: #ffd97a, VerticalAlignment: Center);
-        Text: "";
       }
 
       Label #From {
         FlexWeight: 1;
         Style: (FontSize: 15, TextColor: #ffffff, RenderBold: true, VerticalAlignment: Center);
-        Text: "Sender";
       }
     }
 
     Label #Preview {
       Anchor: (Height: 16);
       Style: (FontSize: 12, TextColor: #9fb0c4);
-      Text: "";
     }
   }
 
@@ -62,13 +59,11 @@ Button #Row {
     Label #Date {
       Anchor: (Height: 20);
       Style: (FontSize: 11, TextColor: #96a9be, VerticalAlignment: Center, HorizontalAlignment: End);
-      Text: "";
     }
 
     Label #Reward {
       Anchor: (Height: 16);
       Style: (FontSize: 11, TextColor: #f0b429, HorizontalAlignment: End, VerticalAlignment: Center);
-      Text: "";
     }
   }
 }

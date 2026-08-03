@@ -1,6 +1,6 @@
 // Row template for the Homes UI list. Appended per home:
 //   cmd.append("#HomeList", "MysticEssentials/HomeRow.ui")
-// and populated by index: cmd.set("#HomeList[i] #Name.Text", ...).
+// and populated by index: cmd.set("#HomeList[i] #Name.TextSpans", ...).
 
 Button #Row {
   Anchor: (Height: 56, Bottom: 8);
@@ -24,13 +24,11 @@ Button #Row {
     Label #Name {
       Anchor: (Height: 22, Bottom: 2);
       Style: (FontSize: 16, TextColor: #ffffff, RenderBold: true, VerticalAlignment: Center);
-      Text: "Home";
     }
 
     Label #Meta {
       Anchor: (Height: 17);
       Style: (FontSize: 12, TextColor: #9fb0c4, VerticalAlignment: Center);
-      Text: "";
     }
   }
 }

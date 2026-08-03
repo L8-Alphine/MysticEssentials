@@ -1,0 +1,56 @@
+// Mystic Essentials persistent notification banner — the boss-bar equivalent.
+//
+// Pinned near the top of the screen so a countdown or emergency stays readable
+// while the player keeps playing. Critical alerts use this so the information
+// survives the moment a title fades, which is the whole point: a restart warning
+// that vanished two seconds after it appeared is a warning nobody acted on.
+//
+// The accent bar and the progress fill are recoloured/resized at runtime.
+Group #MysticNotificationBannerRoot {
+  Anchor: (Top: 64, Left: 0, Right: 0, Height: 54);
+  LayoutMode: CenterMiddle;
+
+  Group #MysticNotificationBannerPanel {
+    Anchor: (Width: 620, Height: 50);
+    Background: #000000(0.55);
+    LayoutMode: Top;
+    Padding: (Horizontal: 14, Vertical: 6);
+
+    Group {
+      LayoutMode: Left;
+      Anchor: (Height: 24, Bottom: 4);
+
+      Group #MysticNotificationBannerAccent {
+        Anchor: (Width: 4, Height: 20, Right: 10);
+        Background: #FF4B4B;
+      }
+
+      Label #MysticNotificationBannerText {
+        FlexWeight: 1;
+        Style: (FontSize: 16, RenderBold: true, TextColor: #ffffff, VerticalAlignment: Center);
+      }
+
+      Label #MysticNotificationBannerHint {
+        Anchor: (Width: 120);
+        Style: (FontSize: 12, TextColor: #9fb0c4, HorizontalAlignment: End, VerticalAlignment: Center);
+      }
+    }
+
+    // Progress track. The Fill and Rest groups below are
+    // given complementary flex weights to draw the remaining fraction.
+    Group #MysticNotificationBannerTrack {
+      LayoutMode: Left;
+      Anchor: (Height: 8);
+      Background: #000000(0.45);
+
+      Group #MysticNotificationBannerFill {
+        FlexWeight: 100;
+        Background: #FF4B4B;
+      }
+
+      Group #MysticNotificationBannerRest {
+        FlexWeight: 0;
+      }
+    }
+  }
+}

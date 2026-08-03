@@ -1,5 +1,7 @@
 package org.hyzionstudios.mysticessentials.modules.warps;
 
+import static org.hyzionstudios.mysticessentials.platform.ui.MysticPage.uiText;
+
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -26,7 +28,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
  * Custom UI pages for warps. Lists are built from row-template {@code .ui}
  * files appended per entry (the builtin {@code WarpListPage} pattern):
  * {@code cmd.append("#WarpList", "MysticEssentials/WarpRow.ui")} then
- * {@code cmd.set("#WarpList[i] #Name.Text", ...)} and a per-row Activating
+ * {@code cmd.set("#WarpList[i] #Name.TextSpans", uiText("#WarpList[i] #Name.TextSpans", ...))} and a per-row Activating
  * binding on {@code #WarpList[i]}.
  */
 final class WarpPages {
@@ -71,8 +73,8 @@ final class WarpPages {
                 Warp warp = visible.get(i);
                 String row = "#WarpList[" + i + "]";
                 cmd.append("#WarpList", WARP_ROW_UI);
-                cmd.set(row + " #Name.Text", warp.getName());
-                cmd.set(row + " #Meta.Text", serverWarpMeta(warp));
+                cmd.set(row + " #Name.TextSpans", uiText(row + " #Name.TextSpans", warp.getName()));
+                cmd.set(row + " #Meta.TextSpans", uiText(row + " #Meta.TextSpans", serverWarpMeta(warp)));
                 cmd.set(row + " #Swatch.Background", serverWarpColor(warp));
                 event.addEventBinding(CustomUIEventBindingType.Activating, row,
                         new EventData().put("action", "select").put("warp", warp.getName()));
@@ -121,22 +123,22 @@ final class WarpPages {
 
         private void applyDetails(UICommandBuilder cmd, Warp warp) {
             if (warp == null) {
-                cmd.set("#WarpName.Text", "No Warp");
-                cmd.set("#WarpDescription.Text", "Create one or check your permissions.");
-                cmd.set("#WarpCost.Text", "-");
-                cmd.set("#WarpVisibility.Text", "-");
-                cmd.set("#WarpPermission.Text", "-");
-                cmd.set("#WarpWorld.Text", "-");
+                cmd.set("#WarpName.TextSpans", uiText("#WarpName.TextSpans", "No Warp"));
+                cmd.set("#WarpDescription.TextSpans", uiText("#WarpDescription.TextSpans", "Create one or check your permissions."));
+                cmd.set("#WarpCost.TextSpans", uiText("#WarpCost.TextSpans", "-"));
+                cmd.set("#WarpVisibility.TextSpans", uiText("#WarpVisibility.TextSpans", "-"));
+                cmd.set("#WarpPermission.TextSpans", uiText("#WarpPermission.TextSpans", "-"));
+                cmd.set("#WarpWorld.TextSpans", uiText("#WarpWorld.TextSpans", "-"));
                 return;
             }
-            cmd.set("#WarpName.Text", warp.getName());
-            cmd.set("#WarpDescription.Text", warp.getDescription() == null || warp.getDescription().isBlank()
-                    ? "No description." : warp.getDescription());
-            cmd.set("#WarpCost.Text", costText(core, warp));
-            cmd.set("#WarpVisibility.Text", warp.getVisibility().name());
-            cmd.set("#WarpPermission.Text", warp.getPermission() == null || warp.getPermission().isBlank()
-                    ? "none" : warp.getPermission());
-            cmd.set("#WarpWorld.Text", worldText(warp.getLocation()));
+            cmd.set("#WarpName.TextSpans", uiText("#WarpName.TextSpans", warp.getName()));
+            cmd.set("#WarpDescription.TextSpans", uiText("#WarpDescription.TextSpans", warp.getDescription() == null || warp.getDescription().isBlank()
+                    ? "No description." : warp.getDescription()));
+            cmd.set("#WarpCost.TextSpans", uiText("#WarpCost.TextSpans", costText(core, warp)));
+            cmd.set("#WarpVisibility.TextSpans", uiText("#WarpVisibility.TextSpans", warp.getVisibility().name()));
+            cmd.set("#WarpPermission.TextSpans", uiText("#WarpPermission.TextSpans", warp.getPermission() == null || warp.getPermission().isBlank()
+                    ? "none" : warp.getPermission()));
+            cmd.set("#WarpWorld.TextSpans", uiText("#WarpWorld.TextSpans", worldText(warp.getLocation())));
         }
     }
 
@@ -159,7 +161,7 @@ final class WarpPages {
                 Store<EntityStore> store) {
             cmd.append(WARP_ADMIN_UI);
             Warp warp = warpName == null ? null : warps.getWarp(warpName).orElse(null);
-            cmd.set("#AdminHeading.Text", warp == null ? "New Warp" : warp.getName());
+            cmd.set("#AdminHeading.TextSpans", uiText("#AdminHeading.TextSpans", warp == null ? "New Warp" : warp.getName()));
             cmd.set("#AdminName.Value", warp == null ? "" : warp.getName());
             cmd.set("#AdminDescription.Value",
                     warp == null || warp.getDescription() == null ? "" : warp.getDescription());
@@ -266,8 +268,8 @@ final class WarpPages {
                 Warp warp = all.get(i);
                 String row = "#PwarpList[" + i + "]";
                 cmd.append("#PwarpList", PLAYER_WARP_ROW_UI);
-                cmd.set(row + " #Name.Text", warp.getName());
-                cmd.set(row + " #Meta.Text", playerWarpMeta(warp));
+                cmd.set(row + " #Name.TextSpans", uiText(row + " #Name.TextSpans", warp.getName()));
+                cmd.set(row + " #Meta.TextSpans", uiText(row + " #Meta.TextSpans", playerWarpMeta(warp)));
                 cmd.set(row + " #Swatch.Background", playerWarpColor(warp));
                 event.addEventBinding(CustomUIEventBindingType.Activating, row,
                         new EventData().put("action", "select").put("warp", warp.getName()));
@@ -275,8 +277,8 @@ final class WarpPages {
 
             Warp selected = selectedWarp(all, selectedName);
             applyDetails(cmd, selected);
-            cmd.set("#PwarpLimit.Text", "You own " + warps.getPlayerWarps(player.getUuid()).size()
-                    + " / " + warps.playerWarpLimit(player.getUuid()) + " player warps.");
+            cmd.set("#PwarpLimit.TextSpans", uiText("#PwarpLimit.TextSpans", "You own " + warps.getPlayerWarps(player.getUuid()).size()
+                    + " / " + warps.playerWarpLimit(player.getUuid()) + " player warps."));
 
             if (selected != null) {
                 event.addEventBinding(CustomUIEventBindingType.Activating, "#TeleportButton",
@@ -309,19 +311,19 @@ final class WarpPages {
 
         private void applyDetails(UICommandBuilder cmd, Warp warp) {
             if (warp == null) {
-                cmd.set("#PwarpName.Text", "No Warp");
-                cmd.set("#PwarpDescription.Text", "Use /pwarp create <name> to add your own.");
-                cmd.set("#PwarpOwner.Text", "-");
-                cmd.set("#PwarpCost.Text", "-");
-                cmd.set("#PwarpWorld.Text", "-");
+                cmd.set("#PwarpName.TextSpans", uiText("#PwarpName.TextSpans", "No Warp"));
+                cmd.set("#PwarpDescription.TextSpans", uiText("#PwarpDescription.TextSpans", "Use /pwarp create <name> to add your own."));
+                cmd.set("#PwarpOwner.TextSpans", uiText("#PwarpOwner.TextSpans", "-"));
+                cmd.set("#PwarpCost.TextSpans", uiText("#PwarpCost.TextSpans", "-"));
+                cmd.set("#PwarpWorld.TextSpans", uiText("#PwarpWorld.TextSpans", "-"));
                 return;
             }
-            cmd.set("#PwarpName.Text", warp.getName());
-            cmd.set("#PwarpDescription.Text", warp.getDescription() == null || warp.getDescription().isBlank()
-                    ? "No description." : warp.getDescription());
-            cmd.set("#PwarpOwner.Text", ownerText(warp));
-            cmd.set("#PwarpCost.Text", costText(core, warp));
-            cmd.set("#PwarpWorld.Text", worldText(warp.getLocation()));
+            cmd.set("#PwarpName.TextSpans", uiText("#PwarpName.TextSpans", warp.getName()));
+            cmd.set("#PwarpDescription.TextSpans", uiText("#PwarpDescription.TextSpans", warp.getDescription() == null || warp.getDescription().isBlank()
+                    ? "No description." : warp.getDescription()));
+            cmd.set("#PwarpOwner.TextSpans", uiText("#PwarpOwner.TextSpans", ownerText(warp)));
+            cmd.set("#PwarpCost.TextSpans", uiText("#PwarpCost.TextSpans", costText(core, warp)));
+            cmd.set("#PwarpWorld.TextSpans", uiText("#PwarpWorld.TextSpans", worldText(warp.getLocation())));
         }
     }
 
@@ -342,21 +344,21 @@ final class WarpPages {
                 Store<EntityStore> store) {
             cmd.append(PLAYER_WARP_MANAGER_UI);
             List<Warp> own = warps.getPlayerWarps(player.getUuid());
-            cmd.set("#ManagerLimit.Text", own.size() + " / " + warps.playerWarpLimit(player.getUuid()));
+            cmd.set("#ManagerLimit.TextSpans", uiText("#ManagerLimit.TextSpans", own.size() + " / " + warps.playerWarpLimit(player.getUuid())));
             cmd.set("#OwnEmpty.Visible", own.isEmpty());
             for (int i = 0; i < own.size(); i++) {
                 Warp warp = own.get(i);
                 String row = "#OwnList[" + i + "]";
                 cmd.append("#OwnList", PLAYER_WARP_ROW_UI);
-                cmd.set(row + " #Name.Text", warp.getName());
-                cmd.set(row + " #Meta.Text", playerWarpMeta(warp));
+                cmd.set(row + " #Name.TextSpans", uiText(row + " #Name.TextSpans", warp.getName()));
+                cmd.set(row + " #Meta.TextSpans", uiText(row + " #Meta.TextSpans", playerWarpMeta(warp)));
                 cmd.set(row + " #Swatch.Background", playerWarpColor(warp));
                 event.addEventBinding(CustomUIEventBindingType.Activating, row,
                         new EventData().put("action", "select").put("warp", warp.getName()));
             }
 
             Warp selected = selectedWarp(own, selectedName);
-            cmd.set("#SelectedName.Text", selected == null ? "No Warp" : selected.getName());
+            cmd.set("#SelectedName.TextSpans", uiText("#SelectedName.TextSpans", selected == null ? "No Warp" : selected.getName()));
             cmd.set("#EditDescription.Value",
                     selected == null || selected.getDescription() == null ? "" : selected.getDescription());
             cmd.set("#EditCost.Value",

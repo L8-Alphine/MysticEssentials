@@ -2,7 +2,7 @@ $C = "../Common.ui";
 
 // Removal line (red) in the Patch Notes viewer content.
 //   cmd.append("#SectionContent", "MysticEssentials/PatchLineRemove.ui")
-//   cmd.set("#SectionContent[i] #Line.Text", ...)
+//   cmd.set("#SectionContent[i] #Line.TextSpans", ...)
 
 Group #Row {
   LayoutMode: Top;
@@ -11,6 +11,5 @@ Group #Row {
   Label #Line {
     Anchor: (Full: 0);
     Style: (FontSize: 14, TextColor: #e07a7a, VerticalAlignment: Center);
-    Text: "";
   }
 }

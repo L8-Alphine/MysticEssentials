@@ -2,7 +2,7 @@ $C = "../Common.ui";
 
 // Category filter chip for the Patch Notes viewer. Appended per filter:
 //   cmd.append("#FilterBar", "MysticEssentials/PatchFilterButton.ui")
-// then: cmd.set("#FilterBar[i] #Label.Text", ...) and toggle the active
+// then: cmd.set("#FilterBar[i] #Label.TextSpans", ...) and toggle the active
 // underline via cmd.set("#FilterBar[i] #Active.Visible", true).
 
 Button #Row {
@@ -21,7 +21,6 @@ Button #Row {
     Label #Label {
       Anchor: (Full: 0);
       Style: (FontSize: 13, TextColor: #c9d6e5, RenderBold: true, HorizontalAlignment: Center, VerticalAlignment: Center);
-      Text: "All";
     }
   }
 

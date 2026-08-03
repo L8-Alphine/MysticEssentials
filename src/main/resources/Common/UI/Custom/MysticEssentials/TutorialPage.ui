@@ -19,13 +19,11 @@ $C.@Container {
     Label #PageTitle {
       Anchor: (Height: 30, Bottom: 4);
       Style: (FontSize: 22, RenderBold: true, TextColor: #ffffff);
-      Text: "";
     }
 
     Label #PageSubtitle {
       Anchor: (Height: 40, Bottom: 10);
       Style: (FontSize: 14, TextColor: #9fb0c4, Wrap: true);
-      Text: "";
     }
 
     Group #ContentList {

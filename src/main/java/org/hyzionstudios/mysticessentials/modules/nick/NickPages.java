@@ -1,5 +1,7 @@
 package org.hyzionstudios.mysticessentials.modules.nick;
 
+import static org.hyzionstudios.mysticessentials.platform.ui.MysticPage.uiText;
+
 import org.hyzionstudios.mysticessentials.api.Permissions;
 import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.platform.ui.MysticPage;
@@ -40,7 +42,7 @@ final class NickPages {
                 Store<EntityStore> store) {
             cmd.append(NICK_UI);
             String current = nick.nickname(player.getUuid());
-            cmd.set("#CurrentNick.Text", current == null ? "none (using your real name)" : current);
+            cmd.set("#CurrentNick.TextSpans", uiText("#CurrentNick.TextSpans", current == null ? "none (using your real name)" : current));
             cmd.set("#NickInput.Value", current == null ? "" : nick.editableNickname(player.getUuid()));
 
             boolean colorsAllowed = player.hasPermission(Permissions.NICK_COLOR);

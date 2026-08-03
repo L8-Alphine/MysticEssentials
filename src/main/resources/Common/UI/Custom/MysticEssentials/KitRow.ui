@@ -20,19 +20,16 @@ Button #Row {
     Label #Name {
       Anchor: (Height: 22, Bottom: 2);
       Style: (FontSize: 16, TextColor: #ffffff, RenderBold: true, VerticalAlignment: Center);
-      Text: "Kit";
     }
 
     Label #Meta {
       Anchor: (Height: 17);
       Style: (FontSize: 12, TextColor: #9fb0c4, VerticalAlignment: Center);
-      Text: "";
     }
   }
 
   Label #Status {
     Anchor: (Width: 130);
     Style: (FontSize: 12, TextColor: #d7e1ee, VerticalAlignment: Center, HorizontalAlignment: End, Wrap: true);
-    Text: "";
   }
 }

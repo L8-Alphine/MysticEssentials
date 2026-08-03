@@ -52,40 +52,38 @@ $C.@Container {
         Label #WarpName {
           Anchor: (Bottom: 8);
           Style: (FontSize: 22, RenderBold: true, TextColor: #ffffff);
-          Text: "No Warp";
         }
 
         Label #WarpDescription {
           Anchor: (Bottom: 12);
           Style: (FontSize: 14, TextColor: #96a9be, Wrap: true);
-          Text: "";
         }
 
         Group {
           LayoutMode: Left;
           Anchor: (Bottom: 8);
           Label { Anchor: (Width: 110); Style: (...$C.@DefaultLabelStyle, FontSize: 13, RenderBold: true); Text: "Cost"; }
-          Label #WarpCost { FlexWeight: 1; Style: (...$C.@DefaultLabelStyle, FontSize: 13); Text: "-"; }
+          Label #WarpCost { FlexWeight: 1; Style: (...$C.@DefaultLabelStyle, FontSize: 13); }
         }
 
         Group {
           LayoutMode: Left;
           Anchor: (Bottom: 8);
           Label { Anchor: (Width: 110); Style: (...$C.@DefaultLabelStyle, FontSize: 13, RenderBold: true); Text: "Visibility"; }
-          Label #WarpVisibility { FlexWeight: 1; Style: (...$C.@DefaultLabelStyle, FontSize: 13); Text: "-"; }
+          Label #WarpVisibility { FlexWeight: 1; Style: (...$C.@DefaultLabelStyle, FontSize: 13); }
         }
 
         Group {
           LayoutMode: Left;
           Anchor: (Bottom: 8);
           Label { Anchor: (Width: 110); Style: (...$C.@DefaultLabelStyle, FontSize: 13, RenderBold: true); Text: "Permission"; }
-          Label #WarpPermission { FlexWeight: 1; Style: (...$C.@DefaultLabelStyle, FontSize: 13, Wrap: true); Text: "-"; }
+          Label #WarpPermission { FlexWeight: 1; Style: (...$C.@DefaultLabelStyle, FontSize: 13, Wrap: true); }
         }
 
         Group {
           LayoutMode: Left;
           Label { Anchor: (Width: 110); Style: (...$C.@DefaultLabelStyle, FontSize: 13, RenderBold: true); Text: "World"; }
-          Label #WarpWorld { FlexWeight: 1; Style: (...$C.@DefaultLabelStyle, FontSize: 13); Text: "-"; }
+          Label #WarpWorld { FlexWeight: 1; Style: (...$C.@DefaultLabelStyle, FontSize: 13); }
         }
       }
 

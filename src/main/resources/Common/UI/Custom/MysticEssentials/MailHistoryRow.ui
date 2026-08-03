@@ -17,19 +17,16 @@ Group #Row {
     Label #Subject {
       Anchor: (Height: 20);
       Style: (FontSize: 14, TextColor: #ffffff, RenderBold: true, VerticalAlignment: Center);
-      Text: "Announcement";
     }
 
     Label #Meta {
       Anchor: (Height: 15);
       Style: (FontSize: 11, TextColor: #f0b429, VerticalAlignment: Center);
-      Text: "";
     }
 
     Label #Preview {
       Anchor: (Height: 15);
       Style: (FontSize: 11, TextColor: #9fb0c4, VerticalAlignment: Center);
-      Text: "";
     }
   }
 

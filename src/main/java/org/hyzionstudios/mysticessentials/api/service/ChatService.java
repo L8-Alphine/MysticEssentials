@@ -49,4 +49,36 @@ public interface ChatService {
     default boolean broadcastToChannel(String channelId, String senderName, String content, String format) {
         return broadcastToChannel(channelId, senderName, content);
     }
+
+    // ----- Mention scopes --------------------------------------------------------
+
+    /**
+     * Adds an option to every player's "who may mention you" list.
+     *
+     * <p>Use this for any scope that depends on a relationship this mod does not
+     * model — friends, guild members, party members. Mystic Essentials ships only
+     * {@code everyone} and {@code nobody}, because those are the only two it can
+     * enforce by itself; a scope with no provider is hidden rather than offered as
+     * a setting that would quietly do nothing.</p>
+     *
+     * <p>Re-registering the same id replaces the previous provider, so a mod
+     * reload does not accumulate duplicates.</p>
+     */
+    default void registerMentionScope(
+            org.hyzionstudios.mysticessentials.api.mention.MentionScopeProvider provider) {
+    }
+
+    /** Removes a scope by id. @return whether one was registered. */
+    default boolean unregisterMentionScope(String scopeId) {
+        return false;
+    }
+
+    /**
+     * The currently available scopes, in display order. Excludes providers whose
+     * {@code isAvailable()} is false.
+     */
+    default java.util.List<
+            org.hyzionstudios.mysticessentials.api.mention.MentionScopeProvider> mentionScopes() {
+        return java.util.List.of();
+    }
 }

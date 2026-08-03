@@ -1,0 +1,9 @@
+// Text field for <field> and <search> nodes. Appended rather than emitted
+// inline because the input styling lives in Common.ui, which an inline
+// fragment cannot import.
+$C = "../Common.ui";
+
+$C.@TextField {
+  @Anchor = (Height: 34);
+  FlexWeight: 1;
+}

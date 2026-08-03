@@ -7,6 +7,11 @@ Three of the larger sub-features have their own pages:
 - [Chat Formatting](chat-formatting) — format templates, colors, gradients, links, and placeholders.
 - [Item Links](itemlinks-module) — share your held item in chat with the `[item]` tag.
 
+Players can also configure exact-name mentions with `/mentions` (alias
+`/mentionsettings`). Mentions use the shared notification engine, so each player
+can choose chat highlighting, title, action-bar and sound behavior, select who
+may mention them, block senders, or enable do-not-disturb.
+
 ## Public chat formatting
 
 When `formatChat` is on, every message is rewritten through a permission-selected format template. See [Chat Formatting](chat-formatting) for the full syntax, color permissions, and placeholder list.
@@ -33,8 +38,18 @@ Channels split chat into separate streams such as global and staff.
 | `/channel leave <name>` | Stop listening to a channel |
 | `/channel temp <id> ...` | Create a temporary channel (`mysticessentials.chat.channel.create.temp`) |
 | `/channel manage` | Manage your temporary channel |
+| `/mentions` | Open mention settings |
 
 Servers can define quick aliases such as `/g`, `/global`, `/sc`, `/schat`, and `/staffchat`. Channels are gated by dynamic permissions: `mysticessentials.chat.channel.<id>` and its `.speak`, `.listen`, and `.moderator` variants. The bundled defaults are a server-wide `global` channel and a permission-gated cross-server `staff` channel.
+
+The channel browser and management pages include compact and full member
+rosters. Rows resolve live owner, channel-moderator, staff, member and listener
+roles; show optional LuckPerms rank information; and expose recent text or
+addon-provided voice activity. Temporary-channel owners can lock membership,
+mute/remove members, change participation, promote moderators, and transfer
+ownership. On owner disconnect, a configurable grace period and succession
+policy can promote a moderator or the oldest member, retain ownership, or close
+the channel. Ownership/moderator changes publish API events.
 
 ### Channel configuration
 
@@ -49,6 +64,10 @@ Channels are configured under `channels` in `modules/chat/config.json`. Top-leve
 | `temporaryChannelDefaultMinutes` | `120` | Redis restore window for temporary channels |
 | `createTemporaryPermission` | `mysticessentials.chat.channel.create.temp` | Permission to create temporary channels |
 | `channels` | global + staff | The channel definitions (see below) |
+| `roster` | enabled | Member-list permission, tags, ranks, activity and visible-row cap |
+| `tempManagement.ownershipTransfer` | enabled, acceptance required | Transfer request expiry and the previous owner's new role |
+| `tempManagement.ownerDisconnect` | 300-second grace | Succession and fallback modes |
+| `tempManagement.moderation` | safe defaults | Per-action moderator capabilities |
 
 Each entry in `channels` supports:
 
@@ -67,6 +86,7 @@ Each entry in `channels` supports:
 | `crossServer` | Route this channel across servers over Redis |
 | `redisTopic` | Redis topic name for cross-server routing |
 | `radiusBlocks` | When > 0, only players within this many blocks receive messages (local/proximity chat) |
+| `locked` | Prevent new members from joining until an owner/moderator unlocks it |
 
 Channel formats use the same placeholders as public chat (see [Chat Formatting](chat-formatting)). The `groupFormats` map lets one channel render differently per rank:
 
@@ -112,6 +132,20 @@ To add a **local/proximity** channel, set `scope: "server"` and a `radiusBlocks`
 
 Players can show off the item in their hand by typing `[item]` in chat. The tag becomes a rarity-colored item name with a short `(/itemview <code>)` hint; hovering the icon in the viewer shows the full native item tooltip. See [Item Links](itemlinks-module) for the workflow, commands, rarity rules, and configuration (`modules/chat/item-links.json`).
 
+## Mentions
+
+`@PlayerName` matching is case-insensitive and exact by default. Trailing
+punctuation works, while URLs, email addresses, item data, and partial names do
+not trigger a notification. Sender cooldowns, same-target cooldowns, a
+per-message cap, a per-minute budget, recipient sound throttling, and a separate
+five-minute mass-mention cooldown make abuse expensive.
+
+Mass mentions (`@everyone`, `@online`, `@staff`, `@channel`) have separate
+permissions. Addons can register relationship scopes such as friends, guild or
+party through `ChatService.registerMentionScope(...)`; unavailable scopes stay
+hidden from player settings instead of silently accepting a rule that cannot be
+enforced. Server defaults live in `modules/chat/mentions.json`.
+
 ## Configuration
 
 All chat settings live in one file:
@@ -120,7 +154,9 @@ All chat settings live in one file:
 modules/chat/config.json
 ```
 
-Item links use `modules/chat/item-links.json`. See the [Configuration Reference](configuration) for every field, and [Chat Formatting](chat-formatting) for template details.
+Item links use `modules/chat/item-links.json` and `modules/chat/item-view.json`;
+mentions use `modules/chat/mentions.json`. See the [Configuration Reference](configuration)
+for the key fields, and [Chat Formatting](chat-formatting) for template details.
 
 ## See also
 

@@ -14,7 +14,6 @@ $C.@Container {
       Label #HeaderInfo {
         Anchor: (Top: 8, Right: 14, Width: 300, Height: 24);
         Style: (FontSize: 13, TextColor: #96a9be, HorizontalAlignment: End, VerticalAlignment: Center);
-        Text: "";
       }
     }
   }
@@ -90,7 +89,6 @@ $C.@Container {
       Label #AudienceLabel {
         Anchor: (Height: 16, Bottom: 6);
         Style: (FontSize: 12, TextColor: #f0b429, VerticalAlignment: Center);
-        Text: "Delivering to: Online now";
       }
 
       $C.@TextField #ParamInput {
@@ -113,7 +111,6 @@ $C.@Container {
       Label #RewardHeader {
         Anchor: (Height: 18, Bottom: 4);
         Style: (...$C.@DefaultLabelStyle, FontSize: 12, RenderBold: true, RenderUppercase: true, TextColor: #f0b429);
-        Text: "Item rewards (max 9)";
       }
 
       Group {
@@ -166,7 +163,6 @@ $C.@Container {
           Label #NoItemsLabel {
             Anchor: (Height: 28);
             Style: (FontSize: 13, TextColor: #9fb0c4, VerticalAlignment: Center);
-            Text: "No matching items — search above.";
             Visible: false;
           }
 
@@ -186,7 +182,6 @@ $C.@Container {
           Label #DraftLabel {
             Anchor: (Height: 16, Bottom: 4);
             Style: (FontSize: 12, TextColor: #9fb0c4);
-            Text: "Attached (0)";
           }
 
           Group #DraftList {

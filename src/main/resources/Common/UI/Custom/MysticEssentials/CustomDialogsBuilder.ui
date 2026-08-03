@@ -1,0 +1,236 @@
+$C = "../Common.ui";
+
+$C.@PageOverlay {}
+
+$C.@Container {
+  Anchor: (Width: 880, Height: 760);
+
+  #Title {
+    Group {
+      $C.@Title {
+        @Text = "CustomDialogs Builder";
+      }
+    }
+  }
+
+  #CloseButton { Visible: true; }
+
+  #Content {
+    LayoutMode: Top;
+    Padding: (Full: 12);
+
+    Group {
+      LayoutMode: Left;
+      Anchor: (Height: 40, Bottom: 8);
+
+      $C.@DropdownBox #DialogDropdown {
+        @Anchor = (Right: 8);
+        FlexWeight: 1;
+      }
+      $C.@TextField #NewDialogId {
+        @Anchor = (Width: 210, Right: 8);
+        PlaceholderText: "new_dialog_id";
+      }
+      $C.@SmallSecondaryTextButton #CreateDialogButton {
+        @Text = "Create";
+        @Anchor = (Width: 90, Right: 6);
+      }
+      $C.@SmallSecondaryTextButton #DeleteDialogButton {
+        @Text = "Delete";
+        @Anchor = (Width: 120);
+      }
+    }
+
+    Group #DialogEditor {
+      LayoutMode: Top;
+
+      Group {
+        Background: (TexturePath: "../Common/ContainerPanelPatch.png", Border: 4);
+        LayoutMode: Top;
+        Padding: (Full: 12);
+        Anchor: (Bottom: 8);
+
+        Label {
+          Anchor: (Height: 24, Bottom: 6);
+          Text: "Dialog";
+          Style: (FontSize: 17, RenderBold: true, TextColor: #e8c97a);
+        }
+
+        Group {
+          LayoutMode: Left;
+          Anchor: (Height: 38);
+
+          $C.@TextField #DialogTitle {
+            @Anchor = (Right: 8);
+            FlexWeight: 1;
+            PlaceholderText: "Dialog title";
+          }
+          $C.@TextField #NpcName {
+            @Anchor = (Right: 8);
+            FlexWeight: 1;
+            PlaceholderText: "NPC name";
+          }
+          $C.@DropdownBox #DialogWidth {
+            @Anchor = (Width: 150, Right: 8);
+          }
+          $C.@SmallSecondaryTextButton #AssignButton {
+            @Text = "Assign NPC";
+            @Anchor = (Width: 120);
+          }
+        }
+      }
+
+      Group {
+        LayoutMode: Left;
+        Anchor: (Height: 500);
+
+        Group {
+          Background: (TexturePath: "../Common/ContainerPanelPatch.png", Border: 4);
+          LayoutMode: Top;
+          Padding: (Full: 10);
+          Anchor: (Width: 250, Right: 8);
+
+          Label #PageCount {
+            Anchor: (Height: 22, Bottom: 6);
+            Style: (FontSize: 14, RenderBold: true, TextColor: #d7e1ee);
+          }
+
+          Group #PageList {
+            LayoutMode: TopScrolling;
+            FlexWeight: 1;
+            ScrollbarStyle: $C.@DefaultScrollbarStyle;
+            Padding: (Right: 5);
+          }
+
+          Group {
+            LayoutMode: Left;
+            Anchor: (Height: 34, Top: 6);
+            $C.@SmallSecondaryTextButton #AddPageButton {
+              @Text = "+";
+              @Anchor = (Width: 45, Right: 4);
+            }
+            $C.@SmallSecondaryTextButton #MovePageUpButton {
+              @Text = "Up";
+              @Anchor = (Width: 55, Right: 4);
+            }
+            $C.@SmallSecondaryTextButton #MovePageDownButton {
+              @Text = "Down";
+              @Anchor = (Width: 65, Right: 4);
+            }
+            $C.@SmallSecondaryTextButton #RemovePageButton {
+              @Text = "X";
+              @Anchor = (Width: 45);
+            }
+          }
+        }
+
+        Group #PageEditor {
+          Background: (TexturePath: "../Common/ContainerPanelPatch.png", Border: 4);
+          LayoutMode: Top;
+          Padding: (Full: 12);
+          FlexWeight: 1;
+
+          Label #PageHeading {
+            Anchor: (Height: 24, Bottom: 6);
+            Style: (FontSize: 17, RenderBold: true, TextColor: #e8c97a);
+          }
+
+          MultilineTextField #PageText {
+            Value: "";
+            Anchor: (Height: 116, Bottom: 8);
+            Style: InputFieldStyle();
+            Background: $C.@InputBoxBackground;
+            Padding: (Horizontal: 10, Vertical: 6);
+          }
+
+          $C.@TextField #ContinueLabel {
+            @Anchor = (Height: 38, Bottom: 10);
+            PlaceholderText: "Continue button label";
+          }
+
+          Group #ButtonPanel {
+            LayoutMode: Left;
+            FlexWeight: 1;
+
+            Group {
+              LayoutMode: Top;
+              Anchor: (Width: 210, Right: 8);
+
+              Label #ButtonCount {
+                Anchor: (Height: 22, Bottom: 5);
+                Style: (FontSize: 13, RenderBold: true, TextColor: #d7e1ee);
+              }
+              Group #ButtonList {
+                LayoutMode: TopScrolling;
+                FlexWeight: 1;
+                ScrollbarStyle: $C.@DefaultScrollbarStyle;
+                Padding: (Right: 5);
+              }
+              Group {
+                LayoutMode: Left;
+                Anchor: (Height: 34, Top: 5);
+                $C.@SmallSecondaryTextButton #AddButtonButton {
+                  @Text = "+";
+                  @Anchor = (Width: 42, Right: 3);
+                }
+                $C.@SmallSecondaryTextButton #MoveButtonUpButton {
+                  @Text = "Up";
+                  @Anchor = (Width: 48, Right: 3);
+                }
+                $C.@SmallSecondaryTextButton #MoveButtonDownButton {
+                  @Text = "Down";
+                  @Anchor = (Width: 58, Right: 3);
+                }
+                $C.@SmallSecondaryTextButton #RemoveButtonButton {
+                  @Text = "X";
+                  @Anchor = (Width: 42);
+                }
+              }
+            }
+
+            Group #ButtonEditor {
+              LayoutMode: Top;
+              FlexWeight: 1;
+
+              Label {
+                Anchor: (Height: 22, Bottom: 5);
+                Text: "Response button";
+                Style: (FontSize: 13, RenderBold: true, TextColor: #d7e1ee);
+              }
+              $C.@TextField #ButtonText {
+                @Anchor = (Height: 38, Bottom: 8);
+                PlaceholderText: "Button text";
+              }
+              MultilineTextField #ButtonActions {
+                Value: "";
+                Anchor: (Height: 104);
+                Style: InputFieldStyle();
+                Background: $C.@InputBoxBackground;
+                Padding: (Horizontal: 10, Vertical: 6);
+              }
+              Label {
+                Anchor: (Height: 36, Top: 4);
+                Text: "Comma-separated dialog actions";
+                Style: (FontSize: 11, TextColor: #8fa1b8, Wrap: true);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    Group {
+      LayoutMode: Left;
+      Anchor: (Height: 42, Top: 8);
+
+      $C.@TextButton #SaveButton {
+        @Text = "Save & Export";
+        @Anchor = (Width: 170, Right: 8);
+      }
+      $C.@TertiaryTextButton #SaveCloseButton {
+        @Text = "Save & Close";
+        @Anchor = (Width: 160);
+      }
+    }
+  }
+}

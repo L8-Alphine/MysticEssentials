@@ -1,18 +1,26 @@
 $C = "../Common.ui";
 
-// Read-only Item Details page. Renders the shared item's data directly (custom-UI
-// ItemSlots do NOT get the native hover tooltip, so we can't defer to hover): a
-// rarity-accented header, cleaned lore (Hytale <color is=…> markup stripped, since
-// Labels render plain text only), single-line stat rows, and share info.
+// Item Details v2 — a structured, sectioned, read-only view of a shared item.
+//
+// This file is only the SHELL: header, scrolling body container, footer. Every
+// section inside #MysticItemBody is generated at runtime with appendInline, since
+// which
+// sections exist depends entirely on what the item actually has. An item with no
+// resonance data has no Resonance section at all — sections are omitted, never
+// rendered empty, and never filled with a placeholder.
+//
+// Custom-UI ItemSlots do not receive the native hover tooltip, so the original
+// tooltip is reachable through the explicit "Original Tooltip" button, which
+// re-renders this same page in tooltip mode.
 
 $C.@PageOverlay {}
 
-$C.@Container {
-  Anchor: (Width: 680, Height: 660);
+$C.@Container #MysticItemShell {
+  Anchor: (Width: 820, Height: 700);
 
   #Title {
     Group {
-      $C.@Title {
+      $C.@Title #HeaderTitle {
         @Text = "Item Details";
       }
     }
@@ -21,27 +29,25 @@ $C.@Container {
   #Content {
     LayoutMode: Top;
 
-    Group {
+    // ----- Identity panel -----------------------------------------------------
+    Group #HeaderPanel {
       LayoutMode: Left;
-      Anchor: (Height: 118, Bottom: 12);
+      Anchor: (Height: 122, Bottom: 10);
       Background: (TexturePath: "../Common/ContainerPanelPatch.png", Border: 4);
       Padding: (Full: 14);
 
       Group #RarityAccent {
-        Anchor: (Width: 6, Height: 84, Right: 14);
+        Anchor: (Width: 6, Height: 88, Right: 14);
         Background: #7a9cc6;
       }
 
-      // ItemSlotButton parent auto-detects the ItemSlot child and shows the FULL
-      // native item tooltip (description with colours, quality, durability) on hover,
-      // dynamically from #Icon.ItemId (config-based mode, per the element docs).
       ItemSlotButton #IconButton {
-        Anchor: (Width: 76, Height: 76, Right: 18);
+        Anchor: (Width: 78, Height: 78, Right: 18);
 
         ItemSlot #Icon {
           Anchor: (Full: 0);
           ShowQualityBackground: true;
-          ShowQuantity: false;
+          ShowQuantity: true;
         }
       }
 
@@ -52,43 +58,36 @@ $C.@Container {
         Label #ItemName {
           Anchor: (Height: 30, Bottom: 4);
           Style: (FontSize: 23, RenderBold: true, TextColor: #ffffff, VerticalAlignment: Center);
-          Text: "Item";
         }
 
         Label #ItemSubtitle {
           Anchor: (Height: 20, Bottom: 3);
           Style: (FontSize: 14, TextColor: #96a9be, VerticalAlignment: Center);
-          Text: "";
         }
 
         Label #ItemId {
           Anchor: (Height: 16);
           Style: (FontSize: 12, TextColor: #6f7f93, VerticalAlignment: Center);
-          Text: "";
+        }
+      }
+
+      // Quality badge. Shows the item's quality name verbatim — a quality
+      // literally named "Null" reads "NULL" here. Hidden entirely when the item
+      // has no quality; never replaced with "Unknown" or "Error".
+      Group #QualityBadge {
+        LayoutMode: CenterMiddle;
+        Anchor: (Width: 116, Height: 34, Left: 10);
+        Background: #7a9cc6(0.22);
+
+        Label #QualityBadgeLabel {
+          Anchor: (Full: 4);
+          Style: (FontSize: 13, RenderBold: true, TextColor: #ffffff, HorizontalAlignment: Center, VerticalAlignment: Center);
         }
       }
     }
 
-    Label {
-      Anchor: (Height: 32, Bottom: 8);
-      Style: (FontSize: 13, TextColor: #8a9bb0, Wrap: true, HorizontalAlignment: Center, VerticalAlignment: Center);
-      Text: "Hover the item icon for full lore, quality and stats.";
-    }
-
-    Label {
-      Anchor: (Height: 22, Bottom: 4);
-      Style: (FontSize: 14, RenderBold: true, TextColor: #E8A93B);
-      Text: "Statistics";
-    }
-
-    Label #StatsEmpty {
-      Anchor: (Height: 22, Bottom: 6);
-      Style: (FontSize: 13, TextColor: #9fb0c4, VerticalAlignment: Center);
-      Text: "No additional statistics.";
-      Visible: false;
-    }
-
-    Group #StatList {
+    // ----- Generated sections -------------------------------------------------
+    Group #MysticItemBody {
       FlexWeight: 1;
       LayoutMode: TopScrolling;
       Padding: (Right: 10, Bottom: 8);
@@ -98,7 +97,6 @@ $C.@Container {
     Label #ShareInfo {
       Anchor: (Height: 22, Bottom: 8);
       Style: (FontSize: 12, TextColor: #7f8ea3, Wrap: true);
-      Text: "";
     }
 
     Group {
@@ -107,12 +105,22 @@ $C.@Container {
 
       $C.@SecondaryTextButton #ReportButton {
         @Text = "Report";
-        @Anchor = (Width: 160, Right: 8);
+        @Anchor = (Width: 120, Right: 8);
+      }
+
+      $C.@SecondaryTextButton #LayoutButton {
+        @Text = "Compact";
+        @Anchor = (Width: 130, Right: 8);
+      }
+
+      $C.@SecondaryTextButton #TooltipButton {
+        @Text = "Original Tooltip";
+        @Anchor = (Width: 190, Right: 8);
       }
 
       $C.@TextButton #CloseButton {
         @Text = "Close";
-        @Anchor = (Width: 180);
+        @Anchor = (Width: 150);
       }
     }
   }

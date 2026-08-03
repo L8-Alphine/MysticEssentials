@@ -2,7 +2,7 @@ $C = "../Common.ui";
 
 // Chosen-attachment row in the Mail compose pane.
 // Appended per pending pick: cmd.append("#DraftList", "MysticEssentials/MailDraftRow.ui")
-// then cmd.set("#DraftList[i] #Name.Text", ...) etc. #Remove drops the pick.
+// then cmd.set("#DraftList[i] #Name.TextSpans", ...) etc. #Remove drops the pick.
 
 Group #Row {
   Anchor: (Height: 34, Bottom: 4);
@@ -19,13 +19,11 @@ Group #Row {
   Label #Name {
     FlexWeight: 1;
     Style: (FontSize: 12, TextColor: #d7e1ee, VerticalAlignment: Center);
-    Text: "item";
   }
 
   Label #Qty {
     Anchor: (Width: 50);
     Style: (FontSize: 12, TextColor: #9fb0c4, HorizontalAlignment: End, VerticalAlignment: Center);
-    Text: "x1";
   }
 
   $C.@CancelTextButton #Remove {

@@ -1,5 +1,7 @@
 package org.hyzionstudios.mysticessentials.modules.teleportation.rtp;
 
+import static org.hyzionstudios.mysticessentials.platform.ui.MysticPage.uiText;
+
 import com.hypixel.hytale.server.core.entity.entities.player.hud.CustomUIHud;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
@@ -22,6 +24,6 @@ final class RtpStatusHud extends CustomUIHud {
     @Override
     protected void build(UICommandBuilder cmd) {
         cmd.append(UI_FILE);
-        cmd.set("#Status.Text", text);
+        cmd.set("#MysticRtpStatus.TextSpans", uiText("#MysticRtpStatus.TextSpans", text));
     }
 }

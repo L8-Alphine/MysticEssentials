@@ -10,6 +10,8 @@ Optional arguments use `[brackets]`. Required arguments use `<angle brackets>`.
 | `/mystic reload` | Reload core and module configuration | `mysticessentials.reload` |
 | `/mystic migrate scan <source> [path]` | Preview file-based migration from a legacy essentials data folder | `mysticessentials.migrate` |
 | `/mystic migrate import <source> [path] [--replace] [--dry-run]` | Import supported legacy data into Mystic Essentials | `mysticessentials.migrate` |
+| `/mystic license [reload]` | Show license status/server id, or reload `license.mclicense` | `mysticessentials.license` |
+| `/notifications`, `/notifs` | Open notification history, filters, and preferences | None |
 
 ## Teleportation
 
@@ -22,6 +24,8 @@ Optional arguments use `[brackets]`. Required arguments use `<angle brackets>`.
 | `/tpaccept [player]` | Accept the newest request or one from a specific player | `mysticessentials.teleport.tpa` |
 | `/tpdeny [player]` | Deny the newest request or one from a specific player | `mysticessentials.teleport.tpa` |
 | `/tpcancel` | Cancel outgoing teleport requests | `mysticessentials.teleport.tpa` |
+| `/tp [player]` | Teleport to a player; without a player, open the requests UI | `mysticessentials.teleport.tp` |
+| `/tp world <player> <world>` | Send a player to another world's spawn | `mysticessentials.teleport.tp.world` |
 | `/tphere <player>` | Teleport one player to you | `mysticessentials.teleport.tphere` |
 | `/tpall` | Teleport every online player to you | `mysticessentials.teleport.tpall` |
 | `/top` | Teleport to the highest available position above you | `mysticessentials.teleport.top` |
@@ -107,18 +111,19 @@ Alias: `/portals`. Portals are configured in-game by pressing Use (F) on a porta
 | `/channel leave <name>` | Stop listening to a channel | None by default |
 | `/channel temp <id> [password|-] [prefix|-] [alias1,alias2|-] [permission]` | Create a temporary channel | `mysticessentials.chat.channel.create.temp` |
 | `/channel manage` | Manage your temporary channel | Owner/moderator rules apply |
+| `/mentions`, `/mentionsettings` | Configure mention scope, delivery, block list, and do-not-disturb | None |
 | Configured aliases such as `/g`, `/global`, `/sc`, `/schat`, `/staffchat` | Switch channel quickly | Channel permissions may apply |
 | `[item]` (chat tag) | Share your held item in chat as an [item link](itemlinks-module) | `mysticessentials.chat.itemlink.use` |
 | `/itemview <code>` | Open the item viewer for a shared [item link](itemlinks-module) | None by default |
-| `/iteminspect [latest\|<number>\|<code>]` | Inspect the latest, nth, or a specific shared item (alias `/inspectitem`) | None by default |
+| `/iteminspect [latest\|<number>\|<code>]` | Inspect the latest, nth, or a specific shared item (aliases `/itemview`, `/inspectitem`) | None by default |
 | `/itemlinks`, `/recentitems` | Browse items recently shared in chat | None by default |
 
 ## Announcements, AFK, and greetings
 
 | Command | Description | Permission |
 | --- | --- | --- |
-| `/broadcast <message>`, `/bc <message>` | Broadcast with the configured broadcast prefix | `mysticessentials.announcement.broadcast` |
-| `/alert <message>` | Broadcast with the configured alert prefix | `mysticessentials.announcement.alert` |
+| `/broadcast [category] [priority] <message> [flags]`, `/bc ...` | Send a targeted notification; the short form keeps the configured prefix | `mysticessentials.announcement.broadcast` |
+| `/alert [category] [priority] <message> [flags]` | Send a higher-priority targeted notification | `mysticessentials.announcement.alert` |
 | `/afk [reason]` | Toggle AFK | `mysticessentials.afk.use` |
 
 ## Kits
@@ -200,3 +205,17 @@ See the [Custom Commands module](customcommands-module) page. Operator-defined c
 | `/customcommands list`, `info`, `test`, `validate` | Inspect and test custom commands | Matching `mysticessentials.customcommands.*` nodes |
 | `/customcommands enable`, `disable` | Toggle a custom command | `mysticessentials.customcommands.manage` |
 | `/customcommands reload` | Reload custom command definitions | `mysticessentials.customcommands.reload` |
+
+## CustomGUIs & CustomDialogs
+
+This module is disabled by default and requires partner access plus a valid
+license. See [CustomGUIs & CustomDialogs](custom-content-module).
+
+| Command | Description | Permission |
+| --- | --- | --- |
+| `/customcontent`, `/customtools` | Show combined CustomContent status/admin entry point | `mysticessentials.customcontent.admin` |
+| `/customdialogs` | Open the dialog builder and QuestLines export/assignment tools | `mysticessentials.customdialogs.admin` |
+| `/customguis list` | List compiled GUI and HUD documents | `mysticessentials.customguis.admin` |
+| `/customguis open <id> [player]` | Open a GUI for yourself or another player | `mysticessentials.customguis.admin` |
+| `/customguis hud <show\|hide> <id> [player]` | Show or hide a HUD document | `mysticessentials.customguis.admin` |
+| `/customguis reload` | Recompile documents and refresh alias commands | `mysticessentials.customguis.admin` |

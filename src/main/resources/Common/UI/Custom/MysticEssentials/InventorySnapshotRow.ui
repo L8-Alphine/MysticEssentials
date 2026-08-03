@@ -12,19 +12,16 @@ Group #Row {
   Label #Cause {
     Anchor: (Width: 110);
     Style: (FontSize: 15, TextColor: #ffd97a, RenderBold: true, VerticalAlignment: Center);
-    Text: "Cause";
   }
 
   Label #Time {
     FlexWeight: 1;
     Style: (FontSize: 14, TextColor: #ffffff, VerticalAlignment: Center);
-    Text: "";
   }
 
   Label #Items {
     Anchor: (Width: 84);
     Style: (FontSize: 12, TextColor: #9fb0c4, VerticalAlignment: Center);
-    Text: "";
   }
 
   $C.@SmallSecondaryTextButton #ViewButton {

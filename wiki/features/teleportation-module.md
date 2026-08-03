@@ -21,6 +21,7 @@ The Teleport Requests UI includes **favorites**, so players can keep frequent fr
 
 | Command | What it does | Permission |
 | --- | --- | --- |
+| `/tp world <player> <world>` | Send a player to another world's spawn point | `mysticessentials.teleport.tp.world` |
 | `/tphere <player>` | Teleport one player to you | `mysticessentials.teleport.tphere` |
 | `/tpall` | Teleport every online player to you | `mysticessentials.teleport.tpall` |
 | `/top` | Teleport to the highest position above you | `mysticessentials.teleport.top` |

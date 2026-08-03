@@ -1,7 +1,7 @@
 // Button row for tutorial pages. Appended per button:
 //   cmd.append("#ButtonList", "MysticEssentials/TutorialButtonRow.ui")
 // label set by index, click bound on the row root (Button):
-//   cmd.set("#ButtonList[i] #ButtonLabel.Text", ...)
+//   cmd.set("#ButtonList[i] #ButtonLabel.TextSpans", ...)
 
 Button #Row {
   Anchor: (Height: 46, Bottom: 8);
@@ -17,6 +17,5 @@ Button #Row {
     FlexWeight: 1;
     Style: (FontSize: 15, TextColor: #ffffff, RenderBold: true,
             VerticalAlignment: Center, HorizontalAlignment: Center);
-    Text: "";
   }
 }

@@ -2,7 +2,7 @@ $C = "../Common.ui";
 
 // Sidebar navigation entry for the Mail UI. Appended per folder:
 //   cmd.append("#NavTop", "MysticEssentials/MailNavRow.ui")
-// then populated by index: cmd.set("#NavTop[i] #Label.Text", ...),
+// then populated by index: cmd.set("#NavTop[i] #Label.TextSpans", ...),
 // active state via cmd.set("#NavTop[i] #Accent.Visible", true).
 
 Button #Row {
@@ -24,6 +24,5 @@ Button #Row {
   Label #Label {
     FlexWeight: 1;
     Style: (FontSize: 14, TextColor: #c9d6e5, RenderBold: true, RenderUppercase: true, VerticalAlignment: Center);
-    Text: "Inbox";
   }
 }

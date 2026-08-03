@@ -20,7 +20,7 @@ $C.@Container {
       LayoutMode: Left;
       Anchor: (Height: 26, Bottom: 10);
       Label { Anchor: (Width: 130); Style: (...$C.@DefaultLabelStyle, FontSize: 13, RenderBold: true); Text: "Current"; }
-      Label #CurrentNick { FlexWeight: 1; Style: (...$C.@DefaultLabelStyle, FontSize: 13); Text: "-"; }
+      Label #CurrentNick { FlexWeight: 1; Style: (...$C.@DefaultLabelStyle, FontSize: 13); }
     }
 
     $C.@PanelSeparatorFancy {

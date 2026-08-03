@@ -14,7 +14,6 @@ $C.@Container {
       Label #VaultCount {
         Anchor: (Top: 8, Right: 14, Width: 220, Height: 24);
         Style: (FontSize: 14, TextColor: #96a9be, HorizontalAlignment: End, VerticalAlignment: Center);
-        Text: "";
       }
     }
   }
@@ -137,22 +136,18 @@ $C.@Container {
       Label #SetAllowance {
         Anchor: (Height: 22, Bottom: 4);
         Style: (FontSize: 14, TextColor: #cddbe8, VerticalAlignment: Center);
-        Text: "";
       }
       Label #SetUsage {
         Anchor: (Height: 22, Bottom: 4);
         Style: (FontSize: 14, TextColor: #cddbe8, VerticalAlignment: Center);
-        Text: "";
       }
       Label #SetCustom {
         Anchor: (Height: 22, Bottom: 4);
         Style: (FontSize: 14, TextColor: #cddbe8, VerticalAlignment: Center);
-        Text: "";
       }
       Label #SetHint {
         Anchor: (Height: 60, Top: 12);
         Style: (FontSize: 12, TextColor: #96a9be, VerticalAlignment: Start, Wrap: true);
-        Text: "";
       }
     }
 
@@ -183,7 +178,6 @@ $C.@Container {
       Label #AdminHint {
         Anchor: (Height: 60, Top: 4);
         Style: (FontSize: 12, TextColor: #96a9be, VerticalAlignment: Start, Wrap: true);
-        Text: "";
       }
     }
   }

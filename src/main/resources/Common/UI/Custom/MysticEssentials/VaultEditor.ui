@@ -14,7 +14,6 @@ $C.@Container {
       Label #Subtitle {
         Anchor: (Top: 8, Right: 14, Width: 260, Height: 24);
         Style: (FontSize: 13, TextColor: #96a9be, HorizontalAlignment: End, VerticalAlignment: Center);
-        Text: "";
       }
     }
   }
@@ -155,7 +154,6 @@ $C.@Container {
           Label #IconCurrent {
             Anchor: (Height: 18);
             Style: (FontSize: 12, TextColor: #96a9be, VerticalAlignment: Center);
-            Text: "";
           }
         }
       }

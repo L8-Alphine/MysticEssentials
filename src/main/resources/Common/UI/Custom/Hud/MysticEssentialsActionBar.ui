@@ -1,0 +1,20 @@
+// Mystic Essentials action-bar line.
+//
+// Sits just above the hotbar for short, transient text — the "you were
+// mentioned" nudge and ordinary broadcasts. Deliberately unobtrusive: no
+// background panel, no icon, one line that fades out on its own, so a routine
+// notice never competes with a title or a banner for attention.
+Group #MysticActionBarRoot {
+  Anchor: (Bottom: 186, Left: 0, Right: 0, Height: 26);
+  LayoutMode: CenterMiddle;
+
+  Group #MysticActionBarPanel {
+    Background: #000000(0.30);
+    Padding: (Horizontal: 14, Vertical: 3);
+    LayoutMode: CenterMiddle;
+
+    Label #MysticActionBarText {
+      Style: (FontSize: 15, TextColor: #ffffff, RenderBold: true, Alignment: Center, VerticalAlignment: Center);
+    }
+  }
+}

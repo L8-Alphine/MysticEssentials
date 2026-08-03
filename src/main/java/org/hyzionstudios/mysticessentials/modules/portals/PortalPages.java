@@ -1,5 +1,7 @@
 package org.hyzionstudios.mysticessentials.modules.portals;
 
+import static org.hyzionstudios.mysticessentials.platform.ui.MysticPage.uiText;
+
 import java.util.List;
 import java.util.Map;
 
@@ -54,15 +56,15 @@ final class PortalPages {
             cmd.append(PORTAL_ADMIN_UI);
             Portal portal = portal();
             if (portal == null) {
-                cmd.set("#PortalHeading.Text", "Portal not found");
+                cmd.set("#PortalHeading.TextSpans", uiText("#PortalHeading.TextSpans", "Portal not found"));
                 return;
             }
             Portal.Type type = portal.getType();
-            cmd.set("#PortalHeading.Text",
-                    (portal.getName().isBlank() ? portal.getId() : portal.getName()));
-            cmd.set("#PortalMeta.Text", portals.worldLabel(portal.getWorld())
+            cmd.set("#PortalHeading.TextSpans",
+                    uiText("#PortalHeading.TextSpans", (portal.getName().isBlank() ? portal.getId() : portal.getName())));
+            cmd.set("#PortalMeta.TextSpans", uiText("#PortalMeta.TextSpans", portals.worldLabel(portal.getWorld())
                     + "  @  " + portal.getX() + ", " + portal.getY() + ", " + portal.getZ()
-                    + "   (" + portal.getId() + ")");
+                    + "   (" + portal.getId() + ")"));
             cmd.set("#PortalName.Value", portal.getName());
             // Dropdown entries MUST be DropdownEntryInfo — UICommandBuilder.set(List)
             // resolves a protocol codec from the element class and rejects Strings.
@@ -77,8 +79,8 @@ final class PortalPages {
             cmd.set("#CommandSection.Visible", type == Portal.Type.COMMAND);
 
             cmd.set("#TargetWorld.Value", portal.getTargetWorld());
-            cmd.set("#UseLocationToggle.Text",
-                    portal.isUseLocation() ? "Exact location: ON" : "Exact location: OFF");
+            cmd.set("#UseLocationToggle.TextSpans",
+                    uiText("#UseLocationToggle.TextSpans", portal.isUseLocation() ? "Exact location: ON" : "Exact location: OFF"));
             cmd.set("#LocationRow.Visible", portal.isUseLocation());
             cmd.set("#PosX.Value", portal.isUseLocation() ? trimmed(portal.getPosX()) : "");
             cmd.set("#PosY.Value", portal.isUseLocation() ? trimmed(portal.getPosY()) : "");
@@ -101,8 +103,8 @@ final class PortalPages {
             cmd.set("#CommandSender.Value", portal.getCommandSender());
 
             cmd.set("#Permission.Value", portal.getPermission());
-            cmd.set("#MarkerToggle.Text",
-                    portal.isMarkerEnabled() ? "Map marker: ON" : "Map marker: OFF");
+            cmd.set("#MarkerToggle.TextSpans",
+                    uiText("#MarkerToggle.TextSpans", portal.isMarkerEnabled() ? "Map marker: ON" : "Map marker: OFF"));
             cmd.set("#MarkerRow.Visible", portal.isMarkerEnabled());
             cmd.set("#MarkerText.Value", portal.getMarkerText());
             cmd.set("#MarkerIcon.Value", portal.getMarkerIcon());

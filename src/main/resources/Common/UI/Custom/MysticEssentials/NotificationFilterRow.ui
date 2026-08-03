@@ -1,0 +1,15 @@
+$C = "../Common.ui";
+
+// One filter tab in the Notification Center. Appended per available filter:
+//   cmd.append("#FilterRow", "MysticEssentials/NotificationFilterRow.ui")
+// then #FilterButton's text is set and the button is bound.
+//
+// One row per registered filter, so a mod that adds a "Guild" tab gets one
+// without this file changing. The active tab is marked in its label text rather
+// than by styling, because per-element style is markup-only in 0.5.6 and cannot
+// be changed at runtime.
+
+$C.@SmallSecondaryTextButton #FilterButton {
+  @Text = " ";
+  @Anchor = (Width: 132, Height: 30, Right: 6, Bottom: 4);
+}

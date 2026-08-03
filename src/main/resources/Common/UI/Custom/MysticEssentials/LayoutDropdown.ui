@@ -1,0 +1,7 @@
+// Dropdown for <select> nodes; entries are pushed at runtime.
+$C = "../Common.ui";
+
+$C.@DropdownBox {
+  @Anchor = (Height: 34);
+  FlexWeight: 1;
+}

@@ -23,7 +23,12 @@ $C.@Container {
       Label #CurrentChannelLabel {
         Anchor: (Height: 26, Bottom: 6);
         Style: (FontSize: 14, TextColor: #E8A93B, RenderBold: true, VerticalAlignment: Center);
-        Text: "Speaking: global";
+      }
+
+      $C.@SecondaryTextButton #ViewMembersButton {
+        @Text = "View Members";
+        @Anchor = (Height: 36, Bottom: 8);
+        Visible: false;
       }
 
       Label #ChannelEmpty {
@@ -65,7 +70,6 @@ $C.@Container {
           Label #ChannelName {
             FlexWeight: 1;
             Style: (FontSize: 20, RenderBold: true, TextColor: #ffffff, VerticalAlignment: Center);
-            Text: "Channel";
           }
         }
 
@@ -73,20 +77,20 @@ $C.@Container {
           LayoutMode: Left;
           Anchor: (Bottom: 8);
           Label { Anchor: (Width: 100); Style: (...$C.@DefaultLabelStyle, FontSize: 13, RenderBold: true); Text: "Type"; }
-          Label #ChannelType { FlexWeight: 1; Style: (...$C.@DefaultLabelStyle, FontSize: 13); Text: "-"; }
+          Label #ChannelType { FlexWeight: 1; Style: (...$C.@DefaultLabelStyle, FontSize: 13); }
         }
 
         Group {
           LayoutMode: Left;
           Anchor: (Bottom: 8);
           Label { Anchor: (Width: 100); Style: (...$C.@DefaultLabelStyle, FontSize: 13, RenderBold: true); Text: "Prefix"; }
-          Label #ChannelPrefix { FlexWeight: 1; Style: (...$C.@DefaultLabelStyle, FontSize: 13); Text: "-"; }
+          Label #ChannelPrefix { FlexWeight: 1; Style: (...$C.@DefaultLabelStyle, FontSize: 13); }
         }
 
         Group {
           LayoutMode: Left;
           Label { Anchor: (Width: 100); Style: (...$C.@DefaultLabelStyle, FontSize: 13, RenderBold: true); Text: "Status"; }
-          Label #ChannelStatus { FlexWeight: 1; Style: (...$C.@DefaultLabelStyle, FontSize: 13); Text: "-"; }
+          Label #ChannelStatus { FlexWeight: 1; Style: (...$C.@DefaultLabelStyle, FontSize: 13); }
         }
       }
 

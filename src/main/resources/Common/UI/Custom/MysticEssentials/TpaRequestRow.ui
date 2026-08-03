@@ -12,7 +12,6 @@ Group #Row {
   Label #Text {
     Anchor: (Height: 20, Bottom: 6);
     Style: (FontSize: 14, TextColor: #ffffff, VerticalAlignment: Center);
-    Text: "Player wants to teleport to you";
   }
 
   Group {

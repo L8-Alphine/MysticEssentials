@@ -21,7 +21,7 @@ Set a value to `false` to force Mystic to ignore an integration even if it is in
 Provides permission checks, group/rank resolution, meta prefixes and suffixes, and numeric limit nodes.
 
 - Chat formats can use `{luckperms_prefix}` and `{luckperms_suffix}`.
-- [Rank Icons](rankicons-module) resolve a player's primary group (and optional meta override) to an inline icon.
+- [Chat Formatting](chat-formatting) rank icons resolve a player's primary group (and optional meta override) to an inline icon.
 - Numeric limits (homes, player warps, vaults) are read from permission suffixes such as `mysticessentials.home.limit.10`.
 
 Without LuckPerms, Mystic falls back to the server's basic permission checks and rank-based features resolve against defaults only.
@@ -30,7 +30,9 @@ Without LuckPerms, Mystic falls back to the server's basic permission checks and
 
 Bridges Mystic's placeholders with the wider PlaceholderAPI ecosystem.
 
-- Mystic's internal placeholders are exposed as `%mystic_<name>%` (and `%mysticessentials_<name>%`).
+- Mystic's internal placeholders are exposed as `%mystic_<name>%` (and `%mysticessentials_<name>%`). Anything a module registers with the `PlaceholderService` is published automatically — no per-placeholder wiring — and the live list is advertised to PlaceholderAPI so it appears in expansion info.
+- Playtime is available to any PlaceholderAPI-aware mod (scoreboards, holograms, tab lists) as `%mystic_playtime_total%`, `%mystic_playtime_active%`, `%mystic_playtime_idle%`, `%mystic_playtime_session%`, plus the `_seconds` and `_hours` variants.
+- Mod load order is not guaranteed, so if PlaceholderAPI comes up after Mystic the expansion registration is retried on a backoff; the server log records whether it ultimately succeeded.
 - Placeholders from other plugins can be used inside Mystic message templates.
 
 See [Chat Formatting](chat-formatting) for how placeholders resolve in chat.

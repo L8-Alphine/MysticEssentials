@@ -29,12 +29,16 @@ These services are always available:
 | `ModuleManager` | `getModuleManager()` | Query, register, reload, and inspect modules |
 | `StorageService` | `getStorageService()` | Namespaced JSON document storage |
 | `PlayerProfileService` | `getPlayerProfileService()` | Profiles, username lookup, playtime, last locations |
+| `PlaytimeService` | `getPlaytimeService()` | Live total, active, idle, and current-session seconds |
 | `MessageService` | `getMessageService()` | Placeholder and color formatting |
 | `PlaceholderService` | `getPlaceholderService()` | Internal placeholders and PlaceholderAPI bridge |
 | `EconomyService` | `getEconomyService()` | VaultUnlocked-backed balance/cost/payout helpers |
 | `PermissionService` | `getPermissionService()` | Permission checks, LuckPerms metadata, numeric limits |
 | `TeleportService` | `getTeleportService()` | Central teleport pipeline |
 | `EventBus` | `getEventBus()` | Lightweight synchronous addon events |
+| `ItemInspectionService` | `getItemInspectionService()` | Shared, provider-extensible item classification and detail model |
+| `NotificationService` | `getNotificationService()` | Unified targeted delivery, history, filters, audiences, and actions |
+| `CustomUiService` | `getCustomUiService()` | UI compiler, registry, sessions, bindings, patches, and typed action router |
 
 ## Module services
 
@@ -141,6 +145,57 @@ Players and configs can then use:
 ```
 
 When PlaceholderAPI is installed, Mystic exposes its placeholders as `%mystic_<name>%`.
+
+Built-in playtime names include `playtime_total`, `playtime_active`,
+`playtime_idle`, `playtime_session`, and `_seconds` / `_hours` variants. New
+registered placeholders are advertised automatically, including the
+`%mysticessentials_<name>%` alias, and late PlaceholderAPI startup is retried.
+
+## Item inspection providers
+
+Register an `ItemViewProvider` to add classification, statistics, modifiers,
+requirements, lore, properties, or a custom section for items owned by your mod:
+
+```java
+api.getItemInspectionService().registerProvider(new MyItemViewProvider());
+```
+
+Providers declare an id and priority, decide whether they support an `ItemStack`
+and context, then populate the shared `ItemViewBuilder`. The same normalized
+model is used by chat item links and other integrations. Provider failures are
+isolated by default, and a section with no data is omitted from the UI.
+
+## Notifications and audiences
+
+Use `NotificationService` instead of sending independent titles and sounds:
+
+```java
+Notification notice = Notification.builder()
+        .category(NotificationCategory.EVENT)
+        .priority(NotificationPriority.IMPORTANT)
+        .title("Tournament")
+        .message("Registration is open.")
+        .action(NotificationAction.command("/tournament"))
+        .build();
+
+api.getNotificationService().send(notice, NotificationAudience.all());
+```
+
+Built-in audiences cover players, sets, permissions, worlds, channels, nearby
+players, staff, and predicates. A guild/party/region addon can call
+`registerAudienceResolver(type, resolver)`. Addons may also register Notification
+Center filters. Delivery then follows server profiles, player preferences,
+critical-bypass rules, and history policy.
+
+## Mention scopes
+
+Relationship-owning mods can add a real option to every player's mention-scope
+picker with `ChatService.registerMentionScope(MentionScopeProvider)`. Implement
+an id, display name, order, availability check, and `allows(sender, target)`.
+Unavailable providers are hidden. Channel ownership/moderator changes are
+published as `ChannelOwnershipTransferredEvent` and
+`ChannelModeratorChangedEvent`; voice integrations may register a
+`ChannelVoicePresenceProvider`.
 
 ## Messages
 

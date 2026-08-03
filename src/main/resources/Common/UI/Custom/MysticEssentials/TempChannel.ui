@@ -19,7 +19,6 @@ $C.@Container {
           HorizontalAlignment: Center,
           VerticalAlignment: Center
         );
-        Text: "Spin up a channel that expires automatically.";
       }
     }
   }

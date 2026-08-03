@@ -1,6 +1,6 @@
 // Text content row for tutorial pages. Appended per content item:
 //   cmd.append("#ContentList", "MysticEssentials/TutorialTextRow.ui")
-// and populated by index: cmd.set("#ContentList[i] #Text.Text", ...).
+// and populated by index: cmd.set("#ContentList[i] #Text.TextSpans", ...).
 
 Group #Row {
   LayoutMode: Top;
@@ -9,6 +9,5 @@ Group #Row {
   Label #Text {
     Anchor: (Height: 40);
     Style: (FontSize: 14, TextColor: #e6edf5, Wrap: true, VerticalAlignment: Center);
-    Text: "";
   }
 }

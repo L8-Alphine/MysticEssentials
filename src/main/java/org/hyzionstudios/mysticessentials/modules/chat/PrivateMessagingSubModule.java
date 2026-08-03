@@ -7,14 +7,18 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
 import org.hyzionstudios.mysticessentials.core.MysticCore;
+import org.hyzionstudios.mysticessentials.api.notification.Notification;
+import org.hyzionstudios.mysticessentials.api.notification.NotificationAudience;
+import org.hyzionstudios.mysticessentials.api.notification.NotificationCategory;
+import org.hyzionstudios.mysticessentials.api.notification.NotificationPriority;
 import org.hyzionstudios.mysticessentials.core.util.Json;
+import org.hyzionstudios.mysticessentials.platform.command.MysticArgTypes;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommand;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommandSender;
 
 import com.google.gson.JsonObject;
 import com.hypixel.hytale.server.core.command.system.arguments.system.RequiredArg;
 import com.hypixel.hytale.server.core.command.system.arguments.types.ArgTypes;
-import com.hypixel.hytale.server.core.command.system.suggestion.SuggestionProvider;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 
 /** Private messaging, reply targets, social spy, Redis relay, and offline-mail fallback. */
@@ -77,8 +81,7 @@ public final class PrivateMessagingSubModule {
     }
 
     private void deliverLocalPm(UUID from, String fromName, PlayerRef target, String message) {
-        core.getMessageService().sendKey(target, "pm-received",
-                Map.of("sender", fromName, "message", message));
+        notifyPrivateMessage(target, fromName, message);
         replyTargets.put(target.getUuid(), from);
         core.platform().findPlayer(from).ifPresent(ref -> {
             core.getMessageService().sendKey(ref, "pm-sent",
@@ -124,8 +127,7 @@ public final class PrivateMessagingSubModule {
         if (target == null) {
             return;
         }
-        core.getMessageService().sendKey(target, "pm-received",
-                Map.of("sender", fromName, "message", message));
+        notifyPrivateMessage(target, fromName, message);
         UUID fromUuid = null;
         if (o.has("fromUuid")) {
             fromUuid = UUID.fromString(o.get("fromUuid").getAsString());
@@ -153,21 +155,31 @@ public final class PrivateMessagingSubModule {
         }
     }
 
+    private void notifyPrivateMessage(PlayerRef target, String fromName, String privateMessage) {
+        Map<String, String> params = Map.of("sender", fromName, "message", privateMessage);
+        if (core.notifications() == null) {
+            core.getMessageService().sendKey(target, "pm-received", params);
+            return;
+        }
+        String message = core.getMessageService().plainFromKey("pm-received", params);
+        core.notifications().send(Notification.builder()
+                .category(NotificationCategory.MESSAGE)
+                .priority(NotificationPriority.NORMAL)
+                .title("Message from " + fromName)
+                .subtitle(privateMessage)
+                .message(message)
+                .showAsTitle(false)
+                .source("mysticessentials:private-message")
+                .build(), NotificationAudience.player(target.getUuid()));
+    }
+
     private boolean allows(PlayerRef player, String permission) {
         return permission == null || permission.isBlank() || player.hasPermission(permission);
     }
 
-    private SuggestionProvider onlinePlayerSuggestions() {
-        return (commandSender, input, index, result) -> {
-            for (PlayerRef player : core.vanish().visiblePlayers(commandSender.getUuid())) {
-                result.suggest(player.getUsername());
-            }
-        };
-    }
-
     private final class MessageCommand extends MysticCommand {
-        private final RequiredArg<String> targetName = withRequiredArg("player", "Target player", ArgTypes.STRING)
-                .suggest(onlinePlayerSuggestions());
+        private final RequiredArg<String> targetName = withRequiredArg("player", "Target player",
+                MysticArgTypes.PLAYER_NAME);
         private final RequiredArg<String> message =
                 withRequiredArg("message", "Message", ArgTypes.GREEDY_STRING);
 

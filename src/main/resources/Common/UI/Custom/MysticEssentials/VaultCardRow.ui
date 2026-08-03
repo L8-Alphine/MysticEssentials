@@ -1,6 +1,6 @@
 // Row template for the vault list dashboard. Appended per vault by the server:
 //   cmd.append("#VaultList", "MysticEssentials/VaultCardRow.ui")
-// and populated by index: cmd.set("#VaultList[i] #Name.Text", ...).
+// and populated by index: cmd.set("#VaultList[i] #Name.TextSpans", ...).
 
 Button #Row {
   Anchor: (Height: 66, Bottom: 8);
@@ -35,27 +35,23 @@ Button #Row {
       Label #Name {
         FlexWeight: 1;
         Style: (FontSize: 17, TextColor: #ffffff, RenderBold: true, VerticalAlignment: Center);
-        Text: "Vault";
       }
 
       Label #Number {
         Anchor: (Width: 60);
         Style: (FontSize: 15, TextColor: #96a9be, HorizontalAlignment: End, VerticalAlignment: Center);
-        Text: "#1";
       }
     }
 
     Label #Meta {
       Anchor: (Height: 17);
       Style: (FontSize: 12, TextColor: #9fb0c4, VerticalAlignment: Center);
-      Text: "";
     }
   }
 
   Label #Status {
     Anchor: (Width: 110);
     Style: (FontSize: 12, TextColor: #d7e1ee, HorizontalAlignment: End, VerticalAlignment: Center, Wrap: true);
-    Text: "";
   }
 
   Button #EditButton {

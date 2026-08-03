@@ -1,5 +1,7 @@
 package org.hyzionstudios.mysticessentials.modules.inventory;
 
+import static org.hyzionstudios.mysticessentials.platform.ui.MysticPage.uiText;
+
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -65,15 +67,15 @@ final class InventoryPages {
                 Store<EntityStore> store) {
             cmd.append(RESTORE_UI);
             boolean online = core.platform().findPlayer(targetUuid).isPresent();
-            cmd.set("#TargetName.Text", targetName + (online ? "" : " (offline)"));
+            cmd.set("#TargetName.TextSpans", uiText("#TargetName.TextSpans", targetName + (online ? "" : " (offline)")));
             cmd.set("#SnapshotsEmpty.Visible", snapshots.isEmpty());
             for (int i = 0; i < snapshots.size(); i++) {
                 InventorySnapshot snapshot = snapshots.get(i);
                 String row = "#SnapshotList[" + i + "]";
                 cmd.append("#SnapshotList", SNAPSHOT_ROW_UI);
-                cmd.set(row + " #Cause.Text", snapshot.cause == null ? "?" : snapshot.cause);
-                cmd.set(row + " #Time.Text", formatTime(snapshot.timestamp));
-                cmd.set(row + " #Items.Text", snapshot.itemCount() + " items");
+                cmd.set(row + " #Cause.TextSpans", uiText(row + " #Cause.TextSpans", snapshot.cause == null ? "?" : snapshot.cause));
+                cmd.set(row + " #Time.TextSpans", uiText(row + " #Time.TextSpans", formatTime(snapshot.timestamp)));
+                cmd.set(row + " #Items.TextSpans", uiText(row + " #Items.TextSpans", snapshot.itemCount() + " items"));
                 event.addEventBinding(CustomUIEventBindingType.Activating, row + " #ViewButton",
                         new EventData().put("action", "view").put("id", snapshot.id));
                 event.addEventBinding(CustomUIEventBindingType.Activating, row + " #RestoreButton",
@@ -171,11 +173,11 @@ final class InventoryPages {
         public void build(Ref<EntityStore> ref, UICommandBuilder cmd, UIEventBuilder event,
                 Store<EntityStore> store) {
             cmd.append(VIEWER_UI);
-            cmd.set("#ViewerSubtitle.Text", targetName + "  |  " + snapshot.cause + "  |  "
-                    + formatTime(snapshot.timestamp));
-            cmd.set("#ItemCount.Text", snapshot.itemCount() + " item"
+            cmd.set("#ViewerSubtitle.TextSpans", uiText("#ViewerSubtitle.TextSpans", targetName + "  |  " + snapshot.cause + "  |  "
+                    + formatTime(snapshot.timestamp)));
+            cmd.set("#ItemCount.TextSpans", uiText("#ItemCount.TextSpans", snapshot.itemCount() + " item"
                     + (snapshot.itemCount() == 1 ? "" : "s") + " across " + snapshot.sections.size()
-                    + " section" + (snapshot.sections.size() == 1 ? "" : "s"));
+                    + " section" + (snapshot.sections.size() == 1 ? "" : "s")));
             cmd.set("#ItemsEmpty.Visible", snapshot.itemCount() == 0);
 
             int index = 0;
@@ -185,9 +187,9 @@ final class InventoryPages {
                     String row = "#ItemList[" + index++ + "]";
                     cmd.append("#ItemList", ITEM_ROW_UI);
                     cmd.set(row + " #Icon.ItemId", item.itemId == null ? "" : item.itemId);
-                    cmd.set(row + " #Name.Text", itemLabel(item.itemId));
-                    cmd.set(row + " #Meta.Text", metaLine(sectionName, item));
-                    cmd.set(row + " #Qty.Text", "x" + Math.max(1, item.quantity));
+                    cmd.set(row + " #Name.TextSpans", uiText(row + " #Name.TextSpans", itemLabel(item.itemId)));
+                    cmd.set(row + " #Meta.TextSpans", uiText(row + " #Meta.TextSpans", metaLine(sectionName, item)));
+                    cmd.set(row + " #Qty.TextSpans", uiText(row + " #Qty.TextSpans", "x" + Math.max(1, item.quantity)));
                 }
             }
 

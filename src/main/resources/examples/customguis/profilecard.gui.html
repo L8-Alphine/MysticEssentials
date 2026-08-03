@@ -1,0 +1,71 @@
+<!--
+  Screen overlay: portrait, name, and two live counters.
+
+  Every label containing a placeholder is re-sent on the refresh interval, so
+  the counters below update once a second without the overlay being redrawn.
+  Mystic's own placeholders are %player_name%, %server_name%, %group%,
+  %playtime%, %playtime_session%, %luckperms_prefix% and %luckperms_suffix%.
+  Each also works as %mystic_<name>% or {name}. Any other %token% is handed to
+  PlaceholderAPI, so expansions from other plugins work here too.
+-->
+<hud id="profilecard"
+     data-custom-width="470"
+     data-custom-height="64"
+     data-custom-anchor="top-right"
+     data-custom-offset-x="24"
+     data-custom-offset-y="24"
+     data-custom-z-order="1"
+     data-custom-refresh-interval="1"
+     data-custom-auto-show="false">
+
+  <row data-custom-bg="#161b2e(0.92)"
+       data-custom-pad="8"
+       data-custom-gap="12"
+       data-custom-height="64">
+
+    <panel data-custom-width="48"
+           data-custom-height="48"
+           data-custom-bg="#0b1220(0.9)"
+           data-custom-pad="4"
+           data-custom-flow="center">
+      <item data-custom-item-id="hytale:emerald"
+            data-custom-width="34"
+            data-custom-height="34"></item>
+    </panel>
+
+    <column data-custom-flex="1" data-custom-flow="middle">
+      <text data-custom-size="16"
+            data-custom-bold="true"
+            data-custom-color="#ffffff"
+            data-custom-wrap="false">%player_name%</text>
+      <text class="muted tiny" data-custom-wrap="false">%mystic_group%</text>
+    </column>
+
+    <row data-custom-width="170" data-custom-gap="10" data-custom-flow="middle">
+      <panel data-custom-width="78"
+             data-custom-height="30"
+             data-custom-bg="#2a1b25(0.9)"
+             data-custom-accent="#e05a5a"
+             data-custom-pad-x="8"
+             data-custom-gap="0">
+        <text data-custom-color="#ff8a8a"
+              data-custom-bold="true"
+              data-custom-align="end"
+              data-custom-wrap="false">%mystic_playtime_session%</text>
+      </panel>
+
+      <panel data-custom-width="78"
+             data-custom-height="30"
+             data-custom-bg="#2a2418(0.9)"
+             data-custom-accent="#e8a93b"
+             data-custom-pad-x="8"
+             data-custom-gap="0">
+        <text data-custom-color="#ffd97a"
+              data-custom-bold="true"
+              data-custom-align="end"
+              data-custom-wrap="false">%mystic_playtime%</text>
+      </panel>
+    </row>
+
+  </row>
+</hud>

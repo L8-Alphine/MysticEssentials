@@ -1,0 +1,14 @@
+{
+  "magic": "MCL1",
+  "version": 1,
+  "signing_key_id": "mystic-signing-test-0001",
+  "encryption_key_id": "mystic-license-content-test",
+  "algorithm": {
+    "encryption": "AES-256-GCM",
+    "signature": "Ed25519"
+  },
+  "iv": "AAECAwQFBgcICQoL",
+  "ciphertext": "PCC0cquBq3XqY63wk4QXCeb0vRaDHi0KXRW68GgAZJAtMt2Z3bd36ivRCoTs9AoCtXtSvTiwlbgMpAd7L9rNw8QPpBj-sxRVJHnPWt65PIkKvKoHRFtxNYDRvKkAgND_rosGh9Bj8jisLAyEZUUZUotXNprb_xWqd89n47LWXlSZfiKg26WmMnzDcoNQoz-2X5fOWVxy9iT_Ospb2LSGnP726kqfmr4Nzgyz2OWxqpn6q6RH-coH1Qqx4v1A6ZWUYS3pn1Kts7teObe5ySS6648ai1QHMo_IQ6Gq62Mh_Ik2RrDwh1QhH3B1iDqDPExmhaGOIawIs5UnUVdDpaxysU7z3rL0qTtLEq1QPZVgQ3mu3antzOLiyh9cBD9t1pZpbWq9LdS2q0j7WBhgKPnJsMf6ahV41f1V23VYUKQJcN_-rUZrySM8rOWnMwJx8XEL8H-59_lL8XE5xlpcr8EpiytKlreneFCmRdvFR_bBAwq-hj0cgIVptfOAWbmyIwZByvayuuJ08eb6Uo4eSjJ36IxUGNL6Umi3UmK7GSyU2D5wDjIIt_MMXoLIrj2bjdPRAhgnfWzmAt_FyoqD4cd6JwoIwbnbNMtfljbCOZ7gijMM7AQgprgkHnH1iIY8z7GZK9h9MK-p7_5rmjSj2Jzd2rKA8-pPwYVV1Hbif_2TcXHYH56R3FOzNjPfkl8ASUPL5N1JXwwUs8brFm5U2Dp62RhmWemNK5InEqc0ybgKOYIn3fNMg6gBCX6OWqzvAtcsX8-5e1ZqUi-kgoz4pvwk9GT57NBK_IKKxFDTwQHiCeyFc6Mf7ECMrwWq7rAkU-BiQbFoD0Tdza1-fWdNqKXCWHq46WKM4SHpIPhYEsENPLYTUavCb1n1njO_24GjuvSk4PApXn0UFziVH6bOdS1P",
+  "authentication_tag": "gs2QPmUiQq-yYtFFfjvU7g",
+  "signature": "zBQ6xWeC0gGpW_7ztty_HRPh2EXO4t0u8BNaFpp_v2vsEfg4BYRwoait6szeZt2JsjaFZyfVX15TRDYRLuHWAA"
+}

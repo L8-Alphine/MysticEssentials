@@ -1,5 +1,7 @@
 package org.hyzionstudios.mysticessentials.modules.playervaults.ui;
 
+import static org.hyzionstudios.mysticessentials.platform.ui.MysticPage.uiText;
+
 import java.util.List;
 import java.util.UUID;
 
@@ -95,8 +97,8 @@ final class VaultEditorUi extends MysticPage {
         boolean canDescription = controller.permissions().canEditDescription(player);
         boolean canReset = controller.permissions().canResetMetadata(player);
 
-        cmd.set("#HeaderTitle.Text", "Edit Vault #" + vaultNumber);
-        cmd.set("#Subtitle.Text", adminView && ownerName != null ? "Owner: " + ownerName : "");
+        cmd.set("#HeaderTitle.TextSpans", uiText("#HeaderTitle.TextSpans", "Edit Vault #" + vaultNumber));
+        cmd.set("#Subtitle.TextSpans", uiText("#Subtitle.TextSpans", adminView && ownerName != null ? "Owner: " + ownerName : ""));
 
         cmd.set("#NameRow.Visible", canName);
         cmd.set("#NameInput.Value", currentName());
@@ -118,7 +120,7 @@ final class VaultEditorUi extends MysticPage {
             String icon = currentIcon();
             cmd.set("#IconPreview.ItemId", icon.isBlank()
                     ? (config.defaultIconItemId == null ? "" : config.defaultIconItemId) : icon);
-            cmd.set("#IconCurrent.Text", icon.isBlank() ? "None selected" : icon);
+            cmd.set("#IconCurrent.TextSpans", uiText("#IconCurrent.TextSpans", icon.isBlank() ? "None selected" : icon));
             cmd.set("#IconSearch.Value", query);
             cmd.set("#IconEmpty.Visible", results.isEmpty());
             for (int i = 0; i < results.size(); i++) {
@@ -126,7 +128,7 @@ final class VaultEditorUi extends MysticPage {
                 String row = "#IconResults[" + i + "]";
                 cmd.append("#IconResults", ICON_ROW_UI);
                 cmd.set(row + " #Icon.ItemId", itemId);
-                cmd.set(row + " #Name.Text", itemId);
+                cmd.set(row + " #Name.TextSpans", uiText(row + " #Name.TextSpans", itemId));
                 event.addEventBinding(CustomUIEventBindingType.Activating, row,
                         pickEventData(canName, canColor, canDescription).put("action", "pick").put("icon", itemId));
             }

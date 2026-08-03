@@ -5,56 +5,70 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 
+import org.hyzionstudios.mysticessentials.api.item.ItemInspectionService;
 import org.hyzionstudios.mysticessentials.core.MysticCore;
+import org.hyzionstudios.mysticessentials.core.item.ItemViewConfig;
 import org.hyzionstudios.mysticessentials.core.util.Json;
+import org.hyzionstudios.mysticessentials.modules.chat.ChatTokens;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommand;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommandSender;
 
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 
 /**
- * Chat item-link subsystem. Detects the configured tag in a player's message,
- * captures a read-only {@link ItemSnapshot} of their held item, and rewrites the
- * tag into a formatted, colour-coded (optionally clickable) display name in chat.
- * The icon is never rendered inline (verified 0.5.6 dead-end) — it appears only in
- * the {@link ItemDetailsPage} and {@link RecentItemLinksPage} custom UI panels,
- * reachable via a chat-link click, the {@code /iteminspect} / {@code /itemlinks}
- * commands, or the Recent Links list.
+ * The chat side of item sharing: detects the configured tag, captures a
+ * server-owned {@link ItemSnapshot} of the sender's held item, and emits a
+ * structured token in its place.
+ *
+ * <p>Crucially, {@link #expand} produces a <b>token</b>, not markup. The token
+ * becomes a coloured, clickable name only in {@link #renderToken}, at the last
+ * step before the line reaches a client. Everything in between — the routing
+ * layer, the cross-server relay, the publish hook, the logs — sees an inert
+ * token and renders it as {@code [Scarlet Requiem]} through
+ * {@link ChatTokens#toPlainText(String, java.util.function.Function)}. Raw
+ * {@code <link>} markup therefore has no path into chat at all.</p>
  */
 public final class ItemLinkSubModule {
 
     private final MysticCore core;
+    private final ItemInspectionService inspection;
+
     private ItemLinkConfig config = new ItemLinkConfig();
+    private ItemViewConfig viewConfig = new ItemViewConfig().normalized();
     private ItemSnapshotService snapshots;
 
     /** Outcome of expanding item tags in one message. */
     public record ExpandResult(String content, ItemSnapshot snapshot) {
     }
 
-    public ItemLinkSubModule(MysticCore core) {
+    public ItemLinkSubModule(MysticCore core, ItemInspectionService inspection) {
         this.core = core;
+        this.inspection = inspection;
     }
 
     // ----- Lifecycle ------------------------------------------------------------
 
     public void enable(Consumer<MysticCommand> commandRegistrar) {
         config = loadConfig();
-        snapshots = new ItemSnapshotService(core, config);
+        viewConfig = loadViewConfig();
+        snapshots = new ItemSnapshotService(core, inspection, viewConfig);
         commandRegistrar.accept(new ItemInspectCommand());
         commandRegistrar.accept(new ItemLinksCommand());
     }
 
     public void reload() {
         config = loadConfig();
+        viewConfig = loadViewConfig();
         if (snapshots != null) {
-            snapshots.updateConfig(config);
+            snapshots.updateConfig(viewConfig);
         }
     }
 
-    public void invalidate(java.util.UUID player) {
+    public void invalidate(UUID player) {
         if (snapshots != null) {
             snapshots.forget(player);
         }
@@ -68,20 +82,23 @@ public final class ItemLinkSubModule {
         return snapshots;
     }
 
+    public ItemViewConfig viewConfig() {
+        return viewConfig;
+    }
+
     // ----- Tag expansion --------------------------------------------------------
 
     /**
-     * Replaces up to {@code maxTagsPerMessage} occurrences of the item tag in a
-     * (already sanitized) player message with the rendered item-link markup.
-     * Captures the sender's held item once and reuses it for every occurrence.
-     * Cheap no-op when the tag is absent, the subsystem is off, or the player
-     * lacks permission.
+     * Replaces up to {@code maxTagsPerMessage} occurrences of the item tag with a
+     * structured item token. Captures the sender's held item once and reuses it
+     * for every occurrence. Cheap no-op when the tag is absent, the subsystem is
+     * off, or the player lacks permission.
      */
     public ExpandResult expand(PlayerRef sender, String message, String channelName) {
         if (message == null || !config.enabled || snapshots == null) {
             return new ExpandResult(message, null);
         }
-        String tag = config.tag == null || config.tag.isBlank() ? "[item]" : config.tag;
+        String tag = config.tag;
         if (!message.contains(tag)) {
             return new ExpandResult(message, null);
         }
@@ -91,16 +108,20 @@ public final class ItemLinkSubModule {
         }
 
         Optional<ItemSnapshot> captured = snapshots.captureHeld(sender, orEmpty(channelName));
-        String replacement = captured.map(this::linkMarkup).orElse("&7[no item]&r");
+        // With nothing in hand there is no snapshot to reference, so this branch
+        // emits literal text rather than a token that could never resolve.
+        String replacement = captured
+                .map(snapshot -> ChatTokens.itemToken(snapshot.id))
+                .orElse(config.noItemLabel);
 
         StringBuilder out = new StringBuilder(message.length() + 32);
         int from = 0;
         int replaced = 0;
         int max = Math.max(1, config.maxTagsPerMessage);
-        int idx;
-        while (replaced < max && (idx = message.indexOf(tag, from)) >= 0) {
-            out.append(message, from, idx).append(replacement);
-            from = idx + tag.length();
+        int index;
+        while (replaced < max && (index = message.indexOf(tag, from)) >= 0) {
+            out.append(message, from, index).append(replacement);
+            from = index + tag.length();
             replaced++;
         }
         out.append(message.substring(from));
@@ -115,10 +136,44 @@ public final class ItemLinkSubModule {
     }
 
     /**
+     * Renders one item token into chat markup — the only place item markup is
+     * ever produced.
+     *
+     * <p>Every failure mode resolves to clean, readable text: an expired snapshot
+     * reads {@code [Item Link Expired]}, a missing one {@code [Item Unavailable]}.
+     * There is no path here that falls back to emitting the raw token or an
+     * unclosed tag.</p>
+     */
+    public String renderToken(String snapshotId) {
+        if (snapshots == null) {
+            return config.unavailableLabel;
+        }
+        ItemSnapshot snapshot = snapshots.get(snapshotId).orElse(null);
+        if (snapshot == null) {
+            // Distinguish "you were too slow" from "this never existed": a code
+            // that is well-formed but unknown is far more likely to be expired.
+            return isWellFormedCode(snapshotId) ? config.expiredLabel : config.unavailableLabel;
+        }
+        return linkMarkup(snapshot);
+    }
+
+    /** The plain label for an item token, used by every non-chat sink. */
+    public String plainLabel(String snapshotId) {
+        if (snapshots == null) {
+            return null;
+        }
+        return snapshots.get(snapshotId).map(ItemSnapshot::plainName).orElse(null);
+    }
+
+    private static boolean isWellFormedCode(String id) {
+        return id != null && id.length() >= 4 && id.chars().allMatch(Character::isLetterOrDigit);
+    }
+
+    /**
      * Builds the chat markup for one item link: a colour-coded, optionally clicky
      * {@code [Name ×n]} followed by a visible, typeable {@code (/itemview CODE)}
-     * hint. The hint is the guaranteed path (works by typing on any input device);
-     * the name-link is a bonus if the client dispatches chat command-links.
+     * hint. The hint is the guaranteed path (it works by typing, on any input
+     * device); the name-link is a bonus if the client dispatches command links.
      */
     private String linkMarkup(ItemSnapshot snapshot) {
         String command = "/" + viewCommandLabel() + " " + snapshot.id;
@@ -130,13 +185,13 @@ public final class ItemLinkSubModule {
         if (config.underlineChatName) {
             sb.append("<u>");
         }
-        sb.append('<').append(normalizeColor(snapshot.rarityColor)).append('>');
-        sb.append('[').append(nameText(snapshot));
-        if (config.showQuantityInChat && snapshot.quantity > 1) {
-            sb.append(" ×").append(snapshot.quantity);
+        sb.append('<').append(normalizeColor(snapshot.accentColor().orElse(null))).append('>');
+        sb.append('[').append(nameMarkup(snapshot));
+        if (config.showQuantityInChat && snapshot.quantity() > 1) {
+            sb.append(" ×").append(snapshot.quantity());
         }
         sb.append(']');
-        // Close styling so following chat text is unaffected.
+        // Close styling so the following chat text is unaffected.
         sb.append("</#>");
         if (config.underlineChatName) {
             sb.append("</u>");
@@ -145,36 +200,28 @@ public final class ItemLinkSubModule {
             sb.append("</link>");
         }
         if (config.showViewCommandInChat) {
-            // Visible + typeable, and also click-linked as a convenience.
             sb.append(" <link:").append(command).append(">&8(&7").append(command)
                     .append("&8)</link>");
         }
         return sb.toString();
     }
 
-    /** The normalized view-command label (no slash, lowercase), defaulting to {@code itemview}. */
+    /** The name portion of a link: a client-translated segment or a safe literal. */
+    private static String nameMarkup(ItemSnapshot snapshot) {
+        var name = snapshot.view.displayName();
+        if (name.isTranslated()) {
+            return name.markup();
+        }
+        return ChatTokens.sanitizeInline(snapshot.plainName());
+    }
+
+    /** The normalized view-command label (no slash, lowercase). */
     private String viewCommandLabel() {
-        String raw = config.viewCommand == null ? "" : config.viewCommand.trim().toLowerCase(Locale.ROOT);
+        String raw = config.viewCommand.trim().toLowerCase(Locale.ROOT);
         while (raw.startsWith("/")) {
             raw = raw.substring(1);
         }
         return raw.isBlank() ? "itemview" : raw;
-    }
-
-    /** The name portion of the chat link: a client-translated segment or a safe literal. */
-    private static String nameText(ItemSnapshot snapshot) {
-        if (snapshot.customName != null && !snapshot.customName.isBlank()) {
-            return sanitizeInline(snapshot.customName);
-        }
-        if (snapshot.translationKey != null && !snapshot.translationKey.isBlank()) {
-            return "<lang:" + snapshot.translationKey + ">";
-        }
-        return sanitizeInline(snapshot.plainName());
-    }
-
-    /** Strips characters that would break the surrounding chat markup. */
-    private static String sanitizeInline(String text) {
-        return text == null ? "" : text.replaceAll("[<>&\\[\\]]", "");
     }
 
     private static String normalizeColor(String color) {
@@ -194,6 +241,10 @@ public final class ItemLinkSubModule {
         return core.paths().moduleExtraConfigFile("chat", "item-links.json");
     }
 
+    private Path viewConfigFile() {
+        return core.paths().moduleExtraConfigFile("chat", "item-view.json");
+    }
+
     private ItemLinkConfig loadConfig() {
         try {
             ItemLinkConfig loaded = Json.readFile(configFile(), ItemLinkConfig.class);
@@ -202,7 +253,7 @@ public final class ItemLinkSubModule {
                 Json.writeFile(configFile(), Json.toTree(loaded));
                 core.log(Level.INFO, "Generated default modules/chat/item-links.json");
             }
-            return normalize(loaded);
+            return loaded.normalized();
         } catch (Exception e) {
             core.log(Level.WARNING, "Failed to load item-links.json (keeping previous config): "
                     + e.getMessage());
@@ -210,50 +261,27 @@ public final class ItemLinkSubModule {
         }
     }
 
-    private static ItemLinkConfig normalize(ItemLinkConfig loaded) {
-        ItemLinkConfig defaults = new ItemLinkConfig();
-        if (loaded.tag == null || loaded.tag.isBlank()) {
-            loaded.tag = defaults.tag;
+    private ItemViewConfig loadViewConfig() {
+        try {
+            ItemViewConfig loaded = Json.readFile(viewConfigFile(), ItemViewConfig.class);
+            if (loaded == null) {
+                loaded = new ItemViewConfig();
+                Json.writeFile(viewConfigFile(), Json.toTree(loaded));
+                core.log(Level.INFO, "Generated default modules/chat/item-view.json");
+            }
+            return loaded.normalized();
+        } catch (Exception e) {
+            core.log(Level.WARNING, "Failed to load item-view.json (keeping previous config): "
+                    + e.getMessage());
+            return viewConfig != null ? viewConfig : new ItemViewConfig().normalized();
         }
-        if (loaded.viewCommand == null || loaded.viewCommand.isBlank()) {
-            loaded.viewCommand = defaults.viewCommand;
-        }
-        if (loaded.maxTagsPerMessage < 1) {
-            loaded.maxTagsPerMessage = 1;
-        } else if (loaded.maxTagsPerMessage > 10) {
-            loaded.maxTagsPerMessage = 10;
-        }
-        if (loaded.snapshot == null) {
-            loaded.snapshot = defaults.snapshot;
-        }
-        if (loaded.snapshot.retentionSeconds < 5) {
-            loaded.snapshot.retentionSeconds = defaults.snapshot.retentionSeconds;
-        }
-        if (loaded.snapshot.maximumSnapshots < 1) {
-            loaded.snapshot.maximumSnapshots = defaults.snapshot.maximumSnapshots;
-        }
-        if (loaded.history == null) {
-            loaded.history = defaults.history;
-        }
-        if (loaded.history.maximumEntries < 1) {
-            loaded.history.maximumEntries = defaults.history.maximumEntries;
-        }
-        if (loaded.inspectionUi == null) {
-            loaded.inspectionUi = defaults.inspectionUi;
-        }
-        if (loaded.rarities == null || loaded.rarities.isEmpty()) {
-            loaded.rarities = defaults.rarities;
-        }
-        if (loaded.rarityRules == null) {
-            loaded.rarityRules = defaults.rarityRules;
-        }
-        return loaded;
     }
 
     // ----- Page opening ---------------------------------------------------------
 
     void openDetails(PlayerRef player, ItemSnapshot snapshot) {
-        if (!core.platform().openPage(player, new ItemDetailsPage(core, player, snapshot, config))) {
+        if (!core.platform().openPage(player,
+                new ItemDetailsPage(core, player, snapshot, viewConfig))) {
             core.getMessageService().send(player,
                     "&cCould not open the item details UI — see the server log.");
         }
@@ -261,7 +289,7 @@ public final class ItemLinkSubModule {
 
     void openRecent(PlayerRef player) {
         if (!core.platform().openPage(player,
-                new RecentItemLinksPage(core, player, snapshots, config))) {
+                new RecentItemLinksPage(core, player, snapshots, viewConfig))) {
             showRecentText(player);
         }
     }
@@ -277,8 +305,9 @@ public final class ItemLinkSubModule {
             ItemSnapshot snapshot = recent.get(i);
             String command = "/" + viewCommandLabel() + " " + snapshot.id;
             core.getMessageService().send(player, "&7" + (i + 1) + ". <link:" + command + "><"
-                    + normalizeColor(snapshot.rarityColor) + ">"
-                    + sanitizeInline(snapshot.plainName()) + "</#></link> &8(&7" + command + "&8)");
+                    + normalizeColor(snapshot.accentColor().orElse(null)) + ">"
+                    + ChatTokens.sanitizeInline(snapshot.plainName()) + "</#></link> &8(&7"
+                    + command + "&8)");
         }
     }
 
@@ -308,12 +337,12 @@ public final class ItemLinkSubModule {
                 sender.replyKey("player-only");
                 return;
             }
-            String arg = sender.arg(0).orElse("latest").trim().toLowerCase(Locale.ROOT);
+            String argument = sender.arg(0).orElse("latest").trim().toLowerCase(Locale.ROOT);
             Optional<ItemSnapshot> target;
-            if (arg.isBlank() || "latest".equals(arg) || "last".equals(arg)) {
+            if (argument.isBlank() || "latest".equals(argument) || "last".equals(argument)) {
                 target = snapshots.latest(player.getUuid());
-            } else if (arg.chars().allMatch(Character::isDigit)) {
-                target = snapshots.recentAt(player.getUuid(), Integer.parseInt(arg));
+            } else if (argument.chars().allMatch(Character::isDigit)) {
+                target = snapshots.recentAt(player.getUuid(), Integer.parseInt(argument));
             } else {
                 target = snapshots.get(sender.arg(0).orElse(""));
             }

@@ -156,6 +156,13 @@ public final class ConfigManager {
             core.log(Level.WARNING, "updateNotifier.checkIntervalHours must be at least 1; using 1 hour.");
             config.updateNotifier.checkIntervalHours = 1;
         }
+        if (config.playerList == null) {
+            config.playerList = new MainConfig.PlayerList();
+        }
+        if (config.playerList.refreshSeconds < 1) {
+            core.log(Level.WARNING, "playerList.refreshSeconds must be at least 1; using 1 second.");
+            config.playerList.refreshSeconds = 1;
+        }
         if (config.modules == null) {
             core.log(Level.WARNING, "config.json has no 'modules' section; enabling defaults.");
             config.modules = new MainConfig().modules;

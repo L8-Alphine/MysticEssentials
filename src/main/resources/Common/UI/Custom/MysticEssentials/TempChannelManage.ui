@@ -25,13 +25,11 @@ $C.@Container {
       Label #ManageChannelName {
         Anchor: (Bottom: 8);
         Style: (FontSize: 20, RenderBold: true, TextColor: #ffffff);
-        Text: "channel";
       }
 
       Label #ManageExpiry {
         Anchor: (Bottom: 12);
         Style: (FontSize: 13, TextColor: #96a9be);
-        Text: "";
       }
 
       Label {

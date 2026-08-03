@@ -17,12 +17,14 @@ import org.hyzionstudios.mysticessentials.api.service.WarpService;
 import org.hyzionstudios.mysticessentials.core.module.AbstractMysticModule;
 import org.hyzionstudios.mysticessentials.core.util.Json;
 import org.hyzionstudios.mysticessentials.platform.Conversions;
+import org.hyzionstudios.mysticessentials.platform.command.MysticArgTypes;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommand;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommandSender;
 
 import com.google.gson.reflect.TypeToken;
 import com.hypixel.hytale.server.core.command.system.arguments.system.RequiredArg;
 import com.hypixel.hytale.server.core.command.system.arguments.types.ArgTypes;
+import com.hypixel.hytale.server.core.command.system.arguments.types.SingleArgumentType;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 
 /**
@@ -41,6 +43,16 @@ public final class WarpModule extends AbstractMysticModule implements WarpServic
 
     private Map<String, Warp> serverWarps = new LinkedHashMap<>();
     private Map<String, Warp> playerWarps = new LinkedHashMap<>();
+
+    /** Server warps the sender can see. */
+    private final SingleArgumentType<String> visibleWarpArg = MysticArgTypes.dynamic(commandSender ->
+            listServerWarps(commandSender.getUuid()).stream().map(Warp::getName).toList());
+    /** Every server warp, for admin commands. */
+    private final SingleArgumentType<String> allWarpArg = MysticArgTypes.dynamic(commandSender ->
+            serverWarps.values().stream().map(Warp::getName).toList());
+    /** Every player warp. */
+    private final SingleArgumentType<String> playerWarpArg = MysticArgTypes.dynamic(commandSender ->
+            playerWarps.values().stream().map(Warp::getName).toList());
 
     public WarpModule() {
         super("warps", "Warps", "1.0.0");
@@ -354,23 +366,6 @@ public final class WarpModule extends AbstractMysticModule implements WarpServic
 
     // ----- Commands ----------------------------------------------------------
 
-    /** Suggests server-warp names the sender can see. */
-    private com.hypixel.hytale.server.core.command.system.suggestion.SuggestionProvider visibleWarpSuggestions() {
-        return (commandSender, input, index, result) ->
-                listServerWarps(commandSender.getUuid()).forEach(w -> result.suggest(w.getName()));
-    }
-
-    /** Suggests all server-warp names (admin commands). */
-    private com.hypixel.hytale.server.core.command.system.suggestion.SuggestionProvider allWarpSuggestions() {
-        return (commandSender, input, index, result) ->
-                serverWarps.values().forEach(w -> result.suggest(w.getName()));
-    }
-
-    /** Suggests every player-warp name. */
-    private com.hypixel.hytale.server.core.command.system.suggestion.SuggestionProvider playerWarpSuggestions() {
-        return (commandSender, input, index, result) ->
-                playerWarps.values().forEach(w -> result.suggest(w.getName()));
-    }
 
     /** {@code /warp} opens the UI; {@code /warp <name>} teleports (positional variant). */
     private final class WarpCommand extends MysticCommand {
@@ -391,8 +386,7 @@ public final class WarpModule extends AbstractMysticModule implements WarpServic
     }
 
     private final class WarpNamedVariant extends MysticCommand {
-        private final RequiredArg<String> name = withRequiredArg("name", "Warp name", ArgTypes.STRING)
-                .suggest(visibleWarpSuggestions());
+        private final RequiredArg<String> name = withRequiredArg("name", "Warp name", visibleWarpArg);
 
         WarpNamedVariant() {
             super(WarpModule.this.core, "Teleport to a named server warp.");
@@ -469,8 +463,7 @@ public final class WarpModule extends AbstractMysticModule implements WarpServic
     }
 
     private final class DelWarpCommand extends MysticCommand {
-        private final RequiredArg<String> name = withRequiredArg("name", "Warp name", ArgTypes.STRING)
-                .suggest(allWarpSuggestions());
+        private final RequiredArg<String> name = withRequiredArg("name", "Warp name", allWarpArg);
 
         DelWarpCommand() {
             super(WarpModule.this.core, "delwarp", "Delete a server warp.");
@@ -514,8 +507,7 @@ public final class WarpModule extends AbstractMysticModule implements WarpServic
     }
 
     private final class PlayerWarpNamedVariant extends MysticCommand {
-        private final RequiredArg<String> name = withRequiredArg("name", "Player-warp name",
-                ArgTypes.STRING).suggest(playerWarpSuggestions());
+        private final RequiredArg<String> name = withRequiredArg("name", "Player-warp name", playerWarpArg);
 
         PlayerWarpNamedVariant() {
             super(WarpModule.this.core, "Teleport to a player warp.");
@@ -571,8 +563,7 @@ public final class WarpModule extends AbstractMysticModule implements WarpServic
     }
 
     private final class PlayerWarpDeleteCommand extends MysticCommand {
-        private final RequiredArg<String> name = withRequiredArg("name", "Player-warp name",
-                ArgTypes.STRING).suggest(playerWarpSuggestions());
+        private final RequiredArg<String> name = withRequiredArg("name", "Player-warp name", playerWarpArg);
 
         PlayerWarpDeleteCommand() {
             super(WarpModule.this.core, "delete", "Delete one of your player warps.");

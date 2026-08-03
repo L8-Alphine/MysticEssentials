@@ -21,19 +21,16 @@ Group #Row {
     Label #Name {
       Anchor: (Height: 20);
       Style: (FontSize: 14, TextColor: #ffffff, RenderBold: true, VerticalAlignment: Center);
-      Text: "item";
     }
 
     Label #Meta {
       Anchor: (Height: 16);
       Style: (FontSize: 11, TextColor: #96a9be, VerticalAlignment: Center);
-      Text: "";
     }
   }
 
   Label #Qty {
     Anchor: (Width: 80);
     Style: (FontSize: 15, TextColor: #d7e1ee, HorizontalAlignment: End, VerticalAlignment: Center, RenderBold: true);
-    Text: "x1";
   }
 }

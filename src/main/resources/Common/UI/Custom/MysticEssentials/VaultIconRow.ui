@@ -22,6 +22,5 @@ Button #Row {
   Label #Name {
     FlexWeight: 1;
     Style: (FontSize: 13, TextColor: #d7e1ee, VerticalAlignment: Center);
-    Text: "item";
   }
 }

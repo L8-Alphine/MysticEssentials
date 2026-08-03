@@ -17,7 +17,6 @@ Button #Row {
   Label #Name {
     FlexWeight: 1;
     Style: (FontSize: 15, TextColor: #ffffff, RenderBold: true, VerticalAlignment: Center);
-    Text: "Player";
   }
 
   Label #Pick {

@@ -25,13 +25,11 @@ $C.@Container {
       Label #PortalHeading {
         Anchor: (Bottom: 2);
         Style: (FontSize: 20, RenderBold: true, TextColor: #ffffff);
-        Text: "Portal";
       }
 
       Label #PortalMeta {
         Anchor: (Bottom: 10);
         Style: (...$C.@DefaultLabelStyle, FontSize: 12);
-        Text: "";
       }
 
       Group {

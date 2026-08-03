@@ -10,14 +10,19 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 import org.hyzionstudios.mysticessentials.api.Permissions;
+import org.hyzionstudios.mysticessentials.api.notification.Notification;
+import org.hyzionstudios.mysticessentials.api.notification.NotificationAction;
+import org.hyzionstudios.mysticessentials.api.notification.NotificationAudience;
+import org.hyzionstudios.mysticessentials.api.notification.NotificationCategory;
+import org.hyzionstudios.mysticessentials.api.notification.NotificationPriority;
 import org.hyzionstudios.mysticessentials.api.service.StorageService;
 import org.hyzionstudios.mysticessentials.core.module.AbstractMysticModule;
 import org.hyzionstudios.mysticessentials.core.util.Json;
+import org.hyzionstudios.mysticessentials.platform.command.MysticArgTypes;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommand;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommandSender;
 
 import com.hypixel.hytale.server.core.command.system.arguments.system.OptionalArg;
-import com.hypixel.hytale.server.core.command.system.arguments.types.ArgTypes;
 import com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 
@@ -215,8 +220,24 @@ public final class PatchNotesModule extends AbstractMysticModule {
                 return;
             }
             if (config.showOnJoin) {
-                core.getMessageService().sendKey(player, "patchnotes-notify-join",
-                        Map.of("count", Integer.toString(count), "command", config.openCommand));
+                Map<String, String> params = Map.of("count", Integer.toString(count),
+                        "command", config.openCommand);
+                if (core.notifications() == null) {
+                    core.getMessageService().sendKey(player, "patchnotes-notify-join", params);
+                    return;
+                }
+                String message = core.getMessageService().plainFromKey(
+                        "patchnotes-notify-join", params);
+                core.notifications().send(Notification.builder()
+                        .category(NotificationCategory.UPDATE)
+                        .priority(NotificationPriority.IMPORTANT)
+                        .title("Patch Notes")
+                        .subtitle(message)
+                        .message(message)
+                        .action(NotificationAction.command("/" + config.openCommand))
+                        .storeInHistory(false)
+                        .source("mysticessentials:patchnotes")
+                        .build(), NotificationAudience.player(player.getUuid()));
             }
         });
     }
@@ -309,9 +330,8 @@ public final class PatchNotesModule extends AbstractMysticModule {
         }
 
         private final class OpenCommand extends MysticCommand {
-            private final OptionalArg<String> target = withOptionalArg("player", "Player to open for", ArgTypes.STRING)
-                    .suggest((commandSender, input, index, result) ->
-                            core.platform().onlinePlayers().forEach(ref -> result.suggest(ref.getUsername())));
+            private final OptionalArg<String> target = withOptionalArg("player", "Player to open for",
+                    MysticArgTypes.PLAYER_NAME);
 
             OpenCommand() {
                 super(PatchNotesModule.this.core, "open", "Open patch notes (optionally for another player).");
@@ -360,9 +380,7 @@ public final class PatchNotesModule extends AbstractMysticModule {
 
         private final class MarkReadCommand extends MysticCommand {
             private final OptionalArg<String> target =
-                    withOptionalArg("player", "Player to mark read for", ArgTypes.STRING)
-                            .suggest((commandSender, input, index, result) ->
-                                    core.platform().onlinePlayers().forEach(ref -> result.suggest(ref.getUsername())));
+                    withOptionalArg("player", "Player to mark read for", MysticArgTypes.PLAYER_NAME);
 
             MarkReadCommand() {
                 super(PatchNotesModule.this.core, "markread", "Mark all patch notes as read.");

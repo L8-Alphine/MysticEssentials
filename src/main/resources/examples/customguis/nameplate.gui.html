@@ -1,0 +1,44 @@
+<!--
+  Screen overlay: an avatar tile beside the player's name.
+
+  HUD documents render the same layout tree as pages but receive no clicks.
+  Show it with /customguis hud show nameplate, or set data-custom-auto-show
+  to "true" to give it to every player on join.
+-->
+<hud id="nameplate"
+     data-custom-width="272"
+     data-custom-height="52"
+     data-custom-anchor="top-left"
+     data-custom-offset-x="24"
+     data-custom-offset-y="24"
+     data-custom-z-order="1"
+     data-custom-refresh-interval="5"
+     data-custom-auto-show="false">
+
+  <row data-custom-gap="10">
+
+    <!-- Avatar tile: swap the item id for any item, or use
+         data-custom-bg-image="Path/To/Portrait.png" for artwork. -->
+    <panel data-custom-width="52"
+           data-custom-height="52"
+           data-custom-bg="#0b1220(0.85)"
+           data-custom-pad="6"
+           data-custom-flow="center">
+      <item data-custom-item-id="hytale:gold_ingot"
+            data-custom-width="36"
+            data-custom-height="36"></item>
+    </panel>
+
+    <panel data-custom-width="200"
+           data-custom-height="52"
+           data-custom-bg="#0b1220(0.85)"
+           data-custom-pad-x="14"
+           data-custom-flow="middle">
+      <text data-custom-size="17"
+            data-custom-bold="true"
+            data-custom-color="#ffffff"
+            data-custom-wrap="false">%player_name%</text>
+    </panel>
+
+  </row>
+</hud>

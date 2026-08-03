@@ -13,13 +13,11 @@ Group #Row {
   Label #Name {
     FlexWeight: 1;
     Style: (FontSize: 16, TextColor: #ffd97a, RenderBold: true, VerticalAlignment: Center);
-    Text: "Player";
   }
 
   Label #Status {
     Anchor: (Width: 70);
     Style: (FontSize: 12, TextColor: #9fb0c4, VerticalAlignment: Center);
-    Text: "";
   }
 
   $C.@SmallSecondaryTextButton #TpaButton {

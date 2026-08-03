@@ -52,33 +52,31 @@ $C.@Container {
         Label #PwarpName {
           Anchor: (Bottom: 8);
           Style: (FontSize: 22, RenderBold: true, TextColor: #ffffff);
-          Text: "No Warp";
         }
 
         Label #PwarpDescription {
           Anchor: (Bottom: 12);
           Style: (FontSize: 14, TextColor: #96a9be, Wrap: true);
-          Text: "";
         }
 
         Group {
           LayoutMode: Left;
           Anchor: (Bottom: 8);
           Label { Anchor: (Width: 110); Style: (...$C.@DefaultLabelStyle, FontSize: 13, RenderBold: true); Text: "Owner"; }
-          Label #PwarpOwner { FlexWeight: 1; Style: (...$C.@DefaultLabelStyle, FontSize: 13); Text: "-"; }
+          Label #PwarpOwner { FlexWeight: 1; Style: (...$C.@DefaultLabelStyle, FontSize: 13); }
         }
 
         Group {
           LayoutMode: Left;
           Anchor: (Bottom: 8);
           Label { Anchor: (Width: 110); Style: (...$C.@DefaultLabelStyle, FontSize: 13, RenderBold: true); Text: "Cost"; }
-          Label #PwarpCost { FlexWeight: 1; Style: (...$C.@DefaultLabelStyle, FontSize: 13); Text: "-"; }
+          Label #PwarpCost { FlexWeight: 1; Style: (...$C.@DefaultLabelStyle, FontSize: 13); }
         }
 
         Group {
           LayoutMode: Left;
           Label { Anchor: (Width: 110); Style: (...$C.@DefaultLabelStyle, FontSize: 13, RenderBold: true); Text: "World"; }
-          Label #PwarpWorld { FlexWeight: 1; Style: (...$C.@DefaultLabelStyle, FontSize: 13); Text: "-"; }
+          Label #PwarpWorld { FlexWeight: 1; Style: (...$C.@DefaultLabelStyle, FontSize: 13); }
         }
       }
 
@@ -100,7 +98,6 @@ $C.@Container {
       Label #PwarpLimit {
         Anchor: (Height: 20);
         Style: (FontSize: 13, TextColor: #96a9be, VerticalAlignment: Center);
-        Text: "";
       }
     }
   }

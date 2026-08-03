@@ -2,7 +2,7 @@ $C = "../Common.ui";
 
 // One row in the Recently Shared Items list. Appended per entry:
 //   cmd.append("#RecentList", "MysticEssentials/RecentItemLinkRow.ui")
-// then set #Icon.ItemId, #Name.Text, #Meta.Text and bind #InspectButton.
+// then set #Icon.ItemId, #Name.TextSpans, #Meta.TextSpans and bind #InspectButton.
 
 Group #Row {
   Anchor: (Height: 54, Bottom: 6);
@@ -28,13 +28,11 @@ Group #Row {
     Label #Name {
       Anchor: (Height: 20, Bottom: 2);
       Style: (FontSize: 15, TextColor: #ffffff, RenderBold: true, VerticalAlignment: Center);
-      Text: "Item";
     }
 
     Label #Meta {
       Anchor: (Height: 16);
       Style: (FontSize: 12, TextColor: #9fb0c4, VerticalAlignment: Center);
-      Text: "";
     }
   }
 

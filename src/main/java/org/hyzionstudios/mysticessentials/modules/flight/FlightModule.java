@@ -9,11 +9,11 @@ import java.util.concurrent.TimeUnit;
 
 import org.hyzionstudios.mysticessentials.api.Permissions;
 import org.hyzionstudios.mysticessentials.core.module.AbstractMysticModule;
+import org.hyzionstudios.mysticessentials.platform.command.MysticArgTypes;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommand;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommandSender;
 
 import com.hypixel.hytale.server.core.command.system.arguments.system.RequiredArg;
-import com.hypixel.hytale.server.core.command.system.arguments.types.ArgTypes;
 import com.hypixel.hytale.server.core.entity.entities.player.movement.MovementManager;
 import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
@@ -217,8 +217,7 @@ public final class FlightModule extends AbstractMysticModule {
 
     private final class FlyOtherVariant extends MysticCommand {
         private final RequiredArg<String> target = withRequiredArg("player", "Target player",
-                ArgTypes.STRING).suggest((commandSender, input, index, result) ->
-                        core.platform().onlinePlayers().forEach(p -> result.suggest(p.getUsername())));
+                MysticArgTypes.PLAYER_NAME);
 
         FlyOtherVariant() {
             super(FlightModule.this.core, "Toggle flight for another player.");

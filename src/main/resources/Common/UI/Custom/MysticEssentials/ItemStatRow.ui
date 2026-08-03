@@ -2,7 +2,7 @@ $C = "../Common.ui";
 
 // One single-line statistic row in the Item Details page. Appended per stat:
 //   cmd.append("#StatList", "MysticEssentials/ItemStatRow.ui")
-// then set #StatLabel.Text and #StatValue.Text. Single-line by design so text
+// then set #StatLabel.TextSpans and #StatValue.TextSpans. Single-line by design so text
 // never overflows onto adjacent rows.
 
 Group #Row {
@@ -13,12 +13,10 @@ Group #Row {
   Label #StatLabel {
     Anchor: (Width: 240);
     Style: (...$C.@DefaultLabelStyle, FontSize: 13, VerticalAlignment: Center);
-    Text: "Stat";
   }
 
   Label #StatValue {
     FlexWeight: 1;
     Style: (...$C.@DefaultLabelStyle, FontSize: 13, RenderBold: true, HorizontalAlignment: End, VerticalAlignment: Center);
-    Text: "";
   }
 }
