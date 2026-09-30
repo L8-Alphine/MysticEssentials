@@ -24,6 +24,13 @@
   mod); see `DEVELOPER_NOTES.md`. A build without them runs with licensed
   modules off.
 
+### Network use
+
+- The README's "Network use" section lists everything the mod sends, where,
+  when, and how to turn each part off: the update check, player portraits
+  (a username to `hytale.photo`, CustomContent only) and licensing (only once
+  `license.key` exists). Mystic Essentials collects no statistics.
+
 ### Removed
 
 - `mystic-license-core` and `mystic-license-example-mod`, the retired

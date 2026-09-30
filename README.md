@@ -753,6 +753,29 @@ Config files are **versioned**: each carries a `configVersion` and is migrated
 
 ---
 
+## Network use
+
+Everything Mystic Essentials sends over the internet, and how to turn each part
+off. It collects no statistics or analytics.
+
+| What | Where | When | What is sent | Turn it off |
+|---|---|---|---|---|
+| Update check | `api.cfwidget.com` (public CurseForge metadata) | At startup, then every `updateNotifier.checkIntervalHours` (12 by default) | Nothing but this mod's version, in the `User-Agent` | `updateNotifier.enabled: false` in `config.json` |
+| Player portraits (CustomContent module only) | `hytale.photo`, or whatever `playerPortraitApiTemplate` names | When a GUI with a `<player-portrait>` element first shows a player; cached for `playerPortraitCacheHours` (24 by default) | That player's **username**, in the URL | `playerPortraitsEnabled: false` in `modules/customcontent/config.json` |
+| Licensing (for the CustomContent module) | The MysticLicenses service | Only once `license.key` exists: at startup, then every 45 minutes or so | The license key, the product id, a random server id, and this mod's version | Remove `license.key` and run `/mystic license reload` (the module stops at the next `/mystic reload`) |
+
+- Player portraits are the only feature that sends player data (a username) to a
+  third party. The CustomContent module is off by default, and portraits can be
+  switched off on their own or pointed at a service you run.
+- Storage and cross-server backends (MySQL, MariaDB, Redis) only connect to
+  servers you configure. Integrations with other mods run inside the server.
+  When MysticIdentity is installed, Mystic Essentials adds its pages (mail,
+  read-only vaults, patch notes) to MysticIdentity's player portal, which you
+  run; `integrations.mysticIdentity: false` in `config.json` turns that off.
+- The licensing service sees your server's IP address, as any HTTPS request
+  shows; it uses it only for short-lived rate limiting and does not store it.
+  The licensing client is tested to send nothing beyond the fields listed above.
+
 ## Integrations
 
 All plugin integrations are optional. `manifest.json` declares only load-order

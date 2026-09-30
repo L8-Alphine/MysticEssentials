@@ -142,7 +142,10 @@ its children are kept.
 Player portraits are enabled by default. `playerPortraitApiTemplate` controls
 the HTTPS endpoint (`{username}` is URL encoded), and
 `playerPortraitCacheHours` controls the disk cache under the module directory.
-Set `playerPortraitsEnabled: false` to disable remote portrait fetching.
+Set `playerPortraitsEnabled: false` to disable remote portrait fetching. Fetching a
+portrait sends that player's username to the portrait service (`hytale.photo` by
+default); it is the only feature in Mystic Essentials that sends player data to a
+third party.
 
 ### Style attributes
 
