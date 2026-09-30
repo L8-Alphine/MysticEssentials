@@ -586,3 +586,29 @@ explicitly supplied.
 ```
 
 Requires JDK 25 (configured via the Gradle toolchain).
+
+### Licensing settings (release builds)
+
+The CustomContent module is licensed through MysticLicenses v2. The licensing
+service's address and its public signing keys are built into the jar, never
+read at runtime, so a server cannot be pointed at a licensing service of its
+own. They are shared by every Mystic mod, so put them in
+`~/.gradle/gradle.properties` (this repository's `gradle.properties` is
+committed), or pass them with `-P`:
+
+```properties
+mystic.licensing.url=https://licenses.example.com
+# kid=publicKeyRaw pairs, comma-separated, exactly as GET <url>/api/v2/runtime/public-keys lists them.
+# Keep a retired key listed until nothing it signed can still be cached.
+mystic.licensing.keys=mls-2026-01=AbCd...
+```
+
+`mysticessentials.licensing.url` / `.keys` override them for this mod only, and
+the environment variables `MYSTIC_LICENSING_URL` / `MYSTIC_LICENSING_KEYS` work
+too. The URL must use `https` (plain `http` only to `localhost`, for testing
+against a local service). Without these settings the build still succeeds and
+the jar runs with licensed modules off.
+
+The client is `vendor/mystic-licenses-sdk-*.jar`, built from
+`sdk/mystic-license-java` in the MysticLicensing repository (`mvn package`).
+It is dependency-free and shaded without relocation, like everything else here.

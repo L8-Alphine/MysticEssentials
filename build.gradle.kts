@@ -1,3 +1,5 @@
+import java.net.URI
+import java.util.Base64
 import java.util.zip.ZipFile
 
 plugins {
@@ -30,9 +32,11 @@ dependencies {
     compileOnly("com.hypixel.hytale:Server:0.6.2")
     testCompileOnly("com.hypixel.hytale:Server:0.6.2")
 
-    // Offline license verification. Zero runtime dependencies of its own, so it
-    // shades in cleanly and cannot collide with anything on the server.
-    implementation(project(":mystic-license-core"))
+    // MysticLicenses v2 client (licensed modules). Built from sdk/mystic-license-java
+    // in the MysticLicensing repository; dependency-free, so it shades in cleanly and,
+    // like everything else here, needs no relocation in Hytale's per-plugin class
+    // loader. Lives in vendor/ because libs/ is not committed.
+    implementation(files("vendor/mystic-licenses-sdk-2.0.0-SNAPSHOT.jar"))
 
     // PlaceholderAPI
     compileOnly("at.helpch:placeholderapi-hytale:1.0.8")
@@ -73,6 +77,108 @@ java {
 tasks.withType<JavaCompile>().configureEach {
     options.compilerArgs.add("-Xlint:deprecation")
 }
+
+// Where this build's licensing lives: the MysticLicenses API, and the keys it signs
+// authorizations with (raw Ed25519 in base64url, as GET /api/v2/runtime/public-keys
+// publishes them), as kid=key pairs separated by commas. Keep a retired key listed
+// until nothing it signed can still be cached. Both are fixed at build time and
+// never read at runtime, so a server operator cannot point the mod at a licensing
+// service of their own. A build without them works normally with licensed modules
+// off. mystic.licensing.* is shared by every Mystic mod (put it in
+// ~/.gradle/gradle.properties); mysticessentials.licensing.* overrides it here.
+val generatedLicensingDir = layout.buildDirectory.dir("generated/licensing-src")
+sourceSets.main { java.srcDir(generatedLicensingDir) }
+
+val generateLicensingEndpoint by tasks.registering {
+    group = "build"
+    description = "Writes the licensing service's address and public keys into the build."
+    val licensingUrl = providers.gradleProperty("mysticessentials.licensing.url")
+        .orElse(providers.gradleProperty("mystic.licensing.url"))
+        .orElse(providers.environmentVariable("MYSTIC_LICENSING_URL"))
+        .orElse("")
+    val licensingKeys = providers.gradleProperty("mysticessentials.licensing.keys")
+        .orElse(providers.gradleProperty("mystic.licensing.keys"))
+        .orElse(providers.environmentVariable("MYSTIC_LICENSING_KEYS"))
+        .orElse("")
+    inputs.property("licensingUrl", licensingUrl)
+    inputs.property("licensingKeys", licensingKeys)
+    val outputDir = generatedLicensingDir
+    outputs.dir(outputDir)
+
+    doLast {
+        val target = outputDir.get().dir("org/hyzionstudios/mysticessentials/generated").asFile
+        target.deleteRecursively()
+        target.mkdirs()
+
+        val address = licensingUrl.get().trim()
+        val keys = linkedMapOf<String, String>()
+        licensingKeys.get().split(',').map { it.trim() }.filter { it.isNotEmpty() }.forEach { entry ->
+            val parts = entry.split('=', limit = 2)
+            val kid = parts[0].trim()
+            if (parts.size != 2 || !Regex("[A-Za-z0-9._-]{1,64}").matches(kid)) {
+                throw GradleException("mystic.licensing.keys takes kid=publicKeyRaw pairs separated by commas")
+            }
+            val raw = parts[1].trim()
+            val decoded = try {
+                Base64.getUrlDecoder().decode(raw)
+            } catch (ignored: IllegalArgumentException) {
+                null
+            }
+            if (decoded == null || decoded.size != 32) {
+                throw GradleException("Licensing key '" + kid + "' is not a raw Ed25519 public key in base64url (32 bytes)")
+            }
+            keys[kid] = raw
+        }
+        if (address.isEmpty() != keys.isEmpty()) {
+            throw GradleException("Set both mystic.licensing.url and mystic.licensing.keys, or neither")
+        }
+        if (keys.size > 10) {
+            throw GradleException("At most 10 licensing keys")
+        }
+        if (address.isNotEmpty()) {
+            val uri = URI(address)
+            // The same rule the client enforces: HTTPS, or plain HTTP to this machine for development.
+            val loopback = uri.scheme == "http" && uri.host in setOf("localhost", "127.0.0.1", "[::1]", "::1")
+            if (uri.scheme != "https" && !loopback) {
+                throw GradleException("mystic.licensing.url must use https (http only to localhost): " + address)
+            }
+            if (uri.host == null || uri.rawQuery != null || uri.rawFragment != null
+                || address.contains('"') || address.contains('\\')) {
+                throw GradleException("mystic.licensing.url is not a plain base URL: " + address)
+            }
+        }
+
+        val quote = "\""
+        val urlValue = if (address.isEmpty()) "null" else quote + address + quote
+        val entries = keys.entries.joinToString(", ") { quote + it.key + quote + ", " + quote + it.value + quote }
+        target.resolve("LicensingEndpoint.java").writeText(
+            listOf(
+                "package org.hyzionstudios.mysticessentials.generated;",
+                "",
+                "import java.util.Map;",
+                "",
+                "/** Generated by the build from mystic.licensing.url and mystic.licensing.keys. */",
+                "public final class LicensingEndpoint {",
+                "    private LicensingEndpoint() {",
+                "    }",
+                "",
+                "    /** The MysticLicenses API, or null when this build has none. */",
+                "    public static String url() {",
+                "        return " + urlValue + ";",
+                "    }",
+                "",
+                "    /** Key id to raw Ed25519 public key (base64url), as the licensing service publishes them. */",
+                "    public static Map<String, String> publicKeys() {",
+                "        return Map.of(" + entries + ");",
+                "    }",
+                "}",
+                ""
+            ).joinToString("\n")
+        )
+    }
+}
+
+tasks.compileJava { dependsOn(generateLicensingEndpoint) }
 
 // The plain jar has no Jedis/JDBC/jsoup inside and must never be what gets
 // deployed: give it a classifier so it cannot overwrite the shaded jar, which

@@ -97,12 +97,12 @@ public final class MysticCore implements MysticEssentialsAPI {
     private org.hyzionstudios.mysticessentials.core.ui.CustomUiServiceImpl customUiService;
 
     /**
-     * Offline license gate. Never null after {@link #enable()} has run, and
-     * {@link #license()} substitutes a no-op before that, so no caller has to
-     * null-check it. A licensing failure disables only the modules that declare
-     * a licensed feature.
+     * MysticLicenses v2. Never null after {@link #enable()} has run, and
+     * {@link #license()} substitutes a grant-nothing answer before that, so no
+     * caller has to null-check it. A licensing failure disables only the modules
+     * that declare a licensed feature.
      */
-    private com.mysticlicensing.license.LicenseGate license;
+    private org.hyzionstudios.mysticessentials.core.license.EssentialsLicense license;
 
     public MysticCore(MysticessentialsPlugin plugin) {
         this.plugin = plugin;
@@ -172,11 +172,11 @@ public final class MysticCore implements MysticEssentialsAPI {
         notificationService = new NotificationServiceImpl(this, loadNotificationConfig());
         customUiService = new org.hyzionstudios.mysticessentials.core.ui.CustomUiServiceImpl(1000);
 
-        // Licensing. Verified once, here, before any module asks about it. This
-        // cannot fail the startup: the worst outcome is that licensed modules
-        // stay off and one warning is logged.
-        license = org.hyzionstudios.mysticessentials.core.license.LicenseSupport.create(this);
-        license.start();
+        // Licensing, before any module asks about it. This cannot fail the
+        // startup: the worst outcome is that licensed modules stay off and one
+        // warning is logged. A server licensed before answers at once from its
+        // cached authorization; a first start waits at most a few seconds.
+        license = org.hyzionstudios.mysticessentials.core.license.LicenseSupport.start(this);
 
         // Core commands + player lifecycle listeners (always available).
         registerCoreCommands();
@@ -186,6 +186,7 @@ public final class MysticCore implements MysticEssentialsAPI {
         moduleManager = new ModuleManagerImpl(this);
         ModuleBootstrap.registerBuiltins(moduleManager);
         moduleManager.enableAll();
+        moduleManager.watchLicense(license);
 
         // After the modules, so the first refresh already sees the AFK service.
         playerListService = new PlayerListService(this);
@@ -236,6 +237,9 @@ public final class MysticCore implements MysticEssentialsAPI {
         }
         if (storageService != null) {
             storageService.shutdown();
+        }
+        if (license != null) {
+            license.close();
         }
         if (scheduler != null) {
             scheduler.shutdown();
@@ -443,14 +447,14 @@ public final class MysticCore implements MysticEssentialsAPI {
     }
 
     /**
-     * The license gate, or a no-op grant-nothing service if licensing has not
-     * been set up yet. Callers can rely on this never being null and never
-     * throwing; see {@code mystic-license-core/README.md} for the failure policy.
+     * What this server is licensed for, or a grant-nothing answer if licensing
+     * has not started yet. Callers can rely on this never being null and never
+     * throwing; see {@code EssentialsLicense} for the failure policy.
      */
-    public com.mysticlicensing.license.MysticLicenseService license() {
-        com.mysticlicensing.license.LicenseGate current = license;
+    public org.hyzionstudios.mysticessentials.core.license.EssentialsLicense license() {
+        org.hyzionstudios.mysticessentials.core.license.EssentialsLicense current = license;
         return current == null
-                ? com.mysticlicensing.license.NoopMysticLicenseService.INSTANCE
+                ? org.hyzionstudios.mysticessentials.core.license.EssentialsLicense.NOT_STARTED
                 : current;
     }
 

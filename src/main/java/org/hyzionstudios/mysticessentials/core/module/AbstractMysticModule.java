@@ -72,13 +72,15 @@ public abstract class AbstractMysticModule implements MysticModule {
      * when it is free — which is the default and true of almost every module.
      *
      * <p>A module that returns a feature id here stays disabled unless the
-     * license grants it. That is the only consequence: nothing else is switched
-     * off, and a missing or broken license never stops the mod or the server
-     * from starting. Ids live in
-     * {@link com.mysticlicensing.license.Products.Essentials} so a typo is a
-     * compile error rather than a module that silently never enables.
+     * license grants it, and {@code /mystic reload} stops it if the license
+     * lapses. That is the only consequence: nothing else is switched off, and a
+     * missing or broken license never stops the mod or the server from
+     * starting. Ids live in
+     * {@link org.hyzionstudios.mysticessentials.core.license.EssentialsLicense}
+     * so a typo is a compile error rather than a module that silently never
+     * enables.
      *
-     * @see org.hyzionstudios.mysticessentials.core.license.LicenseSupport
+     * @see org.hyzionstudios.mysticessentials.core.license.EssentialsLicense
      */
     public String licensedFeature() {
         return null;

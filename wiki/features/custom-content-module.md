@@ -11,20 +11,28 @@ CustomContent is a licensed feature. Access requires all of the following:
 
 1. Join the [Hyzion Discord](https://discord.gg/9aq3Gqg3Gy) and become a partner.
 2. Purchase an eligible [Hyzion Patreon membership](https://www.patreon.com/cw/Hyzion).
-3. Sign in with Discord at [license.hyzion.net](https://license.hyzion.net) to
-   link that Discord account.
-4. Run `/mystic license` on the server and register the displayed server
-   licensing id in the portal.
-5. Download `license.mclicense` and place it at
-   `mods/MysticEssentials/license.mclicense`.
-6. Run `/mystic license reload`, followed by `/mystic reload` to start the newly
-   unlocked module without restarting the server.
+3. Sign in with Discord at [license.hyzion.net](https://license.hyzion.net),
+   claim your Mystic Essentials license, and copy its key.
+4. Put the key in `mods/MysticEssentials/license.key`.
+5. Run `/mystic license reload`, then `/mystic license` a moment later to see
+   the result, followed by `/mystic reload` to start the newly unlocked module
+   without restarting the server.
+
+The server activates online and then runs on a signed authorization it caches
+and renews in the background; while the licensing service is unreachable it
+keeps working for the license's offline grace period. The server appears in the
+portal once activated, so there is no server id to register. Its licensing
+identity lives in `.mystic/` at the server root: do not copy it to another
+server.
 
 The Discord partnership, linked Discord account, and qualifying Patreon
-membership must remain valid. A missing, expired, server-mismatched, or invalid
-license only prevents `customcontent` from enabling; every unlicensed Mystic
-Essentials feature continues to work and the server still starts. The
-`mysticessentials.license` permission controls `/mystic license [reload]`.
+membership must remain valid. When the license stops granting CustomContent
+while the server runs, the change is logged and the module stops at the next
+`/mystic reload` or restart. A missing, lapsed, or invalid license only
+prevents `customcontent` from enabling; every unlicensed Mystic Essentials
+feature continues to work and the server still starts. The
+`mysticessentials.license` permission controls `/mystic license [reload]`. A
+`license.mclicense` from the retired licensing prototype is no longer read.
 
 ## Enable
 

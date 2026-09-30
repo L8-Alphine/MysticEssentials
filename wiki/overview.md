@@ -44,8 +44,7 @@ After the server starts once with Mystic Essentials installed, the mod creates:
 ```text
 mods/MysticEssentials/
   config.json
-  license.mclicense        # only when installing a licensed feature
-  server-id.txt            # generated licensing identity
+  license.key              # only when installing a licensed feature
   messages/en_us.json
   modules/<module>/config.json
   data/

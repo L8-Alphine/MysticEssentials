@@ -7,22 +7,21 @@ import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommand;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommandSender;
 
-import com.mysticlicensing.license.LicenseGate;
-import com.mysticlicensing.license.Products;
-
 /**
  * {@code /mystic license [reload]} - shows what the current license grants, and
- * re-reads it from disk on request.
+ * re-reads {@code license.key} on request.
  *
- * <p>The reload path exists so an operator who has just renewed can drop the new
- * file in and pick it up without a restart. Verification is otherwise done once,
- * at startup, and never on a timer.
+ * <p>The reload path lets an operator add or replace their key without a
+ * restart. The answer comes from the licensing service a moment later, so the
+ * reload reply does not wait for it: the result is logged, and the next
+ * {@code /mystic license} shows it. Renewals, upgrades and lapses otherwise
+ * arrive on their own.
  */
 public final class LicenseCommand extends MysticCommand {
 
-    private final LicenseGate license;
+    private final EssentialsLicense license;
 
-    public LicenseCommand(MysticCore core, LicenseGate license) {
+    public LicenseCommand(MysticCore core, EssentialsLicense license) {
         super(core, "license", "Show or reload the Mystic Essentials license.");
         requirePermission(Permissions.LICENSE);
         allowExtraArguments();
@@ -35,12 +34,9 @@ public final class LicenseCommand extends MysticCommand {
         // the action is whatever follows "license".
         if (isReload(sender.args())) {
             license.reload();
-            sender.reply("&aLicense re-read from disk.");
-            report(sender);
-            if (!license.hasFeature(Products.Essentials.MODULE_CUSTOM_CONTENT)) {
-                return;
-            }
-            sender.reply("&7Run &f/mystic reload &7to start any module the new license unlocked.");
+            sender.reply("&aRe-reading " + LicenseSupport.KEY_FILE + "; checking it with the licensing service.");
+            sender.reply("&7Run &f/mystic license &7in a moment to see the result, then &f/mystic reload"
+                    + " &7to start or stop the modules it affects.");
             return;
         }
 
@@ -59,14 +55,15 @@ public final class LicenseCommand extends MysticCommand {
 
     private void report(MysticCommandSender sender) {
         sender.reply("&6" + license.summaryLine());
-        sender.reply("&7Server licensing id: &f" + license.serverUuid());
+        String serverId = license.serverId();
+        sender.reply("&7Server licensing id: &f" + (serverId == null ? "none yet" : serverId));
 
-        List<String> granted = license.licensedFeatures(Products.Essentials.ALL);
+        List<String> granted = license.licensedFeatures();
         sender.reply(granted.isEmpty()
                 ? "&7Licensed features: &fnone"
                 : "&7Licensed features: &f" + String.join(", ", granted));
 
-        if (!license.isValid()) {
+        if (!license.isLicensed()) {
             sender.reply("&7Everything that is not a licensed feature keeps working normally.");
         }
     }

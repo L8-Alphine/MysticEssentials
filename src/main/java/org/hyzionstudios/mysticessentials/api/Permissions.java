@@ -27,7 +27,7 @@ public final class Permissions {
     public static final String MIGRATE = "mysticessentials.migrate";
     /** {@code /mystic network}: Redis network roster and this server's advertised address. */
     public static final String NETWORK = "mysticessentials.network";
-    /** View the license status and re-read {@code license.mclicense} from disk. */
+    /** View the license status and re-read {@code license.key} from disk. */
     public static final String LICENSE = "mysticessentials.license";
     /** Receive a clickable update notice on join when this build is outdated. */
     public static final String UPDATE_NOTIFY = "mysticessentials.update.notify";

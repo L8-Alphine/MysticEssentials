@@ -32,10 +32,10 @@ The mod includes an asset pack for its custom UI resources, so keep `IncludesAss
 CustomGUIs and CustomDialogs are disabled by default and require a license. Join
 the [Hyzion Discord](https://discord.gg/9aq3Gqg3Gy) and become a partner, purchase
 an eligible [Hyzion Patreon membership](https://www.patreon.com/cw/Hyzion), then
-sign in with Discord at [license.hyzion.net](https://license.hyzion.net) to link
-your account and server. Run `/mystic license` to obtain the server licensing id.
+sign in with Discord at [license.hyzion.net](https://license.hyzion.net) and
+claim your Mystic Essentials license.
 
-Place the downloaded `license.mclicense` in `mods/MysticEssentials/`, enable
+Put its key in `mods/MysticEssentials/license.key`, enable
 `"customcontent": true` in the main module map, and run `/mystic license reload`
 followed by `/mystic reload`. An invalid or missing license disables only this
 module. See [CustomGUIs & CustomDialogs](custom-content-module) for setup and the

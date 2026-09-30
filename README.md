@@ -92,7 +92,7 @@ Player, home, and warp names autocomplete.
 | `/mystic [info\|reload]` | Show info or reload configs (aliases `/mysticessentials`, `/me`) | `mysticessentials.reload` (reload) |
 | `/mystic migrate scan <source> [path]` | Preview a file-based import from a legacy essentials data folder | `mysticessentials.migrate` |
 | `/mystic migrate import <source> [path] [--replace] [--dry-run]` | Import supported legacy homes, spawns, warps, player warps, and kits | `mysticessentials.migrate` |
-| `/mystic license [reload]` | Show the license status and this server's licensing id, or re-read `license.mclicense` from disk | `mysticessentials.license` |
+| `/mystic license [reload]` | Show the license status and this server's licensing id, or re-read `license.key` from disk | `mysticessentials.license` |
 | `/notifications` | Open the Notification Center — review, filter, and open what you missed (alias `/notifs`) | — |
 
 ### Teleportation
@@ -347,25 +347,33 @@ their plain text (Hytale Labels are plain-text only).
 
 Custom dialog authoring and declarative GUIs in one optional module.
 
-**Licensed feature.** This module needs a `license.mclicense` granting
-`mysticessentials` / `module.customcontent` in `mods/MysticEssentials/`. Without
-one it stays off and logs a single line at startup; nothing else in Mystic
-Essentials is affected and the server starts normally. Run `/mystic license` to
-see the current status and this server's licensing id.
+**Licensed feature.** This module needs a Mystic Essentials license granting
+`module.customcontent`, with its key in `mods/MysticEssentials/license.key`.
+Without one it stays off and logs a single line at startup; nothing else in
+Mystic Essentials is affected and the server starts normally. Run
+`/mystic license` to see the current status and this server's licensing id.
 
 To obtain access:
 
 1. Join the [Hyzion Discord](https://discord.gg/9aq3Gqg3Gy) and become a partner.
 2. Purchase an eligible [Hyzion Patreon membership](https://www.patreon.com/cw/Hyzion).
-3. Sign in with Discord at the [Hyzion license portal](https://license.hyzion.net)
-   to link the same Discord account and register the server licensing id shown by
-   `/mystic license`.
-4. Download `license.mclicense`, place it in `mods/MysticEssentials/`, run
+3. Sign in with Discord at the [Hyzion license portal](https://license.hyzion.net),
+   claim your Mystic Essentials license, and copy its key.
+4. Put the key in `mods/MysticEssentials/license.key`, run
    `/mystic license reload`, then `/mystic reload`.
 
 Partner status, the linked Discord account, and an active qualifying membership
-are all required for the CustomContent license. See
-[mystic-license-core/README.md](mystic-license-core/README.md).
+are all required for the CustomContent license.
+
+The server activates online, then runs on a signed authorization it caches and
+renews in the background, so it starts licensed even while the licensing
+service is down, for the license's offline grace period. The server's licensing
+identity lives in `.mystic/` at the server root, shared with other Mystic mods;
+it appears in the portal once activated, with nothing to register by hand. Do
+not copy `.mystic/` to another server. A license change while the server runs
+(a lapsed membership, an upgrade) is logged, and `/mystic reload` starts or
+stops the module to match. A leftover `license.mclicense` from the retired
+licensing prototype is no longer read.
 
 **Disabled by default** — set `"customcontent": true` in the main config's
 module map. Module settings live in `modules/customcontent/config.json`,

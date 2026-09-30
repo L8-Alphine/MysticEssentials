@@ -45,7 +45,7 @@ public final class CustomContentModule extends AbstractMysticModule {
      */
     @Override
     public String licensedFeature() {
-        return com.mysticlicensing.license.Products.Essentials.MODULE_CUSTOM_CONTENT;
+        return org.hyzionstudios.mysticessentials.core.license.EssentialsLicense.MODULE_CUSTOM_CONTENT;
     }
 
     @Override

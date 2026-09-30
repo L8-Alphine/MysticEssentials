@@ -1,5 +1,37 @@
 # Mystic Essentials Changelog
 
+## Unreleased — Licensing on MysticLicenses v2
+
+### Changed
+
+- The CustomContent license moves from offline `license.mclicense` files to
+  MysticLicenses v2. Claim your license in the portal and put its key in
+  `mods/MysticEssentials/license.key`. The server activates online, then runs
+  on a signed authorization it caches and renews in the background, with an
+  offline grace period while the licensing service is unreachable. A server
+  licensed before starts at once; a first start waits at most 5 seconds.
+- The server no longer needs registering by hand: it appears in the portal once
+  activated. Its licensing identity lives in `.mystic/` at the server root,
+  shared with other Mystic mods.
+- `/mystic license reload` re-reads `license.key`: a new key activates and
+  frees the previous license's slot, the same key is re-checked at once, and a
+  removed key releases the server.
+- A license change while the server runs is logged, and `/mystic reload` now
+  also stops a licensed module whose license lapsed (it previously only started
+  newly licensed ones).
+- The licensing service's address and public keys are set at build time
+  (`mystic.licensing.url` / `mystic.licensing.keys`, shared by every Mystic
+  mod); see `DEVELOPER_NOTES.md`. A build without them runs with licensed
+  modules off.
+
+### Removed
+
+- `mystic-license-core` and `mystic-license-example-mod`, the retired
+  prototype's offline verifier, replaced by the v2 SDK in `vendor/`.
+  `license.mclicense`, `server-id.txt` and `license-request.json` are no
+  longer read or written; a leftover `license.mclicense` gets a one-line
+  notice at startup.
+
 ## 1.0.4 — Integration Upgrade and Lifecycle Reliability
 
 Released August 30, 2026.

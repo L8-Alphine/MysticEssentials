@@ -96,25 +96,57 @@ public final class ModuleManagerImpl implements ModuleManager {
      * @see AbstractMysticModule#licensedFeature()
      */
     private boolean licensed(MysticModule module) {
-        if (!(module instanceof AbstractMysticModule base)) {
+        String missing = missingLicenseFeature(module);
+        if (missing == null) {
             return true;
         }
-        String feature;
-        try {
-            feature = base.licensedFeature();
-        } catch (Throwable t) {
-            return true;
-        }
-        if (feature == null) {
-            return true;
-        }
-        if (core.license().hasFeature(com.mysticlicensing.license.Products.ESSENTIALS, feature)) {
-            return true;
-        }
-        core.log(Level.INFO, "Module '" + module.id() + "' needs the '" + feature
+        core.log(Level.INFO, "Module '" + module.id() + "' needs the '" + missing
                 + "' license feature, which this server does not have; skipping. "
                 + "Run /mystic license for details. Everything else is unaffected.");
         return false;
+    }
+
+    /** The license feature the module declares and this server lacks, or null. Never throws. */
+    private String missingLicenseFeature(MysticModule module) {
+        String feature = licensedFeatureOf(module);
+        return feature == null || core.license().hasFeature(feature) ? null : feature;
+    }
+
+    private static String licensedFeatureOf(MysticModule module) {
+        if (!(module instanceof AbstractMysticModule base)) {
+            return null;
+        }
+        try {
+            return base.licensedFeature();
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    /**
+     * Says which modules a license change affects, as it happens: a key added,
+     * an upgrade, a subscription lapsing, the licensing service back after an
+     * outage. Modules are started and stopped only by {@code /mystic reload} or
+     * a restart, never from the licensing thread under a running server.
+     */
+    public void watchLicense(org.hyzionstudios.mysticessentials.core.license.EssentialsLicense license) {
+        Map<String, List<String>> byFeature = new LinkedHashMap<>();
+        for (MysticModule module : modules.values()) {
+            String feature = licensedFeatureOf(module);
+            if (feature != null) {
+                byFeature.computeIfAbsent(feature, key -> new ArrayList<>()).add(module.id());
+            }
+        }
+        byFeature.forEach((feature, ids) -> license.onFeatureChange(feature, granted -> {
+            String names = String.join(", ", ids);
+            if (granted) {
+                core.log(Level.INFO, "The license now grants '" + feature + "'. Run /mystic reload to start "
+                        + names + " (when enabled in config.json).");
+            } else {
+                core.log(Level.WARNING, "The license no longer grants '" + feature + "'. " + names
+                        + " stops at the next /mystic reload or restart.");
+            }
+        }));
     }
 
     private boolean moduleEnabledInConfig(String id) {
@@ -199,11 +231,13 @@ public final class ModuleManagerImpl implements ModuleManager {
     public void syncFromConfig() {
         List<MysticModule> ordered = orderedByDependencies();
 
-        // Stop modules turned off in config — dependents before dependencies.
+        // Stop modules turned off in config, or whose license feature this
+        // server no longer has — dependents before dependencies.
         List<MysticModule> reversed = new ArrayList<>(ordered);
         Collections.reverse(reversed);
         for (MysticModule module : reversed) {
-            if (isEnabled(module.id()) && !moduleEnabledInConfig(module.id())) {
+            if (isEnabled(module.id())
+                    && (!moduleEnabledInConfig(module.id()) || missingLicenseFeature(module) != null)) {
                 disableModule(module);
             }
         }

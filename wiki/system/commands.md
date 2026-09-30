@@ -10,7 +10,7 @@ Optional arguments use `[brackets]`. Required arguments use `<angle brackets>`.
 | `/mystic reload` | Reload core and module configuration | `mysticessentials.reload` |
 | `/mystic migrate scan <source> [path]` | Preview file-based migration from a legacy essentials data folder | `mysticessentials.migrate` |
 | `/mystic migrate import <source> [path] [--replace] [--dry-run]` | Import supported legacy data into Mystic Essentials | `mysticessentials.migrate` |
-| `/mystic license [reload]` | Show license status/server id, or reload `license.mclicense` | `mysticessentials.license` |
+| `/mystic license [reload]` | Show license status/server id, or re-read `license.key` | `mysticessentials.license` |
 | `/notifications`, `/notifs` | Open notification history, filters, and preferences | None |
 
 ## Teleportation
