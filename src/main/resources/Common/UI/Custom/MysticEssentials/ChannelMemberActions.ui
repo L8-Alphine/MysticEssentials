@@ -1,13 +1,15 @@
+// Member Actions — one member's details plus moderation. Buttons are shown only
+// when the server has authorised them for the viewer; the client is never
+// trusted to decide what a moderator may do. Destructive actions are grouped
+// last, under their own heading, so a slip of the mouse near "Make Speaker"
+// cannot land on "Ban".
 $C = "../Common.ui";
-
-// Member details + moderation actions (design bible §12, §13). Buttons are shown
-// only when the viewer is authorised server-side; the client is never trusted to
-// decide what a moderator may do (§24).
+$M = "MysticTheme.ui";
 
 $C.@PageOverlay {}
 
 $C.@Container {
-  Anchor: (Width: 460, Height: 620);
+  Anchor: (Width: 480, Height: 640);
 
   #Title {
     Group {
@@ -20,52 +22,56 @@ $C.@Container {
   #Content {
     LayoutMode: Top;
 
-    Label #MName {
-      Anchor: (Height: 28, Bottom: 2);
-      Style: (FontSize: 22, TextColor: #ffffff, RenderBold: true, VerticalAlignment: Center);
+    $M.@Panel {
+      @Padding = 14;
+      Anchor: (Bottom: 12);
+
+      Label #MName {
+        Anchor: (Height: 30, Bottom: 2);
+        Style: $M.@DisplayStyle;
+      }
+
+      Label #MTags {
+        Anchor: (Height: 16, Bottom: 8);
+        Style: $M.@MetaGoldStyle;
+      }
+
+      $M.@Hairline {
+        @Anchor = (Bottom: 4);
+      }
+
+      $M.@KvRow {
+        $M.@Key { @Text = "Participation"; @Width = 120; }
+        Label #MParticipation { FlexWeight: 1; Style: $M.@ValueStyle; }
+      }
+
+      $M.@KvRow {
+        $M.@Key { @Text = "Server Rank"; @Width = 120; }
+        Label #MRank { FlexWeight: 1; Style: $M.@ValueStyle; }
+      }
+
+      $M.@KvRow {
+        $M.@Key { @Text = "Joined"; @Width = 120; }
+        Label #MJoined { FlexWeight: 1; Style: $M.@ValueStyle; }
+      }
+
+      $M.@KvRow {
+        $M.@Key { @Text = "Moderation"; @Width = 120; }
+        Label #MModeration { FlexWeight: 1; Style: $M.@ValueStyle; }
+      }
     }
 
-    Label #MTags {
-      Anchor: (Height: 18, Bottom: 8);
-      Style: (FontSize: 13, TextColor: #E8A93B, VerticalAlignment: Center);
-    }
-
-    $C.@PanelSeparatorFancy {
-      @Anchor = (Bottom: 8);
-    }
-
-    Group { LayoutMode: Left; Anchor: (Bottom: 6);
-      Label { Anchor: (Width: 130); Style: (...$C.@DefaultLabelStyle, FontSize: 13, RenderBold: true); Text: "Participation"; }
-      Label #MParticipation { FlexWeight: 1; Style: (...$C.@DefaultLabelStyle, FontSize: 13); }
-    }
-    Group { LayoutMode: Left; Anchor: (Bottom: 6);
-      Label { Anchor: (Width: 130); Style: (...$C.@DefaultLabelStyle, FontSize: 13, RenderBold: true); Text: "Server Rank"; }
-      Label #MRank { FlexWeight: 1; Style: (...$C.@DefaultLabelStyle, FontSize: 13); }
-    }
-    Group { LayoutMode: Left; Anchor: (Bottom: 6);
-      Label { Anchor: (Width: 130); Style: (...$C.@DefaultLabelStyle, FontSize: 13, RenderBold: true); Text: "Joined"; }
-      Label #MJoined { FlexWeight: 1; Style: (...$C.@DefaultLabelStyle, FontSize: 13); }
-    }
-    Group { LayoutMode: Left; Anchor: (Bottom: 8);
-      Label { Anchor: (Width: 130); Style: (...$C.@DefaultLabelStyle, FontSize: 13, RenderBold: true); Text: "Moderation"; }
-      Label #MModeration { FlexWeight: 1; Style: (...$C.@DefaultLabelStyle, FontSize: 13); }
-    }
-
-    $C.@PanelSeparatorFancy {
-      @Anchor = (Bottom: 8);
-    }
-
-    // Mute inputs (shown when the viewer can moderate)
+    // Mute inputs (shown when the viewer can moderate).
     Group #MuteInputs {
       LayoutMode: Left;
-      Anchor: (Height: 36, Bottom: 8);
+      Anchor: (Height: 38, Bottom: 10);
 
       $C.@TextField #MuteDuration {
-        @Anchor = (Width: 120, Right: 6);
+        @Anchor = (Width: 110, Right: 8);
         PlaceholderText: "10m";
       }
+
       $C.@TextField #MuteReason {
-        @Anchor = (Right: 6);
         FlexWeight: 1;
         PlaceholderText: "Reason (optional)";
       }
@@ -74,35 +80,70 @@ $C.@Container {
     Group #ActionButtons {
       FlexWeight: 1;
       LayoutMode: TopScrolling;
-      Padding: (Right: 10);
+      Padding: (Right: 6);
       ScrollbarStyle: $C.@DefaultScrollbarStyle;
 
-      Group { LayoutMode: Left; Anchor: (Height: 40, Bottom: 8);
+      $M.@Section {
+        @Text = "Role";
+        @Anchor = (Bottom: 8);
+      }
+
+      Group {
+        LayoutMode: Left;
+        Anchor: (Height: 44, Bottom: 8);
+
         $C.@SecondaryTextButton #SpeakerBtn { @Text = "Make Speaker"; @Anchor = (Right: 8); FlexWeight: 1; Visible: false; }
         $C.@SecondaryTextButton #ListenerBtn { @Text = "Make Listener"; FlexWeight: 1; Visible: false; }
       }
-      Group { LayoutMode: Left; Anchor: (Height: 40, Bottom: 8);
-        $C.@TextButton #MuteBtn { @Text = "Channel Mute"; @Anchor = (Right: 8); FlexWeight: 1; Visible: false; }
-        $C.@SecondaryTextButton #UnmuteBtn { @Text = "Remove Mute"; FlexWeight: 1; Visible: false; }
-      }
-      Group { LayoutMode: Left; Anchor: (Height: 40, Bottom: 8);
+
+      Group {
+        LayoutMode: Left;
+        Anchor: (Height: 44, Bottom: 12);
+
         $C.@SecondaryTextButton #ModAddBtn { @Text = "Promote Moderator"; @Anchor = (Right: 8); FlexWeight: 1; Visible: false; }
         $C.@CancelTextButton #ModRemoveBtn { @Text = "Remove Moderator"; FlexWeight: 1; Visible: false; }
       }
-      Group { LayoutMode: Left; Anchor: (Height: 40, Bottom: 8);
+
+      $M.@Section {
+        @Text = "Voice";
+        @Anchor = (Bottom: 8);
+      }
+
+      Group {
+        LayoutMode: Left;
+        Anchor: (Height: 44, Bottom: 12);
+
+        $C.@TextButton #MuteBtn { @Text = "Channel Mute"; @Anchor = (Right: 8); FlexWeight: 1; Visible: false; }
+        $C.@SecondaryTextButton #UnmuteBtn { @Text = "Remove Mute"; FlexWeight: 1; Visible: false; }
+      }
+
+      $M.@Section {
+        @Text = "Membership";
+        @Style = $M.@EyebrowDangerStyle;
+        @Anchor = (Bottom: 8);
+      }
+
+      Group {
+        LayoutMode: Left;
+        Anchor: (Height: 44, Bottom: 8);
+
         $C.@CancelTextButton #RemoveBtn { @Text = "Remove From Channel"; @Anchor = (Right: 8); FlexWeight: 1; Visible: false; }
         $C.@CancelTextButton #BanBtn { @Text = "Ban"; FlexWeight: 1; Visible: false; }
         $C.@SecondaryTextButton #UnbanBtn { @Text = "Unban"; FlexWeight: 1; Visible: false; }
       }
-      Group { LayoutMode: Left; Anchor: (Height: 40, Bottom: 8);
+
+      Group {
+        LayoutMode: Left;
+        Anchor: (Height: 44, Bottom: 8);
+
         $C.@TextButton #TransferBtn { @Text = "Transfer Ownership"; FlexWeight: 1; Visible: false; }
       }
     }
 
-    Group {
-      LayoutMode: Left;
-      Anchor: (Height: 44, Top: 6);
-      $C.@SecondaryTextButton #BackBtn {
+    $M.@ActionBar {
+      @Anchor = (Height: 44, Top: 8);
+
+      $C.@TertiaryTextButton #BackBtn {
         @Text = "Back to Members";
         FlexWeight: 1;
       }

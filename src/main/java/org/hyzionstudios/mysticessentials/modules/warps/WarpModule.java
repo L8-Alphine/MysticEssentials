@@ -264,7 +264,7 @@ public final class WarpModule extends AbstractMysticModule implements WarpServic
         if (warp == null) {
             return false;
         }
-        warp.setLocation(Conversions.capture(player));
+        warp.setLocation(core.platform().capture(player));
         savePlayerWarps();
         return true;
     }
@@ -342,13 +342,13 @@ public final class WarpModule extends AbstractMysticModule implements WarpServic
         } else {
             Warp existing = serverWarps.get(newKey);
             if (existing == null) {
-                warp = new Warp(name.trim(), Conversions.capture(player));
+                warp = new Warp(name.trim(), core.platform().capture(player));
             } else {
                 warp = existing;
             }
         }
         if (captureLocation || warp.getLocation() == null) {
-            warp.setLocation(Conversions.capture(player));
+            warp.setLocation(core.platform().capture(player));
         }
         warp.setDescription(blankToNull(description));
         warp.setPermission(blankToNull(permission));
@@ -453,10 +453,10 @@ public final class WarpModule extends AbstractMysticModule implements WarpServic
             String warpName = sender.get(name);
             Warp existing = serverWarps.get(key(warpName));
             if (existing != null) {
-                existing.setLocation(Conversions.capture(player));
+                existing.setLocation(core.platform().capture(player));
                 setServerWarp(existing);
             } else {
-                setServerWarp(new Warp(warpName, Conversions.capture(player)));
+                setServerWarp(new Warp(warpName, core.platform().capture(player)));
             }
             sender.replyKey("warp-saved", Map.of("warp", warpName));
         }
@@ -551,7 +551,7 @@ public final class WarpModule extends AbstractMysticModule implements WarpServic
                 return;
             }
             String warpName = sender.get(name);
-            if (createPlayerWarp(sender.uuid(), warpName, Conversions.capture(player))) {
+            if (createPlayerWarp(sender.uuid(), warpName, core.platform().capture(player))) {
                 sender.replyKey("pwarp-created", Map.of("warp", warpName));
                 openPlayerWarpManagerUi(player, warpName);
             } else if (getPlayerWarp(warpName).isPresent()) {

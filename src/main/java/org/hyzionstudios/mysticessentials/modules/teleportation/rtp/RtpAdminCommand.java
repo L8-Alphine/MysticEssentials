@@ -68,7 +68,7 @@ final class RtpAdminCommand extends MysticCommand {
             return;
         }
         sender.replyKey("rtp-admin-test-start", Map.of("profile", profile.id));
-        rtp.service().findDestination(RtpDestinationRequest.of(profile.id)).thenAccept(result -> {
+        rtp.service().findDestination(destinationRequest(sender, profile.id)).thenAccept(result -> {
             if (result.found()) {
                 sender.replyKey("rtp-admin-test-found", Map.of(
                         "x", Integer.toString((int) Math.floor(result.location().getX())),
@@ -106,7 +106,7 @@ final class RtpAdminCommand extends MysticCommand {
             return;
         }
         sender.replyKey("rtp-admin-debug-start", Map.of("profile", profile.id));
-        rtp.service().findDestination(RtpDestinationRequest.of(profile.id)).thenAccept(result -> {
+        rtp.service().findDestination(destinationRequest(sender, profile.id)).thenAccept(result -> {
             sender.replyKey("rtp-admin-debug-summary", Map.of(
                     "found", result.found() ? "yes" : "no",
                     "attempts", Integer.toString(result.attempts())));
@@ -273,5 +273,10 @@ final class RtpAdminCommand extends MysticCommand {
 
     private static String arg(String[] args, int index) {
         return index < args.length ? args[index] : null;
+    }
+
+    /** Player-run diagnostics must exercise player-relative validators too. */
+    private static RtpDestinationRequest destinationRequest(MysticCommandSender sender, String profileId) {
+        return new RtpDestinationRequest(profileId, sender.isPlayer() ? sender.uuid() : null);
     }
 }

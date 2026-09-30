@@ -54,8 +54,8 @@ public final class RecentItemLinksPage extends MysticPage {
             cmd.set(sel + " #Icon.ItemId", snapshot.itemId());
             // Translated names go through as a Message so the client resolves
             // them; everything else is sent pre-resolved, because a raw Message
-            // set on a text span is a known 0.5.6 client disconnect.
-            cmd.set(sel + " #Name.TextSpans", snapshot.view.displayName().isTranslated()
+            // set on a text span is a known client disconnect, still on 0.6.2.
+            cmd.set(sel + " #Name.TextSpans", snapshot.view.displayName().hasTranslations()
                     ? uiText(sel + " #Name.TextSpans", snapshot.nameMessage())
                     : uiText(sel + " #Name.TextSpans", snapshot.plainName()));
             cmd.set(sel + " #Meta.TextSpans", uiText(sel + " #Meta.TextSpans", meta(snapshot)));

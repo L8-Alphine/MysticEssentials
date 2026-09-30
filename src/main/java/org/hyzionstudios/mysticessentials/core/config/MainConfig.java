@@ -33,6 +33,7 @@ public final class MainConfig {
         map.put("nick", true);
         map.put("patchnotes", true);
         map.put("portals", true);
+        map.put("craftblock", true);
         // Tutorial ships disabled: enable here AND in modules/tutorial/config.json.
         map.put("tutorial", false);
         // Custom Commands ships disabled: enable here AND in modules/customcommands/config.json.
@@ -68,9 +69,30 @@ public final class MainConfig {
         public boolean enabled = false;
         public String host = "localhost";
         public int port = 6379;
+        /** ACL user (Redis 6+); blank uses the legacy {@code default} user. */
+        public String username = "";
         public String password = "";
         public String serverId = "survival-1";
-        public String networkId = "mystic-network";
+        public String networkId = "mystic_network";
+        /**
+         * Hostname/IP clients can use when another server refers them here. Blank
+         * = auto-detect (the bound interface, else the first LAN/public IPv4);
+         * set it behind NAT, Docker or a proxy where the detected address is wrong.
+         */
+        public String advertisedHost = "";
+        /** Public game port paired with {@link #advertisedHost}; 0 = the port this server is bound to. */
+        public int advertisedPort = 0;
+        /**
+         * Public address of a network proxy (MysticGate) fronting every server.
+         * When set, players are referred to the proxy instead of a server's
+         * advertised address, and the referral payload names the destination
+         * server id for the proxy to route on — so backends can stay on private
+         * addresses. Blank = no proxy; clients are referred to servers directly.
+         */
+        public String proxyHost = "";
+        public int proxyPort = 0;
+        /** Redis-backed network roster expiry. Must exceed two heartbeat intervals. */
+        public int presenceTtlSeconds = 30;
     }
 
     public static final class Integrations {
@@ -79,6 +101,8 @@ public final class MainConfig {
         public boolean vaultUnlocked = true;
         public boolean mysticVanish = true;
         public boolean mysticModeration = true;
+        /** MysticIdentity managed accounts: chat and private messages honour a child's policy. */
+        public boolean mysticIdentity = true;
     }
 
     /** Core update checks and permission-gated join notifications. */

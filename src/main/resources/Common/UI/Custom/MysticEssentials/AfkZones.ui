@@ -1,9 +1,11 @@
+// AFK Zones — pick a place to wait. Plain AFK-in-place stays available below.
 $C = "../Common.ui";
+$M = "MysticTheme.ui";
 
 $C.@PageOverlay {}
 
 $C.@Container {
-  Anchor: (Width: 520, Height: 560);
+  Anchor: (Width: 540, Height: 580);
 
   #Title {
     Group {
@@ -17,32 +19,42 @@ $C.@Container {
     LayoutMode: Top;
 
     Label {
-      Anchor: (Height: 36, Bottom: 8);
-      Style: (FontSize: 14, TextColor: #9fb0c4, VerticalAlignment: Center, Wrap: true);
-      Text: "Choose a zone to AFK in. You will be sent back here when you return.";
+      Anchor: (Height: 34, Bottom: 10);
+      Style: $M.@BodyMutedStyle;
+      Text: "Choose a zone to wait in. You will be returned to where you are standing now when you come back.";
     }
 
-    Label #ZonesEmpty {
-      Anchor: (Height: 40);
-      Style: (FontSize: 14, TextColor: #9fb0c4, VerticalAlignment: Center, Wrap: true);
-      Text: "No AFK zones are available to you.";
-      Visible: false;
+    $M.@Section {
+      @Text = "Zones";
+      @Anchor = (Bottom: 8);
     }
 
-    Group #ZoneList {
+    $M.@Well {
       FlexWeight: 1;
-      LayoutMode: TopScrolling;
-      Padding: (Right: 10);
-      ScrollbarStyle: $C.@DefaultScrollbarStyle;
+
+      Label #ZonesEmpty {
+        Anchor: (Height: 72);
+        Style: $M.@EmptyStyle;
+        Text: "No AFK zones are available to you.";
+        Visible: false;
+      }
+
+      Group #ZoneList {
+        FlexWeight: 1;
+        LayoutMode: TopScrolling;
+        Padding: (Right: 6);
+        ScrollbarStyle: $C.@DefaultScrollbarStyle;
+      }
     }
 
-    Group {
-      LayoutMode: Left;
-      Anchor: (Height: 44, Top: 10);
+    $M.@ActionBar {
+      @Anchor = (Height: 44, Top: 12);
+
+      $M.@Spacer {}
 
       $C.@SecondaryTextButton #AfkHereButton {
         @Text = "Just AFK Here";
-        @Anchor = (Width: 200);
+        @Anchor = (Width: 190);
       }
     }
   }

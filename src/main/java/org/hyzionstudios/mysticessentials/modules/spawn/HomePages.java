@@ -53,17 +53,18 @@ final class HomePages {
             List<Home> homes = spawn.getHomes(player.getUuid());
             cmd.set("#HomeCount.TextSpans", uiText("#HomeCount.TextSpans", homes.size() + " / " + spawn.homeLimit(player.getUuid())));
             cmd.set("#HomesEmpty.Visible", homes.isEmpty());
+            Home selected = selectedHome(homes, selectedName);
             for (int i = 0; i < homes.size(); i++) {
                 Home home = homes.get(i);
                 String row = "#HomeList[" + i + "]";
                 cmd.append("#HomeList", HOME_ROW_UI);
                 cmd.set(row + " #Name.TextSpans", uiText(row + " #Name.TextSpans", home.getName()));
                 cmd.set(row + " #Meta.TextSpans", uiText(row + " #Meta.TextSpans", locationText(home.getLocation())));
+                cmd.set(row + " #Selected.Visible", home == selected);
                 event.addEventBinding(CustomUIEventBindingType.Activating, row,
                         new EventData().put("action", "select").put("home", home.getName()));
             }
 
-            Home selected = selectedHome(homes, selectedName);
             cmd.set("#SelectedHome.TextSpans", uiText("#SelectedHome.TextSpans", selected == null ? "No Home" : selected.getName()));
             cmd.set("#HomeWorld.TextSpans", uiText("#HomeWorld.TextSpans", selected == null ? "-" : locationText(selected.getLocation())));
             cmd.set("#RenameInput.Value", "");
@@ -126,7 +127,7 @@ final class HomePages {
                         reopen(ref, store, new HomesPage(core, spawn, player, selectedName));
                         return;
                     }
-                    boolean created = spawn.setHome(player.getUuid(), name, Conversions.capture(player));
+                    boolean created = spawn.setHome(player.getUuid(), name, core.platform().capture(player));
                     core.getMessageService().sendKey(player, created
                             ? "home-set"
                             : "home-limit", created

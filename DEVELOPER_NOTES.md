@@ -6,8 +6,14 @@ was discovered from the cached server jar and used as the source of truth, plus
 the remaining adapter TODOs where a Hytale call still needs verification before
 it can be enabled.
 
-The mod **compiles and packages** (`./gradlew shadowJar` → `build/libs/MysticEssentials-1.0.0.jar`)
-against `com.hypixel.hytale:Server:0.5.6`.
+The mod **compiles and packages** (`./gradlew shadowJar` → `build/libs/MysticEssentials-1.0.4.jar`)
+against `com.hypixel.hytale:Server:0.6.2` (Update 6).
+
+Update 6 compatibility work includes the three-state `FlyMode`, up-front command
+permissions via `requireNoPermission()`, spectator and hardcore-life player-list
+fields, expanded builder-tool packet layouts, component-backed chunk/fluid reads,
+and the ECS `InventoryComponent` model. The manifest intentionally targets only
+the Update 6 patchline (`>=0.6.0 <0.7.0`) because Update 6 changed the protocol CRC.
 
 ---
 
@@ -16,7 +22,7 @@ against `com.hypixel.hytale:Server:0.5.6`.
 The Hytale API is **not guessed**. It was read directly from the compiled server
 classes with `javap`:
 
-- Cached artifact: `~/.gradle/caches/.../com.hypixel.hytale/Server/0.5.6/Server-0.5.6.jar`
+- Cached artifact: `~/.gradle/caches/.../com.hypixel.hytale/Server/0.6.2/Server-0.6.2.jar`
   (identical surface to `%APPDATA%/Hytale/install/.../Server/HytaleServer.jar`).
 - Inspected with `jar tf` (class listing) and `javap -classpath <jar> -public <class>`.
 
@@ -49,7 +55,7 @@ easy to re-verify when the server version changes.
 
 ```
 MysticessentialsPlugin (Hytale entry) → MysticCore (non-disableable) implements MysticEssentialsAPI
-  Core services: ConfigManager, StorageService(+JsonStorageProvider, SQL/Redis skeletons),
+  Core services: ConfigManager, StorageService(+JSON/SQL providers, Redis transport),
     PlayerProfileService, MessageService(+ColorPipeline), PermissionService(LuckPerms),
     PlaceholderService(PlaceholderAPI), EconomyService(VaultUnlocked), TeleportService,
     SchedulerService, CooldownService, EventBus, RedisBridge
@@ -60,7 +66,8 @@ MysticessentialsPlugin (Hytale entry) → MysticCore (non-disableable) implement
 
 - **Core cannot be disabled.** Modules are toggled in `mods/MysticEssentials/config.json`.
 - Modules communicate through **services and the EventBus**, not direct coupling.
-- Storage is **provider-abstracted**; JSON is implemented, SQL/Redis are clean skeletons.
+- Storage is **provider-abstracted**; JSON and SQL are durable providers, while
+  Redis is intentionally a separate cache/pub-sub/locking transport.
 - All paths resolve through **`PathManager`** — no hardcoded paths.
 
 ## What actually works now
@@ -123,17 +130,32 @@ returns nothing.
 ### Server Players list decoration (implemented)
 
 `core/playerlist/PlayerListService` puts rank prefixes/suffixes and an AFK
-marker on the map-screen roster. Findings from the 0.5.6 jar and client:
+marker on the map-screen roster. Findings from the 0.6.0 jar and client:
 
 - The engine's `server.core.modules.serverplayerlist.ServerPlayerListModule`
   builds every row in `createServerPlayerListPlayer(PlayerRef)` as
-  `new ServerPlayerListPlayer(uuid, playerRef.getUsername(), worldUuid, ping)`.
+  `new ServerPlayerListPlayer(uuid, playerRef.getUsername(), worldUuid, ping,
+  spectating, livesRemaining)`. Mystic Essentials preserves the Update 6
+  spectator and hardcore-life fields when it replaces the display name.
   The name is a **plain protocol string** with no server-side hook, so the only
   way to change it is to send a replacement row for the same UUID afterwards.
 - It sends the full roster to a connecting player and that player's single row
-  to everyone else (`PlayerConnectEvent`), a `RemoveFromServerPlayerList` on
-  disconnect, a `UpdateServerPlayerList` (uuid + worldUuid only — never the
-  name) on `AddPlayerToWorldEvent`, and a ping map every 10s.
+  to everyone else from **both** `PlayerConnectEvent` **and**
+  `PlayerReadyEvent`, a `RemoveFromServerPlayerList` on disconnect, and a ping
+  map every 10s. Update 6 moved the send that the client actually keeps onto
+  `PlayerReadyEvent` (0.5.6 used `AddPlayerToWorldEvent`), which lands well
+  after `PlayerConnectEvent` — decorating only on connect is silently
+  overwritten, which is what made ranks disappear from the roster on 0.6.
+  `PlayerReadyEvent` is keyed, so it needs `registerGlobal`
+  (`HytalePlatform.onGlobalEvent`), not a plain `register`.
+- Update 6 also added `broadcastListEntry(PlayerRef)`, which the engine calls
+  from `ServerPlayerListSystems.OnSpectatingChange` and on a hardcore-lives
+  change. Both re-send the plain username, so `PlayerListService` keys its
+  change detection on `(name, spectating, lives)` — a spectating or lives
+  transition therefore re-asserts the decorated name on the next refresh.
+- Update 6 filters every one of those broadcasts through the viewer's
+  `HiddenPlayersManager`. `PlayerListService.send` does the same, or a replaced
+  row would put a vanished player back on the map roster.
 - The client has `ProcessAddToServerPlayerListPacket` /
   `ProcessRemoveFromServerPlayerListPacket` /
   `ProcessUpdateServerPlayerListPacket` /
@@ -146,8 +168,8 @@ marker on the map-screen roster. Findings from the 0.5.6 jar and client:
   `RemoveFromServerPlayerList` immediately before the add. That pair is correct
   under either semantic, and netty preserves the write order.
 - Registration is at `EventPriority.LAST` so our rows land after the engine's;
-  a one-shot resync 1.5s after connect repairs the roster if that ordering ever
-  changes.
+  a one-shot resync 1.5s after **ready** repairs the roster if that ordering
+  ever changes.
 
 ### Message & colouring (implemented)
 
@@ -164,15 +186,18 @@ discovered from the jar:
 - `Message.join(...)` is literally `new Message()` (empty root) + `insertAll(...)`
   — so `MysticText` uses the same empty-root + children shape.
 
-`MysticText` supports legacy (`&a`, `&l`/`&o`/`&n`/`&r`; `&m`/`&k` dropped — no
-field), hex (`&#rrggbb`, `<#rrggbb>`, 3-digit), MiniMessage-style tags
-(`<red>`, `<color:#hex>`, `<bold>`/`<b>`, `<italic>`/`<i>`, `<underlined>`/`<u>`,
-`<reset>`, closing `</…>`), `<gradient:#a:#b[:#c…]>…</gradient>`,
+`MysticText` supports legacy (`&a`, `&l`/`&o`/`&n`/`&m`/`&r`; only `&k`
+obfuscated is dropped — no field), hex (`&#rrggbb`, `<#rrggbb>`, 3-digit),
+MiniMessage-style tags (`<red>`, `<color:#hex>`, `<bold>`/`<b>`,
+`<italic>`/`<i>`, `<underlined>`/`<u>`,
+`<strikethrough>`/`<st>`/`<s>`, `<reset>`, closing `</…>`),
+`<gradient:#a:#b[:#c…]>…</gradient>`,
 `<rainbow>…</rainbow>` (interpolated per character), `<link:target>…</link>`
 (protocol `link` field), and `<lang:key>` (client translation via `messageId`).
 Colours are set explicitly per segment, so rendering does not depend on
 client-side markup. `underlined` is set via the public
-`FormattedMessage.underlined` field (no `Message` setter).
+`FormattedMessage.underlined` field (no `Message` setter); `strikethrough` —
+the field Update 6 added — goes through `Message.strikethrough(boolean)`.
 
 All runtime Custom UI text is assigned through `.TextSpans` and
 `MysticPage.uiText(...)`. Do not mix `.Text` and `.TextSpans` on the same
@@ -182,10 +207,13 @@ node because they do not reliably inherit `LabelStyle.TextColor`;
 `uiText(...)` supplies the control's semantic fallback colour and preserves
 explicit `MysticText` formatting.
 
-**Hover is not supported** — the 0.5.6 `FormattedMessage` has no hover field, only
-`link`. Only `link` interactivity is representable.
+**Hover is not supported** — `FormattedMessage` still has no hover field on
+0.6.2, only `link`. Only `link` interactivity is representable. Update 6 added
+`strikethrough` to that struct, which is why `&m` renders now instead of being
+dropped.
 
-**Live-verified** on the real 0.5.6 server (`F:\Hytale Servers\0.5.6\Server`):
+**Live-verified** on a real server (originally 0.5.6; the Update 6 surface is
+re-verified against the 0.6.2 jar):
 the mod loads with no errors, generates configs, and — with the server's
 installed integrations — logs `Permission integration: LuckPerms connected`,
 `Placeholder integration: PlaceholderAPI connected`, and registers the
@@ -205,7 +233,7 @@ storage this is network-wide; on per-server JSON it is per-server.
 ### Redis (implemented)
 
 `RedisBridge` provides a **cache** (`cacheGet`/`cacheSet` with TTL) and a
-**pub/sub** bus (`publish`/`subscribe`) backed by **Jedis** (netty-free, so no
+**pub/sub** bus (`publish`/`subscribe`) backed by **Jedis 7.4.1** (netty-free, so no
 clash with the server's bundled netty; shaded with commons-pool2). Redis is a
 cache/message layer, never the primary datastore.
 
@@ -248,13 +276,24 @@ not relied on. If the DB is unreachable at start, the Core logs and **falls back
 to JSON** so the server still boots. Configure host/port/db/credentials/poolSize
 under `storage.mysql` in `config.json`.
 
-### Integrations (wired, verified against the dependency jars)
+### Integrations (wired and contract-checked)
 
-- **LuckPerms** (`net.luckperms.api`): `LuckPermsProvider.get()` on start. Permission checks go through `PlayerRef.hasPermission` (the LuckPerms platform is Hytale's permission provider); `primaryGroup`, `prefix`, `suffix` read `User.getCachedData().getMetaData()`. Falls back cleanly when absent.
-- **PlaceholderAPI-Hytale** (`at.helpch.placeholderapi`): external `%...%` resolved via `PlaceholderAPI.setPlaceholders(PlayerRef, String)`; Mystic exposes its own placeholders as `%mystic_<name>%` through a registered `PlaceholderExpansion` (`MysticExpansion`). Internal `{...}` placeholders always work.
-- **VaultUnlocked** (Vault2, `net.milkbowl.vault2.economy.Economy` via `net.cfh.vault.VaultUnlocked.economy()`): balance/has/withdraw/deposit/format with `(pluginName, uuid, BigDecimal)` and `EconomyResponse.transactionSuccess()`; lazy account creation. No economy → safe no-op success.
+- **LuckPerms API 5.5** (`net.luckperms.api`): `LuckPermsProvider.get()` on start. Permission checks go through `PlayerRef.hasPermission`; `primaryGroup`, `prefix`, and `suffix` read cached user metadata. Reinitialization clears a previous provider before probing again.
+- **PlaceholderAPI-Hytale 1.0.8** (`at.helpch.placeholderapi`): external `%...%` values resolve through `PlaceholderAPI.setPlaceholders(PlayerRef, String)`. `MysticExpansion` publishes the `%mystic_...%` and `%mysticessentials_...%` namespaces. Registration, aliases, late-start retries, reload, and shutdown are generation-safe and unregister stale expansions.
+- **VaultUnlocked 2.20.1** (Vault2): provider lookup uses `VaultUnlocked.economy()`. All money enters the current `BigDecimal` API through the plugin namespace; account creation and formatting use the 2.20 signatures. UUIDs and amounts are validated, provider exceptions fail safely, and no economy means no-op success.
+- **MysticVanish 1.x**: `VanishBridge` reflects only the stable provider/API methods, so no local Vanish jar is compiled or shaded. It fails visible when the provider disappears or returns an error.
+- **MysticModeration 1.x**: deliberately not a reverse manifest dependency because MysticModeration already optionally depends on Essentials. `ModerationBridge` discovers the running plugin and loads its provider through that plugin's classloader, avoiding both a dependency cycle and startup-order cache poisoning.
+- **MysticIdentity 0.1.x**: `ManagedAccountsBridge` reflects `MysticIdentityProvider.get()` → `managed()` → `check` / `checkInteraction` and the `ManagedCapability` enum by name, so no local jar is compiled or shaded. Chat asks it at delivery time only — `PrivateMessagingSubModule.privateMessage` and `handleRemotePm` (`TEXT_PRIVATE`; the receiving server judges again because the origin may not know a remote child), `ChannelsSubModule.deliverInbound` (`TEXT_PUBLIC` per listener for a remote player, `TEXT_CROSS_PLATFORM` per listener for a bridged line). Local chat is already narrowed by MysticIdentity itself on the native chat event at `FIRST`, which `localRecipients` honours by intersecting with the event's targets. Fails open.
+- **MysticRPG 1.x**: declared as an optional load-order dependency. RTP's reflection bridge checks the installed World API for player level and safe-region content; ItemView reads the published GearStamp/display metadata without mutating MysticRPG's signature.
+- **QuestLines**: Custom Content locates the configured plugin id through the Hytale plugin manager and reflects its requirements, actions, substitutions, and GUI registration API. Compatible QuestLinesDialog/QuestLinesGUI data also has file-based import/export paths.
+- **SimpleEnchantments and LuxReforge**: ItemView consumes their stable BSON stack metadata contracts. This is passive interoperability and therefore does not require their classes or manifest entries.
+- **Redis / SQL**: Jedis 7.4.1 uses the supported pooled `RedisClient` for commands and a dedicated subscriber connection. HikariCP 7.0.2, MariaDB Connector/J 3.5.8, and MySQL Connector/J 26.7.0 are shaded for network storage.
 
-All three are `compileOnly` and guarded (provider lookup in try/catch on start; call sites gated on availability), so a server missing any of them loads fine.
+`LuckPerms`, PlaceholderAPI, and VaultUnlocked are `compileOnly`; every Mystic
+plugin bridge is reflection-only. The manifest's `OptionalDependencies` map is
+load ordering, not installation requirements. `verifyIntegrationContracts`
+checks the manifest and external method signatures, and is part of `check`.
+`/mystic reload` reinitializes every config-toggled bridge and reconnects Redis.
 
 ### Chat formatting (wired)
 
@@ -276,8 +315,8 @@ entity on its world thread and calls `PageManager.openCustomPage`). Pages
 extend `platform.ui.MysticPage`, which centralizes payload parsing and the
 reopen-to-refresh pattern.
 
-Lists follow the builtin `WarpListPage` pattern verified from the 0.5.6 server
-jar and `Assets.zip`:
+Lists follow the builtin `WarpListPage` pattern verified from the server
+jar and `Assets.zip` (unchanged through 0.6.2):
 
 - The page `.ui` declares an empty scrolling container
   (`Group #WarpList { LayoutMode: TopScrolling; }`).
@@ -301,6 +340,48 @@ GOTCHA: `ResourceCommonAsset.of(clazz, name, path)` resolves the resource from
 its SECOND argument via `Class.getResourceAsStream`, so pass the absolute
 `"/Common/..."` form there; the third argument is only stored as the asset
 path.
+
+### UI design system (`MysticTheme.ui`)
+
+Every page and row template imports `$M = "MysticTheme.ui";` next to
+`$C = "../Common.ui";`. Window chrome, primary buttons, inputs and dropdowns
+still come from the game's `Common.ui` so a Mystic page sits beside a native
+one without a seam; everything inside the window is built from the theme:
+
+- **Tokens**: palette (`@Ink0`…, `@TextHi/Body/Muted/Dim/Faint`, `@Gold`,
+  `@Blue`, `@Success/Warn/Danger`) and one type scale (`@DisplayStyle` for the
+  selected item, `@HeadingStyle`/`@RowNameStyle`, `@EyebrowStyle` for section
+  labels, `@Body/Meta/CaptionStyle`, `@Key/ValueStyle` for key/value rows).
+- **Surfaces**: `@Panel` (the game's bordered header-tab frame) for the thing
+  being viewed or edited; `@Well` (flat inset) for lists and empty states —
+  put ONLY the list scroller inside a Well so appended rows keep their indices.
+- **Rows**: `Button #Row { Style: $M.@RowStyle; $M.@RowSelection #Selected {}
+  Group { Anchor: (Full: 0); LayoutMode: Left; ... } }`. The row root is
+  absolutely positioned so the selection overlay (gold spine + tint) draws
+  behind the body. Master/detail pages set `#Selected.Visible` on the resolved
+  selection. `#Swatch` / `#Accent` / `#TagChip` stay plain-colour Groups because
+  the server recolours them through `.Background`.
+- **Helpers**: `@Section` (eyebrow + rule), `@FieldLabel`, `@KvRow` + `@Key`,
+  `@Hairline`, `@IconWell`, `@Pill`, `@Tab`, `@SettingRow`, `@ActionBar` +
+  `@Spacer` (put the destructive button after the spacer), `@HeaderMeta`,
+  `@ColumnDivider`, `@Bullet`.
+
+Sizing facts that shape the layouts: `Common.ui` buttons are a fixed 44 px
+(small variants 32), text fields 38, dropdowns 32 × 330 — the component sets
+those AFTER spreading `@Anchor`, so pass margins through `@Anchor` but override
+`Anchor:` directly on the instance (as the game's own pages do) when a
+different Width/Height is genuinely needed. An input beside a button sits in
+a 44 px row with `@Anchor = (Vertical: 3)`.
+
+Runtime text colour comes from `MysticPage.UI_TEXT_COLORS` (a `TextSpans`
+value carries its own colour and overrides the label style), so that table
+mirrors the theme tokens; add an entry there when introducing a new dynamic
+label id.
+
+Every component parameter in `MysticTheme.ui` has a default, and
+`validateUiDocuments` enforces both that and every `$M.@X` / `$C.@X`
+instantiation (an omitted required parameter breaks OTHER mods' documents on
+the client).
 
 ### Player warp storage
 
@@ -404,8 +485,10 @@ api.getNotificationService().send(
 - **Audiences your mod owns** resolve through a registered resolver:
   `registerAudienceResolver("guild", id -> membersOf(id))`. Without one,
   `NotificationAudience.guild(...)` delivers to nobody rather than erroring.
-- **History is written even when nothing was shown**, so a player in
-  do-not-disturb still finds the notice in `/notifications`.
+- **History is reserved for durable notices.** Important and critical profiles
+  are stored by default even when nothing was shown, so a player in
+  do-not-disturb can still find them in `/notifications`. Low and normal sends
+  must explicitly opt in with `storeInHistory(true)`.
 - **Critical notifications bypass player preferences** unless the server sets
   `notifications.critical.allow-player-disable`. That rule is enforced in one
   place, not at each call site.
@@ -488,13 +571,17 @@ catalogue), `data/modules/chat/item-view.json` (inspection + panel display), and
 Mystic Essentials' built-in sounds use vanilla AssetMap ids: routine notices use
 `SFX_Attn_Quiet`, announcements use `SFX_Attn_Moderate`, alerts use
 `SFX_Attn_Loud`, and critical notices use `SFX_Attn_VeryLoud`. The announcement
-module exposes `broadcastTitle`, `broadcastSound`, `alertTitle`, and `alertSound`;
-both commands render through Hytale's `EventTitleUtil` surface.
+module exposes `broadcastTitle` and `broadcastSound` for rotating announcements
+and `alertTitle` for the manual alert headline. Both manual commands render
+through Hytale's `EventTitleUtil` surface and only play a sound when one is
+explicitly supplied.
 
 ## Building
 
 ```bash
-./gradlew shadowJar        # -> build/libs/MysticEssentials-1.0.0.jar
+./gradlew shadowJar        # -> build/libs/MysticEssentials-1.0.4.jar (deploy this one)
+                           #    the plain `jar` task now writes *-thin.jar so it can no longer
+                           #    overwrite the shaded jar during `gradle build`
 ./gradlew deployMod        # builds + copies to .hytale-server/mods
 ```
 

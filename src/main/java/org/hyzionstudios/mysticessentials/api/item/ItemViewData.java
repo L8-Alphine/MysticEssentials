@@ -103,12 +103,14 @@ public final class ItemViewData {
      * otherwise the prettified item id. Used for chat fallbacks and log lines.
      */
     public String plainName() {
-        String plain = displayName.plain();
+        String fallback = ItemNames.prettify(itemId);
+        String plain = displayName.hasTranslations()
+                ? displayName.plainWithTranslationFallback(fallback)
+                : displayName.plain();
         if (!plain.isBlank()) {
             return plain;
         }
-        String prettified = ItemNames.prettify(itemId);
-        return prettified.isBlank() ? "Unknown Item" : prettified;
+        return fallback.isBlank() ? "Unknown Item" : fallback;
     }
 
     public Optional<String> iconAsset() {

@@ -1,5 +1,6 @@
 package org.hyzionstudios.mysticessentials.core.integration;
 
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -21,9 +22,16 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
  */
 public final class VanishBridge {
 
+    private static final String PROVIDER_CLASS =
+            "org.hyzionstudios.mysticvanish.api.MysticVanishProvider";
+
     private final MysticCore core;
     private boolean enabled;
     private boolean present;
+    private Method providerGet;
+    private Method providerRegistered;
+    private Method isVanished;
+    private Method canSee;
 
     public VanishBridge(MysticCore core) {
         this.core = core;
@@ -31,15 +39,22 @@ public final class VanishBridge {
 
     public void init(boolean enabledInConfig) {
         enabled = enabledInConfig;
+        clear();
         if (!enabled) {
             core.log(Level.INFO, "Vanish integration: disabled in config");
             return;
         }
         try {
-            Class.forName("org.hyzionstudios.mysticvanish.api.MysticVanishProvider");
+            Class<?> provider = Class.forName(PROVIDER_CLASS, false,
+                    VanishBridge.class.getClassLoader());
+            Class<?> api = provider.getMethod("get").getReturnType();
+            providerGet = provider.getMethod("get");
+            providerRegistered = provider.getMethod("isRegistered");
+            isVanished = api.getMethod("isVanished", UUID.class);
+            canSee = api.getMethod("canSee", UUID.class, UUID.class);
             present = true;
         } catch (Throwable t) {
-            present = false;
+            clear();
         }
         core.log(Level.INFO, "Vanish integration: MysticVanish "
                 + (present ? "detected" : "not present"));
@@ -51,7 +66,7 @@ public final class VanishBridge {
 
     private boolean providerRegistered() {
         try {
-            return org.hyzionstudios.mysticvanish.api.MysticVanishProvider.isRegistered();
+            return Boolean.TRUE.equals(providerRegistered.invoke(null));
         } catch (Throwable t) {
             return false;
         }
@@ -63,7 +78,8 @@ public final class VanishBridge {
             return false;
         }
         try {
-            return org.hyzionstudios.mysticvanish.api.MysticVanishProvider.get().isVanished(player);
+            Object api = providerGet.invoke(null);
+            return Boolean.TRUE.equals(isVanished.invoke(api, player));
         } catch (Throwable t) {
             return false;
         }
@@ -79,8 +95,9 @@ public final class VanishBridge {
             return true;
         }
         try {
-            var api = org.hyzionstudios.mysticvanish.api.MysticVanishProvider.get();
-            return !api.isVanished(target) || api.canSee(viewer, target);
+            Object api = providerGet.invoke(null);
+            return !Boolean.TRUE.equals(isVanished.invoke(api, target))
+                    || Boolean.TRUE.equals(canSee.invoke(api, viewer, target));
         } catch (Throwable t) {
             return true;
         }
@@ -95,5 +112,13 @@ public final class VanishBridge {
             }
         }
         return visible;
+    }
+
+    private void clear() {
+        present = false;
+        providerGet = null;
+        providerRegistered = null;
+        isVanished = null;
+        canSee = null;
     }
 }

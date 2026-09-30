@@ -10,8 +10,8 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.util.NotificationUtil;
 
 /**
- * Shows a client toast notification, using the verified 0.5.6
- * {@code NotificationUtil} (the same path the vanilla server uses).
+ * Shows a client toast notification through {@code NotificationUtil}, verified
+ * against 0.6.2 (the same path the vanilla server uses).
  *
  * <pre>
  * { "type": "notification", "title": "&aThanks for voting!",

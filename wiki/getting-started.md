@@ -18,7 +18,7 @@ Mystic Essentials works without the optional integrations. Missing integrations 
 
 ## Installation
 
-1. Build or download `MysticEssentials-1.0.2.jar`.
+1. Build or download `MysticEssentials-1.0.3.jar`.
 2. Place the jar in your server `mods/` folder.
 3. Start the server once.
 4. Stop the server, or keep it running if you plan to use `/mystic reload`.

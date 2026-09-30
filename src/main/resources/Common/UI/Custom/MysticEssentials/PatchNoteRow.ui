@@ -1,61 +1,63 @@
-$C = "../Common.ui";
-
-// Row template for the patch list in the Patch Notes UI. Appended per note:
+// Row template for the update list in the Patch Notes UI. Appended per note:
 //   cmd.append("#NoteList", "MysticEssentials/PatchNoteRow.ui")
 // then populated by index: cmd.set("#NoteList[i] #Title.TextSpans", ...).
-// The row root is a Button so the whole card selects the patch.
+// The row root is a Button so the whole card selects the patch. #Accent marks
+// the note being read; #Pinned shows for pinned notes; #Unread carries the dot.
+$M = "MysticTheme.ui";
 
 Button #Row {
-  Anchor: (Height: 58, Bottom: 8);
-  LayoutMode: Left;
-  Padding: (Left: 10, Right: 10, Top: 6, Bottom: 6);
-  Style: (
-    Default: (Background: #000000(0.18)),
-    Hovered: (Background: #7fa8d6(0.16)),
-    Pressed: (Background: #7fa8d6(0.26))
-  );
-
-  Group #Accent {
-    Anchor: (Width: 3, Height: 40, Right: 10);
-    Background: #7fa8d6;
-    Visible: false;
-  }
+  Anchor: (Height: 58, Bottom: 4);
+  Style: $M.@RowStyle;
+  LayoutMode: Full;
 
   Group {
-    FlexWeight: 1;
-    LayoutMode: Top;
+    Anchor: (Full: 0);
+    LayoutMode: Left;
+    Padding: (Left: 0, Right: 12, Top: 9, Bottom: 9);
+
+    Group #Accent {
+      Anchor: (Width: 3, Height: 40, Right: 13);
+      Background: #E8A93B;
+      Visible: false;
+    }
 
     Group {
-      LayoutMode: Left;
-      Anchor: (Height: 22);
+      FlexWeight: 1;
+      LayoutMode: Top;
 
-      Label #Unread {
-        Anchor: (Width: 14);
-        Style: (FontSize: 15, TextColor: #7bd88f, VerticalAlignment: Center);
+      Group {
+        LayoutMode: Left;
+        Anchor: (Height: 22, Bottom: 2);
+
+        Label #Unread {
+          Anchor: (Width: 14);
+          Style: (...$M.@RowNameStyle, TextColor: #6fd08c);
+        }
+
+        Label #Title {
+          FlexWeight: 1;
+          Style: $M.@RowNameStyle;
+        }
       }
 
-      Label #Title {
-        FlexWeight: 1;
-        Style: (FontSize: 15, TextColor: #ffffff, RenderBold: true, VerticalAlignment: Center);
+      Label #Meta {
+        Anchor: (Height: 14);
+        Style: $M.@RowMetaStyle;
       }
     }
 
-    Label #Meta {
-      Anchor: (Height: 16);
-      Style: (FontSize: 12, TextColor: #96a9be);
-    }
-  }
+    Group #Pinned {
+      Anchor: (Width: 46, Height: 18, Left: 6, Top: 11);
+      Background: #7a9cc6(0.30);
+      Padding: (Horizontal: 4);
+      LayoutMode: CenterMiddle;
+      Visible: false;
 
-  Group #Pinned {
-    Anchor: (Width: 42, Height: 20, Left: 6);
-    Background: #7fa8d6(0.22);
-    Padding: (Left: 4, Right: 4);
-    Visible: false;
-
-    Label {
-      Anchor: (Full: 0);
-      Style: (FontSize: 10, TextColor: #cfe0f5, RenderBold: true, RenderUppercase: true, HorizontalAlignment: Center, VerticalAlignment: Center);
-      Text: "Pin";
+      Label {
+        Anchor: (Full: 0);
+        Style: $M.@PillStyle;
+        Text: "Pinned";
+      }
     }
   }
 }

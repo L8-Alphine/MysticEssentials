@@ -9,7 +9,8 @@ package org.hyzionstudios.mysticessentials.modules.chat.itemlink;
  * ({@link org.hyzionstudios.mysticessentials.core.item.ItemViewConfig}), because
  * the ItemView is shared infrastructure used well beyond chat.</p>
  *
- * <p>Reflects the verified 0.5.6 reality: inline {@code FormattedMessage.image}
+ * <p>Reflects the verified reality through 0.6.2: inline
+ * {@code FormattedMessage.image}
  * does not render in chat, so there is no "item icon in chat" toggle — the chat
  * line carries the formatted, colour-coded name and the icon appears only in the
  * custom-UI panels, which render real {@code ItemSlot} elements.</p>

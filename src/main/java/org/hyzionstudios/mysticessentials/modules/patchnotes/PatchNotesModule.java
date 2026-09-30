@@ -84,6 +84,15 @@ public final class PatchNotesModule extends AbstractMysticModule {
      * {@code maxPatchNotesShown}.
      */
     List<PatchNote> sortedNotes(String search) {
+        return sortNotes(search);
+    }
+
+    /** The notes in the order and number the in-game list shows, for the MysticIdentity web portal. */
+    public List<PatchNote> displayedNotes() {
+        return List.copyOf(sortNotes(null));
+    }
+
+    private List<PatchNote> sortNotes(String search) {
         List<PatchNote> matched = new ArrayList<>();
         for (PatchNote note : notes) {
             if (matchesSearch(note, search)) {

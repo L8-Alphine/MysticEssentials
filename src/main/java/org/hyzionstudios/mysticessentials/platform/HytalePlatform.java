@@ -33,7 +33,10 @@ import com.hypixel.hytale.server.core.modules.entity.teleport.Teleport;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
+import com.hypixel.hytale.server.core.universe.world.chunk.BlockChunk;
 import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
+import com.hypixel.hytale.server.core.universe.world.chunk.section.FluidSection;
+import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.core.universe.world.spawn.GlobalSpawnProvider;
 
@@ -80,12 +83,115 @@ public final class HytalePlatform {
         }
     }
 
+    /** Captures a location and tags it with this Redis network server id. */
+    public MysticLocation capture(PlayerRef player) {
+        MysticLocation location = Conversions.capture(player);
+        if (core.networkPlayers() != null) {
+            location.setServerId(core.networkPlayers().localServerId());
+        }
+        return location;
+    }
+
     /** @return all online players, or an empty list if the universe is not ready. */
     public Collection<PlayerRef> onlinePlayers() {
         try {
             return Universe.get().getPlayers();
         } catch (Throwable t) {
             return List.of();
+        }
+    }
+
+    /**
+     * Resolves the {@link PlayerRef} behind an entity reference — what keyed
+     * player events such as {@code PlayerReadyEvent} hand out. The ref is carried
+     * as an ordinary component, so it is read as one.
+     *
+     * @return empty when the entity is gone or is not a player
+     */
+    public Optional<PlayerRef> playerRefOf(Ref<EntityStore> ref) {
+        try {
+            if (ref == null || !ref.isValid()) {
+                return Optional.empty();
+            }
+            return Optional.ofNullable(ref.getStore().getComponent(ref,
+                    Universe.get().getPlayerRefComponentType()));
+        } catch (Throwable t) {
+            return Optional.empty();
+        }
+    }
+
+    /** @return whether the player's entity is currently placed in a world (safe to teleport). */
+    public boolean isInWorld(PlayerRef player) {
+        try {
+            Ref<EntityStore> ref = player == null ? null : player.getReference();
+            return ref != null && ref.isValid();
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    // ----- Network endpoint ----------------------------------------------------
+
+    /**
+     * The game port this server is listening on, taken from the engine's live
+     * listeners. Empty until the engine has bound (it binds after plugins start,
+     * so callers should retry rather than cache an empty answer).
+     */
+    public java.util.OptionalInt boundPort() {
+        try {
+            for (com.hypixel.hytale.protocol.io.ServerListener listener
+                    : com.hypixel.hytale.server.core.io.ServerManager.get().getListeners()) {
+                if (listener.localAddress() instanceof java.net.InetSocketAddress bound && bound.getPort() > 0) {
+                    return java.util.OptionalInt.of(bound.getPort());
+                }
+            }
+        } catch (Throwable ignored) {
+            // Not bound yet, or the server manager is unavailable.
+        }
+        return java.util.OptionalInt.empty();
+    }
+
+    /**
+     * Best-effort address other machines can reach this server on: the interface
+     * it is bound to, or — when bound to every interface — the first IPv4
+     * non-loopback, non-link-local address of an interface that is up (IPv6 only
+     * as a last resort). This is right for servers on one machine or one LAN and
+     * for a VPS with a public interface; behind NAT, Docker or a proxy the
+     * operator must configure the public address instead.
+     */
+    public Optional<String> reachableHost() {
+        try {
+            for (com.hypixel.hytale.protocol.io.ServerListener listener
+                    : com.hypixel.hytale.server.core.io.ServerManager.get().getListeners()) {
+                if (listener.localAddress() instanceof java.net.InetSocketAddress bound
+                        && bound.getAddress() != null
+                        && !bound.getAddress().isAnyLocalAddress()
+                        && !bound.getAddress().isLoopbackAddress()) {
+                    return Optional.of(bound.getAddress().getHostAddress());
+                }
+            }
+            java.net.InetAddress fallback = null;
+            for (java.net.NetworkInterface nic
+                    : java.util.Collections.list(java.net.NetworkInterface.getNetworkInterfaces())) {
+                if (!nic.isUp() || nic.isLoopback()) {
+                    continue;
+                }
+                for (java.net.InetAddress address : java.util.Collections.list(nic.getInetAddresses())) {
+                    if (address.isLoopbackAddress() || address.isLinkLocalAddress()
+                            || address.isMulticastAddress() || address.isAnyLocalAddress()) {
+                        continue;
+                    }
+                    if (address instanceof java.net.Inet4Address) {
+                        return Optional.of(address.getHostAddress());
+                    }
+                    if (fallback == null) {
+                        fallback = address;
+                    }
+                }
+            }
+            return Optional.ofNullable(fallback).map(java.net.InetAddress::getHostAddress);
+        } catch (Throwable ignored) {
+            return Optional.empty();
         }
     }
 
@@ -274,16 +380,39 @@ public final class HytalePlatform {
                 new org.joml.Vector3d(destination.getX(), destination.getY(), destination.getZ()), rotation);
 
         boolean dispatched = runOnEntityThread(player, (store, entity, currentWorld) -> {
-            Teleport teleport = Teleport.createForPlayer(destWorld, transform);
-            teleport.setHeadRotation(new Rotation3f(rotation));
-            CompletableFuture<Void> applied = new CompletableFuture<>();
-            teleport.setOnComplete(applied);
-            store.putComponent(entity, Teleport.getComponentType(), teleport);
-            applied.whenComplete((v, error) ->
-                    outcome.complete(error == null ? TeleportService.Result.SUCCESS : TeleportService.Result.FAILED));
+            try {
+                // Teleport is a one-shot component. Hytale's own teleport command
+                // adds it; setting/replacing an existing component is ignored by
+                // TeleportSystems.PlayerMoveSystem and would leave our future hung.
+                if (store.getComponent(entity, Teleport.getComponentType()) != null) {
+                    core.log(Level.WARNING, "Teleport refused for " + player.getUsername()
+                            + ": another Teleport component is already pending.");
+                    outcome.complete(TeleportService.Result.FAILED);
+                    return;
+                }
+                Teleport teleport = Teleport.createForPlayer(destWorld, transform);
+                teleport.setHeadRotation(new Rotation3f(rotation));
+                CompletableFuture<Void> applied = new CompletableFuture<>();
+                teleport.setOnComplete(applied);
+                store.addComponent(entity, Teleport.getComponentType(), teleport);
+                applied.whenComplete((v, error) -> outcome.complete(
+                        error == null ? TeleportService.Result.SUCCESS : TeleportService.Result.FAILED));
+            } catch (Throwable error) {
+                core.log(Level.SEVERE, "Could not queue teleport for " + player.getUsername() + ": " + error);
+                outcome.complete(TeleportService.Result.FAILED);
+            }
         });
         if (!dispatched) {
             outcome.complete(TeleportService.Result.FAILED);
+        } else {
+            core.scheduler().runLater(() -> {
+                if (outcome.complete(TeleportService.Result.FAILED)) {
+                    core.log(Level.WARNING, "Teleport timed out for " + player.getUsername()
+                            + " to " + destination.getWorld() + " at "
+                            + (int) destination.getX() + ", " + (int) destination.getY() + ", "
+                            + (int) destination.getZ());
+                }
+            }, 10, java.util.concurrent.TimeUnit.SECONDS);
         }
         return outcome;
     }
@@ -306,8 +435,9 @@ public final class HytalePlatform {
 
         boolean dispatched = runOnEntityThread(player, (store, entity, currentWorld) -> {
             long chunkIndex = ChunkUtil.indexChunkFromBlock(blockX, blockZ);
-            currentWorld.getChunkAsync(chunkIndex)
-                    .thenAcceptAsync(chunk -> completeTopLocation(outcome, currentWorld, chunk, blockX, blockZ, yaw, pitch),
+            currentWorld.getChunkStore().getChunkReferenceAsync(chunkIndex)
+                    .thenAcceptAsync(chunkRef -> completeTopLocation(outcome, currentWorld,
+                                    worldChunk(currentWorld, chunkRef), blockX, blockZ, yaw, pitch),
                             currentWorld)
                     .exceptionally(error -> {
                         core.log(Level.WARNING, "Failed to resolve /top destination for "
@@ -354,7 +484,7 @@ public final class HytalePlatform {
      * biome filters) live in the RTP service on top of this result.</p>
      *
      * <p>Runs the block reads on the target world's thread via the verified
-     * {@code World.getChunkAsync} + world-executor continuation, mirroring
+     * {@code ChunkStore.getChunkReferenceAsync} + world-executor continuation, mirroring
      * {@link #topLocation}. The result completes with a centred
      * {@link MysticLocation} (feet at {@code surface + 1}, looking straight
      * ahead) or empty when the column is unsafe or the chunk cannot load.</p>
@@ -369,8 +499,9 @@ public final class HytalePlatform {
         }
         try {
             long chunkIndex = ChunkUtil.indexChunkFromBlock(blockX, blockZ);
-            world.getChunkAsync(chunkIndex)
-                    .thenAcceptAsync(chunk -> completeGroundSample(outcome, world, chunk, blockX, blockZ,
+            world.getChunkStore().getChunkReferenceAsync(chunkIndex)
+                    .thenAcceptAsync(chunkRef -> completeGroundSample(outcome, world,
+                            worldChunk(world, chunkRef), blockX, blockZ,
                             requiredHeadroom, allowLiquids, minY, maxY), world)
                     .exceptionally(error -> {
                         outcome.complete(Optional.empty());
@@ -382,8 +513,8 @@ public final class HytalePlatform {
         return outcome;
     }
 
-    /** Block id returned by {@link WorldChunk#getBlock} for empty space (air). */
-    private static final int AIR_BLOCK_ID = 0;
+    /** Block id used by the Update 6 asset map for empty space (air). */
+    private static final int AIR_BLOCK_ID = BlockType.EMPTY_ID;
 
     private void completeGroundSample(CompletableFuture<Optional<MysticLocation>> outcome, World world,
             WorldChunk chunk, int blockX, int blockZ, int requiredHeadroom, boolean allowLiquids,
@@ -407,22 +538,22 @@ public final class HytalePlatform {
                 return;
             }
             // The surface block must be solid ground to stand on.
-            if (chunk.getBlock(localX, surfaceY, localZ) == AIR_BLOCK_ID) {
+            if (blockId(chunk, localX, surfaceY, localZ) == AIR_BLOCK_ID) {
                 outcome.complete(Optional.empty());
                 return;
             }
             // Require clear air for the player's body.
             int headroom = Math.max(1, requiredHeadroom);
             for (int dy = 0; dy < headroom; dy++) {
-                if (chunk.getBlock(localX, feetY + dy, localZ) != AIR_BLOCK_ID) {
+                if (blockId(chunk, localX, feetY + dy, localZ) != AIR_BLOCK_ID) {
                     outcome.complete(Optional.empty());
                     return;
                 }
             }
             // Reject standing in or on fluids (deep water, lava) unless allowed.
             if (!allowLiquids
-                    && (chunk.getFluidId(localX, surfaceY, localZ) != 0
-                            || chunk.getFluidId(localX, feetY, localZ) != 0)) {
+                    && (RtpFluidSafety.isPresent(fluidId(world, blockX, surfaceY, blockZ))
+                            || RtpFluidSafety.isPresent(fluidId(world, blockX, feetY, blockZ)))) {
                 outcome.complete(Optional.empty());
                 return;
             }
@@ -467,8 +598,9 @@ public final class HytalePlatform {
         }
         try {
             long chunkIndex = ChunkUtil.indexChunkFromBlock(blockX, blockZ);
-            world.getChunkAsync(chunkIndex)
-                    .thenAcceptAsync(chunk -> completeStandingSpot(outcome, world, chunk, blockX, blockZ,
+            world.getChunkStore().getChunkReferenceAsync(chunkIndex)
+                    .thenAcceptAsync(chunkRef -> completeStandingSpot(outcome, world,
+                            worldChunk(world, chunkRef), blockX, blockZ,
                             requiredHeadroom, blockedBlockIds, blockedFluidIds, preferredFeetY,
                             maxVerticalDistance), world)
                     .exceptionally(error -> {
@@ -504,15 +636,15 @@ public final class HytalePlatform {
                     break;
                 }
                 int floorY = feetY - 1;
-                int floor = chunk.getBlock(localX, floorY, localZ);
+                int floor = blockId(chunk, localX, floorY, localZ);
                 if (floor == AIR_BLOCK_ID || contains(blockedBlockIds, floor)
-                        || contains(blockedFluidIds, chunk.getFluidId(localX, floorY, localZ))) {
+                        || contains(blockedFluidIds, fluidId(world, blockX, floorY, blockZ))) {
                     continue;
                 }
                 boolean clear = true;
                 for (int dy = 0; dy < headroom && clear; dy++) {
-                    clear = chunk.getBlock(localX, feetY + dy, localZ) == AIR_BLOCK_ID
-                            && !contains(blockedFluidIds, chunk.getFluidId(localX, feetY + dy, localZ));
+                    clear = blockId(chunk, localX, feetY + dy, localZ) == AIR_BLOCK_ID
+                            && !contains(blockedFluidIds, fluidId(world, blockX, feetY + dy, blockZ));
                 }
                 if (!clear) {
                     continue;
@@ -534,6 +666,38 @@ public final class HytalePlatform {
 
     private static boolean contains(Set<Integer> ids, int id) {
         return ids != null && !ids.isEmpty() && ids.contains(id);
+    }
+
+    /** Reads the numeric block id used by RTP safety configuration. */
+    private static int blockId(WorldChunk chunk, int x, int y, int z) {
+        var reference = chunk.getReference();
+        if (reference == null) {
+            return BlockType.UNKNOWN_ID;
+        }
+        BlockChunk blocks = reference.getStore().getComponent(reference, BlockChunk.getComponentType());
+        return blocks == null ? BlockType.UNKNOWN_ID : blocks.getBlock(x, y, z);
+    }
+
+    /** Resolves a loaded chunk column through Update 6's component-backed chunk store. */
+    private static WorldChunk worldChunk(World world, Ref<ChunkStore> chunkRef) {
+        if (chunkRef == null || !chunkRef.isValid()) {
+            return null;
+        }
+        return world.getChunkStore().getStore().getComponent(chunkRef, WorldChunk.getComponentType());
+    }
+
+    /** Reads a fluid from its chunk-section component; missing sections use the engine sentinel. */
+    private static int fluidId(World world, int blockX, int blockY, int blockZ) {
+        ChunkStore chunks = world.getChunkStore();
+        Ref<ChunkStore> sectionRef = chunks.getChunkSectionReferenceAtBlock(blockX, blockY, blockZ);
+        if (sectionRef == null || !sectionRef.isValid()) {
+            return Integer.MIN_VALUE;
+        }
+        FluidSection fluids = chunks.getStore().getComponent(sectionRef, FluidSection.getComponentType());
+        return fluids == null
+                ? Integer.MIN_VALUE
+                : fluids.getFluidId(ChunkUtil.localCoordinate(blockX),
+                        ChunkUtil.localCoordinate(blockY), ChunkUtil.localCoordinate(blockZ));
     }
 
     /**
@@ -733,7 +897,7 @@ public final class HytalePlatform {
      * Registers a command through the plugin's command registry.
      *
      * @return the registration handle — its public {@code unregister()} fully
-     *         removes the command again (verified 0.5.6: the handle's teardown
+     *         removes the command again (verified 0.6.2: the handle's teardown
      *         runnable removes the name from {@code CommandManager}'s command
      *         map and every alias from its alias map). {@code null} if the
      *         engine rejected the registration. Callers that never unregister
@@ -788,6 +952,32 @@ public final class HytalePlatform {
     }
 
     /**
+     * Registers an ECS system against the entity store — the only way to observe
+     * the engine's {@code EcsEvent}s (e.g. {@code CraftRecipeEvent.Pre}), which
+     * are invoked on entities and never reach the plugin event registry.
+     *
+     * <p>Systems are keyed by class: registering the same system class twice
+     * throws, and the registry drops every system this plugin registered when
+     * the plugin shuts down. There is no per-system unregister handle exposed
+     * to plugins, so a module that can be hot-disabled should register once and
+     * gate its own behaviour rather than expect to remove the system.</p>
+     *
+     * @return {@code true} when the system was accepted
+     */
+    public boolean registerEntitySystem(
+            com.hypixel.hytale.component.system.ISystem<
+                    com.hypixel.hytale.server.core.universe.world.storage.EntityStore> system) {
+        try {
+            plugin.getEntityStoreRegistry().registerSystem(system);
+            return true;
+        } catch (Throwable t) {
+            core.log(Level.WARNING, "Could not register ECS system "
+                    + system.getClass().getSimpleName() + ": " + t);
+            return false;
+        }
+    }
+
+    /**
      * Registers a listener for a Hytale server event.
      *
      * @return the registration handle — its public {@code unregister()} removes
@@ -810,6 +1000,23 @@ public final class HytalePlatform {
     public <E extends IBaseEvent<Void>> com.hypixel.hytale.event.EventRegistration<Void, E> onEvent(
             com.hypixel.hytale.event.EventPriority priority, Class<? super E> eventType, Consumer<E> listener) {
         return plugin.getEventRegistry().register(priority, eventType, listener);
+    }
+
+    /**
+     * Registers a listener for a <em>keyed</em> Hytale server event across every
+     * key.
+     *
+     * <p>{@link #onEvent} only accepts the {@code IBaseEvent<Void>} events that
+     * carry no key. An event with a key — {@code PlayerReadyEvent} is one — is
+     * dispatched per key, so a plain registration never sees it; a global
+     * registration does, and is how the engine's own modules subscribe.</p>
+     *
+     * @return the registration handle — its public {@code unregister()} removes
+     *         the listener again.
+     */
+    public <K, E extends IBaseEvent<K>> com.hypixel.hytale.event.EventRegistration<K, E> onGlobalEvent(
+            com.hypixel.hytale.event.EventPriority priority, Class<? super E> eventType, Consumer<E> listener) {
+        return plugin.getEventRegistry().registerGlobal(priority, eventType, listener);
     }
 
     /**

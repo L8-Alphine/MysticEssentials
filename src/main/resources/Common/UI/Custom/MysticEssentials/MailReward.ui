@@ -1,20 +1,17 @@
-$C = "../Common.ui";
-
 // Reward slot template for the mail reading pane.
 // Appended per attachment: cmd.append("#RewardList", "MysticEssentials/MailReward.ui")
 // then cmd.set("#RewardList[i] #Slot.ItemId", ...) and "#RewardList[i] #Qty.TextSpans".
+$M = "MysticTheme.ui";
 
 Group #Cell {
-  Anchor: (Width: 52, Height: 60, Right: 8);
+  Anchor: (Width: 56, Height: 70, Right: 8);
   LayoutMode: Top;
 
-  Group {
-    Anchor: (Width: 52, Height: 52);
-    Background: #1a2530;
-    Padding: 2;
+  $M.@IconWell {
+    @Size = 56;
 
     ItemSlot #Slot {
-      Anchor: (Full: 0);
+      Anchor: (Width: 50, Height: 50);
       ShowQualityBackground: true;
       ShowQuantity: false;
     }
@@ -22,6 +19,6 @@ Group #Cell {
 
   Label #Qty {
     Anchor: (Height: 14);
-    Style: (FontSize: 11, TextColor: #d7e1ee, HorizontalAlignment: Center, VerticalAlignment: Center);
+    Style: (...$M.@CaptionStyle, TextColor: #dee2ef, HorizontalAlignment: Center);
   }
 }

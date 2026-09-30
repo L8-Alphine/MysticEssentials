@@ -1,12 +1,12 @@
+// Channel Roster — a slim member list for the current channel with counts and a
+// jump to the full member-management page.
 $C = "../Common.ui";
-
-// Compact channel roster (design bible §5). A slim member list for the current
-// channel with counts and a jump to the full member-management interface.
+$M = "MysticTheme.ui";
 
 $C.@PageOverlay {}
 
 $C.@Container {
-  Anchor: (Width: 380, Height: 580);
+  Anchor: (Width: 400, Height: 600);
 
   #Title {
     Group {
@@ -19,52 +19,63 @@ $C.@Container {
   #Content {
     LayoutMode: Top;
 
-    Label #RosterChannel {
-      Anchor: (Height: 26, Bottom: 2);
-      Style: (FontSize: 18, TextColor: #ffffff, RenderBold: true, VerticalAlignment: Center);
+    $M.@Panel {
+      @Padding = 14;
+      Anchor: (Bottom: 12);
+
+      Label #RosterChannel {
+        Anchor: (Height: 28, Bottom: 2);
+        Style: $M.@DisplaySmallStyle;
+      }
+
+      Label #RosterCounts {
+        Anchor: (Height: 16);
+        Style: $M.@MetaGoldStyle;
+      }
     }
 
-    Label #RosterCounts {
-      Anchor: (Height: 18, Bottom: 8);
-      Style: (FontSize: 13, TextColor: #E8A93B, VerticalAlignment: Center);
-    }
-
-    $C.@PanelSeparatorFancy {
+    $M.@Section {
+      @Text = "Online Members";
       @Anchor = (Bottom: 8);
     }
 
-    Label #RosterEmpty {
-      Anchor: (Height: 40);
-      Style: (FontSize: 14, TextColor: #9fb0c4, VerticalAlignment: Center);
-      Text: "No members are online in this channel.";
-      Visible: false;
-    }
-
-    Group #MemberList {
+    $M.@Well {
       FlexWeight: 1;
-      LayoutMode: TopScrolling;
-      Padding: (Right: 10);
-      ScrollbarStyle: $C.@DefaultScrollbarStyle;
+
+      Label #RosterEmpty {
+        Anchor: (Height: 64);
+        Style: $M.@EmptyStyle;
+        Text: "Nobody from this channel is online right now.";
+        Visible: false;
+      }
+
+      Group #MemberList {
+        FlexWeight: 1;
+        LayoutMode: TopScrolling;
+        Padding: (Right: 6);
+        ScrollbarStyle: $C.@DefaultScrollbarStyle;
+      }
     }
 
     Label #RosterMore {
-      Anchor: (Height: 18, Top: 4);
-      Style: (FontSize: 12, TextColor: #9fb0c4, VerticalAlignment: Center);
+      Anchor: (Height: 18, Top: 6);
+      Style: $M.@CaptionStyle;
       Visible: false;
     }
 
-    Group {
-      LayoutMode: Left;
-      Anchor: (Height: 44, Top: 8);
+    $M.@ActionBar {
+      @Anchor = (Height: 44, Top: 10);
 
       $C.@SecondaryTextButton #FullListButton {
         @Text = "Full Member List";
-        @Anchor = (Width: 230, Right: 8);
+        @Anchor = (Width: 200);
       }
 
-      $C.@CancelTextButton #CloseButton {
+      $M.@Spacer {}
+
+      $C.@TertiaryTextButton #CloseButton {
         @Text = "Close";
-        @Anchor = (Width: 120);
+        @Anchor = (Width: 110);
       }
     }
   }

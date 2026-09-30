@@ -59,7 +59,7 @@ loads.
 ```java
 LicenseGate license = LicenseGate.builder(Products.ESSENTIALS)
         .dataDir(modDataDirectory)      // license.mclicense + server-id.txt live here
-        .modVersion("1.0.2")
+        .modVersion("1.0.4")
         .logger(myLoggerAdapter)        // two methods: info, warn
         .build();
 

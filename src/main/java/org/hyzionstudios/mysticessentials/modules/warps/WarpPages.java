@@ -69,6 +69,7 @@ final class WarpPages {
                     .filter(w -> matchesSearch(search, w.getName(), w.getDescription()))
                     .toList();
             cmd.set("#WarpEmpty.Visible", visible.isEmpty());
+            Warp selected = selectedWarp(visible, selectedName);
             for (int i = 0; i < visible.size(); i++) {
                 Warp warp = visible.get(i);
                 String row = "#WarpList[" + i + "]";
@@ -76,11 +77,11 @@ final class WarpPages {
                 cmd.set(row + " #Name.TextSpans", uiText(row + " #Name.TextSpans", warp.getName()));
                 cmd.set(row + " #Meta.TextSpans", uiText(row + " #Meta.TextSpans", serverWarpMeta(warp)));
                 cmd.set(row + " #Swatch.Background", serverWarpColor(warp));
+                cmd.set(row + " #Selected.Visible", warp == selected);
                 event.addEventBinding(CustomUIEventBindingType.Activating, row,
                         new EventData().put("action", "select").put("warp", warp.getName()));
             }
 
-            Warp selected = selectedWarp(visible, selectedName);
             applyDetails(cmd, selected);
 
             boolean showManage = warps.canSetWarps(player) && selected != null;
@@ -264,6 +265,7 @@ final class WarpPages {
                     .filter(w -> matchesSearch(search, w.getName(), w.getDescription(), w.getOwnerName()))
                     .toList();
             cmd.set("#PwarpEmpty.Visible", all.isEmpty());
+            Warp selected = selectedWarp(all, selectedName);
             for (int i = 0; i < all.size(); i++) {
                 Warp warp = all.get(i);
                 String row = "#PwarpList[" + i + "]";
@@ -271,11 +273,11 @@ final class WarpPages {
                 cmd.set(row + " #Name.TextSpans", uiText(row + " #Name.TextSpans", warp.getName()));
                 cmd.set(row + " #Meta.TextSpans", uiText(row + " #Meta.TextSpans", playerWarpMeta(warp)));
                 cmd.set(row + " #Swatch.Background", playerWarpColor(warp));
+                cmd.set(row + " #Selected.Visible", warp == selected);
                 event.addEventBinding(CustomUIEventBindingType.Activating, row,
                         new EventData().put("action", "select").put("warp", warp.getName()));
             }
 
-            Warp selected = selectedWarp(all, selectedName);
             applyDetails(cmd, selected);
             cmd.set("#PwarpLimit.TextSpans", uiText("#PwarpLimit.TextSpans", "You own " + warps.getPlayerWarps(player.getUuid()).size()
                     + " / " + warps.playerWarpLimit(player.getUuid()) + " player warps."));
@@ -346,6 +348,7 @@ final class WarpPages {
             List<Warp> own = warps.getPlayerWarps(player.getUuid());
             cmd.set("#ManagerLimit.TextSpans", uiText("#ManagerLimit.TextSpans", own.size() + " / " + warps.playerWarpLimit(player.getUuid())));
             cmd.set("#OwnEmpty.Visible", own.isEmpty());
+            Warp selected = selectedWarp(own, selectedName);
             for (int i = 0; i < own.size(); i++) {
                 Warp warp = own.get(i);
                 String row = "#OwnList[" + i + "]";
@@ -353,11 +356,11 @@ final class WarpPages {
                 cmd.set(row + " #Name.TextSpans", uiText(row + " #Name.TextSpans", warp.getName()));
                 cmd.set(row + " #Meta.TextSpans", uiText(row + " #Meta.TextSpans", playerWarpMeta(warp)));
                 cmd.set(row + " #Swatch.Background", playerWarpColor(warp));
+                cmd.set(row + " #Selected.Visible", warp == selected);
                 event.addEventBinding(CustomUIEventBindingType.Activating, row,
                         new EventData().put("action", "select").put("warp", warp.getName()));
             }
 
-            Warp selected = selectedWarp(own, selectedName);
             cmd.set("#SelectedName.TextSpans", uiText("#SelectedName.TextSpans", selected == null ? "No Warp" : selected.getName()));
             cmd.set("#EditDescription.Value",
                     selected == null || selected.getDescription() == null ? "" : selected.getDescription());

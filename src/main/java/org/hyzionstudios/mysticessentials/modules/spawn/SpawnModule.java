@@ -68,8 +68,12 @@ public final class SpawnModule extends AbstractMysticModule implements SpawnServ
         registerCommand(new DelHomeCommand());
         registerCommand(new RenameHomeCommand());
         registerCommand(new HomesCommand());
-        // First-join / on-join teleport to spawn (respawn-point interception has no
-        // hook in 0.5.6 — respawn is ECS-driven with no event to override it).
+        // First-join / on-join teleport to spawn. Respawn itself is not
+        // intercepted here: the module publishes its spawn through
+        // GlobalSpawnProvider, which is what the engine respawns against.
+        // Update 6 does add a cancellable ECS RespawnEvent, so overriding the
+        // respawn destination directly is now possible if this ever needs to
+        // diverge from the published spawn.
         if (config.teleportOnFirstJoin || config.teleportOnJoin) {
             registerEvent(
                     com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent.class,
@@ -327,7 +331,7 @@ public final class SpawnModule extends AbstractMysticModule implements SpawnServ
             if (guardTemporaryWorld(sender, player, "the global spawn")) {
                 return;
             }
-            setGlobalSpawn(Conversions.capture(player));
+            setGlobalSpawn(core.platform().capture(player));
             sender.replyKey("spawn-global-set");
         }
     }
@@ -348,7 +352,7 @@ public final class SpawnModule extends AbstractMysticModule implements SpawnServ
             if (guardTemporaryWorld(sender, player, "a world spawn")) {
                 return;
             }
-            MysticLocation location = Conversions.capture(player);
+            MysticLocation location = core.platform().capture(player);
             setWorldSpawn(location.getWorld(), location);
             sender.replyKey("spawn-world-set", Map.of("world", location.getWorld()));
         }
@@ -374,7 +378,7 @@ public final class SpawnModule extends AbstractMysticModule implements SpawnServ
         if (homes == null || !homes.has(name)) {
             return false;
         }
-        homes.add(name, Json.toTree(Conversions.capture(player)));
+        homes.add(name, Json.toTree(core.platform().capture(player)));
         core.getPlayerProfileService().getCached(player.getUuid())
                 .ifPresent(core.getPlayerProfileService()::save);
         return true;
@@ -394,7 +398,7 @@ public final class SpawnModule extends AbstractMysticModule implements SpawnServ
         if (guardTemporaryWorld(sender, player, "a home")) {
             return;
         }
-        boolean created = setHome(sender.uuid(), homeName, Conversions.capture(player));
+        boolean created = setHome(sender.uuid(), homeName, core.platform().capture(player));
         if (created) {
             sender.replyKey("home-set", Map.of("home", homeName));
         } else {

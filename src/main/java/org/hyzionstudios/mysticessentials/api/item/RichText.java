@@ -3,6 +3,8 @@ package org.hyzionstudios.mysticessentials.api.item;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.hyzionstudios.mysticessentials.core.message.MysticText;
 
@@ -14,7 +16,7 @@ import org.hyzionstudios.mysticessentials.core.message.MysticText;
  * from {@code String} lets the renderer decide, per surface, whether it needs
  * the marked-up form (chat, {@code TextSpans}) or the stripped plain form
  * (plain-text {@code Label.Text}, log lines, external bridges) — a distinction
- * the 0.5.6 client is unforgiving about.</p>
+ * the client is unforgiving about.</p>
  *
  * <p><b>Absence is expressed by a {@code null} {@code RichText}, never by a
  * sentinel string.</b> {@code RichText.plain("Null")} is a perfectly valid
@@ -24,6 +26,8 @@ import org.hyzionstudios.mysticessentials.core.message.MysticText;
 public final class RichText {
 
     private static final RichText EMPTY = new RichText("", null, Map.of());
+    private static final Pattern EMBEDDED_TRANSLATION =
+            Pattern.compile("(?i)<lang:[^>]+>");
 
     private final String markup;
     private final String translationKey;
@@ -85,11 +89,32 @@ public final class RichText {
      * non-empty label should fall back to a known plain value.
      */
     public String plain() {
-        return translationKey != null ? "" : MysticText.stripMarkup(markup);
+        return plainWithTranslationFallback("");
+    }
+
+    /**
+     * The plain form with every client-only translation segment replaced by a
+     * readable server-side fallback. This is used by logs and cross-server chat
+     * relays, which cannot resolve a client's language catalogue themselves.
+     */
+    public String plainWithTranslationFallback(String fallback) {
+        String safeFallback = fallback == null ? "" : fallback
+                .replace('<', '(').replace('>', ')');
+        if (translationKey != null) {
+            return safeFallback;
+        }
+        String resolved = EMBEDDED_TRANSLATION.matcher(markup)
+                .replaceAll(Matcher.quoteReplacement(safeFallback));
+        return MysticText.stripMarkup(resolved);
     }
 
     public boolean isTranslated() {
         return translationKey != null;
+    }
+
+    /** Whether this value contains one or more client-translated segments. */
+    public boolean hasTranslations() {
+        return translationKey != null || EMBEDDED_TRANSLATION.matcher(markup).find();
     }
 
     public String translationKey() {

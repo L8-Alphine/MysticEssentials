@@ -2,20 +2,16 @@
 //   cmd.append("#ButtonList", "MysticEssentials/TutorialButtonRow.ui")
 // label set by index, click bound on the row root (Button):
 //   cmd.set("#ButtonList[i] #ButtonLabel.TextSpans", ...)
+$M = "MysticTheme.ui";
 
 Button #Row {
-  Anchor: (Height: 46, Bottom: 8);
-  LayoutMode: Left;
-  Padding: (Left: 12, Right: 12, Top: 6, Bottom: 6);
-  Style: (
-    Default: (Background: #7a9cc6(0.16)),
-    Hovered: (Background: #7a9cc6(0.30)),
-    Pressed: (Background: #7a9cc6(0.42))
-  );
+  Anchor: (Height: 44, Bottom: 6);
+  Padding: (Left: 14, Right: 14);
+  Style: $M.@InlineButtonStyle;
+  LayoutMode: Full;
 
   Label #ButtonLabel {
-    FlexWeight: 1;
-    Style: (FontSize: 15, TextColor: #ffffff, RenderBold: true,
-            VerticalAlignment: Center, HorizontalAlignment: Center);
+    Anchor: (Full: 0);
+    Style: (...$M.@TabLabelStyle, FontSize: 14);
   }
 }

@@ -36,6 +36,7 @@ public final class PermissionServiceImpl implements PermissionService {
     }
 
     public void init(boolean enabledInConfig) {
+        luckPerms = null;
         if (enabledInConfig) {
             try {
                 luckPerms = LuckPermsProvider.get();

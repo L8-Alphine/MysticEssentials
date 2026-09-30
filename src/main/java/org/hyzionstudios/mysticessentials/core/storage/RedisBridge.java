@@ -13,9 +13,12 @@ import org.hyzionstudios.mysticessentials.core.util.Json;
 import com.google.gson.JsonObject;
 
 import redis.clients.jedis.Jedis;
-import redis.clients.jedis.JedisPool;
-import redis.clients.jedis.JedisPoolConfig;
+import redis.clients.jedis.DefaultJedisClientConfig;
+import redis.clients.jedis.HostAndPort;
+import redis.clients.jedis.JedisClientConfig;
 import redis.clients.jedis.JedisPubSub;
+import redis.clients.jedis.RedisClient;
+import redis.clients.jedis.params.SetParams;
 
 /**
  * Redis integration: a fast cache and a pub/sub bus for cross-server features
@@ -37,41 +40,74 @@ public final class RedisBridge {
 
     private MainConfig.Redis config;
     private volatile boolean enabled;
-    private JedisPool pool;
+    private RedisClient commands;
+    private JedisClientConfig clientConfig;
     private Thread subscriberThread;
     private volatile JedisPubSub subscription;
     private volatile boolean shuttingDown;
+    private volatile long lifecycleGeneration;
 
     public RedisBridge(MysticCore core) {
         this.core = core;
     }
 
-    public void init(MainConfig.Redis config) {
+    public synchronized void init(MainConfig.Redis config) {
+        lifecycleGeneration++;
         this.config = config;
         if (config == null || !config.enabled) {
             core.log(Level.INFO, "Redis disabled; cross-server features run in local-only mode.");
             return;
         }
         try {
+            String username = config.username == null || config.username.isBlank() ? null : config.username;
             String password = config.password == null || config.password.isBlank() ? null : config.password;
-            pool = new JedisPool(new JedisPoolConfig(), config.host, config.port, 2000, password);
-            try (Jedis jedis = pool.getResource()) {
-                jedis.ping();
+            var clientBuilder = DefaultJedisClientConfig.builder()
+                    .connectionTimeoutMillis(2000)
+                    .socketTimeoutMillis(2000)
+                    .clientName("MysticEssentials");
+            if (username != null) {
+                clientBuilder.user(username);
             }
+            if (password != null) {
+                clientBuilder.password(password);
+            }
+            clientConfig = clientBuilder.build();
+            commands = RedisClient.builder()
+                    .hostAndPort(new HostAndPort(config.host, config.port))
+                    .clientConfig(clientConfig)
+                    .build();
+            commands.ping();
             enabled = true;
             startSubscriber();
             core.log(Level.INFO, "Redis connected at " + config.host + ":" + config.port
                     + " (network=" + config.networkId + ", server=" + config.serverId + ")");
+        } catch (LinkageError t) {
+            // Jedis is shaded into the release jar; its absence means the thin
+            // (unshaded) jar was deployed, not that Redis is down.
+            core.log(Level.SEVERE, "Redis enabled but the Redis client library is missing from this jar ("
+                    + t + "). Deploy the shaded MysticEssentials-<version>.jar, not the -thin one. "
+                    + "Running in local-only mode.");
+            enabled = false;
+            closeCommands();
         } catch (Throwable t) {
             core.log(Level.SEVERE, "Redis enabled but connection failed (" + t.getMessage()
                     + "); running in local-only mode.");
             enabled = false;
-            closePool();
+            closeCommands();
         }
     }
 
     public boolean isEnabled() {
         return enabled;
+    }
+
+    /** Applies new Redis settings without dropping registered logical-channel handlers. */
+    public synchronized void reconfigure(MainConfig.Redis config) {
+        shutdown();
+        shuttingDown = false;
+        subscription = null;
+        subscriberThread = null;
+        init(config);
     }
 
     public String serverId() {
@@ -89,6 +125,11 @@ public final class RedisBridge {
         handlers.put(channel, handler);
     }
 
+    /** Removes a logical-channel handler registered by a reloadable module. */
+    public void unsubscribe(String channel, Consumer<String> handler) {
+        handlers.remove(channel, handler);
+    }
+
     /** Publishes a payload to a logical channel across the network. No-op if Redis is unavailable. */
     public void publish(String channel, String payload) {
         if (!enabled) {
@@ -98,8 +139,8 @@ public final class RedisBridge {
         envelope.addProperty("s", config.serverId);
         envelope.addProperty("c", channel);
         envelope.addProperty("m", payload);
-        try (Jedis jedis = pool.getResource()) {
-            jedis.publish(channelKey(channel), Json.toString(envelope));
+        try {
+            commands.publish(channelKey(channel), Json.toString(envelope));
         } catch (Throwable t) {
             core.log(Level.WARNING, "Redis publish to '" + channel + "' failed: " + t);
         }
@@ -112,18 +153,20 @@ public final class RedisBridge {
                 dispatch(message);
             }
         };
-        subscriberThread = new Thread(this::subscriberLoop, "MysticEssentials-Redis-Sub");
+        long generation = lifecycleGeneration;
+        subscriberThread = new Thread(() -> subscriberLoop(generation),
+                "MysticEssentials-Redis-Sub");
         subscriberThread.setDaemon(true);
         subscriberThread.start();
     }
 
-    private void subscriberLoop() {
+    private void subscriberLoop(long generation) {
         String pattern = channelKey("*");
-        while (enabled && !shuttingDown) {
-            try (Jedis jedis = pool.getResource()) {
+        while (enabled && !shuttingDown && generation == lifecycleGeneration) {
+            try (Jedis jedis = new Jedis(config.host, config.port, clientConfig)) {
                 jedis.psubscribe(subscription, pattern); // blocks until punsubscribe
             } catch (Throwable t) {
-                if (shuttingDown) {
+                if (shuttingDown || generation != lifecycleGeneration) {
                     return;
                 }
                 core.log(Level.WARNING, "Redis subscriber dropped (" + t.getMessage() + "); reconnecting in 5s.");
@@ -157,8 +200,8 @@ public final class RedisBridge {
         if (!enabled) {
             return null;
         }
-        try (Jedis jedis = pool.getResource()) {
-            return jedis.get(cacheKey(key));
+        try {
+            return commands.get(cacheKey(key));
         } catch (Throwable t) {
             return null;
         }
@@ -169,11 +212,11 @@ public final class RedisBridge {
         if (!enabled) {
             return;
         }
-        try (Jedis jedis = pool.getResource()) {
+        try {
             if (ttlSeconds > 0) {
-                jedis.setex(cacheKey(key), ttlSeconds, value);
+                commands.set(cacheKey(key), value, SetParams.setParams().ex(ttlSeconds));
             } else {
-                jedis.set(cacheKey(key), value);
+                commands.set(cacheKey(key), value);
             }
         } catch (Throwable t) {
             core.log(Level.WARNING, "Redis cacheSet '" + key + "' failed: " + t);
@@ -185,14 +228,105 @@ public final class RedisBridge {
         if (!enabled || keys == null || keys.length == 0) {
             return;
         }
-        try (Jedis jedis = pool.getResource()) {
+        try {
             String[] namespaced = new String[keys.length];
             for (int i = 0; i < keys.length; i++) {
                 namespaced[i] = cacheKey(keys[i]);
             }
-            jedis.del(namespaced);
+            commands.del(namespaced);
         } catch (Throwable t) {
             core.log(Level.WARNING, "Redis cacheDelete failed: " + t);
+        }
+    }
+
+    /** Adds members to a namespaced Redis set and optionally refreshes its TTL. */
+    public boolean cacheSetAdd(String key, int ttlSeconds, String... members) {
+        if (!enabled || members == null || members.length == 0) {
+            return false;
+        }
+        try {
+            String namespaced = cacheKey(key);
+            commands.sadd(namespaced, members);
+            if (ttlSeconds > 0) {
+                commands.expire(namespaced, ttlSeconds);
+            }
+            return true;
+        } catch (Throwable t) {
+            core.log(Level.WARNING, "Redis cacheSetAdd '" + key + "' failed: " + t);
+            return false;
+        }
+    }
+
+    /** Returns a snapshot of a namespaced Redis set, or an empty set when unavailable. */
+    public java.util.Set<String> cacheSetMembers(String key) {
+        if (!enabled) {
+            return java.util.Set.of();
+        }
+        try {
+            return java.util.Set.copyOf(commands.smembers(cacheKey(key)));
+        } catch (Throwable t) {
+            core.log(Level.WARNING, "Redis cacheSetMembers '" + key + "' failed: " + t);
+            return java.util.Set.of();
+        }
+    }
+
+    /** Removes members from a namespaced Redis set. */
+    public void cacheSetRemove(String key, String... members) {
+        if (!enabled || members == null || members.length == 0) {
+            return;
+        }
+        try {
+            commands.srem(cacheKey(key), members);
+        } catch (Throwable t) {
+            core.log(Level.WARNING, "Redis cacheSetRemove '" + key + "' failed: " + t);
+        }
+    }
+
+    /**
+     * Writes one field of a namespaced Redis hash and refreshes the key's TTL.
+     * Fields are the unit of atomicity, so several servers can add entries to
+     * the same hash concurrently without a read-modify-write race.
+     */
+    public boolean cacheHashSet(String key, String field, String value, long ttlSeconds) {
+        if (!enabled || field == null || value == null) {
+            return false;
+        }
+        try {
+            String namespaced = cacheKey(key);
+            commands.hset(namespaced, field, value);
+            if (ttlSeconds > 0) {
+                commands.expire(namespaced, ttlSeconds);
+            }
+            return true;
+        } catch (Throwable t) {
+            core.log(Level.WARNING, "Redis cacheHashSet '" + key + "' failed: " + t);
+            return false;
+        }
+    }
+
+    /** Snapshot of a namespaced Redis hash, or an empty map when absent/unavailable. */
+    public Map<String, String> cacheHashGetAll(String key) {
+        if (!enabled) {
+            return Map.of();
+        }
+        try {
+            Map<String, String> fields = commands.hgetAll(cacheKey(key));
+            return fields == null ? Map.of() : Map.copyOf(fields);
+        } catch (Throwable t) {
+            core.log(Level.WARNING, "Redis cacheHashGetAll '" + key + "' failed: " + t);
+            return Map.of();
+        }
+    }
+
+    /** Removes fields from a namespaced Redis hash. No-op if Redis is unavailable. */
+    public void cacheHashRemove(String key, String... fields) {
+        if (!enabled || fields == null || fields.length == 0) {
+            return;
+        }
+        try {
+            commands.hdel(cacheKey(key), fields);
+        } catch (Throwable t) {
+            core.log(Level.WARNING, "Redis cacheHashRemove '" + key + "' failed: " + t);
         }
     }
 
@@ -221,9 +355,9 @@ public final class RedisBridge {
         if (!enabled) {
             return false;
         }
-        try (Jedis jedis = pool.getResource()) {
-            String reply = jedis.set(key, payload,
-                    redis.clients.jedis.params.SetParams.setParams().nx().ex(Math.max(1, ttlSeconds)));
+        try {
+            String reply = commands.set(key, payload,
+                    SetParams.setParams().nx().ex(Math.max(1, ttlSeconds)));
             return "OK".equals(reply);
         } catch (Throwable t) {
             core.log(Level.WARNING, "Redis lockAcquire '" + key + "' failed: " + t);
@@ -236,8 +370,8 @@ public final class RedisBridge {
         if (!enabled) {
             return null;
         }
-        try (Jedis jedis = pool.getResource()) {
-            return jedis.get(key);
+        try {
+            return commands.get(key);
         } catch (Throwable t) {
             return null;
         }
@@ -253,8 +387,8 @@ public final class RedisBridge {
         if (!enabled) {
             return false;
         }
-        try (Jedis jedis = pool.getResource()) {
-            Object result = jedis.eval(LOCK_RENEW_SCRIPT, List.of(key),
+        try {
+            Object result = commands.eval(LOCK_RENEW_SCRIPT, List.of(key),
                     List.of(payload, Long.toString(Math.max(1, ttlSeconds))));
             return result instanceof Long value && value == 1L;
         } catch (Throwable t) {
@@ -274,8 +408,8 @@ public final class RedisBridge {
         if (!enabled) {
             return false;
         }
-        try (Jedis jedis = pool.getResource()) {
-            Object result = jedis.eval(LOCK_RELEASE_SCRIPT, List.of(key), List.of(payload));
+        try {
+            Object result = commands.eval(LOCK_RELEASE_SCRIPT, List.of(key), List.of(payload));
             return result instanceof Long value && value == 1L;
         } catch (Throwable t) {
             core.log(Level.WARNING, "Redis lockRelease '" + key + "' failed: " + t);
@@ -288,8 +422,8 @@ public final class RedisBridge {
         if (!enabled) {
             return false;
         }
-        try (Jedis jedis = pool.getResource()) {
-            return jedis.del(key) > 0;
+        try {
+            return commands.del(key) > 0;
         } catch (Throwable t) {
             core.log(Level.WARNING, "Redis lockForceRelease '" + key + "' failed: " + t);
             return false;
@@ -298,7 +432,8 @@ public final class RedisBridge {
 
     // ----- Lifecycle / helpers ----------------------------------------------
 
-    public void shutdown() {
+    public synchronized void shutdown() {
+        lifecycleGeneration++;
         shuttingDown = true;
         enabled = false;
         try {
@@ -311,14 +446,20 @@ public final class RedisBridge {
         if (subscriberThread != null) {
             subscriberThread.interrupt();
         }
-        closePool();
+        closeCommands();
     }
 
-    private void closePool() {
-        if (pool != null) {
-            pool.close();
-            pool = null;
+    private void closeCommands() {
+        if (commands != null) {
+            try {
+                commands.close();
+            } catch (Throwable t) {
+                core.log(Level.WARNING, "Redis command client did not close cleanly: " + t.getMessage());
+            } finally {
+                commands = null;
+            }
         }
+        clientConfig = null;
     }
 
     private String channelKey(String channel) {

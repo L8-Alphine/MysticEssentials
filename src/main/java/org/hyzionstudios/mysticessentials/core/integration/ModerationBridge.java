@@ -5,6 +5,10 @@ import java.util.logging.Level;
 
 import org.hyzionstudios.mysticessentials.core.MysticCore;
 
+import com.hypixel.hytale.common.plugin.PluginIdentifier;
+import com.hypixel.hytale.server.core.HytaleServer;
+import com.hypixel.hytale.server.core.plugin.PluginBase;
+
 /**
  * Soft integration with MysticModeration.
  *
@@ -17,10 +21,11 @@ import org.hyzionstudios.mysticessentials.core.MysticCore;
 public final class ModerationBridge {
 
     private static final String PROVIDER_CLASS = "org.hyzionstudios.mysticmoderation.api.MysticModerationProvider";
+    private static final PluginIdentifier PLUGIN_ID =
+            new PluginIdentifier("org.hyzionstudios", "mysticmoderation");
 
     private final MysticCore core;
     private boolean enabled;
-    private boolean present;
 
     public ModerationBridge(MysticCore core) {
         this.core = core;
@@ -32,26 +37,26 @@ public final class ModerationBridge {
             core.log(Level.INFO, "Moderation integration: disabled in config");
             return;
         }
-        try {
-            Class.forName(PROVIDER_CLASS);
-            present = true;
-        } catch (Throwable t) {
-            present = false;
-        }
         core.log(Level.INFO, "Moderation integration: MysticModeration "
-                + (present ? "detected" : "not present"));
+                + (plugin().isPresent() ? "detected" : "not present yet"));
     }
 
     public boolean isAvailable() {
-        return enabled && present && api().isPresent();
+        return enabled && api().isPresent();
     }
 
     public Optional<Object> api() {
-        if (!enabled || !present) {
+        if (!enabled) {
             return Optional.empty();
         }
         try {
-            Object result = Class.forName(PROVIDER_CLASS).getMethod("get").invoke(null);
+            PluginBase moderationPlugin = plugin().orElse(null);
+            if (moderationPlugin == null) {
+                return Optional.empty();
+            }
+            Class<?> provider = Class.forName(PROVIDER_CLASS, false,
+                    moderationPlugin.getClass().getClassLoader());
+            Object result = provider.getMethod("get").invoke(null);
             if (result instanceof Optional<?> optional) {
                 return optional.map(Object.class::cast);
             }
@@ -70,5 +75,13 @@ public final class ModerationBridge {
                 return false;
             }
         }).orElse(false);
+    }
+
+    private Optional<PluginBase> plugin() {
+        try {
+            return Optional.ofNullable(HytaleServer.get().getPluginManager().getPlugin(PLUGIN_ID));
+        } catch (Throwable t) {
+            return Optional.empty();
+        }
     }
 }

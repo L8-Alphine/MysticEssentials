@@ -13,13 +13,14 @@ import org.hyzionstudios.mysticessentials.platform.command.MysticArgTypes;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommand;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommandSender;
 
+import com.hypixel.hytale.protocol.FlyMode;
 import com.hypixel.hytale.server.core.command.system.arguments.system.RequiredArg;
 import com.hypixel.hytale.server.core.entity.entities.player.movement.MovementManager;
 import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 
 /**
- * Flight: {@code /fly} toggles the verified {@code MovementSettings.canFly}
+ * Flight: {@code /fly} toggles the verified {@code MovementSettings.fly}
  * flag through the player's {@code MovementManager} component (mutated on the
  * player's world thread, then pushed to the client with
  * {@code MovementManager.update(packetHandler)}). Flight is always off until
@@ -48,8 +49,13 @@ public final class FlightModule extends AbstractMysticModule {
         config = core.configManager().loadModuleConfig(id(), FlightConfig.class, new FlightConfig());
         registerCommand(new FlyCommand());
         // World transfers and gamemode changes rebuild MovementSettings from
-        // defaults (no usable plugin event exposes them in 0.5.6), so flight is
-        // re-applied on a short loop for players who have it enabled.
+        // defaults, so flight is re-applied on a short loop for players who have
+        // it enabled. A loop rather than an event because the rebuild is not
+        // itself observable: AddPlayerToWorldEvent and the ECS
+        // ChangeGameModeEvent fire around it, not after it, and Update 6's new
+        // GameModeTypeEnterEvent/ExitEvent cover game-mode *types* (hardcore,
+        // spectator) rather than the Adventure/Creative switch that rebuilds
+        // movement settings.
         reapplyTask = core.scheduler().runRepeating(this::reapplyFlight, 10, 10, TimeUnit.SECONDS);
         registerEvent(PlayerDisconnectEvent.class, (PlayerDisconnectEvent event) ->
                 flying.remove(event.getPlayerRef().getUuid()));
@@ -63,7 +69,7 @@ public final class FlightModule extends AbstractMysticModule {
         startChargeTask();
     }
 
-    /** Re-applies canFly for flying players whose settings were rebuilt by the server. */
+    /** Re-applies the allowed fly mode for players whose settings were rebuilt by the server. */
     private void reapplyFlight() {
         for (UUID uuid : flying) {
             core.platform().findPlayer(uuid).ifPresent(player -> applyFlight(player, true));
@@ -145,7 +151,7 @@ public final class FlightModule extends AbstractMysticModule {
     }
 
     /**
-     * Mutates {@code MovementSettings.canFly} on the player's world thread and
+     * Mutates {@code MovementSettings.fly} on the player's world thread and
      * pushes the updated settings to the client.
      */
     private void applyFlight(PlayerRef player, boolean canFly) {
@@ -156,7 +162,7 @@ public final class FlightModule extends AbstractMysticModule {
                 return;
             }
             var settings = movement.getSettings();
-            settings.canFly = canFly;
+            settings.fly = canFly ? FlyMode.Allowed : FlyMode.Disabled;
             if (canFly) {
                 var defaults = movement.getDefaultSettings();
                 settings.horizontalFlySpeed = defaults.horizontalFlySpeed

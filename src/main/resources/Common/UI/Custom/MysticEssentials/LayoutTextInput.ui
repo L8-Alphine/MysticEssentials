@@ -4,6 +4,5 @@
 $C = "../Common.ui";
 
 $C.@TextField {
-  @Anchor = (Height: 34);
   FlexWeight: 1;
 }

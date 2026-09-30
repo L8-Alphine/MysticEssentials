@@ -38,6 +38,7 @@ public final class EconomyServiceImpl implements EconomyService {
     }
 
     public void init(boolean enabledInConfig) {
+        vaultPresent = false;
         vaultPresent = enabledInConfig && isClassPresent("net.cfh.vault.VaultUnlocked");
         if (!enabledInConfig) {
             core.log(Level.INFO, "Economy integration: disabled in config.");
@@ -76,58 +77,94 @@ public final class EconomyServiceImpl implements EconomyService {
     @Override
     public double balance(UUID player) {
         Economy economy = resolve();
-        if (economy == null) {
+        if (economy == null || player == null) {
             return 0.0;
         }
-        ensureAccount(economy, player);
-        return economy.balance(PLUGIN, player).doubleValue();
+        try {
+            ensureAccount(economy, player);
+            BigDecimal balance = economy.balance(PLUGIN, player);
+            return balance == null ? 0.0 : balance.doubleValue();
+        } catch (Throwable t) {
+            logFailure("balance", player, t);
+            return 0.0;
+        }
     }
 
     @Override
     public boolean has(UUID player, double amount) {
+        if (player == null || !validAmount(amount)) {
+            return false;
+        }
         Economy economy = resolve();
         if (economy == null) {
             return true;
         }
-        ensureAccount(economy, player);
-        return economy.has(PLUGIN, player, BigDecimal.valueOf(amount));
+        try {
+            ensureAccount(economy, player);
+            return economy.has(PLUGIN, player, BigDecimal.valueOf(amount));
+        } catch (Throwable t) {
+            logFailure("balance check", player, t);
+            return false;
+        }
     }
 
     @Override
     public boolean withdraw(UUID player, double amount) {
+        if (player == null || !validAmount(amount)) {
+            return false;
+        }
         Economy economy = resolve();
         if (economy == null) {
             return true;
         }
-        ensureAccount(economy, player);
-        EconomyResponse response = economy.withdraw(PLUGIN, player, BigDecimal.valueOf(amount));
-        return response != null && response.transactionSuccess();
+        try {
+            ensureAccount(economy, player);
+            EconomyResponse response = economy.withdraw(PLUGIN, player, BigDecimal.valueOf(amount));
+            return response != null && response.transactionSuccess();
+        } catch (Throwable t) {
+            logFailure("withdrawal", player, t);
+            return false;
+        }
     }
 
     @Override
     public boolean deposit(UUID player, double amount) {
+        if (player == null || !validAmount(amount)) {
+            return false;
+        }
         Economy economy = resolve();
         if (economy == null) {
             return true;
         }
-        ensureAccount(economy, player);
-        EconomyResponse response = economy.deposit(PLUGIN, player, BigDecimal.valueOf(amount));
-        return response != null && response.transactionSuccess();
+        try {
+            ensureAccount(economy, player);
+            EconomyResponse response = economy.deposit(PLUGIN, player, BigDecimal.valueOf(amount));
+            return response != null && response.transactionSuccess();
+        } catch (Throwable t) {
+            logFailure("deposit", player, t);
+            return false;
+        }
     }
 
     @Override
     public String format(double amount) {
         Economy economy = resolve();
-        if (economy == null) {
-            return String.format("%.2f", amount);
+        if (economy == null || !Double.isFinite(amount)) {
+            return String.format(java.util.Locale.ROOT, "%.2f", Double.isFinite(amount) ? amount : 0.0);
         }
-        return economy.format(BigDecimal.valueOf(amount));
+        try {
+            String formatted = economy.format(PLUGIN, BigDecimal.valueOf(amount));
+            return formatted == null ? String.format(java.util.Locale.ROOT, "%.2f", amount) : formatted;
+        } catch (Throwable t) {
+            core.log(Level.WARNING, "Economy formatting failed: " + t);
+            return String.format(java.util.Locale.ROOT, "%.2f", amount);
+        }
     }
 
     private void ensureAccount(Economy economy, UUID player) {
         try {
             if (!economy.hasAccount(player)) {
-                economy.createAccount(player, accountName(player));
+                economy.createAccount(player, accountName(player), true);
             }
         } catch (Throwable t) {
             core.log(Level.WARNING, "Economy account check failed for " + player + ": " + t);
@@ -144,6 +181,14 @@ public final class EconomyServiceImpl implements EconomyService {
         } catch (Throwable t) {
             return "unknown";
         }
+    }
+
+    private static boolean validAmount(double amount) {
+        return Double.isFinite(amount) && amount >= 0.0;
+    }
+
+    private void logFailure(String operation, UUID player, Throwable error) {
+        core.log(Level.WARNING, "Economy " + operation + " failed for " + player + ": " + error);
     }
 
     private static boolean isClassPresent(String name) {

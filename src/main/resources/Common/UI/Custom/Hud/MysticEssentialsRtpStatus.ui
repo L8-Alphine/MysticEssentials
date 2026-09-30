@@ -7,12 +7,21 @@ Group #RtpStatusHudRoot {
   LayoutMode: CenterMiddle;
 
   Group #RtpStatusPanel {
-    Background: #000000(0.35);
-    Padding: (Horizontal: 18, Vertical: 6);
-    LayoutMode: CenterMiddle;
+    Background: #0a0f16(0.55);
+    LayoutMode: Left;
 
-    Label #MysticRtpStatus {
-      Style: (FontSize: 18, TextColor: #55ffff, RenderBold: true, Alignment: Center, VerticalAlignment: Center);
+    Group {
+      Anchor: (Width: 3, Height: 34);
+      Background: #55ffff;
+    }
+
+    Group {
+      Padding: (Left: 14, Right: 16, Vertical: 6);
+      LayoutMode: CenterMiddle;
+
+      Label #MysticRtpStatus {
+        Style: (FontSize: 17, TextColor: #ffffff, RenderBold: true, Alignment: Center, VerticalAlignment: Center);
+      }
     }
   }
 }

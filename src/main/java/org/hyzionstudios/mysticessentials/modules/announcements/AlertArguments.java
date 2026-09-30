@@ -125,6 +125,7 @@ final class AlertArguments {
                 case "no-chat" -> builder.showInChat(false);
                 case "toast" -> builder.showAsToast(true);
                 case "actionbar" -> builder.showAsActionBar(true);
+                case "history" -> builder.storeInHistory(true);
                 case "no-history" -> builder.storeInHistory(false);
                 case "sticky" -> builder.dismissible(false);
                 default -> {

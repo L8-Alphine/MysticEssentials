@@ -7,6 +7,5 @@ $C.@SecondaryTextButton {
   // break this document -- it stops the client resolving documents from OTHER
   // packs, disconnecting every player at world join.
   @Text = "";
-  @Anchor = (Height: 40);
   FlexWeight: 1;
 }

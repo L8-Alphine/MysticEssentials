@@ -1,34 +1,45 @@
-// Row template for the AFK zone selection UI. Appended per zone:
+// Row template for the AFK zone picker. Appended per entry:
 //   cmd.append("#ZoneList", "MysticEssentials/AfkZoneRow.ui")
 // and populated by index: cmd.set("#ZoneList[i] #Name.TextSpans", ...).
+// #Swatch is recoloured by the server; #Selected marks the current selection.
+$M = "MysticTheme.ui";
 
 Button #Row {
-  Anchor: (Height: 56, Bottom: 8);
-  LayoutMode: Left;
-  Padding: (Left: 10, Right: 10, Top: 7, Bottom: 7);
-  Style: (
-    Default: (Background: #000000(0.18)),
-    Hovered: (Background: #7a9cc6(0.18)),
-    Pressed: (Background: #7a9cc6(0.28))
-  );
+  Anchor: (Height: 56, Bottom: 4);
+  Style: $M.@RowStyle;
+  LayoutMode: Full;
 
-  Group #Swatch {
-    Anchor: (Width: 8, Height: 42, Right: 10);
-    Background: #67c47a;
+  $M.@RowSelection #Selected {
+    @Height = 56;
   }
 
   Group {
-    LayoutMode: Top;
-    FlexWeight: 1;
+    Anchor: (Full: 0);
+    LayoutMode: Left;
+    Padding: (Left: 12, Right: 12, Top: 10, Bottom: 10);
 
-    Label #Name {
-      Anchor: (Height: 22, Bottom: 2);
-      Style: (FontSize: 16, TextColor: #ffffff, RenderBold: true, VerticalAlignment: Center);
+    $M.@IconWell {
+      @Anchor = (Right: 12);
+
+      Group #Swatch {
+        Anchor: (Width: 12, Height: 12);
+        Background: #67c47a;
+      }
     }
 
-    Label #Meta {
-      Anchor: (Height: 17);
-      Style: (FontSize: 12, TextColor: #9fb0c4, VerticalAlignment: Center);
+    Group {
+      LayoutMode: Top;
+      FlexWeight: 1;
+
+      Label #Name {
+        Anchor: (Height: 20, Bottom: 2);
+        Style: $M.@RowNameStyle;
+      }
+
+      Label #Meta {
+        Anchor: (Height: 14);
+        Style: $M.@RowMetaStyle;
+      }
     }
   }
 }

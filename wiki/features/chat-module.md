@@ -24,7 +24,7 @@ When `formatChat` is on, every message is rewritten through a permission-selecte
 | `/tell`, `/w`, `/whisper` | Aliases for `/msg` | `mysticessentials.chat.private.message` |
 | `/reply <message>`, `/r <message>` | Reply to your last private message | `mysticessentials.chat.private.reply` |
 
-Private messaging can deliver across servers over Redis (`allowCrossServer`) and fall back to [mail](mail-module) for offline players (`offlineToMail`). **Social spy** (`mysticessentials.chat.socialspy`) lets staff monitor private messages; players with `mysticessentials.chat.socialspy.exempt` are hidden from it.
+Private messaging can deliver across servers over Redis (`allowCrossServer`): `/msg` tab-completes and resolves players on every server in the network, and a player online nowhere falls back to [mail](mail-module) (`offlineToMail`). **Social spy** (`mysticessentials.chat.socialspy`) lets staff monitor private messages; players with `mysticessentials.chat.socialspy.exempt` are hidden from it.
 
 ## Channels
 
@@ -60,6 +60,7 @@ Channels are configured under `channels` in `modules/chat/config.json`. Top-leve
 | `enabled` | `true` | Enable channel commands and routing |
 | `defaultSpeak` | `"global"` | Channel new players speak in |
 | `defaultJoin` | `["global"]` | Channels new players listen to |
+| `crossServerPrefix` | `"&8[&b{server_id}&8] "` | Prepended to lines arriving from another server in a `crossServer` channel; supports `{server_id}`, blank disables, skipped when the channel `format` already uses `{server_id}` |
 | `allowTemporaryChannels` | `true` | Allow player-created session channels |
 | `temporaryChannelDefaultMinutes` | `120` | Redis restore window for temporary channels |
 | `createTemporaryPermission` | `mysticessentials.chat.channel.create.temp` | Permission to create temporary channels |
@@ -83,7 +84,7 @@ Each entry in `channels` supports:
 | `aliases` | Quick-switch command aliases (e.g. `["g","global"]`) |
 | `password` | Optional join password |
 | `joinPermission` / `speakPermission` / `listenPermission` / `moderatorPermission` | Fine-grained gates |
-| `crossServer` | Route this channel across servers over Redis |
+| `crossServer` | Route this channel across servers over Redis; inbound lines carry the origin server (see `crossServerPrefix` and `{server_id}`) |
 | `redisTopic` | Redis topic name for cross-server routing |
 | `radiusBlocks` | When > 0, only players within this many blocks receive messages (local/proximity chat) |
 | `locked` | Prevent new members from joining until an owner/moderator unlocks it |

@@ -53,7 +53,7 @@ Check Redis:
 - `storage.redis.enabled` is `true`.
 - All servers share the same `networkId`.
 - Each server has a unique `serverId`.
-- Redis host, port, and password are correct.
+- Redis host, port, username, and password are correct.
 - Firewall rules allow connections.
 
 Without Redis, cross-server features become local-only.

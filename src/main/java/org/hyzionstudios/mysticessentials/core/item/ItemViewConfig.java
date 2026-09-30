@@ -18,9 +18,11 @@ public final class ItemViewConfig {
     public Providers providers = new Providers();
 
     /**
-     * Quality definitions keyed by the engine's {@code Item.getQualityIndex()}.
-     * An index with no entry here yields <b>no</b> quality on the item — genuine
-     * absence — rather than a made-up placeholder.
+     * Optional display overrides keyed by the engine's
+     * {@code Item.getQualityIndex()}. The definition id must match the runtime
+     * quality id at that index (a namespace prefix is ignored), because asset
+     * packs can add qualities and shift index allocation. Unmatched or unlisted
+     * qualities are read directly from the engine asset.
      */
     public List<QualityDefinition> qualities = defaultQualities();
 

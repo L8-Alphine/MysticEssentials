@@ -3,8 +3,8 @@ package org.hyzionstudios.mysticessentials.api.rtp;
 /**
  * Boundary shape a Random Teleport profile samples candidate coordinates from.
  *
- * <p>{@code WORLD_BORDER} is honoured on a best-effort basis: the verified 0.5.6
- * server API does not expose a world-border query, so a profile using it samples
+ * <p>{@code WORLD_BORDER} is honoured on a best-effort basis: the server API
+ * still exposes no world-border query on 0.6.2, so a profile using it samples
  * a large square around its configured centre bounded by
  * {@link RtpProfile#maximumRadius}.</p>
  */

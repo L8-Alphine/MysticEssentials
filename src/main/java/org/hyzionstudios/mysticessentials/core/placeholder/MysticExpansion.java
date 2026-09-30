@@ -56,11 +56,6 @@ public final class MysticExpansion extends PlaceholderExpansion {
     }
 
     @Override
-    public String getDescription() {
-        return "Player profile, rank, and playtime placeholders from Mystic Essentials.";
-    }
-
-    @Override
     public boolean persist() {
         return true;
     }

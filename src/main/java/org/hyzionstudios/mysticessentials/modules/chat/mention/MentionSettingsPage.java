@@ -123,7 +123,7 @@ final class MentionSettingsPage extends MysticPage {
 
     /**
      * One scope row. The selection marker lives in the label text because
-     * per-element style is markup-only in 0.5.6 and cannot be set at runtime.
+     * per-element style is markup-only through 0.6.2 and cannot be set at runtime.
      */
     private void scopeRow(UICommandBuilder cmd, UIEventBuilder event, int index, String label,
             String scopeId, boolean selected, boolean selectable) {

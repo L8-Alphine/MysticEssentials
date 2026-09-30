@@ -1,28 +1,28 @@
-$C = "../Common.ui";
-
 // Sidebar navigation entry for the Mail UI. Appended per folder:
 //   cmd.append("#NavTop", "MysticEssentials/MailNavRow.ui")
 // then populated by index: cmd.set("#NavTop[i] #Label.TextSpans", ...),
 // active state via cmd.set("#NavTop[i] #Accent.Visible", true).
+$M = "MysticTheme.ui";
 
 Button #Row {
-  Anchor: (Height: 34, Bottom: 4);
-  LayoutMode: Left;
-  Padding: (Left: 6, Right: 6);
-  Style: (
-    Default: (Background: #000000(0.0)),
-    Hovered: (Background: #7a9cc6(0.16)),
-    Pressed: (Background: #7a9cc6(0.26))
-  );
+  Anchor: (Height: 34, Bottom: 3);
+  Style: $M.@TabStyle;
+  LayoutMode: Full;
 
-  Group #Accent {
-    Anchor: (Width: 3, Height: 22, Right: 10);
-    Background: #f0b429;
-    Visible: false;
-  }
+  Group {
+    Anchor: (Full: 0);
+    LayoutMode: Left;
+    Padding: (Left: 0, Right: 10);
 
-  Label #Label {
-    FlexWeight: 1;
-    Style: (FontSize: 14, TextColor: #c9d6e5, RenderBold: true, RenderUppercase: true, VerticalAlignment: Center);
+    Group #Accent {
+      Anchor: (Width: 3, Height: 34, Right: 11);
+      Background: #E8A93B;
+      Visible: false;
+    }
+
+    Label #Label {
+      FlexWeight: 1;
+      Style: (...$M.@TabLabelStyle, HorizontalAlignment: Start);
+    }
   }
 }

@@ -1,9 +1,13 @@
+// My Homes — master/detail. The list on the left is the navigation; the panel on
+// the right is the selected home with its actions. Destructive Delete lives at
+// the far end of the action bar, away from Teleport.
 $C = "../Common.ui";
+$M = "MysticTheme.ui";
 
 $C.@PageOverlay {}
 
 $C.@Container {
-  Anchor: (Width: 900, Height: 640);
+  Anchor: (Width: 920, Height: 640);
 
   #Title {
     Group {
@@ -11,9 +15,8 @@ $C.@Container {
         @Text = "My Homes";
       }
 
-      Label #HomeCount {
-        Anchor: (Top: 8, Right: 14, Width: 120, Height: 24);
-        Style: (FontSize: 14, TextColor: #96a9be, HorizontalAlignment: End, VerticalAlignment: Center);
+      $M.@HeaderMeta #HomeCount {
+        @Width = 160;
       }
     }
   }
@@ -21,69 +24,94 @@ $C.@Container {
   #Content {
     LayoutMode: Left;
 
+    // ---- Master: home list --------------------------------------------------
     Group {
       Anchor: (Width: 300);
       LayoutMode: Top;
 
-      Label #HomesEmpty {
-        Anchor: (Height: 40);
-        Style: (FontSize: 14, TextColor: #9fb0c4, VerticalAlignment: Center, Wrap: true);
-        Text: "You have no homes yet. Use /sethome <name>.";
-        Visible: false;
+      $M.@Section {
+        @Text = "Your Homes";
+        @Anchor = (Bottom: 10);
       }
 
-      Group #HomeList {
+      $M.@Well {
         FlexWeight: 1;
-        LayoutMode: TopScrolling;
-        Padding: (Right: 10);
-        ScrollbarStyle: $C.@DefaultScrollbarStyle;
+
+        Label #HomesEmpty {
+          Anchor: (Height: 72);
+          Style: $M.@EmptyStyle;
+          Text: "You have no homes yet. Set one below, or use /sethome <name>.";
+          Visible: false;
+        }
+
+        Group #HomeList {
+          FlexWeight: 1;
+          LayoutMode: TopScrolling;
+          Padding: (Right: 6);
+          ScrollbarStyle: $C.@DefaultScrollbarStyle;
+        }
       }
     }
 
+    $M.@ColumnDivider {}
+
+    // ---- Detail: selected home ----------------------------------------------
     Group {
       FlexWeight: 1;
       LayoutMode: TopScrolling;
-      Padding: (Left: 12);
+      Padding: (Right: 4);
       ScrollbarStyle: $C.@DefaultScrollbarStyle;
 
-      Group {
-        Background: (TexturePath: "../Common/ContainerPanelPatch.png", Border: 4);
-        LayoutMode: Top;
-        Padding: (Full: 16);
+      $M.@Panel {
         Anchor: (Bottom: 12);
 
+        $M.@Section {
+          @Text = "Selected Home";
+          @Style = $M.@EyebrowGoldStyle;
+          @Anchor = (Bottom: 8);
+        }
+
         Label #SelectedHome {
-          Anchor: (Bottom: 8);
-          Style: (FontSize: 20, RenderBold: true, TextColor: #ffffff);
+          Anchor: (Height: 32, Bottom: 6);
+          Style: $M.@DisplayStyle;
+        }
+
+        $M.@Hairline {
+          @Anchor = (Bottom: 6);
+        }
+
+        $M.@KvRow {
+          $M.@Key { @Text = "Location"; }
+          Label #HomeWorld { FlexWeight: 1; Style: $M.@ValueStyle; }
+        }
+
+        $M.@Hairline {
+          @Anchor = (Top: 6, Bottom: 12);
+        }
+
+        $M.@FieldLabel {
+          @Text = "Rename";
         }
 
         Group {
           LayoutMode: Left;
-          Anchor: (Bottom: 10);
-          Label { Anchor: (Width: 100); Style: (...$C.@DefaultLabelStyle, FontSize: 13, RenderBold: true); Text: "Location"; }
-          Label #HomeWorld { FlexWeight: 1; Style: (...$C.@DefaultLabelStyle, FontSize: 13); }
-        }
-
-        Group {
-          LayoutMode: Left;
-          Anchor: (Height: 38);
+          Anchor: (Height: 44);
 
           $C.@TextField #RenameInput {
-            @Anchor = (Right: 8);
+            @Anchor = (Vertical: 3, Right: 8);
             FlexWeight: 1;
             PlaceholderText: "New name";
           }
 
           $C.@SecondaryTextButton #RenameButton {
             @Text = "Rename";
-            @Anchor = (Width: 140);
+            @Anchor = (Width: 130);
           }
         }
       }
 
-      Group {
-        LayoutMode: Left;
-        Anchor: (Height: 44, Bottom: 8);
+      $M.@ActionBar {
+        @Anchor = (Height: 44, Bottom: 18);
 
         $C.@TextButton #TeleportButton {
           @Text = "Teleport";
@@ -92,43 +120,41 @@ $C.@Container {
 
         $C.@SecondaryTextButton #MoveHereButton {
           @Text = "Move Here";
-          @Anchor = (Width: 170);
+          @Anchor = (Width: 150);
         }
-      }
 
-      Group {
-        LayoutMode: Left;
-        Anchor: (Height: 44, Bottom: 14);
+        $M.@Spacer {}
 
         $C.@CancelTextButton #DeleteButton {
-          @Text = "Delete Home";
-          @Anchor = (Width: 200);
+          @Text = "Delete";
+          @Anchor = (Width: 120);
         }
       }
 
-      $C.@PanelSeparatorFancy {
-        @Anchor = (Bottom: 10);
+      $M.@Section {
+        @Text = "Set a New Home";
+        @Anchor = (Bottom: 6);
       }
 
       Label {
-        Anchor: (Bottom: 6);
-        Style: (...$C.@DefaultLabelStyle, FontSize: 13, RenderBold: true);
-        Text: "Set a new home at your location";
+        Anchor: (Height: 18, Bottom: 8);
+        Style: $M.@CaptionStyle;
+        Text: "Saves where you are standing right now under a new name.";
       }
 
       Group {
         LayoutMode: Left;
-        Anchor: (Height: 38);
+        Anchor: (Height: 44);
 
         $C.@TextField #NewHomeName {
-          @Anchor = (Right: 8);
+          @Anchor = (Vertical: 3, Right: 8);
           FlexWeight: 1;
           PlaceholderText: "Home name";
         }
 
         $C.@SecondaryTextButton #CreateHomeButton {
           @Text = "Set Home";
-          @Anchor = (Width: 150);
+          @Anchor = (Width: 140);
         }
       }
     }

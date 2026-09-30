@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
 import java.util.function.Function;
 
 import org.hyzionstudios.mysticessentials.core.MysticCore;
@@ -20,7 +21,7 @@ import com.hypixel.hytale.server.core.universe.world.World;
 /**
  * String argument types that feed the client's tab-completion popup.
  *
- * <p><b>Why these exist</b> (verified against Server 0.5.6): the per-argument
+ * <p><b>Why these exist</b> (verified against Server 0.6.2): the per-argument
  * {@code Argument.suggest(SuggestionProvider)} hook never reaches the client.
  * Its only reader is {@code Argument.getSuggestions(...)}, which nothing in the
  * server calls. What the client actually does is send an
@@ -66,6 +67,10 @@ public final class MysticArgTypes {
     public static final SingleArgumentType<String> PLAYER_NAME = new DynamicString(
             PLAYER_NAME_KEY, PLAYER_USAGE_KEY, MysticArgTypes::visiblePlayerNames);
 
+    /** An online player on this server or any Redis-connected network server. */
+    public static final SingleArgumentType<String> NETWORK_PLAYER_NAME = new DynamicString(
+            PLAYER_NAME_KEY, PLAYER_USAGE_KEY, MysticArgTypes::visibleNetworkPlayerNames);
+
     /** The name of a loaded world. */
     public static final SingleArgumentType<String> WORLD_NAME = new DynamicString(
             WORLD_NAME_KEY, WORLD_USAGE_KEY, sender -> worldNames());
@@ -95,6 +100,27 @@ public final class MysticArgTypes {
             names.add(player.getUsername());
         }
         return names;
+    }
+
+    /** Network-wide player names, conservatively excluding remotely vanished players. */
+    public static List<String> visibleNetworkPlayerNames(CommandSender sender) {
+        MysticCore instance = core;
+        if (instance == null || instance.networkPlayers() == null) {
+            return visiblePlayerNames(sender);
+        }
+        java.util.LinkedHashSet<String> names = new java.util.LinkedHashSet<>(visiblePlayerNames(sender));
+        UUID viewer = sender == null ? null : sender.getUuid();
+        for (var player : instance.networkPlayers().onlinePlayers()) {
+            if (player.local(instance.networkPlayers().localServerId())) {
+                continue;
+            }
+            // A remote server cannot evaluate this viewer's local permission
+            // context, so never leak a vanished remote player through completion.
+            if (!player.vanished() && (viewer == null || !viewer.equals(player.uuid()))) {
+                names.add(player.username());
+            }
+        }
+        return new ArrayList<>(names);
     }
 
     /** Names of every loaded world. */
@@ -144,8 +170,8 @@ public final class MysticArgTypes {
 
         /**
          * The token being completed. The client sends just the partial word, but
-         * the (unused in 0.5.6) per-argument path passes every token joined, so
-         * take the last one either way.
+         * the (still unused on 0.6.2) per-argument path passes every token
+         * joined, so take the last one either way.
          */
         private static String partialToken(String input) {
             if (input == null || input.isBlank()) {

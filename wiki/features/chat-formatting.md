@@ -50,6 +50,7 @@ Assign the gating nodes (`mysticessentials.chat.format.owner`, `...vip`) to the 
 | `{player_name}` | The account username |
 | `{display_name}` | Nickname if set, otherwise the username |
 | `{channel}` | The sender's current channel display name |
+| `{server_id}` | Origin server of a line that arrived over Redis (empty for local lines); the channel `crossServerPrefix` adds it automatically when a format does not |
 | `{message}` | The player's message text |
 | `{luckperms_prefix}`, `{luckperms_suffix}` | LuckPerms meta prefix/suffix (when LuckPerms is present) |
 | `{playtime}` / `{playtime_total}` | Total playtime, formatted (`3d 4h 21m`) |

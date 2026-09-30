@@ -688,11 +688,7 @@ public final class MentionSubModule {
                     "Configure who may mention you and how you are notified.");
             addAliases("mentionsettings");
             allowExtraArguments();
-        }
-
-        @Override
-        protected boolean canGeneratePermission() {
-            return false;
+            requireNoPermission();
         }
 
         @Override

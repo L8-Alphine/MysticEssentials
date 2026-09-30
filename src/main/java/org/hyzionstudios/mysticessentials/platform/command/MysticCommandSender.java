@@ -40,7 +40,7 @@ public final class MysticCommandSender {
 
     /**
      * How many leading tokens of the input belong to the command itself rather
-     * than its arguments. Verified against 0.5.6: both the console path and the
+     * than its arguments. Verified against 0.6.2: both the console path and the
      * client chat path hand {@code CommandManager.handleCommand} the <b>whole
      * command line</b>, and {@code ParserContext.inputString} joins all of its
      * tokens — so the input starts with the called command's name path (as

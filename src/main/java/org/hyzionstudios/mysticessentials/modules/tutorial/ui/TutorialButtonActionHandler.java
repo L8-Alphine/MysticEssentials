@@ -9,7 +9,10 @@ import org.hyzionstudios.mysticessentials.modules.tutorial.session.TutorialPlayO
 import org.hyzionstudios.mysticessentials.modules.tutorial.util.TutorialPlaceholders;
 import org.hyzionstudios.mysticessentials.api.model.MysticLocation;
 
+import com.hypixel.hytale.protocol.SoundCategory;
+import com.hypixel.hytale.server.core.asset.type.soundevent.config.SoundEvent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.universe.world.SoundUtil;
 
 /**
  * Executes a tutorial page button's action. Called from the page's
@@ -69,8 +72,8 @@ public final class TutorialButtonActionHandler {
             }
             case MESSAGE -> core.getMessageService().send(player, value);
             case URL ->
-                // No client browser-open packet exists in 0.5.6; deliver as a
-                // clickable chat link instead (MysticText <link:> markup).
+                // No client browser-open packet exists through 0.6.2; deliver as
+                // a clickable chat link instead (MysticText <link:> markup).
                 core.getMessageService().send(player, "&7Link: <link:" + value + ">&b" + value + "</link>");
             case TELEPORT -> {
                 controls.closePage();
@@ -83,11 +86,39 @@ public final class TutorialButtonActionHandler {
                     core.platform().teleportEntity(player, destination);
                 }
             }
-            case SOUND ->
-                // TODO: no verified play-sound-to-player API in the 0.5.6 server
-                // jar; wire this once one exists.
-                module.logger().debug("Button '" + button.id + "' requested sound '" + value
-                        + "' — sound actions are not supported on Hytale 0.5.6.");
+            case SOUND -> playSound(player, pageId, button.id, value);
+        }
+    }
+
+    /**
+     * Plays a 2D sound event to one player, the same resolution the builtin
+     * {@code /sound play2d} command and the custom-command sound action use:
+     * look the name up in the sound asset map, then push it to that player.
+     * Asset packs differ between servers, so an unknown name is logged and
+     * skipped rather than treated as a configuration error.
+     */
+    private void playSound(PlayerRef player, String pageId, String buttonId, String soundEvent) {
+        if (soundEvent == null || soundEvent.isBlank()) {
+            module.logger().error("Page '" + pageId + "' button '" + buttonId
+                    + "' has a sound action with no sound event name");
+            return;
+        }
+        int index;
+        try {
+            index = SoundEvent.getAssetMap().getIndexOrDefault(soundEvent, -1);
+        } catch (Throwable t) {
+            module.logger().error("Sound asset lookup failed for '" + soundEvent + "': " + t);
+            return;
+        }
+        if (index < 0) {
+            module.logger().error("Page '" + pageId + "' button '" + buttonId
+                    + "' requested unknown sound event '" + soundEvent + "'; skipped.");
+            return;
+        }
+        try {
+            SoundUtil.playSoundEvent2dToPlayer(player, index, SoundCategory.UI, 1.0f, 1.0f);
+        } catch (Throwable t) {
+            module.logger().error("Could not play button sound '" + soundEvent + "': " + t);
         }
     }
 

@@ -10,10 +10,14 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
  * The two HUD overlays the notification engine draws: the persistent banner
  * (this platform's boss bar) and the action-bar line.
  *
- * <p>0.5.6 has no native boss bar or action bar, so both are custom HUD
- * documents. Keeping them here rather than in the delivery class means the
- * delivery logic stays about <i>policy</i> — which surfaces, for whom — and the
- * markup details stay in one small place.</p>
+ * <p>Both are custom HUD documents. There is still no native action bar on
+ * 0.6.2, and Update 6's new {@code UpdateBossBar} packet does not fit either:
+ * it carries {@code (entityNetworkId, name, hide)} — a nameplate bound to a
+ * living entity, with no progress value and no way to address a free-standing
+ * message — so an arbitrary notification banner cannot be expressed through it.
+ * Keeping both here rather than in the delivery class means the delivery logic
+ * stays about <i>policy</i> — which surfaces, for whom — and the markup details
+ * stay in one small place.</p>
  */
 final class NotificationHuds {
 

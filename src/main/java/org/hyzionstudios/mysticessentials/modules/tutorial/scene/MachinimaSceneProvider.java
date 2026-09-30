@@ -16,14 +16,14 @@ import com.hypixel.hytale.server.core.entity.entities.player.CameraManager;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 
 /**
- * Plays cinematic scenes through the <b>verified</b> Hytale 0.5.6 machinima
+ * Plays cinematic scenes through the <b>verified</b> Hytale 0.6.2 machinima
  * protocol: {@code UpdateMachinimaScene(player, sceneName, frame, updateType,
  * scene)} sent to the client via {@code PlayerRef.getPacketHandler()}, with
  * {@code SceneUpdateType.Play} / {@code Stop}. Camera recovery uses the
  * verified {@code CameraManager.resetCamera(PlayerRef)} component call.
  *
- * <p><b>Known limits of the 0.5.6 surface</b> (checked against the decompiled
- * server jar): the server has no machinima scene registry, no scene-progress
+ * <p><b>Known limits of the surface through 0.6.2</b> (checked against the
+ * decompiled server jar): the server has no machinima scene registry, no scene-progress
  * event, and no completion callback — the packet layer is fire-and-forget and
  * scene/path assets live client-side. Consequences:</p>
  * <ul>
@@ -113,7 +113,7 @@ public final class MachinimaSceneProvider implements TutorialSceneProvider {
             return CompletableFuture.completedFuture(
                     TutorialSceneResult.of(TutorialSceneResultType.COMPLETED, "fire-and-forget"));
         }
-        // No completion signal exists in 0.5.6 (see class javadoc); treat the
+        // No completion signal exists through 0.6.2 (see class javadoc); treat the
         // configured scene time budget as the scene duration.
         ScheduledFuture<?> completionTask = core.scheduler().runLater(() -> {
             Running entry = running.remove(request.playerId);

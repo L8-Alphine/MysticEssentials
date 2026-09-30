@@ -7,6 +7,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
 import org.hyzionstudios.mysticessentials.core.MysticCore;
+import org.hyzionstudios.mysticessentials.core.network.NetworkPlayerService.NetworkPlayer;
 import org.hyzionstudios.mysticessentials.api.notification.Notification;
 import org.hyzionstudios.mysticessentials.api.notification.NotificationAudience;
 import org.hyzionstudios.mysticessentials.api.notification.NotificationCategory;
@@ -29,6 +30,7 @@ public final class PrivateMessagingSubModule {
     private final MysticCore core;
     private final ChatModule chat;
     private final java.util.Map<UUID, UUID> replyTargets = new java.util.concurrent.ConcurrentHashMap<>();
+    private final Consumer<String> redisHandler = this::handleRemotePm;
 
     private ChatConfig.PrivateMessaging config = new ChatConfig.PrivateMessaging();
 
@@ -44,9 +46,7 @@ public final class PrivateMessagingSubModule {
         }
         commandRegistrar.accept(new MessageCommand());
         commandRegistrar.accept(new ReplyCommand());
-        if (this.config.allowCrossServer && core.redis().isEnabled()) {
-            core.redis().subscribe(CHANNEL_PM, this::handleRemotePm);
-        }
+        core.redis().subscribe(CHANNEL_PM, redisHandler);
     }
 
     public void reload(ChatConfig.PrivateMessaging config) {
@@ -54,6 +54,7 @@ public final class PrivateMessagingSubModule {
     }
 
     public void disable() {
+        core.redis().unsubscribe(CHANNEL_PM, redisHandler);
         replyTargets.clear();
     }
 
@@ -63,21 +64,53 @@ public final class PrivateMessagingSubModule {
         }
         Optional<PlayerRef> target = core.platform().findPlayer(to);
         Optional<PlayerRef> sender = core.platform().findPlayer(from);
+        // A managed child's policy (MysticIdentity) decides whether these two may message
+        // at all; guardians and trusted staff are exempt inside that answer. Asked here so
+        // /msg, /reply and API callers all refuse the same way, before any delivery path.
+        if (!core.managedAccounts().allowsInteraction(from, to,
+                org.hyzionstudios.mysticessentials.core.integration.ManagedAccountsBridge.TEXT_PRIVATE)) {
+            sender.ifPresent(ref -> core.getMessageService().sendKey(ref, "pm-blocked",
+                    Map.of("target", target.map(PlayerRef::getUsername).orElse("that player"))));
+            return CompletableFuture.completedFuture(false);
+        }
         String fromName = sender.map(PlayerRef::getUsername).orElse("Server");
         String prepared = sender.map(ref -> chat.preparePlayerMessage(ref, message)).orElse(message);
         if (target.isPresent()) {
             deliverLocalPm(from, fromName, target.get(), prepared);
             return CompletableFuture.completedFuture(true);
         }
-        if (config.allowCrossServer && core.redis().isEnabled()) {
+        // Elsewhere on the network: relay by UUID. The Redis roster says whether the
+        // player is online at all, so a truly offline player falls through to mail
+        // instead of a relay nobody receives.
+        NetworkPlayer remote = remotePlayer(to).orElse(null);
+        if (remote != null) {
             publishPm(from.toString(), fromName, to.toString(), null, prepared);
-            echoToSender(from, "player", prepared);
+            echoToSender(from, remote.username(), prepared);
             return CompletableFuture.completedFuture(true);
         }
         if (config.offlineToMail && core.getMailService() != null) {
             return core.getMailService().send(from, fromName, to, prepared).thenApply(ignored -> true);
         }
         return CompletableFuture.completedFuture(false);
+    }
+
+    /** A player online on another network server (never a remotely vanished one). */
+    private Optional<NetworkPlayer> remotePlayer(UUID uuid) {
+        if (!config.allowCrossServer || !core.redis().isEnabled() || core.networkPlayers() == null) {
+            return Optional.empty();
+        }
+        return core.networkPlayers().find(uuid)
+                .filter(player -> !player.local(core.networkPlayers().localServerId()))
+                .filter(player -> !player.vanished());
+    }
+
+    private Optional<NetworkPlayer> remotePlayerByName(String username) {
+        if (!config.allowCrossServer || !core.redis().isEnabled() || core.networkPlayers() == null) {
+            return Optional.empty();
+        }
+        return core.networkPlayers().findByName(username)
+                .filter(player -> !player.local(core.networkPlayers().localServerId()))
+                .filter(player -> !player.vanished());
     }
 
     private void deliverLocalPm(UUID from, String fromName, PlayerRef target, String message) {
@@ -114,6 +147,9 @@ public final class PrivateMessagingSubModule {
     }
 
     private void handleRemotePm(String payload) {
+        if (!config.enabled || !config.allowCrossServer) {
+            return;
+        }
         JsonObject o = Json.asObject(Json.parse(payload));
         String message = o.has("message") ? o.get("message").getAsString() : "";
         String fromName = o.has("fromName") ? o.get("fromName").getAsString() : "Server";
@@ -127,10 +163,19 @@ public final class PrivateMessagingSubModule {
         if (target == null) {
             return;
         }
-        notifyPrivateMessage(target, fromName, message);
         UUID fromUuid = null;
         if (o.has("fromUuid")) {
             fromUuid = UUID.fromString(o.get("fromUuid").getAsString());
+        }
+        // The origin server may not know this child's policy; the server the child is on
+        // does, so the pair is judged again here. Dropped quietly: the sender already saw
+        // their echo on their own server.
+        if (!core.managedAccounts().allowsInteraction(fromUuid, target.getUuid(),
+                org.hyzionstudios.mysticessentials.core.integration.ManagedAccountsBridge.TEXT_PRIVATE)) {
+            return;
+        }
+        notifyPrivateMessage(target, fromName, message);
+        if (fromUuid != null) {
             replyTargets.put(target.getUuid(), fromUuid);
         }
         notifySocialSpies(fromUuid, fromName, target, message);
@@ -179,7 +224,7 @@ public final class PrivateMessagingSubModule {
 
     private final class MessageCommand extends MysticCommand {
         private final RequiredArg<String> targetName = withRequiredArg("player", "Target player",
-                MysticArgTypes.PLAYER_NAME);
+                MysticArgTypes.NETWORK_PLAYER_NAME);
         private final RequiredArg<String> message =
                 withRequiredArg("message", "Message", ArgTypes.GREEDY_STRING);
 
@@ -208,10 +253,11 @@ public final class PrivateMessagingSubModule {
                 privateMessage(sender.uuid(), target.get().getUuid(), body);
                 return;
             }
-            if (config.allowCrossServer && core.redis().isEnabled()) {
-                publishPm(sender.uuid().toString(), sender.name(), null, name, chat.preparePlayerMessage(
-                        sender.player().orElse(null), body));
-                echoToSender(sender.uuid(), name, body);
+            // Online on another network server: resolve the name through the Redis
+            // roster and relay by UUID, the same path /reply and the API use.
+            Optional<NetworkPlayer> remote = remotePlayerByName(name);
+            if (remote.isPresent()) {
+                privateMessage(sender.uuid(), remote.get().uuid(), body);
                 return;
             }
             if (config.offlineToMail && core.getMailService() != null) {

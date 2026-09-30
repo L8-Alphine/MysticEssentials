@@ -25,6 +25,7 @@ public final class RandomTeleportConfig {
     public Defaults randomTeleport = new Defaults();
     public SearchEngine searchEngine = new SearchEngine();
     public Warmup warmup = new Warmup();
+    public MysticRpgSafety mysticRpgSafety = new MysticRpgSafety();
 
     /**
      * Block-type tags whose blocks make a candidate's ground unsafe. Honoured
@@ -79,6 +80,25 @@ public final class RandomTeleportConfig {
         public boolean cancelOnCombat = true;
         public boolean cancelOnWorldChange = true;
         public boolean cancelOnLogout = true;
+    }
+
+    /**
+     * Optional MysticRPG-aware destination safety. When MysticRPG and its World
+     * module are available, RTP candidates must fall inside the configured
+     * content-level band around the requesting player's current RPG level.
+     */
+    public static final class MysticRpgSafety {
+        public boolean enabled = true;
+        /** Lowest allowed content level relative to the player's level. */
+        public int minimumLevelOffset = -10;
+        /** Highest allowed content level relative to the player's level. */
+        public int maximumLevelOffset = 3;
+        /** MysticRPG sanctuary/safe regions do not need a combat-level match. */
+        public boolean allowSafeRegions = true;
+        /** Refuse RTP if MysticRPG is active but the online profile is not loaded. */
+        public boolean rejectWhenProfileUnavailable = true;
+        /** Refuse RTP when an installed but incompatible MysticRPG API cannot be queried. */
+        public boolean rejectOnIntegrationError = true;
     }
 
     /** Builds the first-run config with one worked-example wilderness profile. */

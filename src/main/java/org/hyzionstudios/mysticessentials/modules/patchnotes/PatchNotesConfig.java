@@ -10,8 +10,9 @@ import java.util.List;
  * keys via Gson; defaults here define the file written on first run.
  *
  * <p>The visual theme (dark navy list + content panes, colour-coded lines) is
- * baked into the {@code .ui} files rather than exposed here: Hytale 0.5.6 Custom
- * UI Labels take a static style only, so colours cannot be re-themed at runtime.</p>
+ * baked into the {@code .ui} files rather than exposed here: Hytale Custom UI
+ * Labels take a static style only through 0.6.2, so colours cannot be re-themed
+ * at runtime.</p>
  */
 public final class PatchNotesConfig {
 

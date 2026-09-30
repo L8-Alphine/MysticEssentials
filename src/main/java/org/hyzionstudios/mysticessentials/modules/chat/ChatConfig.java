@@ -54,6 +54,13 @@ public final class ChatConfig {
         public boolean enabled = true;
         public String defaultSpeak = "global";
         public List<String> defaultJoin = new ArrayList<>(List.of("global"));
+        /**
+         * Prepended to lines that arrive over Redis from another server in a
+         * {@code crossServer} channel, so readers can tell where a message came
+         * from. Supports {@code {server_id}}. Blank disables it; it is also skipped
+         * when the channel format already places {@code {server_id}} itself.
+         */
+        public String crossServerPrefix = "&8[&b{server_id}&8] ";
         public boolean allowTemporaryChannels = true;
         public int temporaryChannelDefaultMinutes = 120;
         public String createTemporaryPermission = "mysticessentials.chat.channel.create.temp";
@@ -136,7 +143,7 @@ public final class ChatConfig {
         public int recentTextActivitySeconds = 30;
         /** Query the voice provider for a live speaking indicator (no-op without a provider). */
         public boolean activeSpeakerIndicator = true;
-        /** Typing has no client signal in 0.5.6; kept for config compatibility, off by default. */
+        /** Typing still has no client signal on 0.6.2; kept for config compatibility, off by default. */
         public boolean typingIndicator = false;
     }
 

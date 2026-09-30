@@ -21,11 +21,15 @@ public final class AnnouncementConfig {
     public String alertPrefix = "&8[&c&lALERT&8] &c";
     /** Headline shown through Hytale's built-in event-title system. */
     public String broadcastTitle = "Announcement";
-    /** Vanilla AssetMap id played for broadcasts and rotating announcements. */
+    /** Vanilla AssetMap id played for rotating announcements and AnnouncementService sends. */
     public String broadcastSound = NotificationSounds.ANNOUNCEMENT;
     /** Headline shown through Hytale's built-in event-title system. */
     public String alertTitle = "Alert";
-    /** Vanilla AssetMap id played for alerts. */
+    /**
+     * Legacy default retained for config compatibility. Manual alerts are silent
+     * unless their sender supplies {@code --sound <id>}.
+     */
+    @Deprecated
     public String alertSound = NotificationSounds.ALERT;
     public List<JsonElement> messages = defaultMessages();
 

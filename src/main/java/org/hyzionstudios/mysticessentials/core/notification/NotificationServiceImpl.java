@@ -180,9 +180,13 @@ public final class NotificationServiceImpl implements NotificationService {
                     delivery.deliver(recipient, notification, category, profile, preferences,
                             critical || notification.bypassPlayerPreferences()));
         }
-        // Recorded regardless of whether anything was shown: history exists
-        // precisely for the notifications a player did not see live.
-        if (notification.storeInHistory().orElse(profile.history)) {
+        // Explicit choices always win. Otherwise history is reserved for durable
+        // important/critical notices; routine broadcasts, AFK lines, private
+        // messages, and similar traffic must not churn through the inbox cap.
+        boolean storeInHistory = notification.storeInHistory()
+                .orElse(profile.history
+                        && notification.priority().atLeast(NotificationPriority.IMPORTANT));
+        if (storeInHistory) {
             store.record(uuid, toRecord(notification, category));
         }
     }

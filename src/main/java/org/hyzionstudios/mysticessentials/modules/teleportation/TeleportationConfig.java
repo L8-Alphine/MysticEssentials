@@ -6,6 +6,9 @@ import java.util.List;
 /** Persisted teleportation settings for {@code modules/teleportation/config.json}. */
 public final class TeleportationConfig {
 
+    /** Redis-backed network player discovery, requests, and server handoff. */
+    public CrossServer crossServer = new CrossServer();
+
     /** Seconds before a pending /tpa request expires. */
     public int requestExpirySeconds = 60;
 
@@ -29,4 +32,16 @@ public final class TeleportationConfig {
 
     /** Destination worlds blocked for every teleport routed through the module. */
     public List<String> worldBlacklist = new ArrayList<>();
+
+    public static final class CrossServer {
+        /** Uses Redis automatically when both this switch and storage.redis.enabled are true. */
+        public boolean enabled = true;
+        /**
+         * Delay after a transferred player is ready in the destination world before
+         * the accepted teleport completes (lets chunks settle around them first).
+         */
+        public int arrivalDelaySeconds = 1;
+        /** How long an accepted transfer waits for the player to arrive before it is dropped. */
+        public int arrivalTimeoutSeconds = 30;
+    }
 }

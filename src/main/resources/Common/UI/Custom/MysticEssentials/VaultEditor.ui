@@ -1,9 +1,12 @@
+// Edit Vault — the vault's identity on the left (name, colour, icon id, lore),
+// a live icon preview and searchable item picker on the right.
 $C = "../Common.ui";
+$M = "MysticTheme.ui";
 
 $C.@PageOverlay {}
 
 $C.@Container {
-  Anchor: (Width: 940, Height: 620);
+  Anchor: (Width: 960, Height: 640);
 
   #Title {
     Group {
@@ -11,9 +14,8 @@ $C.@Container {
         @Text = "Edit Vault";
       }
 
-      Label #Subtitle {
-        Anchor: (Top: 8, Right: 14, Width: 260, Height: 24);
-        Style: (FontSize: 13, TextColor: #96a9be, HorizontalAlignment: End, VerticalAlignment: Center);
+      $M.@HeaderMeta #Subtitle {
+        @Width = 260;
       }
     }
   }
@@ -21,121 +23,105 @@ $C.@Container {
   #Content {
     LayoutMode: Left;
 
-    // ----- Left column: text/colour fields + actions -----
+    // ----- Identity ---------------------------------------------------------
     Group {
       Anchor: (Width: 420);
       LayoutMode: Top;
-      Padding: (Right: 16);
 
-      Group #NameRow {
-        LayoutMode: Top;
-        Anchor: (Bottom: 12);
+      $M.@Panel {
+        Group #NameRow {
+          LayoutMode: Top;
+          Anchor: (Bottom: 12);
 
-        Label {
-          Anchor: (Bottom: 6);
-          Style: (...$C.@DefaultLabelStyle, FontSize: 13, RenderBold: true);
-          Text: "Name";
+          $M.@FieldLabel { @Text = "Name"; }
+
+          $C.@TextField #NameInput {
+            PlaceholderText: "Vault name";
+          }
         }
 
-        $C.@TextField #NameInput {
-          @Anchor = (Height: 38);
-          PlaceholderText: "Vault name";
-        }
-      }
+        Group #ColorRow {
+          LayoutMode: Left;
+          Anchor: (Height: 32, Bottom: 12);
 
-      Group #ColorRow {
-        LayoutMode: Left;
-        Anchor: (Height: 38, Bottom: 12);
+          Label {
+            Anchor: (Width: 110);
+            Style: $M.@KeyStyle;
+            Text: "Colour";
+          }
 
-        Label {
-          Anchor: (Width: 130);
-          Style: (...$C.@DefaultLabelStyle, FontSize: 13, RenderBold: true, VerticalAlignment: Center);
-          Text: "Color";
-        }
-
-        ColorPickerDropdownBox #ColorInput {
-          Anchor: (Width: 50, Height: 32);
-          Format: Rgb;
-          Style: $C.@DefaultColorPickerDropdownBoxStyle;
-          Color: #7a9cc6;
-          DisplayTextField: true;
-        }
-      }
-
-      Group #IconRow {
-        LayoutMode: Top;
-        Anchor: (Bottom: 12);
-
-        Label {
-          Anchor: (Bottom: 6);
-          Style: (...$C.@DefaultLabelStyle, FontSize: 13, RenderBold: true);
-          Text: "Icon item id";
+          ColorPickerDropdownBox #ColorInput {
+            Anchor: (Width: 50, Height: 32);
+            Format: Rgb;
+            Style: $C.@DefaultColorPickerDropdownBoxStyle;
+            Color: #7a9cc6;
+            DisplayTextField: true;
+          }
         }
 
-        $C.@TextField #IconInput {
-          @Anchor = (Height: 38);
-          PlaceholderText: "e.g. Stone (or pick on the right)";
-        }
-      }
+        Group #IconRow {
+          LayoutMode: Top;
+          Anchor: (Bottom: 12);
 
-      Group #DescriptionRow {
-        LayoutMode: Top;
-        Anchor: (Bottom: 12);
+          $M.@FieldLabel { @Text = "Icon item id"; }
 
-        Label {
-          Anchor: (Bottom: 6);
-          Style: (...$C.@DefaultLabelStyle, FontSize: 13, RenderBold: true);
-          Text: "Description";
+          $C.@TextField #IconInput {
+            PlaceholderText: "e.g. Stone — or pick one on the right";
+          }
         }
 
-        $C.@TextField #DescriptionInput {
-          @Anchor = (Height: 38);
-          PlaceholderText: "Optional lore shown on the card";
+        Group #DescriptionRow {
+          LayoutMode: Top;
+
+          $M.@FieldLabel { @Text = "Description  ·  optional"; }
+
+          $C.@TextField #DescriptionInput {
+            PlaceholderText: "Lore shown on the vault card";
+          }
         }
       }
 
-      Group {
-        FlexWeight: 1;
-      }
+      $M.@Spacer {}
 
-      Group {
-        LayoutMode: Left;
-        Anchor: (Height: 44);
+      $M.@ActionBar {
+        @Anchor = (Height: 44);
 
         $C.@TextButton #ApplyButton {
           @Text = "Apply";
-          @Anchor = (Width: 150, Right: 8);
+          @Anchor = (Width: 140, Right: 8);
         }
 
         $C.@SecondaryTextButton #ResetButton {
           @Text = "Reset";
-          @Anchor = (Width: 130, Right: 8);
+          @Anchor = (Width: 120);
         }
 
-        $C.@CancelTextButton #BackButton {
+        $M.@Spacer {}
+
+        $C.@TertiaryTextButton #BackButton {
           @Text = "Back";
           @Anchor = (Width: 110);
         }
       }
     }
 
-    // ----- Right column: icon preview + searchable item picker -----
+    $M.@ColumnDivider {}
+
+    // ----- Icon picker -------------------------------------------------------
     Group #IconPickerColumn {
       FlexWeight: 1;
       LayoutMode: Top;
-      Padding: (Left: 16);
 
       Group {
         LayoutMode: Left;
-        Anchor: (Height: 56, Bottom: 10);
+        Anchor: (Height: 52, Bottom: 12);
 
-        Group #IconPreviewBorder {
-          Anchor: (Width: 52, Height: 52, Right: 12);
-          Background: #1a2530;
-          Padding: 2;
+        $M.@IconWell {
+          @Size = 52;
+          @Anchor = (Right: 12);
 
           ItemSlot #IconPreview {
-            Anchor: (Full: 0);
+            Anchor: (Width: 48, Height: 48);
             ShowQualityBackground: true;
             ShowQuantity: false;
           }
@@ -145,36 +131,44 @@ $C.@Container {
           LayoutMode: Top;
           FlexWeight: 1;
 
+          $M.@Spacer {}
+
           Label {
-            Anchor: (Height: 20);
-            Style: (...$C.@DefaultLabelStyle, FontSize: 13, RenderBold: true, VerticalAlignment: Center);
-            Text: "Choose an icon";
+            Anchor: (Height: 16, Bottom: 4);
+            Style: $M.@EyebrowGoldStyle;
+            Text: "Icon Preview";
           }
 
           Label #IconCurrent {
-            Anchor: (Height: 18);
-            Style: (FontSize: 12, TextColor: #96a9be, VerticalAlignment: Center);
+            Anchor: (Height: 16);
+            Style: $M.@MetaStyle;
           }
+
+          $M.@Spacer {}
         }
       }
 
       $C.@TextField #IconSearch {
-        @Anchor = (Height: 34, Bottom: 8);
+        @Anchor = (Bottom: 8);
         PlaceholderText: "Search items...";
       }
 
-      Label #IconEmpty {
-        Anchor: (Height: 30);
-        Style: (FontSize: 13, TextColor: #9fb0c4, VerticalAlignment: Center);
-        Text: "No matching items.";
-        Visible: false;
-      }
-
-      Group #IconResults {
+      $M.@Well {
         FlexWeight: 1;
-        LayoutMode: TopScrolling;
-        Padding: (Right: 10);
-        ScrollbarStyle: $C.@DefaultScrollbarStyle;
+
+        Label #IconEmpty {
+          Anchor: (Height: 56);
+          Style: $M.@EmptyStyle;
+          Text: "No matching items.";
+          Visible: false;
+        }
+
+        Group #IconResults {
+          FlexWeight: 1;
+          LayoutMode: TopScrolling;
+          Padding: (Right: 6);
+          ScrollbarStyle: $C.@DefaultScrollbarStyle;
+        }
       }
     }
   }

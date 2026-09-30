@@ -50,6 +50,7 @@ final class KitPages {
             List<Map.Entry<String, KitConfig.Kit>> entries = new ArrayList<>(visible.entrySet());
             cmd.set("#KitCount.TextSpans", uiText("#KitCount.TextSpans", entries.size() + " kits"));
             cmd.set("#KitEmpty.Visible", entries.isEmpty());
+            Map.Entry<String, KitConfig.Kit> selected = selected(entries);
 
             for (int i = 0; i < entries.size(); i++) {
                 Map.Entry<String, KitConfig.Kit> entry = entries.get(i);
@@ -61,11 +62,11 @@ final class KitPages {
                 cmd.set(row + " #Meta.TextSpans", uiText(row + " #Meta.TextSpans", kitSummary(id, kit)));
                 cmd.set(row + " #Status.TextSpans", uiText(row + " #Status.TextSpans", kits.statusText(player, id, kit)));
                 cmd.set(row + " #Swatch.Background", statusColor(kits.statusText(player, id, kit)));
+                cmd.set(row + " #Selected.Visible", entry == selected);
                 event.addEventBinding(CustomUIEventBindingType.Activating, row,
                         new EventData().put("action", "select").put("kit", id));
             }
 
-            Map.Entry<String, KitConfig.Kit> selected = selected(entries);
             applyDetails(cmd, selected);
             if (selected != null) {
                 String id = selected.getKey();

@@ -1,8 +1,7 @@
+// Recently Shared Items — one row per remembered item link, each with the
+// native item tooltip on hover and an Inspect button that opens ItemDetails.
 $C = "../Common.ui";
-
-// The "Recently Shared Items" browser. Built by RecentItemLinksPage: one row per
-// remembered item link (RecentItemLinkRow.ui appended into #RecentList), each row
-// carrying an #Icon (ItemSlot) and an #InspectButton that opens ItemDetails.
+$M = "MysticTheme.ui";
 
 $C.@PageOverlay {}
 
@@ -20,27 +19,37 @@ $C.@Container {
   #Content {
     LayoutMode: Top;
 
-    Label #RecentEmpty {
-      Anchor: (Height: 40);
-      Style: (FontSize: 14, TextColor: #9fb0c4, VerticalAlignment: Center);
-      Text: "No items have been shared recently.";
-      Visible: false;
+    $M.@Section {
+      @Text = "Shared in Chat";
+      @Anchor = (Bottom: 8);
     }
 
-    Group #RecentList {
+    $M.@Well {
       FlexWeight: 1;
-      LayoutMode: TopScrolling;
-      Padding: (Right: 10);
-      ScrollbarStyle: $C.@DefaultScrollbarStyle;
+
+      Label #RecentEmpty {
+        Anchor: (Height: 72);
+        Style: $M.@EmptyStyle;
+        Text: "No items have been shared recently. Use [item] in chat to link the one you are holding.";
+        Visible: false;
+      }
+
+      Group #RecentList {
+        FlexWeight: 1;
+        LayoutMode: TopScrolling;
+        Padding: (Right: 6);
+        ScrollbarStyle: $C.@DefaultScrollbarStyle;
+      }
     }
 
-    Group {
-      LayoutMode: Left;
-      Anchor: (Height: 44, Top: 10);
+    $M.@ActionBar {
+      @Anchor = (Height: 44, Top: 12);
+
+      $M.@Spacer {}
 
       $C.@TextButton #CloseButton {
         @Text = "Close";
-        @Anchor = (Width: 180);
+        @Anchor = (Width: 150);
       }
     }
   }

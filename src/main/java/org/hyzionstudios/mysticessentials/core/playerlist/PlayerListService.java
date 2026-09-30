@@ -17,13 +17,21 @@ import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.core.config.MainConfig;
 import org.hyzionstudios.mysticessentials.core.message.MysticText;
 
+import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.event.EventPriority;
 import com.hypixel.hytale.protocol.packets.interface_.AddToServerPlayerList;
 import com.hypixel.hytale.protocol.packets.interface_.RemoveFromServerPlayerList;
 import com.hypixel.hytale.protocol.packets.interface_.ServerPlayerListPlayer;
+import com.hypixel.hytale.server.core.HytaleServer;
+import com.hypixel.hytale.server.core.entity.entities.player.HiddenPlayersManager;
 import com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
+import com.hypixel.hytale.server.core.event.events.player.PlayerReadyEvent;
+import com.hypixel.hytale.server.core.modules.entity.component.PlayerLives;
+import com.hypixel.hytale.server.core.modules.entity.component.Spectating;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.universe.Universe;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
 /**
  * Puts rank prefixes, suffixes, and an AFK marker on the names in the client's
@@ -36,10 +44,20 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
  * the engine has sent its own — the client keys rows by UUID, and the row's
  * username is whatever arrived last.</p>
  *
- * <p>Names are recomputed on a timer and pushed <b>only when the resolved name
- * actually changes</b>, so an idle server sends nothing. A player whose resolved
- * name equals their real username is left entirely alone: with no prefix, suffix,
- * or AFK state there is nothing to override, and the engine's own row stands.</p>
+ * <p>The engine re-sends its own plain row at three points, each of which wipes
+ * an override, so all three are followed here: it ships the joining client the
+ * whole roster from {@code PlayerReadyEvent} (0.6 moved this off
+ * {@code AddPlayerToWorldEvent}, and it lands well after
+ * {@code PlayerConnectEvent} — listening on connect alone is why decorated names
+ * came back plain), and it calls {@code broadcastListEntry} whenever a player's
+ * spectating or hardcore-lives state changes.</p>
+ *
+ * <p>Names are recomputed on a timer and pushed <b>only when the row actually
+ * changes</b>, so an idle server sends nothing. Spectating and lives are part of
+ * that comparison precisely because they are what the engine re-broadcasts on.
+ * A player whose resolved name equals their real username is left entirely
+ * alone: with no prefix, suffix, or AFK state there is nothing to override, and
+ * the engine's own row stands.</p>
  *
  * <p>The client renders the row as a plain {@code Label}, so colour and format
  * markup is stripped from the resolved name rather than shipped as literal
@@ -53,16 +71,24 @@ public final class PlayerListService {
     private final MysticCore core;
 
     /**
-     * Names currently overriding the engine's, keyed by player. A player absent
-     * from this map is showing their real username, which is what every client
-     * receives from the engine on join — so this doubles as the set of rows a
-     * freshly-connected player has to be told about.
+     * The row last sent for each decorated player. A player absent from this map
+     * is showing their real username, which is what every client receives from
+     * the engine on join — so this doubles as the set of rows a freshly-connected
+     * player has to be told about.
      */
-    private final Map<UUID, String> overrides = new ConcurrentHashMap<>();
+    private final Map<UUID, Row> overrides = new ConcurrentHashMap<>();
 
     private ScheduledFuture<?> refreshTask;
     private com.hypixel.hytale.registry.Registration connectListener;
+    private com.hypixel.hytale.registry.Registration readyListener;
     private com.hypixel.hytale.registry.Registration disconnectListener;
+
+    /**
+     * Everything in a list row that this service decides. Ping is excluded: the
+     * engine refreshes it through {@code UpdateServerPlayerListPing}, which
+     * carries no username and so never disturbs an override.
+     */
+    private record Row(String name, boolean spectating, Integer lives) {}
 
     public PlayerListService(MysticCore core) {
         this.core = core;
@@ -79,6 +105,10 @@ public final class PlayerListService {
         // joining client its roster; our replacement rows land on top of it.
         connectListener = core.platform().onEvent(EventPriority.LAST, PlayerConnectEvent.class,
                 (PlayerConnectEvent event) -> onConnect(event.getPlayerRef()));
+        // The roster the client actually keeps is the one sent from here. This
+        // event is keyed, so it needs a global registration to arrive at all.
+        readyListener = core.platform().onGlobalEvent(EventPriority.LAST, PlayerReadyEvent.class,
+                (PlayerReadyEvent event) -> onReady(playerRefOf(event.getPlayerRef())));
         disconnectListener = core.platform().onEvent(PlayerDisconnectEvent.class,
                 (PlayerDisconnectEvent event) -> overrides.remove(event.getPlayerRef().getUuid()));
         refreshTask = core.scheduler().runRepeating(this::refresh,
@@ -117,6 +147,7 @@ public final class PlayerListService {
             refreshTask = null;
         }
         connectListener = unregister(connectListener);
+        readyListener = unregister(readyListener);
         disconnectListener = unregister(disconnectListener);
     }
 
@@ -151,16 +182,20 @@ public final class PlayerListService {
                 present.add(uuid);
                 String username = player.getUsername();
                 String resolved = decorate(player);
-                String showing = overrides.getOrDefault(uuid, username);
-                if (resolved.equals(showing)) {
+                if (resolved.equals(username)) {
+                    // Nothing left to override; hand the row back to the engine
+                    // if we were the ones holding it.
+                    if (overrides.remove(uuid) != null) {
+                        changed.add(entry(player, username));
+                    }
                     continue;
                 }
-                if (resolved.equals(username)) {
-                    overrides.remove(uuid);
-                } else {
-                    overrides.put(uuid, resolved);
+                Row row = new Row(resolved, isSpectating(player), livesRemaining(player));
+                if (row.equals(overrides.get(uuid))) {
+                    continue;
                 }
-                changed.add(entry(player, resolved));
+                overrides.put(uuid, row);
+                changed.add(entry(player, row));
             }
             overrides.keySet().retainAll(present);
 
@@ -179,9 +214,37 @@ public final class PlayerListService {
      * also broadcasts it to everybody else.
      */
     private synchronized void onConnect(PlayerRef joiner) {
-        UUID uuid = joiner.getUuid();
         replayOverridesTo(joiner);
         refresh();
+    }
+
+    /**
+     * Resolves the {@link PlayerRef} behind an entity reference. {@code
+     * PlayerReadyEvent} hands out the ECS reference, and both routes from there
+     * to a {@code PlayerRef} on {@code Player} itself are deprecated for
+     * removal; the ref is carried as an ordinary component, so read it as one.
+     *
+     * @return {@code null} when the entity is gone or is not a player
+     */
+    private static PlayerRef playerRefOf(Ref<EntityStore> ref) {
+        if (ref == null || !ref.isValid()) {
+            return null;
+        }
+        return ref.getStore().getComponent(ref, Universe.get().getPlayerRefComponentType());
+    }
+
+    /**
+     * Rebuilds both directions once the engine has shipped this client the full
+     * roster of plain usernames and told everyone else the joiner's plain row.
+     * Also fires when a player moves between worlds, where the engine re-sends
+     * that same roster.
+     */
+    private void onReady(PlayerRef player) {
+        if (player == null) {
+            return;
+        }
+        UUID uuid = player.getUuid();
+        resync(uuid);
         // Listening at LAST priority puts this after the engine's own roster
         // packet, but that ordering is the engine's to change. One delayed
         // repair pass costs two packets and makes a lost race self-correcting
@@ -197,9 +260,9 @@ public final class PlayerListService {
             }
             List<ServerPlayerListPlayer> rows = new ArrayList<>(overrides.size());
             for (PlayerRef player : core.platform().onlinePlayers()) {
-                String name = overrides.get(player.getUuid());
-                if (name != null) {
-                    rows.add(entry(player, name));
+                Row row = overrides.get(player.getUuid());
+                if (row != null) {
+                    rows.add(entry(player, row));
                 }
             }
             if (!rows.isEmpty()) {
@@ -288,9 +351,28 @@ public final class PlayerListService {
 
     // ----- Protocol ----------------------------------------------------------
 
+    private ServerPlayerListPlayer entry(PlayerRef player, Row row) {
+        return new ServerPlayerListPlayer(player.getUuid(), row.name(), player.getWorldUuid(),
+                core.platform().pingMillis(player), row.spectating(), row.lives());
+    }
+
+    /** A row carrying {@code name} over this player's current engine-owned state. */
     private ServerPlayerListPlayer entry(PlayerRef player, String name) {
-        return new ServerPlayerListPlayer(player.getUuid(), name, player.getWorldUuid(),
-                core.platform().pingMillis(player));
+        return entry(player, new Row(name, isSpectating(player), livesRemaining(player)));
+    }
+
+    private static boolean isSpectating(PlayerRef player) {
+        return player.getComponentConcurrent(Spectating.getComponentType()) != null;
+    }
+
+    private static Integer livesRemaining(PlayerRef player) {
+        var defaults = HytaleServer.get().getConfig().getDefaults();
+        if (!defaults.getHardcoreMode().showsPersonalLives(defaults.getHardcoreLives())) {
+            return null;
+        }
+        PlayerLives lives = player.getComponentConcurrent(PlayerLives.getComponentType());
+        int remaining = lives == null ? defaults.getHardcoreLives() : lives.getRemaining();
+        return Math.max(remaining, 0);
     }
 
     /**
@@ -299,26 +381,74 @@ public final class PlayerListService {
      * by UUID or appends them, and the two packets are written back to back on
      * the same connection so they arrive together.
      *
-     * <p>One packet instance is shared across every viewer, matching the engine's
-     * own broadcast, so the connection layer serializes it once.</p>
+     * <p>A viewer is never sent a row for somebody their {@code
+     * HiddenPlayersManager} hides. The engine filters its own broadcasts that
+     * way, so re-adding the row here would put a vanished player back on the map
+     * list.</p>
+     *
+     * <p>One packet instance is shared across every viewer hiding nobody in the
+     * batch, matching the engine's own broadcast, so the connection layer
+     * serializes it once.</p>
      */
     private void send(Collection<PlayerRef> viewers, List<ServerPlayerListPlayer> rows) {
         ServerPlayerListPlayer[] entries = rows.toArray(new ServerPlayerListPlayer[0]);
-        AddToServerPlayerList addition = new AddToServerPlayerList(entries);
-        RemoveFromServerPlayerList removal = null;
-        if (config().rebuildEntries) {
-            UUID[] uuids = new UUID[entries.length];
-            for (int i = 0; i < entries.length; i++) {
-                uuids[i] = entries[i].uuid;
-            }
-            removal = new RemoveFromServerPlayerList(uuids);
-        }
+        boolean rebuild = config().rebuildEntries;
+        AddToServerPlayerList sharedAddition = new AddToServerPlayerList(entries);
+        RemoveFromServerPlayerList sharedRemoval = rebuild
+                ? new RemoveFromServerPlayerList(uuidsOf(entries))
+                : null;
+
         for (PlayerRef viewer : viewers) {
-            if (removal != null) {
-                core.platform().sendPacket(viewer, removal);
+            ServerPlayerListPlayer[] visible = visibleTo(viewer, entries);
+            if (visible.length == 0) {
+                continue;
             }
-            core.platform().sendPacket(viewer, addition);
+            boolean whole = visible.length == entries.length;
+            if (rebuild) {
+                core.platform().sendPacket(viewer, whole
+                        ? sharedRemoval
+                        : new RemoveFromServerPlayerList(uuidsOf(visible)));
+            }
+            core.platform().sendPacket(viewer, whole
+                    ? sharedAddition
+                    : new AddToServerPlayerList(visible));
         }
+    }
+
+    /**
+     * @return {@code entries} without the players {@code viewer} hides, or
+     *         {@code entries} itself when it hides none of them.
+     */
+    private static ServerPlayerListPlayer[] visibleTo(PlayerRef viewer, ServerPlayerListPlayer[] entries) {
+        HiddenPlayersManager hidden = viewer.getHiddenPlayersManager();
+        if (hidden == null) {
+            return entries;
+        }
+        int count = 0;
+        for (ServerPlayerListPlayer entry : entries) {
+            if (!hidden.isPlayerHidden(entry.uuid)) {
+                count++;
+            }
+        }
+        if (count == entries.length) {
+            return entries;
+        }
+        ServerPlayerListPlayer[] visible = new ServerPlayerListPlayer[count];
+        int index = 0;
+        for (ServerPlayerListPlayer entry : entries) {
+            if (!hidden.isPlayerHidden(entry.uuid)) {
+                visible[index++] = entry;
+            }
+        }
+        return visible;
+    }
+
+    private static UUID[] uuidsOf(ServerPlayerListPlayer[] entries) {
+        UUID[] uuids = new UUID[entries.length];
+        for (int i = 0; i < entries.length; i++) {
+            uuids[i] = entries[i].uuid;
+        }
+        return uuids;
     }
 
     private MainConfig.PlayerList config() {

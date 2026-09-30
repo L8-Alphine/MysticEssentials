@@ -1,4 +1,4 @@
-// Gold primary button for <button data-custom-variant="primary">.
+// Primary button for <button data-custom-variant="primary">.
 $C = "../Common.ui";
 
 $C.@TextButton {
@@ -7,6 +7,5 @@ $C.@TextButton {
   // break this document -- it stops the client resolving documents from OTHER
   // packs, disconnecting every player at world join.
   @Text = "";
-  @Anchor = (Height: 40);
   FlexWeight: 1;
 }

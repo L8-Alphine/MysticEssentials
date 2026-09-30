@@ -32,6 +32,9 @@ public final class PlayerVaultRedisBridge {
 
     private final MysticCore core;
     private PlayerVaultConfig config;
+    private Consumer<UpdateNotice> updateHandler;
+    private Consumer<String> redisUpdateHandler;
+    private String subscribedChannel;
 
     public PlayerVaultRedisBridge(MysticCore core, PlayerVaultConfig config) {
         this.core = core;
@@ -39,7 +42,11 @@ public final class PlayerVaultRedisBridge {
     }
 
     public void updateConfig(PlayerVaultConfig config) {
+        unsubscribeUpdates();
         this.config = config;
+        if (updateHandler != null) {
+            subscribeUpdates(updateHandler);
+        }
     }
 
     private RedisBridge redis() {
@@ -134,7 +141,11 @@ public final class PlayerVaultRedisBridge {
         if (redis() == null) {
             return;
         }
-        redis().subscribe(config.crossServer.pubSubChannel, raw -> {
+        updateHandler = handler;
+        redisUpdateHandler = raw -> {
+            if (!config.crossServer.enabled) {
+                return;
+            }
             try {
                 JsonObject payload = Json.asObject(Json.parse(raw));
                 UUID owner = UUID.fromString(payload.get("owner").getAsString());
@@ -144,7 +155,17 @@ public final class PlayerVaultRedisBridge {
             } catch (Throwable ignored) {
                 // Malformed notice; nothing to do.
             }
-        });
+        };
+        subscribedChannel = config.crossServer.pubSubChannel;
+        redis().subscribe(subscribedChannel, redisUpdateHandler);
+    }
+
+    public void unsubscribeUpdates() {
+        if (redis() != null && subscribedChannel != null && redisUpdateHandler != null) {
+            redis().unsubscribe(subscribedChannel, redisUpdateHandler);
+        }
+        subscribedChannel = null;
+        redisUpdateHandler = null;
     }
 
     /** A cross-server notification that a vault was written on another server. */

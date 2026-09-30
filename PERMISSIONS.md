@@ -12,6 +12,7 @@ All nodes are prefixed `mysticessentials.`.
 |---|---|
 | `mysticessentials.reload` | `/mystic reload` |
 | `mysticessentials.migrate` | `/mystic migrate scan`, `/mystic migrate import` |
+| `mysticessentials.network` | `/mystic network` — Redis roster and this server's advertised address |
 | `mysticessentials.license` | `/mystic license`, `/mystic license reload` |
 | `mysticessentials.update.notify` | Receive the clickable outdated-mod notice on join (operators normally inherit this node) |
 
@@ -157,6 +158,14 @@ permission; every player has their own history and preferences.
 | `mysticessentials.fly.others` | `/fly <player>` |
 | `mysticessentials.fly.unlimited` | Free unlimited flight (paid mode exempt) |
 | `mysticessentials.fly.free` | Exempt from paid-flight charges |
+
+## Craft Blocking
+
+| Node | Grants |
+|---|---|
+| `mysticessentials.craftblock.admin` | `/craftblock`, `/craftblock check` |
+| `mysticessentials.craftblock.bypass` | Craft every blocked item |
+| `mysticessentials.craftblock.bypass.<item id>` | Craft one blocked item (item id lower-cased) |
 
 ## Inventory
 

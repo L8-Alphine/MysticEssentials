@@ -1,15 +1,21 @@
-$C = "../Common.ui";
-
 // Addition line (green) in the Patch Notes viewer content.
 //   cmd.append("#SectionContent", "MysticEssentials/PatchLineAdd.ui")
 //   cmd.set("#SectionContent[i] #Line.TextSpans", ...)
+$M = "MysticTheme.ui";
 
 Group #Row {
-  LayoutMode: Top;
+  LayoutMode: Left;
   Anchor: (Height: 20);
+  Padding: (Left: 12);
+
+  Label {
+    Anchor: (Width: 16);
+    Style: (FontSize: 14, RenderBold: true, TextColor: #6fd08c, VerticalAlignment: Center);
+    Text: "+";
+  }
 
   Label #Line {
-    Anchor: (Full: 0);
-    Style: (FontSize: 14, TextColor: #7bd88f, VerticalAlignment: Center);
+    FlexWeight: 1;
+    Style: (FontSize: 14, TextColor: #a9e3b7, VerticalAlignment: Center);
   }
 }

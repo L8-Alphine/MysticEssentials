@@ -15,6 +15,7 @@ import org.hyzionstudios.mysticessentials.api.item.ItemViewEntries.ItemModifierE
 import org.hyzionstudios.mysticessentials.api.item.ItemViewEntries.ItemStatEntry;
 import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.core.item.ItemViewConfig;
+import org.hyzionstudios.mysticessentials.core.message.MysticText;
 import org.hyzionstudios.mysticessentials.platform.ui.MysticPage;
 
 import com.google.gson.JsonObject;
@@ -64,6 +65,17 @@ public final class ItemDetailsPage extends MysticPage {
 
     /** Guard so a pathological item cannot emit an unbounded number of elements. */
     private static final int MAX_EMITTED_ROWS = 400;
+
+    /** Shell width the body cannot use: the panel padding plus the scrollbar gutter. */
+    private static final int BODY_HORIZONTAL_INSET = 34;
+    /** Average glyph advance as a fraction of the font size, measured against the shipped font. */
+    private static final double CHAR_WIDTH_RATIO = 0.67;
+    /** The share of a line a word-boundary break typically leaves unused. */
+    private static final double WORD_WRAP_SLACK = 0.92;
+    /** Rendered line spacing as a fraction of the font size. */
+    private static final double LINE_HEIGHT_RATIO = 1.4;
+    /** Ceiling on a single paragraph, so one pathological line cannot fill the body. */
+    private static final int MAX_PARAGRAPH_LINES = 24;
 
     private final ItemSnapshot snapshot;
     private final ItemViewConfig config;
@@ -134,9 +146,10 @@ public final class ItemDetailsPage extends MysticPage {
         cmd.set("#RarityAccent.Background", accent());
 
         // Only a *translation* Message may be handed to the client here; a raw
-        // Message is a known 0.5.6 disconnect. So the translated case passes the
-        // Message and every other case passes an already-resolved plain String.
-        cmd.set("#ItemName.TextSpans", view.displayName().isTranslated()
+        // Message is a known client disconnect (still true on 0.6.2). So the
+        // translated case passes the Message and every other case passes an
+        // already-resolved plain String.
+        cmd.set("#ItemName.TextSpans", view.displayName().hasTranslations()
                 ? uiText("#ItemName.TextSpans", snapshot.nameMessage())
                 : uiText("#ItemName.TextSpans", snapshot.plainName()));
         cmd.set("#ItemSubtitle.TextSpans",
@@ -264,21 +277,102 @@ public final class ItemDetailsPage extends MysticPage {
         if (text == null || text.isBlank() || emittedRows++ > MAX_EMITTED_ROWS) {
             return;
         }
+        Paragraph paragraph = measure(text, fontSize, compact);
         String id = nextId("p");
         cmd.appendInline("#MysticItemBody", "Label " + id + " {\n"
-                + "  Anchor: (Height: " + paragraphHeight(text) + ", Bottom: 4);\n"
+                + "  Anchor: (Height: " + paragraph.lines * lineHeight(fontSize) + ", Bottom: 4);\n"
                 + "  Padding: (Left: 6, Right: 6);\n"
                 + "  Style: (FontSize: " + fontSize + ", TextColor: " + safeColor(color)
                 + ", Wrap: true);\n"
                 + "}");
-        cmd.set(id + ".TextSpans", uiText(id + ".TextSpans", text));
+        cmd.set(id + ".TextSpans", uiText(id + ".TextSpans", paragraph.text));
     }
 
-    /** Rough wrapped height so long lore is not clipped to one line. */
-    private int paragraphHeight(String text) {
-        int charsPerLine = compact ? 58 : 92;
-        int lines = Math.max(1, (text.length() + charsPerLine - 1) / charsPerLine);
-        return Math.min(140, 18 * lines);
+    /** Paragraph text together with the number of lines it renders as. */
+    record Paragraph(String text, int lines) {
+    }
+
+    /**
+     * Measures a paragraph, trimming it to {@link #MAX_PARAGRAPH_LINES}.
+     *
+     * <p>The generated elements are laid out from their declared anchors, so an
+     * under-estimate here does not clip the paragraph — it lets the next section
+     * draw on top of it. The reserved height must therefore cover every line
+     * that will actually be drawn, which is why the ceiling shortens the
+     * <i>text</i> rather than just the anchor: capping the height alone would
+     * reintroduce the overlap for exactly the paragraphs the cap exists for.</p>
+     *
+     * <p>Two things the raw character count gets wrong, both of which this
+     * accounts for: a paragraph may carry explicit line breaks — a MysticRPG
+     * description is rejoined with a blank line between its halves — and markup
+     * such as {@code <#8fd48f>} spends characters on no width at all.</p>
+     */
+    static Paragraph measure(String text, int fontSize, boolean compact) {
+        int charsPerLine = charsPerLine(fontSize, compact);
+        String[] segments = text.split("\r\n|\r|\n", -1);
+        StringBuilder kept = new StringBuilder(text.length());
+        int lines = 0;
+
+        for (int i = 0; i < segments.length; i++) {
+            int length = MysticText.stripMarkup(segments[i]).length();
+            int segmentLines = Math.max(1, (length + charsPerLine - 1) / charsPerLine);
+            if (lines + segmentLines > MAX_PARAGRAPH_LINES) {
+                // Keep as much of the offending segment as the budget allows
+                // rather than dropping it — a single long paragraph must still
+                // read as a paragraph, not as a lone ellipsis. One line is held
+                // back so the ellipsis itself has somewhere to go.
+                String clipped = clip(segments[i], (MAX_PARAGRAPH_LINES - 1 - lines) * charsPerLine);
+                if (!clipped.isEmpty()) {
+                    if (i > 0) {
+                        kept.append('\n');
+                    }
+                    kept.append(clipped);
+                }
+                if (kept.length() > 0) {
+                    kept.append('\n');
+                }
+                kept.append('…');
+                return new Paragraph(kept.toString(), Math.max(MAX_PARAGRAPH_LINES, lines + 1));
+            }
+            if (i > 0) {
+                kept.append('\n');
+            }
+            kept.append(segments[i]);
+            lines += segmentLines;
+        }
+        return new Paragraph(text, Math.max(1, lines));
+    }
+
+    /**
+     * Cuts {@code segment} to at most {@code budget} characters, preferring the
+     * last word boundary. Measured against the raw form, which is never shorter
+     * than the rendered form, so the result cannot exceed the budgeted lines.
+     */
+    private static String clip(String segment, int budget) {
+        if (budget <= 0) {
+            return "";
+        }
+        if (segment.length() <= budget) {
+            return segment;
+        }
+        String head = segment.substring(0, budget);
+        int lastSpace = head.lastIndexOf(' ');
+        return lastSpace > budget - 24 ? head.substring(0, lastSpace) : head;
+    }
+
+    /**
+     * Characters that fit on one line, from the body's usable width. Wrapping
+     * breaks on words, so the fit is reduced by {@link #WORD_WRAP_SLACK} — the
+     * part of a line a word boundary typically leaves unused.
+     */
+    private static int charsPerLine(int fontSize, boolean compact) {
+        int usable = (compact ? WIDTH_COMPACT : WIDTH_FULL) - BODY_HORIZONTAL_INSET;
+        double charWidth = fontSize * CHAR_WIDTH_RATIO;
+        return Math.max(16, (int) (usable * WORD_WRAP_SLACK / charWidth));
+    }
+
+    static int lineHeight(int fontSize) {
+        return (int) Math.ceil(fontSize * LINE_HEIGHT_RATIO);
     }
 
     // ----- Tooltip body -----------------------------------------------------------

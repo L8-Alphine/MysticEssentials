@@ -1,37 +1,42 @@
-$C = "../Common.ui";
-
 // Sent-announcement history row in the Mail Admin Center.
 // Appended per entry: cmd.append("#HistoryList", "MysticEssentials/MailHistoryRow.ui").
 // #Resend re-broadcasts the announcement to its original audience.
+$C = "../Common.ui";
+$M = "MysticTheme.ui";
 
 Group #Row {
-  Anchor: (Height: 64, Bottom: 8);
+  Anchor: (Height: 68, Bottom: 4);
   LayoutMode: Left;
-  Padding: (Left: 10, Right: 10, Top: 6, Bottom: 6);
-  Background: #000000(0.18);
+  Padding: (Left: 0, Right: 10, Top: 8, Bottom: 8);
+  Background: #0a0f16(0.38);
+
+  Group {
+    Anchor: (Width: 3, Height: 52, Right: 13);
+    Background: #E8A93B(0.6);
+  }
 
   Group {
     FlexWeight: 1;
     LayoutMode: Top;
 
     Label #Subject {
-      Anchor: (Height: 20);
-      Style: (FontSize: 14, TextColor: #ffffff, RenderBold: true, VerticalAlignment: Center);
+      Anchor: (Height: 20, Bottom: 2);
+      Style: $M.@RowNameStyle;
     }
 
     Label #Meta {
-      Anchor: (Height: 15);
-      Style: (FontSize: 11, TextColor: #f0b429, VerticalAlignment: Center);
+      Anchor: (Height: 14, Bottom: 2);
+      Style: (...$M.@RowMetaStyle, TextColor: #e8c97a);
     }
 
     Label #Preview {
-      Anchor: (Height: 15);
-      Style: (FontSize: 11, TextColor: #9fb0c4, VerticalAlignment: Center);
+      Anchor: (Height: 14);
+      Style: $M.@RowMetaStyle;
     }
   }
 
-  $C.@SecondaryTextButton #Resend {
+  $C.@SmallSecondaryTextButton #Resend {
     @Text = "Resend";
-    @Anchor = (Width: 96, Left: 8);
+    @Anchor = (Width: 96, Left: 8, Vertical: 10);
   }
 }

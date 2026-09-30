@@ -84,6 +84,9 @@ public final class ChannelsSubModule {
     private final Map<UUID, TransferRequest> pendingTransfers = new ConcurrentHashMap<>();
     private final Set<String> seenRemoteMessages = ConcurrentHashMap.newKeySet();
     private final Set<String> registeredAliases = ConcurrentHashMap.newKeySet();
+    private final Set<String> subscribedRedisTopics = ConcurrentHashMap.newKeySet();
+    private final Consumer<String> redisMessageHandler = this::handleRemoteChannelMessage;
+    private final Consumer<String> redisStateHandler = this::handleRemoteState;
     private final ChannelAudit audit;
     /** Last time a player sent a message to a channel, for the recent-activity indicator (§15). */
     private final Map<UUID, Instant> lastTextActivity = new ConcurrentHashMap<>();
@@ -118,6 +121,7 @@ public final class ChannelsSubModule {
         this.config = config == null ? new ChatConfig.Channels() : config;
         Map<String, ChatConfig.Channel> next = new HashMap<>();
         Map<String, String> aliases = new HashMap<>();
+        Set<String> desiredRedisTopics = new java.util.HashSet<>();
         if (this.config.channels != null) {
             for (ChatConfig.Channel channel : this.config.channels) {
                 if (channel.id == null || channel.id.isBlank()) {
@@ -129,14 +133,25 @@ public final class ChannelsSubModule {
                 if (channel.crossServer && !core.redis().isEnabled()) {
                     core.log(Level.WARNING, "Chat channel '" + channel.id
                             + "' is crossServer=true but Redis is disabled; messages will stay local until Redis works.");
-                } else if (channel.crossServer) {
-                    core.redis().subscribe(REDIS_PREFIX + redisTopic(channel), this::handleRemoteChannelMessage);
+                }
+                if (channel.crossServer) {
+                    desiredRedisTopics.add(REDIS_PREFIX + redisTopic(channel));
                 }
             }
         }
+        for (String oldTopic : new java.util.HashSet<>(subscribedRedisTopics)) {
+            if (!desiredRedisTopics.contains(oldTopic)) {
+                core.redis().unsubscribe(oldTopic, redisMessageHandler);
+                subscribedRedisTopics.remove(oldTopic);
+            }
+        }
+        for (String topic : desiredRedisTopics) {
+            core.redis().subscribe(topic, redisMessageHandler);
+            subscribedRedisTopics.add(topic);
+        }
         configuredChannels = next;
-        if (core.redis().isEnabled() && !stateSubscribed) {
-            core.redis().subscribe(REDIS_STATE_TOPIC, this::handleRemoteState);
+        if (!stateSubscribed) {
+            core.redis().subscribe(REDIS_STATE_TOPIC, redisStateHandler);
             stateSubscribed = true;
         }
         loadRedisTemporaryChannels();
@@ -172,6 +187,11 @@ public final class ChannelsSubModule {
         lastTextActivity.clear();
         temporaryChannels.clear();
         seenRemoteMessages.clear();
+        for (String topic : subscribedRedisTopics) {
+            core.redis().unsubscribe(topic, redisMessageHandler);
+        }
+        subscribedRedisTopics.clear();
+        core.redis().unsubscribe(REDIS_STATE_TOPIC, redisStateHandler);
         voiceProvider = ChannelVoicePresenceProvider.NONE;
         stateSubscribed = false;
     }
@@ -1624,6 +1644,14 @@ public final class ChannelsSubModule {
         String template = formatOverride != null && !formatOverride.isBlank()
                 ? formatOverride
                 : formatForGroup(placeholderContext, channel);
+        // A line from another network server carries its origin. Channel formats
+        // are written for local chat and rarely mention {server_id}, so the
+        // configured prefix supplies it unless the format already does.
+        boolean fromRemoteServer = originServerId != null && !originServerId.isBlank();
+        String prefix = config.crossServerPrefix;
+        if (fromRemoteServer && prefix != null && !prefix.isBlank() && !template.contains("{server_id}")) {
+            template = prefix + template;
+        }
         // Inbound content is flattened again on arrival. The sending server should
         // already have done this, but a peer running an older build (or an external
         // injector) must not be able to put raw tokens or markup on local screens.
@@ -1634,10 +1662,19 @@ public final class ChannelsSubModule {
                 .replace("{channel}", displayName(channel))
                 .replace("{server_id}", originServerId == null ? "" : originServerId)
                 .replace("{message}", safeContent);
+        // A managed child's policy (MysticIdentity) is asked per listener: a remote player's
+        // line on the pair, a bridged line on the listener's own cross-platform setting.
+        // The origin server filtered its own listeners on the native chat event; this is
+        // the same rule for the listeners it cannot see.
+        List<PlayerRef> listening = new ArrayList<>();
         for (PlayerRef recipient : core.platform().onlinePlayers()) {
             if (isListening(recipient, channel)) {
-                recipient.sendMessage(core.getMessageService().formatFor(placeholderContext, line));
+                listening.add(recipient);
             }
+        }
+        for (PlayerRef recipient : core.managedAccounts().reachable(placeholderContext, listening,
+                org.hyzionstudios.mysticessentials.core.integration.ManagedAccountsBridge.TEXT_PUBLIC)) {
+            recipient.sendMessage(core.getMessageService().formatFor(placeholderContext, line));
         }
     }
 
@@ -2271,15 +2308,12 @@ public final class ChannelsSubModule {
     private abstract class PublicChannelCommand extends MysticCommand {
         PublicChannelCommand(MysticCore core, String name, String description) {
             super(core, name, description);
+            requireNoPermission();
         }
 
         PublicChannelCommand(MysticCore core, String description) {
             super(core, description);
-        }
-
-        @Override
-        protected boolean canGeneratePermission() {
-            return false;
+            requireNoPermission();
         }
     }
 

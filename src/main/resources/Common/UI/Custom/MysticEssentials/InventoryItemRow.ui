@@ -1,17 +1,22 @@
 // Row template for the Inventory Viewer's item list.
 // Appended per occupied slot: cmd.append("#ItemList", "MysticEssentials/InventoryItemRow.ui")
 // and populated by index: cmd.set("#ItemList[i] #Icon.ItemId", "<itemId>").
+$M = "MysticTheme.ui";
 
 Group #Row {
-  Anchor: (Height: 46, Bottom: 6);
+  Anchor: (Height: 52, Bottom: 4);
   LayoutMode: Left;
-  Padding: (Left: 10, Right: 10, Top: 4, Bottom: 4);
-  Background: #000000(0.18);
+  Padding: (Left: 12, Right: 12, Top: 8, Bottom: 8);
+  Background: #0a0f16(0.38);
 
-  ItemSlot #Icon {
-    Anchor: (Width: 38, Height: 38, Right: 12);
-    ShowQualityBackground: true;
-    ShowQuantity: false;
+  $M.@IconWell {
+    @Anchor = (Right: 12);
+
+    ItemSlot #Icon {
+      Anchor: (Width: 32, Height: 32);
+      ShowQualityBackground: true;
+      ShowQuantity: false;
+    }
   }
 
   Group {
@@ -19,18 +24,18 @@ Group #Row {
     FlexWeight: 1;
 
     Label #Name {
-      Anchor: (Height: 20);
-      Style: (FontSize: 14, TextColor: #ffffff, RenderBold: true, VerticalAlignment: Center);
+      Anchor: (Height: 20, Bottom: 2);
+      Style: $M.@RowNameStyle;
     }
 
     Label #Meta {
-      Anchor: (Height: 16);
-      Style: (FontSize: 11, TextColor: #96a9be, VerticalAlignment: Center);
+      Anchor: (Height: 14);
+      Style: $M.@RowMetaStyle;
     }
   }
 
   Label #Qty {
-    Anchor: (Width: 80);
-    Style: (FontSize: 15, TextColor: #d7e1ee, HorizontalAlignment: End, VerticalAlignment: Center, RenderBold: true);
+    Anchor: (Width: 80, Left: 8);
+    Style: (...$M.@RowSideStyle, FontSize: 15, RenderBold: true, TextColor: #ffffff);
   }
 }

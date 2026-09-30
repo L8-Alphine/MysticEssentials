@@ -7,6 +7,7 @@ import java.util.UUID;
 
 import org.hyzionstudios.mysticessentials.api.item.ItemViewData;
 import org.hyzionstudios.mysticessentials.api.item.RichText;
+import org.hyzionstudios.mysticessentials.core.message.MysticText;
 
 import com.hypixel.hytale.server.core.Message;
 
@@ -83,13 +84,17 @@ public final class ItemSnapshot {
     }
 
     /**
-     * The item's name as a renderable {@link Message}: a client-translated
-     * segment when the item has a translation key (so a templated name such as
-     * "{material} Longsword" resolves fully client-side), otherwise a literal.
+     * The item's name as a renderable {@link Message}: one or more translated
+     * segments when the item has translation keys (so an affixed templated name
+     * such as "Vigorous {material} Longsword" resolves fully client-side),
+     * otherwise a literal.
      */
     public Message nameMessage() {
         RichText name = view.displayName();
         if (!name.isTranslated()) {
+            if (name.hasTranslations()) {
+                return MysticText.parse(name.markup());
+            }
             String plain = name.plain();
             return Message.raw(plain.isBlank() ? plainName() : plain);
         }

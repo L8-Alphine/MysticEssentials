@@ -20,6 +20,7 @@ public final class VaultItemCodec {
     }
 
     /** Serializes an occupied slot's item; returns {@code null} for empty slots. */
+    @SuppressWarnings("deprecation") // Full BSON is required for lossless vault round-trips.
     public static VaultItemStack toStored(int slot, ItemStack stack) {
         if (stack == null || stack.isEmpty()) {
             return null;

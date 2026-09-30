@@ -6,6 +6,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.Consumer;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -40,6 +41,7 @@ public final class AnnouncementModule extends AbstractMysticModule implements An
     private List<AutoAnnouncement> autoAnnouncements = List.of();
     private ScheduledFuture<?> autoTask;
     private final AtomicInteger rotationIndex = new AtomicInteger();
+    private final Consumer<String> redisHandler = this::broadcastLocal;
 
     public AnnouncementModule() {
         super("announcements", "Announcements", "1.0.0");
@@ -51,9 +53,9 @@ public final class AnnouncementModule extends AbstractMysticModule implements An
         registerCommand(new BroadcastCommand());
         registerCommand(new AlertCommand());
         // Cross-server broadcasts: receive network broadcasts and show them locally.
-        if (core.redis().isEnabled()) {
-            core.redis().subscribe(CHANNEL, this::broadcastLocal);
-        }
+        // Register even while disconnected: RedisBridge retains logical handlers
+        // across reconnect/reload and publish itself is a safe no-op while down.
+        core.redis().subscribe(CHANNEL, redisHandler);
         if (config.autoBroadcastEnabled) {
             startAutoBroadcast();
         }
@@ -71,6 +73,7 @@ public final class AnnouncementModule extends AbstractMysticModule implements An
     @Override
     public void onDisable() {
         stopAutoBroadcast();
+        core.redis().unsubscribe(CHANNEL, redisHandler);
     }
 
     // ----- AnnouncementService -----------------------------------------------
@@ -159,6 +162,7 @@ public final class AnnouncementModule extends AbstractMysticModule implements An
                 .message(message)
                 .sound(sound)
                 .showAsTitle(true)
+                .storeInHistory(false)
                 .source("mysticessentials:announcements");
     }
 
@@ -444,12 +448,28 @@ public final class AnnouncementModule extends AbstractMysticModule implements An
                 && parsed.notification().message().isPresent()) {
             presentation.subtitle(parsed.notification().message().orElseThrow());
         }
-        if (parsed.notification().sound().isEmpty()) {
-            presentation.sound(alert ? config.alertSound : config.broadcastSound);
+        // Manual broadcasts and alerts are transient screen-level notices by
+        // default: chat + toast + Hytale's built-in title surface. Flags typed by
+        // the sender still win over these defaults.
+        if (parsed.notification().showInChat().isEmpty()) {
+            presentation.showInChat(true);
         }
-        // Both commands are intentional screen-level notices. EventTitleUtil in
-        // NotificationDelivery is Hytale's built-in title system.
-        presentation.showAsTitle(true);
+        if (parsed.notification().showAsTitle().isEmpty()) {
+            presentation.showAsTitle(true);
+        }
+        if (parsed.notification().showAsActionBar().isEmpty()) {
+            presentation.showAsActionBar(false);
+        }
+        if (parsed.notification().showAsToast().isEmpty()) {
+            presentation.showAsToast(true);
+        }
+        if (parsed.notification().showAsBanner().isEmpty()) {
+            presentation.showAsBanner(false);
+        }
+        presentation.playSound(parsed.notification().sound().isPresent());
+        if (parsed.notification().storeInHistory().isEmpty()) {
+            presentation.storeInHistory(false);
+        }
         if (!parsed.categoryExplicit()) {
             presentation.chatPrefix(orEmpty(configuredPrefix));
         }

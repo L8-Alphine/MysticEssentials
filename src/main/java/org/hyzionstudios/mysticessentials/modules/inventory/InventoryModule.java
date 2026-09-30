@@ -24,8 +24,7 @@ import org.hyzionstudios.mysticessentials.platform.command.MysticCommandSender;
 import com.google.gson.reflect.TypeToken;
 import com.hypixel.hytale.server.core.command.system.arguments.system.RequiredArg;
 import com.hypixel.hytale.server.core.command.system.arguments.types.SingleArgumentType;
-import com.hypixel.hytale.server.core.entity.entities.Player;
-import com.hypixel.hytale.server.core.inventory.Inventory;
+import com.hypixel.hytale.server.core.inventory.InventoryComponent;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 import com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent;
@@ -38,7 +37,9 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
  * ({@code /inventory restore <player>}).
  *
  * <p>All ECS inventory access runs on the owning player's world thread. Death
- * has no plugin event in 0.5.6, so a poll watches online players for the
+ * still has no plugin or ECS event on 0.6.2 — Update 6 added
+ * {@code RespawnEvent} but nothing for the death itself, and {@code DeathSystems}
+ * stays internal — so a poll watches online players for the
  * {@code DeathComponent} and snapshots on the first sighting per death.
  * Snapshots are stored through the {@code StorageService} under the
  * {@code inventory_snapshots} namespace keyed by player UUID.</p>
@@ -120,7 +121,7 @@ public final class InventoryModule extends AbstractMysticModule {
 
     // ----- Snapshot capture -----------------------------------------------------
 
-    /** Watches for the DeathComponent (no death event exists in 0.5.6). */
+    /** Watches for the DeathComponent (no death event exists through 0.6.2). */
     private void pollDeaths() {
         for (PlayerRef player : core.platform().onlinePlayers()) {
             UUID uuid = player.getUuid();
@@ -155,12 +156,12 @@ public final class InventoryModule extends AbstractMysticModule {
     /** MUST run on the player's world thread. */
     private boolean captureOnThread(PlayerRef player, String cause) {
         try {
-            Inventory inventory = resolveInventory(player);
-            if (inventory == null) {
+            Map<String, ItemContainer> inventorySections = sections(player);
+            if (inventorySections.isEmpty()) {
                 return false;
             }
             InventorySnapshot snapshot = InventorySnapshot.create(cause);
-            for (Map.Entry<String, ItemContainer> section : sections(inventory).entrySet()) {
+            for (Map.Entry<String, ItemContainer> section : inventorySections.entrySet()) {
                 List<InventorySnapshot.SlotItem> slots = captureContainer(section.getValue());
                 if (!slots.isEmpty()) {
                     snapshot.sections.put(section.getKey(), slots);
@@ -175,27 +176,36 @@ public final class InventoryModule extends AbstractMysticModule {
         }
     }
 
-    private Inventory resolveInventory(PlayerRef player) {
+    private static Map<String, ItemContainer> sections(PlayerRef player) {
+        Map<String, ItemContainer> sections = new LinkedHashMap<>();
         var ref = player.getReference();
         if (ref == null || !ref.isValid()) {
-            return null;
+            return sections;
         }
-        Player entity = ref.getStore().getComponent(ref, Player.getComponentType());
-        return entity == null ? null : entity.getInventory();
-    }
-
-    private static Map<String, ItemContainer> sections(Inventory inventory) {
-        Map<String, ItemContainer> sections = new LinkedHashMap<>();
-        sections.put("hotbar", inventory.getHotbar());
-        sections.put("storage", inventory.getStorage());
-        sections.put("armor", inventory.getArmor());
-        sections.put("utility", inventory.getUtility());
-        sections.put("tools", inventory.getTools());
-        sections.put("backpack", inventory.getBackpack());
-        sections.values().removeIf(java.util.Objects::isNull);
+        var store = ref.getStore();
+        putSection(sections, "hotbar",
+                store.getComponent(ref, InventoryComponent.Hotbar.getComponentType()));
+        putSection(sections, "storage",
+                store.getComponent(ref, InventoryComponent.Storage.getComponentType()));
+        putSection(sections, "armor",
+                store.getComponent(ref, InventoryComponent.Armor.getComponentType()));
+        putSection(sections, "utility",
+                store.getComponent(ref, InventoryComponent.Utility.getComponentType()));
+        putSection(sections, "tools",
+                store.getComponent(ref, InventoryComponent.Tool.getComponentType()));
+        putSection(sections, "backpack",
+                store.getComponent(ref, InventoryComponent.Backpack.getComponentType()));
         return sections;
     }
 
+    private static void putSection(Map<String, ItemContainer> sections, String name,
+            InventoryComponent component) {
+        if (component != null && component.getInventory() != null) {
+            sections.put(name, component.getInventory());
+        }
+    }
+
+    @SuppressWarnings("deprecation") // Full BSON is required for lossless snapshot round-trips.
     private static List<InventorySnapshot.SlotItem> captureContainer(ItemContainer container) {
         List<InventorySnapshot.SlotItem> slots = new ArrayList<>();
         for (short slot = 0; slot < container.getCapacity(); slot++) {
@@ -254,12 +264,12 @@ public final class InventoryModule extends AbstractMysticModule {
         CompletableFuture<Boolean> outcome = new CompletableFuture<>();
         boolean dispatched = core.platform().runOnEntityThread(player, (store, entity, world) -> {
             captureOnThread(player, "PreClear");
-            Inventory inventory = resolveInventory(player);
-            if (inventory == null) {
+            Map<String, ItemContainer> inventorySections = sections(player);
+            if (inventorySections.isEmpty()) {
                 outcome.complete(false);
                 return;
             }
-            for (ItemContainer container : sections(inventory).values()) {
+            for (ItemContainer container : inventorySections.values()) {
                 container.clear();
             }
             outcome.complete(true);
@@ -293,12 +303,11 @@ public final class InventoryModule extends AbstractMysticModule {
         boolean dispatched = core.platform().runOnEntityThread(target, (store, entity, world) -> {
             try {
                 captureOnThread(target, "PreRestore");
-                Inventory inventory = resolveInventory(target);
-                if (inventory == null) {
+                Map<String, ItemContainer> sections = sections(target);
+                if (sections.isEmpty()) {
                     outcome.complete(false);
                     return;
                 }
-                Map<String, ItemContainer> sections = sections(inventory);
                 for (ItemContainer container : sections.values()) {
                     container.clear();
                 }

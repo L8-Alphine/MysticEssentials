@@ -3,20 +3,22 @@
 The modular, API-first essentials foundation for Hytale servers — homes, warps,
 spawn, teleport requests, mail, chat formatting, private messages, announcements,
 AFK, greetings/MOTD, kits, flight, inventory snapshots, nicknames, and more.
-Every feature is a module you can toggle in `config.json`, and it integrates
-with LuckPerms, PlaceholderAPI, VaultUnlocked, and MysticVanish.
+Every feature is a module you can toggle in `config.json`, with guarded
+integrations for permissions, placeholders, economy, moderation, RPG content,
+custom content, item metadata, SQL, and cross-server Redis.
 
-Built and tested against **Hytale Server 0.5.6**.
+Built and tested against **Hytale Server 0.6.2 (Update 6)**. The manifest accepts
+the Update 6 patch line (`>=0.6.0 <0.7.0`).
 
 ---
 
 ## Installation
 
-1. Drop `MysticEssentials-1.0.0.jar` into your server's `mods/` folder.
+1. Drop `MysticEssentials-1.0.4.jar` into your server's `mods/` folder.
 2. Start the server once — it generates `mods/MysticEssentials/config.json`, the
    message bundle, and per-module config files.
-3. (Optional) Install **LuckPerms**, **PlaceholderAPI**, and/or **VaultUnlocked**
-   for permissions, placeholders, and economy features. They're auto-detected.
+3. (Optional) Install any plugins listed in the integration matrix below. Every
+   plugin bridge is auto-detected and fails open when its provider is absent.
 4. Edit configs, then run `/mystic reload` (or restart).
 
 Storage defaults to local JSON. For production, set `storage.provider` to
@@ -108,10 +110,28 @@ Player, home, and warp names autocomplete.
 | `/tpall` | Teleport every online player to you | `mysticessentials.teleport.tpall` |
 | `/top` | Teleport to the highest block in your current column | `mysticessentials.teleport.top` |
 | `/back` | Return to your previous location | `mysticessentials.teleport.back` |
+| `/rtp [profile]` | Randomly teleport to a safe destination | `mysticessentials.teleport.rtp` |
+| `/rtpadmin` | Inspect and administer random-teleport profiles/searches | `mysticessentials.teleport.rtp.admin` |
 
 The Teleport Requests UI (`/tpa` with no player) includes a **favorites list**:
 add players with `FAV +`, remove with `FAV -`; online favorites get one-click
 TPA / TPA HERE buttons and offline favorites stay listed.
+
+With Redis enabled, requests work across the network: `/tpa <player>` and the
+UI see players on every server, requests are stored in Redis and pulled by the
+target's server (so they survive a missed announcement or a server switch), and
+accepting one refers the mover to the other server and finishes the teleport
+once they arrive. Each server advertises its own address (auto-detected; set
+`storage.redis.advertisedHost` / `advertisedPort` behind NAT, Docker or a proxy).
+
+Random Teleport has a soft MysticRPG integration. When MysticRPG's World module
+is available, every candidate and the final destination are checked against the
+requesting player's current RPG level. Configure the accepted content band in
+`modules/teleportation/rtp.json` under `mysticRpgSafety`; defaults accept content
+from 10 levels below through 3 levels above the player. MysticRPG safe regions
+are allowed regardless of level. When content is above that band, centered RTP
+shapes automatically narrow inward toward lower-level areas; content below the
+band moves the search outward. Set `enabled: false` to opt out.
 
 ### Spawn & Homes
 | Command | Description | Permission |
@@ -150,6 +170,24 @@ permission and show a world-map marker.
 | `/portal list` | List every portal (type, target, location) | `mysticessentials.portal.admin` |
 | `/portal edit` | Open the config page for the nearest portal (8 blocks) | `mysticessentials.portal.admin` |
 | `/portal remove <id>` | Delete a portal by id | `mysticessentials.portal.admin` |
+
+### Craft Blocking
+Stops configured item ids from being crafted, at every bench and in hand
+crafting. The block list lives in `modules/craftblock/config.json`
+(`blockedItems`); entries are case-insensitive item ids and may use `*`
+wildcards (`Mcw_*`). A recipe is denied when its recipe id or **any** of its
+output item ids matches, so one item id covers every recipe that produces it.
+Denied players get a toast explaining why — blocked recipes still appear in the
+client's bench UI, which the client owns. Processing benches (smelters and the
+like) are **not** covered: the server never fires a craft event for them.
+
+| Command | Description | Permission |
+|---|---|---|
+| `/craftblock` | List the active block list | `mysticessentials.craftblock.admin` |
+| `/craftblock check` | Show the item id of the item in your hand, and whether it is blocked | `mysticessentials.craftblock.admin` |
+
+Bypass: `mysticessentials.craftblock.bypass` (all items) or
+`mysticessentials.craftblock.bypass.<item id>` (one item).
 
 ### Mail
 | Command | Description | Permission |
@@ -211,11 +249,12 @@ Both commands accept a short form and a precise one. `/broadcast The market is
 open` behaves as it always did — including the configured `broadcastPrefix` and
 `alertPrefix` from `modules/announcements/config.json`, which still apply to the
 plain form. Naming a category explicitly (`/broadcast event …`) uses that
-category's prefix instead. Broadcasts and rotating announcements use Hytale's
-built-in event title with `SFX_Attn_Moderate`; alerts use the same title system
-with `SFX_Attn_Loud`. The headline and sound are configurable with
-`broadcastTitle`, `broadcastSound`, `alertTitle`, and `alertSound`. The longer
-form reaches the rest of the engine:
+category's prefix instead. Rotating announcements use Hytale's built-in event
+title with `SFX_Attn_Moderate`. Manual broadcasts and alerts default to chat,
+toast, and title only; pass `--sound` when a manual notice should also make
+noise. The rotating-announcement headline and sound are configurable with
+`broadcastTitle` and `broadcastSound`; `alertTitle` supplies the default manual
+alert headline. The longer form reaches the rest of the engine:
 
 ```
 /alert critical --title "Server Restart" --subtitle "60 seconds"
@@ -226,16 +265,19 @@ form reaches the rest of the engine:
 Flags: `--title`, `--subtitle`, `--message`, `--sound`, `--icon`, `--source`,
 `--command`, `--url`, `--duration <seconds>`, `--audience <spec>`, and the
 switches `--bossbar`/`--banner`, `--toast`, `--actionbar`, `--no-chat`,
-`--no-history`, `--sticky`.
+`--history`, `--no-history`, `--sticky`.
 
 Audience specs: `all`, `staff`, `world:<name>`, `channel:<id>`,
 `permission:<node>`, `player:<name>`, `guild:<id>`, `party:<id>`, `region:<id>`.
 The last three resolve only when a mod has registered a resolver for them.
 
 Priorities escalate which surfaces are used — `low` stays in chat, `normal` adds
-the action bar and a toast, `important` adds a title and stores history, and
-`critical` additionally pins a banner and **cannot be suppressed by player
-preferences** (sending one needs `mysticessentials.notifications.critical`).
+the action bar and a toast, and `important` adds a title and stores history.
+Routine notifications are not stored unless their sender explicitly opts in.
+Manual `/broadcast` and `/alert` notices are transient by default regardless of
+priority. `critical` additionally pins a banner when requested and **cannot be
+suppressed by player preferences** (sending one needs
+`mysticessentials.notifications.critical`).
 | `/afk [reason]` | Toggle AFK | `mysticessentials.afk.use` |
 | `/afkzone pos1` / `/afkzone pos2` | Select a reward-zone corner at your position | `mysticessentials.afk.zone.admin` |
 | `/afkzone create <name>` | Create an AFK reward zone from the selected corners | `mysticessentials.afk.zone.admin` |
@@ -299,7 +341,7 @@ a category `type` (`additions`/`fixes`/`changes`/`removals`) and a Markdown-subs
 `body`. The body supports `#`/`##` headers, `-`/`+` bullet lines (coloured by
 category — additions green, removals red), and blank-line spacing; inline
 `**bold**`, `*italic*`, `` `code` ``, and `[label](target)` markers are shown as
-their plain text (Hytale 0.5.6 Labels are plain-text only).
+their plain text (Hytale Labels are plain-text only).
 
 ### CustomGUIs & CustomDialogs
 
@@ -399,7 +441,7 @@ then run `/tutorial scene import`). Playback is **server-driven** (`sceneProvide
 = camera`): the server samples the scene's camera keyframes and steers the player's
 camera along the path with the `SetServerCamera` packet — the client does not need
 the scene locally. (The `machinima` provider, which sends the machinima packet, is
-kept for a future client but is a no-op on 0.5.6, which has no receiver for it.)
+kept for a future client but is currently a no-op.)
 A tutorial plays a scene via its `machinima.sceneId`; `machinima.placement` is
 `fixed` (play at the scene's recorded world coordinates) or `relocate` (translate
 the scene so its origin sits at `machinima.anchor` — `player` position, or explicit
@@ -535,7 +577,7 @@ Every message and config template supports this markup:
 | `<lang:some.key>` | Client-translated text |
 | `{player_name}`, `{luckperms_prefix}`, `{group}`, `%papi_placeholder%` | Placeholders |
 
-> Hover text is not available — the Hytale 0.5.6 message protocol has no hover
+> Hover text is not available — the current Hytale message protocol has no hover
 > field (only links).
 
 Runtime text in Mystic Essentials pages, row templates, text buttons, and HUDs
@@ -684,8 +726,9 @@ Notable per-module settings:
   ```
 - **greetings** — MOTD lines, first-join message, and optional join/leave broadcasts.
 - **announcements** — also `broadcastPrefix`, `alertPrefix`, `broadcastTitle`,
-  `alertTitle`, `broadcastSound`, and `alertSound` for `/broadcast`, rotating
-  announcements, and `/alert`.
+  and `alertTitle` for `/broadcast`, rotating announcements, and `/alert`, plus
+  `broadcastSound` for the rotating announcement sound. Manual commands use
+  `--sound` when sound is desired.
 - **kits** — kit definitions (`items`, `cooldownSeconds` with `-1` = one-time,
   `requiredOnlineSeconds`, `requirePermission`, `cost`, `description`) and
   `firstJoinKit` granted automatically on first join.
@@ -704,25 +747,30 @@ Config files are **versioned**: each carries a `configVersion` and is migrated
 
 ## Integrations
 
-- **LuckPerms** — permission checks, primary group, and `{luckperms_prefix}` /
-  `{luckperms_suffix}` in chat and messages.
-- **PlaceholderAPI** — resolves `%…%` placeholders, and exposes Mystic's own to
-  other mods as `%mystic_<name>%` / `%mysticessentials_<name>%` (e.g.
-  `%mystic_playtime_total%`, `%mystic_player_name%`, `%mystic_group%`). The full
-  list is advertised to PlaceholderAPI, so it shows up in expansion info. If
-  PlaceholderAPI starts after Mystic, registration is retried automatically.
-- **VaultUnlocked** — economy for paid warps, teleport costs, paid flight, kit
-  costs, and AFK rewards. Requires an economy provider mod; without one, costs
-  are free and payouts no-op.
-- **MysticVanish** — vanished players are hidden from the TPA UI and player
-  suggestions, treated as offline for `/msg` and `/tpa`, and join/leave/AFK
-  announcements stay silent for them. Auto-detected; drop
-  `MysticVanish-1.0.0.jar` in `mods/`.
+All plugin integrations are optional. `manifest.json` declares only load-order
+hints, never hard dependencies, and `/mystic reload` reapplies the five main
+integration toggles plus the Redis connection without a restart.
 
-Cross-server (multiple servers on one network) broadcasts and private messages
-work when Redis is enabled in `config.json`.
+| Integration | What Mystic Essentials uses | Behavior when absent |
+|---|---|---|
+| **LuckPerms API 5.5** | Permission provider, primary group, prefix, and suffix | Native Hytale permission checks remain; group metadata is empty |
+| **PlaceholderAPI-Hytale 1.0.8+** | Resolves external `%...%` values and registers `%mystic_<name>%` / `%mysticessentials_<name>%` | Internal `{...}` placeholders continue to work; late registration is retried |
+| **VaultUnlocked 2.20+** | Paid warps/teleports/flight/kits and AFK payouts through its current `BigDecimal` economy API | Costs become free and payouts safely no-op |
+| **MysticVanish 1.0+** | Hides vanished players from suggestions, TPA, messaging, and public lifecycle announcements | Everyone is treated as visible |
+| **MysticModeration 1.0+** | Dynamic diagnostics/API and reload bridge; discovered after startup through MysticModeration's plugin classloader | Moderation calls are unavailable; core moderation audit logs remain local |
+| **MysticIdentity 0.1+** | Managed (parentally supervised) accounts: private messages are refused between a pair the child's policy keeps apart (`TEXT_PRIVATE`), cross-server channel lines are delivered per listener (`TEXT_PUBLIC`), and bridged Discord lines skip a child whose cross-platform chat is off (`TEXT_CROSS_PLATFORM`); guardians and trusted staff are exempt inside MysticIdentity's answer | Nobody is restricted |
+| **MysticIdentity player portal** | Mail (read-only; attachments are claimed in game), view-only vaults and patch notes on the web dashboard, plus a My identity card with unread mail, vault count and nickname. Loaded from its own source set (`src/mysticidentity/java`) so the main code never compiles against MysticIdentity; follows `integrations.mysticIdentity` | The pages do not appear |
+| **MysticRPG 1.0+** | RPG-level/safe-region checks for random teleport plus its stable item metadata contract | RTP uses terrain/config safety only; ordinary item details remain |
+| **QuestLines** | Reflection-only requirements/actions/placeholders bridge for Custom Content, plus compatible dialog/GUI imports and exports | Custom Content's native layouts and dialogs still work |
+| **SimpleEnchantments / LuxReforge** | Reads their stable BSON item metadata into chat ItemView details without linking to their jars | Their extra item sections are omitted |
+| **Redis 7+ server** | Cross-server chat, PMs, broadcasts, temporary channel state, custom-command sync, player-vault cache and distributed locks | Features degrade to local-only, except modules configured to require Redis refuse unsafe writes |
+| **MySQL or MariaDB** | Durable shared storage using the bundled HikariCP pool and JDBC drivers | Startup falls back to local JSON if the database cannot initialize |
 
-Chat channel cross-server delivery also requires Redis.
+Redis is a cache and pub/sub transport, not the primary datastore. Set
+`storage.redis.enabled` for network features; choose `storage.provider` as
+`json`, `mysql`, or `mariadb` for durable data. Third-party mods can also use
+the public `MysticEssentialsProvider` API to register ItemView providers and
+other service-level extensions.
 
 ---
 
@@ -736,7 +784,8 @@ Hytale API surface, and how to build addons against
 ## Building
 
 ```bash
-./gradlew shadowJar     # -> build/libs/MysticEssentials-1.0.0.jar
+./gradlew shadowJar     # -> build/libs/MysticEssentials-1.0.4.jar (the one to deploy)
+                        #    MysticEssentials-1.0.4-thin.jar has no bundled Jedis/JDBC — never deploy it
 ./gradlew deployMod     # build + copy to the project-local server mods folder
 ```
 

@@ -1,9 +1,12 @@
+// Teleport Requests — people on the left (favourites pinned above everyone
+// online), incoming requests on the right where they need an answer.
 $C = "../Common.ui";
+$M = "MysticTheme.ui";
 
 $C.@PageOverlay {}
 
 $C.@Container {
-  Anchor: (Width: 940, Height: 640);
+  Anchor: (Width: 960, Height: 640);
 
   #Title {
     Group {
@@ -18,74 +21,87 @@ $C.@Container {
   #Content {
     LayoutMode: Left;
 
+    // ---- People -------------------------------------------------------------
     Group {
       FlexWeight: 1;
       LayoutMode: Top;
-      Padding: (Right: 12);
 
-      Label {
-        Anchor: (Height: 26, Bottom: 6);
-        Style: (...$C.@DefaultLabelStyle, FontSize: 14, RenderBold: true, RenderUppercase: true);
-        Text: "Favorites";
+      $M.@Section {
+        @Text = "Favourites";
+        @Style = $M.@EyebrowGoldStyle;
+        @Anchor = (Bottom: 8);
       }
 
-      Label #FavoritesEmpty {
-        Anchor: (Height: 30);
-        Style: (FontSize: 13, TextColor: #9fb0c4, VerticalAlignment: Center);
-        Text: "No favorites yet. Use FAV + to add one.";
-        Visible: false;
+      $M.@Well {
+        Anchor: (Height: 176, Bottom: 14);
+
+        Label #FavoritesEmpty {
+          Anchor: (Height: 48);
+          Style: $M.@EmptyStyle;
+          Text: "No favourites yet. Star a player below to keep them here.";
+          Visible: false;
+        }
+
+        Group #FavoriteList {
+          FlexWeight: 1;
+          LayoutMode: TopScrolling;
+          Padding: (Right: 6);
+          ScrollbarStyle: $C.@DefaultScrollbarStyle;
+        }
       }
 
-      Group #FavoriteList {
-        Anchor: (Height: 170, Bottom: 8);
-        LayoutMode: TopScrolling;
-        Padding: (Right: 10);
-        ScrollbarStyle: $C.@DefaultScrollbarStyle;
+      $M.@Section {
+        @Text = "Online Players";
+        @Anchor = (Bottom: 8);
       }
 
-      Label {
-        Anchor: (Height: 26, Bottom: 6);
-        Style: (...$C.@DefaultLabelStyle, FontSize: 14, RenderBold: true, RenderUppercase: true);
-        Text: "Online Players";
-      }
-
-      Label #PlayersEmpty {
-        Anchor: (Height: 40);
-        Style: (FontSize: 14, TextColor: #9fb0c4, VerticalAlignment: Center);
-        Text: "Nobody else is online right now.";
-        Visible: false;
-      }
-
-      Group #PlayerList {
+      $M.@Well {
         FlexWeight: 1;
-        LayoutMode: TopScrolling;
-        Padding: (Right: 10);
-        ScrollbarStyle: $C.@DefaultScrollbarStyle;
+
+        Label #PlayersEmpty {
+          Anchor: (Height: 64);
+          Style: $M.@EmptyStyle;
+          Text: "Nobody else is online right now.";
+          Visible: false;
+        }
+
+        Group #PlayerList {
+          FlexWeight: 1;
+          LayoutMode: TopScrolling;
+          Padding: (Right: 6);
+          ScrollbarStyle: $C.@DefaultScrollbarStyle;
+        }
       }
     }
 
+    $M.@ColumnDivider {}
+
+    // ---- Incoming -----------------------------------------------------------
     Group {
-      Anchor: (Width: 360);
+      Anchor: (Width: 340);
       LayoutMode: Top;
 
-      Label {
-        Anchor: (Height: 26, Bottom: 6);
-        Style: (...$C.@DefaultLabelStyle, FontSize: 14, RenderBold: true, RenderUppercase: true);
-        Text: "Incoming Requests";
+      $M.@Section {
+        @Text = "Incoming Requests";
+        @Anchor = (Bottom: 8);
       }
 
-      Label #RequestsEmpty {
-        Anchor: (Height: 40);
-        Style: (FontSize: 14, TextColor: #9fb0c4, VerticalAlignment: Center);
-        Text: "No pending requests.";
-        Visible: false;
-      }
-
-      Group #RequestList {
+      $M.@Well {
         FlexWeight: 1;
-        LayoutMode: TopScrolling;
-        Padding: (Right: 10);
-        ScrollbarStyle: $C.@DefaultScrollbarStyle;
+
+        Label #RequestsEmpty {
+          Anchor: (Height: 64);
+          Style: $M.@EmptyStyle;
+          Text: "No pending requests.";
+          Visible: false;
+        }
+
+        Group #RequestList {
+          FlexWeight: 1;
+          LayoutMode: TopScrolling;
+          Padding: (Right: 6);
+          ScrollbarStyle: $C.@DefaultScrollbarStyle;
+        }
       }
     }
   }

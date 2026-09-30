@@ -82,6 +82,7 @@ final class ChannelPages {
 
             List<ChannelRow> rows = channels.channelRowsFor(player);
             cmd.set("#ChannelEmpty.Visible", rows.isEmpty());
+            ChannelRow selected = selectedRow(rows, selectedChannelId);
             for (int i = 0; i < rows.size(); i++) {
                 ChannelRow row = rows.get(i);
                 String sel = "#ChannelList[" + i + "]";
@@ -89,11 +90,11 @@ final class ChannelPages {
                 cmd.set(sel + " #Name.TextSpans", uiText(sel + " #Name.TextSpans", row.name()));
                 cmd.set(sel + " #Meta.TextSpans", uiText(sel + " #Meta.TextSpans", rowSubtitle(row)));
                 cmd.set(sel + " #Swatch.Background", safeColor(row.color()));
+                cmd.set(sel + " #Selected.Visible", row == selected);
                 event.addEventBinding(CustomUIEventBindingType.Activating, sel,
                         new EventData().put("action", "select").put("channel", row.id()));
             }
 
-            ChannelRow selected = selectedRow(rows, selectedChannelId);
             applySelectedChannel(cmd, selected);
 
             if (selected != null) {

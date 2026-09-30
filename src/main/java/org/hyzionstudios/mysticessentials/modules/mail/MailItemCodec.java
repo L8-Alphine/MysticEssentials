@@ -16,6 +16,7 @@ final class MailItemCodec {
     }
 
     /** Serializes an occupied item stack; returns {@code null} for empty stacks. */
+    @SuppressWarnings("deprecation") // Full BSON is required for lossless attachment round-trips.
     static MailAttachment toStored(ItemStack stack, int quantity) {
         if (stack == null || stack.isEmpty()) {
             return null;

@@ -16,7 +16,8 @@ import com.hypixel.hytale.server.core.command.system.CommandRegistration;
 
 /**
  * Adapter around Hytale's command registration for the dynamic custom-command
- * stubs. Isolates every 0.5.6-specific assumption in one place:
+ * stubs. Isolates every engine-version-specific assumption in one place
+ * (re-verified against 0.6.2):
  *
  * <ul>
  *   <li>One {@link DynamicCommandStub} is registered <b>per label</b> (primary
@@ -25,7 +26,7 @@ import com.hypixel.hytale.server.core.command.system.CommandRegistration;
  *   <li>Unregistration is real: {@code CommandRegistry.registerCommand}
  *       returns a {@link CommandRegistration} whose public
  *       {@code unregister()} removes the command from the engine's command
- *       and alias maps (verified against the 0.5.6 bytecode). The handle is
+ *       and alias maps (verified against the 0.6.2 bytecode). The handle is
  *       one-shot — re-adding a label later registers a fresh stub.</li>
  *   <li>Stubs still resolve their definition at call time, so even a label
  *       whose unregistration was skipped (e.g. registry already shut down)

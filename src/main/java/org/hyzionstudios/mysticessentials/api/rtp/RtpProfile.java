@@ -101,8 +101,9 @@ public final class RtpProfile {
     }
 
     /**
-     * Optional per-profile filters. Fields backed by not-yet-verified 0.5.6 APIs
-     * (biomes, block tags, world types) or by other Mystic modules (claims via
+     * Optional per-profile filters. Fields backed by server APIs that remain
+     * unverified through 0.6.2 (biomes, block tags, world types) or by other
+     * Mystic modules (claims via
      * MysticGuilds, level via MysticRPG) are honoured only when a corresponding
      * capability/exclusion provider is registered; otherwise they are ignored so
      * a search never silently fails.

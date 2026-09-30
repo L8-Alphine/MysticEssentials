@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import org.hyzionstudios.mysticessentials.core.MysticCore;
+import org.hyzionstudios.mysticessentials.core.network.NetworkPlayerService.NetworkPlayer;
 import org.hyzionstudios.mysticessentials.modules.teleportation.TeleportationModule.PendingRequest;
 import org.hyzionstudios.mysticessentials.platform.ui.MysticPage;
 
@@ -63,17 +64,20 @@ final class TpaPages {
             Map<UUID, String> favorites = teleport.favorites(player.getUuid());
             List<Map.Entry<UUID, String>> favoriteEntries = new ArrayList<>(favorites.entrySet());
             favoriteEntries.sort(Comparator
-                    .comparing((Map.Entry<UUID, String> e) -> core.platform().findPlayer(e.getKey()).isEmpty())
+                    .comparing((Map.Entry<UUID, String> e) -> visibleNetworkPlayer(e.getKey()) == null)
                     .thenComparing(Map.Entry::getValue, String.CASE_INSENSITIVE_ORDER));
             cmd.set("#FavoritesEmpty.Visible", favoriteEntries.isEmpty());
             for (int i = 0; i < favoriteEntries.size(); i++) {
                 Map.Entry<UUID, String> favorite = favoriteEntries.get(i);
-                PlayerRef online = core.platform().findPlayer(favorite.getKey()).orElse(null);
-                String name = online != null ? online.getUsername() : favorite.getValue();
+                NetworkPlayer online = visibleNetworkPlayer(favorite.getKey());
+                String name = online != null ? online.username() : favorite.getValue();
                 String row = "#FavoriteList[" + i + "]";
                 cmd.append("#FavoriteList", FAVORITE_ROW_UI);
                 cmd.set(row + " #Name.TextSpans", uiText(row + " #Name.TextSpans", name));
-                cmd.set(row + " #Status.TextSpans", uiText(row + " #Status.TextSpans", online != null ? "" : "offline"));
+                String status = online == null ? "offline"
+                        : (online.local(core.networkPlayers().localServerId()) ? "" : online.serverId())
+                                + (online.afk() ? " AFK" : "");
+                cmd.set(row + " #Status.TextSpans", uiText(row + " #Status.TextSpans", status));
                 boolean visible = online != null;
                 cmd.set(row + " #TpaButton.Visible", visible);
                 cmd.set(row + " #HereButton.Visible", visible);
@@ -87,39 +91,47 @@ final class TpaPages {
                         new EventData().put("action", "unfavorite").put("target", favorite.getKey().toString()));
             }
 
-            List<PlayerRef> others = new ArrayList<>();
-            for (PlayerRef online : core.vanish().visiblePlayers(player.getUuid())) {
-                if (!online.getUuid().equals(player.getUuid())
-                        && matchesSearch(search, online.getUsername())) {
+            List<NetworkPlayer> others = new ArrayList<>();
+            for (NetworkPlayer online : core.networkPlayers().onlinePlayers()) {
+                if (!online.uuid().equals(player.getUuid()) && isVisible(online)
+                        && matchesSearch(search, online.username())) {
                     others.add(online);
                 }
             }
-            others.sort(Comparator.comparing(PlayerRef::getUsername, String.CASE_INSENSITIVE_ORDER));
+            others.sort(Comparator.comparing(NetworkPlayer::username, String.CASE_INSENSITIVE_ORDER));
 
             cmd.set("#PlayersEmpty.Visible", others.isEmpty());
             for (int i = 0; i < others.size(); i++) {
-                PlayerRef other = others.get(i);
+                NetworkPlayer other = others.get(i);
                 String row = "#PlayerList[" + i + "]";
                 cmd.append("#PlayerList", PLAYER_ROW_UI);
-                cmd.set(row + " #Name.TextSpans", uiText(row + " #Name.TextSpans", other.getUsername()));
-                cmd.set(row + " #FavButton.Visible", !favorites.containsKey(other.getUuid()));
+                String label = other.local(core.networkPlayers().localServerId())
+                        ? other.username() : other.username() + " (" + other.serverId() + ")";
+                cmd.set(row + " #Name.TextSpans", uiText(row + " #Name.TextSpans", label));
+                cmd.set(row + " #FavButton.Visible", !favorites.containsKey(other.uuid()));
                 event.addEventBinding(CustomUIEventBindingType.Activating, row + " #TpaButton",
-                        new EventData().put("action", "tpa").put("target", other.getUuid().toString()));
+                        new EventData().put("action", "tpa").put("target", other.uuid().toString()));
                 event.addEventBinding(CustomUIEventBindingType.Activating, row + " #HereButton",
-                        new EventData().put("action", "tpahere").put("target", other.getUuid().toString()));
+                        new EventData().put("action", "tpahere").put("target", other.uuid().toString()));
                 event.addEventBinding(CustomUIEventBindingType.Activating, row + " #FavButton",
-                        new EventData().put("action", "favorite").put("target", other.getUuid().toString()));
+                        new EventData().put("action", "favorite").put("target", other.uuid().toString()));
             }
 
-            List<PendingRequest> requests = teleport.incomingRequests(player.getUuid());
+            // Pulls requests other network servers stored in Redis, so a request
+            // sent while this player was elsewhere (or whose announcement was
+            // missed) still shows up here.
+            List<PendingRequest> requests = teleport.syncIncomingRequests(player.getUuid());
             cmd.set("#RequestsEmpty.Visible", requests.isEmpty());
             for (int i = 0; i < requests.size(); i++) {
                 PendingRequest request = requests.get(i);
                 String row = "#RequestList[" + i + "]";
                 cmd.append("#RequestList", REQUEST_ROW_UI);
+                String who = request.remote(core.networkPlayers().localServerId())
+                        ? request.requesterName() + " (" + request.requesterServerId() + ")"
+                        : request.requesterName();
                 cmd.set(row + " #Text.TextSpans", uiText(row + " #Text.TextSpans", request.requesterTeleports()
-                        ? request.requesterName() + " wants to teleport to you"
-                        : request.requesterName() + " wants you to teleport to them"));
+                        ? who + " wants to teleport to you"
+                        : who + " wants you to teleport to them"));
                 event.addEventBinding(CustomUIEventBindingType.Activating, row + " #AcceptButton",
                         new EventData().put("action", "accept").put("requester", request.requester().toString()));
                 event.addEventBinding(CustomUIEventBindingType.Activating, row + " #DenyButton",
@@ -137,22 +149,21 @@ final class TpaPages {
             switch (action) {
                 case "tpa", "tpahere" -> {
                     UUID target = parseUuid(field(payload, "target"));
-                    PlayerRef targetRef = target == null ? null
-                            : core.platform().findPlayer(target).orElse(null);
+                    NetworkPlayer targetRef = target == null ? null : visibleNetworkPlayer(target);
                     if (targetRef == null) {
                         core.getMessageService().sendKey(player, "teleport-target-offline");
-                    } else if (teleport.sendRequest(player, targetRef, "tpa".equals(action))) {
+                    } else if (teleport.sendRequest(player, targetRef.uuid(), targetRef.username(),
+                            "tpa".equals(action))) {
                         core.getMessageService().send(player,
-                                "&7Teleport request sent to &e" + targetRef.getUsername());
+                                "&7Teleport request sent to &e" + targetRef.username());
                     }
                     reopen(ref, store, new TpaPage(core, teleport, player, search));
                 }
                 case "favorite" -> {
                     UUID target = parseUuid(field(payload, "target"));
-                    PlayerRef targetRef = target == null ? null
-                            : core.platform().findPlayer(target).orElse(null);
+                    NetworkPlayer targetRef = target == null ? null : visibleNetworkPlayer(target);
                     if (targetRef != null) {
-                        teleport.addFavorite(player.getUuid(), target, targetRef.getUsername());
+                        teleport.addFavorite(player.getUuid(), target, targetRef.username());
                     }
                     reopen(ref, store, new TpaPage(core, teleport, player, search));
                 }
@@ -176,6 +187,18 @@ final class TpaPages {
                 default -> {
                 }
             }
+        }
+
+        private NetworkPlayer visibleNetworkPlayer(UUID uuid) {
+            NetworkPlayer networkPlayer = core.networkPlayers().find(uuid).orElse(null);
+            return networkPlayer != null && isVisible(networkPlayer) ? networkPlayer : null;
+        }
+
+        private boolean isVisible(NetworkPlayer candidate) {
+            if (candidate.local(core.networkPlayers().localServerId())) {
+                return core.vanish().canSee(player.getUuid(), candidate.uuid());
+            }
+            return !candidate.vanished();
         }
 
         private static UUID parseUuid(String raw) {

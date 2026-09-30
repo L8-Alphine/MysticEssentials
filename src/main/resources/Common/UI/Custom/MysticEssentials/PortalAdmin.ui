@@ -1,9 +1,14 @@
+// Portal — configure one portal block. The form is grouped by concern:
+// identity, destination (world / server / commands — the server shows the one
+// that matches the chosen type), access, and map marker. The whole form
+// scrolls; Save and Delete stay fixed at the foot.
 $C = "../Common.ui";
+$M = "MysticTheme.ui";
 
 $C.@PageOverlay {}
 
 $C.@Container {
-  Anchor: (Width: 640, Height: 700);
+  Anchor: (Width: 660, Height: 720);
 
   #Title {
     Group {
@@ -17,195 +22,234 @@ $C.@Container {
     LayoutMode: Top;
 
     Group {
-      Background: (TexturePath: "../Common/ContainerPanelPatch.png", Border: 4);
-      LayoutMode: Top;
-      Padding: (Full: 16);
-      Anchor: (Bottom: 12);
+      FlexWeight: 1;
+      LayoutMode: TopScrolling;
+      Padding: (Right: 6);
+      ScrollbarStyle: $C.@DefaultScrollbarStyle;
 
-      Label #PortalHeading {
-        Anchor: (Bottom: 2);
-        Style: (FontSize: 20, RenderBold: true, TextColor: #ffffff);
-      }
+      // ---- Identity --------------------------------------------------------
+      $M.@Panel {
+        Anchor: (Bottom: 12);
 
-      Label #PortalMeta {
-        Anchor: (Bottom: 10);
-        Style: (...$C.@DefaultLabelStyle, FontSize: 12);
-      }
-
-      Group {
-        LayoutMode: Left;
-        Anchor: (Height: 38, Bottom: 10);
-
-        $C.@TextField #PortalName {
-          @Anchor = (Right: 8);
-          FlexWeight: 1;
-          PlaceholderText: "Display name (optional)";
+        Label #PortalHeading {
+          Anchor: (Height: 30, Bottom: 2);
+          Style: $M.@DisplayStyle;
         }
 
-        $C.@DropdownBox #PortalType {
-          @Anchor = (Width: 220);
-        }
-      }
-
-      Group #WorldSection {
-        LayoutMode: Top;
-
-        Label {
-          Anchor: (Bottom: 6);
-          Style: (...$C.@DefaultLabelStyle, FontSize: 13, RenderBold: true);
-          Text: "Target world";
-        }
-        $C.@TextField #TargetWorld {
-          @Anchor = (Height: 38, Bottom: 10);
-          PlaceholderText: "World name";
+        Label #PortalMeta {
+          Anchor: (Height: 16, Bottom: 12);
+          Style: $M.@CaptionStyle;
         }
 
         Group {
           LayoutMode: Left;
-          Anchor: (Height: 38, Bottom: 10);
-
-          $C.@SecondaryTextButton #UseLocationToggle {
-            @Text = "Exact location: OFF";
-            @Anchor = (Width: 220, Right: 8);
-          }
-
-          $C.@SmallTertiaryTextButton #HereButton {
-            @Text = "Use my position";
-            @Anchor = (Width: 170);
-          }
-        }
-
-        Group #LocationRow {
-          LayoutMode: Left;
-          Anchor: (Height: 38, Bottom: 10);
-
-          $C.@TextField #PosX {
-            @Anchor = (Width: 110, Right: 8);
-            PlaceholderText: "X";
-          }
-          $C.@TextField #PosY {
-            @Anchor = (Width: 110, Right: 8);
-            PlaceholderText: "Y";
-          }
-          $C.@TextField #PosZ {
-            @Anchor = (Width: 110, Right: 8);
-            PlaceholderText: "Z";
-          }
-
-          $C.@DropdownBox #Facing {
-            @Anchor = (Width: 180);
-          }
-        }
-      }
-
-      Group #ServerSection {
-        LayoutMode: Left;
-        Anchor: (Height: 38, Bottom: 10);
-
-        $C.@TextField #Host {
-          @Anchor = (Right: 8);
-          FlexWeight: 1;
-          PlaceholderText: "Server host";
-        }
-
-        $C.@TextField #Port {
-          @Anchor = (Width: 140);
-          PlaceholderText: "Port";
-        }
-      }
-
-      Group #CommandSection {
-        LayoutMode: Top;
-
-        Label {
-          Anchor: (Bottom: 6);
-          Style: (...$C.@DefaultLabelStyle, FontSize: 13, RenderBold: true);
-          Text: "Commands (separate with ; — use wait <ticks> to pause)";
-        }
-        $C.@TextField #Command {
-          @Anchor = (Height: 38, Bottom: 10);
-          PlaceholderText: "spawn {PlayerUsername}; wait 20; give {PlayerUsername} torch";
-        }
-
-        Group {
-          LayoutMode: Left;
-          Anchor: (Height: 34, Bottom: 10);
+          Anchor: (Height: 16, Bottom: 6);
 
           Label {
-            Anchor: (Width: 110);
-            Style: (...$C.@DefaultLabelStyle, FontSize: 13, RenderBold: true, VerticalAlignment: Center);
-            Text: "Run as";
+            FlexWeight: 1;
+            Style: $M.@EyebrowStyle;
+            Text: "Display name  ·  optional";
           }
 
-          $C.@DropdownBox #CommandSender {
+          Label {
+            Anchor: (Width: 220);
+            Style: $M.@EyebrowStyle;
+            Text: "Type";
+          }
+        }
+
+        Group {
+          LayoutMode: Left;
+          Anchor: (Height: 38);
+
+          $C.@TextField #PortalName {
+            @Anchor = (Right: 8);
+            FlexWeight: 1;
+            PlaceholderText: "Shown on the marker and in messages";
+          }
+
+          $C.@DropdownBox #PortalType {
+            Anchor: (Width: 220, Height: 32, Top: 3);
+          }
+        }
+      }
+
+      // ---- Destination -----------------------------------------------------
+      $M.@Panel {
+        Anchor: (Bottom: 12);
+
+        $M.@Section {
+          @Text = "Destination";
+          @Style = $M.@EyebrowGoldStyle;
+          @Anchor = (Bottom: 10);
+        }
+
+        Group #WorldSection {
+          LayoutMode: Top;
+
+          $M.@FieldLabel { @Text = "Target world"; }
+
+          $C.@TextField #TargetWorld {
+            @Anchor = (Bottom: 10);
+            PlaceholderText: "World name";
+          }
+
+          Group {
+            LayoutMode: Left;
+            Anchor: (Height: 44, Bottom: 8);
+
+            $C.@SecondaryTextButton #UseLocationToggle {
+              @Text = "Exact location: OFF";
+              @Anchor = (Width: 220, Right: 8);
+            }
+
+            $C.@SmallTertiaryTextButton #HereButton {
+              @Text = "Use my position";
+              @Anchor = (Width: 160, Vertical: 6);
+            }
+          }
+
+          Group #LocationRow {
+            LayoutMode: Left;
+            Anchor: (Height: 38);
+
+            $C.@TextField #PosX {
+              @Anchor = (Width: 100, Right: 8);
+              PlaceholderText: "X";
+            }
+
+            $C.@TextField #PosY {
+              @Anchor = (Width: 100, Right: 8);
+              PlaceholderText: "Y";
+            }
+
+            $C.@TextField #PosZ {
+              @Anchor = (Width: 100, Right: 8);
+              PlaceholderText: "Z";
+            }
+
+            $C.@DropdownBox #Facing {
+              Anchor: (Width: 170, Height: 32, Top: 3);
+            }
+          }
+        }
+
+        Group #ServerSection {
+          LayoutMode: Top;
+
+          $M.@FieldLabel { @Text = "Server"; }
+
+          Group {
+            LayoutMode: Left;
+            Anchor: (Height: 38);
+
+            $C.@TextField #Host {
+              @Anchor = (Right: 8);
+              FlexWeight: 1;
+              PlaceholderText: "Host";
+            }
+
+            $C.@TextField #Port {
+              @Anchor = (Width: 130);
+              PlaceholderText: "Port";
+            }
+          }
+        }
+
+        Group #CommandSection {
+          LayoutMode: Top;
+
+          $M.@FieldLabel { @Text = "Commands  ·  separate with ;  ·  wait <ticks> pauses"; }
+
+          $C.@TextField #Command {
+            @Anchor = (Bottom: 10);
+            PlaceholderText: "spawn {PlayerUsername}; wait 20; give {PlayerUsername} torch";
+          }
+
+          Group {
+            LayoutMode: Left;
+            Anchor: (Height: 32);
+
+            Label {
+              Anchor: (Width: 110);
+              Style: $M.@KeyStyle;
+              Text: "Run as";
+            }
+
+            $C.@DropdownBox #CommandSender {
+              Anchor: (Width: 220, Height: 32);
+            }
+          }
+        }
+      }
+
+      // ---- Access & marker -------------------------------------------------
+      $M.@Panel {
+        $M.@Section {
+          @Text = "Access";
+          @Style = $M.@EyebrowGoldStyle;
+          @Anchor = (Bottom: 10);
+        }
+
+        $M.@FieldLabel { @Text = "Required permission  ·  empty = everyone"; }
+
+        $C.@TextField #Permission {
+          @Anchor = (Bottom: 14);
+          PlaceholderText: "e.g. mysticessentials.portal.vip";
+        }
+
+        $M.@Section {
+          @Text = "Map Marker";
+          @Style = $M.@EyebrowGoldStyle;
+          @Anchor = (Bottom: 10);
+        }
+
+        Group {
+          LayoutMode: Left;
+          Anchor: (Height: 44, Bottom: 8);
+
+          $C.@SecondaryTextButton #MarkerToggle {
+            @Text = "Map marker: OFF";
+            @Anchor = (Width: 220);
+          }
+        }
+
+        Group #MarkerRow {
+          LayoutMode: Left;
+          Anchor: (Height: 38);
+
+          $C.@TextField #MarkerText {
+            @Anchor = (Right: 8);
+            FlexWeight: 1;
+            PlaceholderText: "Marker label";
+          }
+
+          $C.@TextField #MarkerIcon {
             @Anchor = (Width: 200);
+            PlaceholderText: "Icon (Portal.png)";
           }
         }
       }
-
-      $C.@PanelSeparatorFancy {
-        @Anchor = (Bottom: 10);
-      }
-
-      Label {
-        Anchor: (Bottom: 6);
-        Style: (...$C.@DefaultLabelStyle, FontSize: 13, RenderBold: true);
-        Text: "Required permission (empty = everyone)";
-      }
-      $C.@TextField #Permission {
-        @Anchor = (Height: 38, Bottom: 10);
-        PlaceholderText: "e.g. mysticessentials.portal.vip";
-      }
-
-      Group {
-        LayoutMode: Left;
-        Anchor: (Height: 38, Bottom: 6);
-
-        $C.@SecondaryTextButton #MarkerToggle {
-          @Text = "Map marker: OFF";
-          @Anchor = (Width: 220);
-        }
-      }
-
-      Group #MarkerRow {
-        LayoutMode: Left;
-        Anchor: (Height: 38);
-
-        $C.@TextField #MarkerText {
-          @Anchor = (Right: 8);
-          FlexWeight: 1;
-          PlaceholderText: "Marker label";
-        }
-
-        $C.@TextField #MarkerIcon {
-          @Anchor = (Width: 200);
-          PlaceholderText: "Icon (Portal.png)";
-        }
-      }
     }
 
-    Group {
-      LayoutMode: Left;
-      Anchor: (Height: 44, Bottom: 8);
-
-      $C.@TextButton #SaveButton {
-        @Text = "Save Portal";
-        @Anchor = (Width: 200, Right: 8);
-      }
-
-      $C.@CancelTextButton #DeletePortalButton {
-        @Text = "Delete Portal";
-        @Anchor = (Width: 190);
-      }
-    }
-
-    Group {
-      LayoutMode: Left;
-      Anchor: (Height: 44);
+    $M.@ActionBar {
+      @Anchor = (Height: 44, Top: 12);
 
       $C.@TertiaryTextButton #CloseButton {
         @Text = "Close";
-        @Anchor = (Width: 140);
+        @Anchor = (Width: 110, Right: 8);
+      }
+
+      $C.@CancelTextButton #DeletePortalButton {
+        @Text = "Delete";
+        @Anchor = (Width: 120);
+      }
+
+      $M.@Spacer {}
+
+      $C.@TextButton #SaveButton {
+        @Text = "Save Portal";
+        @Anchor = (Width: 180);
       }
     }
   }

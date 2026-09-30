@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiFunction;
 import java.util.logging.Level;
@@ -45,19 +46,32 @@ public final class PlaceholderServiceImpl implements PlaceholderService {
     /** Live expansion instances; only populated when PlaceholderAPI is present. */
     private final List<MysticExpansion> expansions = new java.util.ArrayList<>();
     private boolean placeholderApiAvailable;
+    private int lifecycleGeneration;
+    private ScheduledFuture<?> retryTask;
 
     public PlaceholderServiceImpl(MysticCore core) {
         this.core = core;
     }
 
-    public void init(boolean enabledInConfig) {
+    public synchronized void init(boolean enabledInConfig) {
+        lifecycleGeneration++;
+        cancelRetry();
+        unregisterExpansions();
         placeholderApiAvailable = enabledInConfig && isClassPresent("at.helpch.placeholderapi.PlaceholderAPI");
         core.log(Level.INFO, "Placeholder integration: PlaceholderAPI "
                 + (placeholderApiAvailable ? "connected" : "not present (internal placeholders only)"));
         registerBuiltins();
         if (placeholderApiAvailable) {
-            registerExpansions(1);
+            registerExpansions(1, lifecycleGeneration);
         }
+    }
+
+    /** Stops retry work and unregisters both aliases during plugin shutdown. */
+    public synchronized void shutdown() {
+        lifecycleGeneration++;
+        placeholderApiAvailable = false;
+        cancelRetry();
+        unregisterExpansions();
     }
 
     /**
@@ -71,7 +85,10 @@ public final class PlaceholderServiceImpl implements PlaceholderService {
      * failed attempts are retried on a backoff and the outcome is logged
      * honestly.</p>
      */
-    private void registerExpansions(int attempt) {
+    private synchronized void registerExpansions(int attempt, int expectedGeneration) {
+        if (!placeholderApiAvailable || expectedGeneration != lifecycleGeneration) {
+            return;
+        }
         if (expansions.isEmpty()) {
             for (String identifier : EXPANSION_IDENTIFIERS) {
                 expansions.add(new MysticExpansion(core, this, identifier));
@@ -103,8 +120,30 @@ public final class PlaceholderServiceImpl implements PlaceholderService {
                     + "Mystic's own {name} placeholders are unaffected.");
             return;
         }
-        core.scheduler().runLater(() -> registerExpansions(attempt + 1),
+        retryTask = core.scheduler().runLater(
+                () -> registerExpansions(attempt + 1, expectedGeneration),
                 (long) attempt * EXPANSION_RETRY_DELAY_SECONDS, TimeUnit.SECONDS);
+    }
+
+    private void cancelRetry() {
+        if (retryTask != null) {
+            retryTask.cancel(false);
+            retryTask = null;
+        }
+    }
+
+    private void unregisterExpansions() {
+        for (MysticExpansion expansion : expansions) {
+            try {
+                if (expansion.isRegistered()) {
+                    expansion.unregister();
+                }
+            } catch (Throwable t) {
+                core.log(Level.WARNING, "Failed to unregister PlaceholderAPI expansion '"
+                        + expansion.getIdentifier() + "': " + t);
+            }
+        }
+        expansions.clear();
     }
 
     /** Every registered placeholder name, sorted — the expansion's advertised list. */

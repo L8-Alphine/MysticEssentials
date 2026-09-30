@@ -209,7 +209,7 @@ public final class ItemLinkSubModule {
     /** The name portion of a link: a client-translated segment or a safe literal. */
     private static String nameMarkup(ItemSnapshot snapshot) {
         var name = snapshot.view.displayName();
-        if (name.isTranslated()) {
+        if (name.hasTranslations()) {
             return name.markup();
         }
         return ChatTokens.sanitizeInline(snapshot.plainName());
@@ -323,11 +323,7 @@ public final class ItemLinkSubModule {
                 addAliases(view);
             }
             allowExtraArguments();
-        }
-
-        @Override
-        protected boolean canGeneratePermission() {
-            return false;
+            requireNoPermission();
         }
 
         @Override
@@ -358,11 +354,7 @@ public final class ItemLinkSubModule {
                     "Browse items recently shared in chat.");
             addAliases("recentitems");
             allowExtraArguments();
-        }
-
-        @Override
-        protected boolean canGeneratePermission() {
-            return false;
+            requireNoPermission();
         }
 
         @Override

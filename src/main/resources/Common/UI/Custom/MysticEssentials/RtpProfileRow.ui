@@ -1,41 +1,54 @@
-$C = "../Common.ui";
-
 // Card template for the Random Teleport selection UI.
 // Appended per profile: cmd.append("#ProfileList", "MysticEssentials/RtpProfileRow.ui").
+$C = "../Common.ui";
+$M = "MysticTheme.ui";
 
 Group #Row {
-  Anchor: (Height: 96, Bottom: 8);
-  LayoutMode: Top;
-  Padding: (Left: 12, Right: 12, Top: 8, Bottom: 8);
-  Background: #000000(0.18);
+  Anchor: (Height: 104, Bottom: 6);
+  LayoutMode: Left;
+  Padding: (Left: 0, Right: 14, Top: 12, Bottom: 12);
+  Background: #0a0f16(0.38);
 
   Group {
-    Anchor: (Height: 30);
-    LayoutMode: Left;
+    Anchor: (Width: 3, Height: 80, Right: 13);
+    Background: #7a9cc6;
+  }
+
+  Group {
+    LayoutMode: Top;
+    FlexWeight: 1;
 
     Label #Name {
-      FlexWeight: 1;
-      Style: (FontSize: 17, TextColor: #ffffff, RenderBold: true, VerticalAlignment: Center);
+      Anchor: (Height: 24, Bottom: 4);
+      Style: (...$M.@RowNameStyle, FontSize: 17);
     }
 
-    $C.@SmallSecondaryTextButton #TeleportButton {
-      @Text = "TELEPORT";
-      @Anchor = (Width: 130);
+    Label #World {
+      Anchor: (Height: 16, Bottom: 2);
+      Style: $M.@RowMetaStyle;
+    }
+
+    Label #Details {
+      Anchor: (Height: 16, Bottom: 2);
+      Style: $M.@RowMetaStyle;
+    }
+
+    Label #Status {
+      Anchor: (Height: 16);
+      Style: (...$M.@RowMetaStyle, TextColor: #6fd08c);
     }
   }
 
-  Label #World {
-    Anchor: (Height: 20);
-    Style: (FontSize: 13, TextColor: #9fb0c4);
-  }
+  Group {
+    LayoutMode: Top;
+    Anchor: (Width: 150, Left: 12);
 
-  Label #Details {
-    Anchor: (Height: 20);
-    Style: (FontSize: 13, TextColor: #9fb0c4);
-  }
+    $M.@Spacer {}
 
-  Label #Status {
-    Anchor: (Height: 20);
-    Style: (FontSize: 13, TextColor: #8fd694);
+    $C.@TextButton #TeleportButton {
+      @Text = "Teleport";
+    }
+
+    $M.@Spacer {}
   }
 }

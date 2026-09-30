@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 
 import org.hyzionstudios.mysticessentials.core.MysticCore;
@@ -29,6 +30,7 @@ public final class CustomCommandCooldownService {
     private final MysticCore core;
     private final CustomCommandStorage storage;
     private final Supplier<CustomCommandsConfig> config;
+    private final Consumer<String> redisHandler = this::handleRemote;
 
     /** player uuid -> (command name -> expiry epoch millis). */
     private final Map<UUID, Map<String, Long>> expiries = new ConcurrentHashMap<>();
@@ -42,19 +44,25 @@ public final class CustomCommandCooldownService {
 
     /** Subscribes to cross-server cooldown events; call once on module enable. */
     public void connectRedis() {
-        if (!core.redis().isEnabled() || !config.get().crossServer.syncCooldowns) {
+        core.redis().subscribe(REDIS_CHANNEL, redisHandler);
+    }
+
+    public void disconnectRedis() {
+        core.redis().unsubscribe(REDIS_CHANNEL, redisHandler);
+    }
+
+    private void handleRemote(String payload) {
+        if (!config.get().crossServer.syncCooldowns) {
             return;
         }
-        core.redis().subscribe(REDIS_CHANNEL, payload -> {
-            try {
-                JsonObject json = Json.parse(payload).getAsJsonObject();
-                applyRemote(UUID.fromString(json.get("uuid").getAsString()),
-                        json.get("command").getAsString(),
-                        json.get("expiry").getAsLong());
-            } catch (RuntimeException e) {
-                core.log(Level.WARNING, "[customcommands] Bad cooldown sync payload: " + e.getMessage());
-            }
-        });
+        try {
+            JsonObject json = Json.parse(payload).getAsJsonObject();
+            applyRemote(UUID.fromString(json.get("uuid").getAsString()),
+                    json.get("command").getAsString(),
+                    json.get("expiry").getAsLong());
+        } catch (RuntimeException e) {
+            core.log(Level.WARNING, "[customcommands] Bad cooldown sync payload: " + e.getMessage());
+        }
     }
 
     // ----- Queries --------------------------------------------------------------

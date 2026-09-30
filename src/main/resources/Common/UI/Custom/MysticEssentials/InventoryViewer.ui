@@ -1,4 +1,7 @@
+// Inventory Viewer — the contents of one snapshot. Restore is the primary
+// action; Back is quiet.
 $C = "../Common.ui";
+$M = "MysticTheme.ui";
 
 $C.@PageOverlay {}
 
@@ -11,9 +14,8 @@ $C.@Container {
         @Text = "Inventory Viewer";
       }
 
-      Label #ViewerSubtitle {
-        Anchor: (Top: 8, Right: 14, Width: 320, Height: 24);
-        Style: (FontSize: 14, TextColor: #96a9be, HorizontalAlignment: End, VerticalAlignment: Center);
+      $M.@HeaderMeta #ViewerSubtitle {
+        @Width = 320;
       }
     }
   }
@@ -21,37 +23,53 @@ $C.@Container {
   #Content {
     LayoutMode: Top;
 
-    Label #ItemCount {
-      Anchor: (Height: 22, Bottom: 6);
-      Style: (FontSize: 13, TextColor: #96a9be, VerticalAlignment: Center);
-    }
-
-    Label #ItemsEmpty {
-      Anchor: (Height: 40);
-      Style: (FontSize: 14, TextColor: #9fb0c4, VerticalAlignment: Center);
-      Text: "This snapshot has no items.";
-      Visible: false;
-    }
-
-    Group #ItemList {
-      FlexWeight: 1;
-      LayoutMode: TopScrolling;
-      Padding: (Right: 10);
-      ScrollbarStyle: $C.@DefaultScrollbarStyle;
-    }
-
     Group {
       LayoutMode: Left;
-      Anchor: (Height: 44, Top: 10);
+      Anchor: (Height: 16, Bottom: 8);
+
+      Label {
+        Anchor: (Right: 10);
+        Style: $M.@EyebrowStyle;
+        Text: "Contents";
+      }
+
+      Label #ItemCount {
+        FlexWeight: 1;
+        Style: (...$M.@EyebrowStyle, TextColor: #96a9be);
+      }
+    }
+
+    $M.@Well {
+      FlexWeight: 1;
+
+      Label #ItemsEmpty {
+        Anchor: (Height: 64);
+        Style: $M.@EmptyStyle;
+        Text: "This snapshot has no items.";
+        Visible: false;
+      }
+
+      Group #ItemList {
+        FlexWeight: 1;
+        LayoutMode: TopScrolling;
+        Padding: (Right: 6);
+        ScrollbarStyle: $C.@DefaultScrollbarStyle;
+      }
+    }
+
+    $M.@ActionBar {
+      @Anchor = (Height: 44, Top: 12);
+
+      $C.@TertiaryTextButton #BackButton {
+        @Text = "Back";
+        @Anchor = (Width: 120);
+      }
+
+      $M.@Spacer {}
 
       $C.@TextButton #RestoreButton {
         @Text = "Restore This Snapshot";
-        @Anchor = (Width: 240, Right: 8);
-      }
-
-      $C.@CancelTextButton #BackButton {
-        @Text = "Back";
-        @Anchor = (Width: 130);
+        @Anchor = (Width: 240);
       }
     }
   }

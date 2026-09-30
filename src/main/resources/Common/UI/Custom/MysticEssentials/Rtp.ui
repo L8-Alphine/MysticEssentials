@@ -1,4 +1,7 @@
+// Random Teleport — choose a destination profile. Each card names the world,
+// the range and the cost; the teleport button is on the card itself.
 $C = "../Common.ui";
+$M = "MysticTheme.ui";
 
 $C.@PageOverlay {}
 
@@ -16,18 +19,27 @@ $C.@Container {
   #Content {
     LayoutMode: Top;
 
-    Label #Empty {
-      Anchor: (Height: 40);
-      Style: (FontSize: 14, TextColor: #9fb0c4, VerticalAlignment: Center);
-      Text: "No random teleport destinations are available to you.";
-      Visible: false;
+    $M.@Section {
+      @Text = "Destinations";
+      @Anchor = (Bottom: 8);
     }
 
-    Group #ProfileList {
+    $M.@Well {
       FlexWeight: 1;
-      LayoutMode: TopScrolling;
-      Padding: (Right: 10);
-      ScrollbarStyle: $C.@DefaultScrollbarStyle;
+
+      Label #Empty {
+        Anchor: (Height: 72);
+        Style: $M.@EmptyStyle;
+        Text: "No random teleport destinations are available to you.";
+        Visible: false;
+      }
+
+      Group #ProfileList {
+        FlexWeight: 1;
+        LayoutMode: TopScrolling;
+        Padding: (Right: 6);
+        ScrollbarStyle: $C.@DefaultScrollbarStyle;
+      }
     }
   }
 }

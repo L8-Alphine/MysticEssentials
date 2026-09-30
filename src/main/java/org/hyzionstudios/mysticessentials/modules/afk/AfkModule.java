@@ -257,6 +257,7 @@ public final class AfkModule extends AbstractMysticModule implements AfkService 
     }
 
     /** One-time upgrade: the old single {@code zoneCornerA/B} pair becomes a named zone. */
+    @SuppressWarnings("deprecation") // One-time reader for the deprecated pre-zone config fields.
     private void convertLegacyZoneCorners() {
         AfkConfig.Rewards r = config.rewards;
         if (r.zoneCornerA == null || r.zoneCornerB == null) {
@@ -295,6 +296,7 @@ public final class AfkModule extends AbstractMysticModule implements AfkService 
         state.afk = afk;
         state.reason = reason;
         state.lastActivityMillis = System.currentTimeMillis();
+        core.networkPlayers().refreshLocalState();
         core.platform().findPlayer(player).ifPresent(ref -> {
             state.lastPosition = safeCapture(ref);
             if (!afk) {
@@ -336,6 +338,7 @@ public final class AfkModule extends AbstractMysticModule implements AfkService 
         state.afk = false;
         state.reason = null;
         state.lastActivityMillis = System.currentTimeMillis();
+        core.networkPlayers().refreshLocalState();
         if (wasAfk) {
             core.platform().findPlayer(player).ifPresent(ref -> {
                 endZoneSession(ref);
@@ -390,6 +393,7 @@ public final class AfkModule extends AbstractMysticModule implements AfkService 
                     state.afk = true;
                     state.reason = "zone";
                     state.lastActivityMillis = now;
+                    core.networkPlayers().refreshLocalState();
                     core.getMessageService().sendKey(player, "afk-now");
                     announce(uuid, player.getUsername() + " is now AFK");
                 }
@@ -435,6 +439,7 @@ public final class AfkModule extends AbstractMysticModule implements AfkService 
     /** Flags a player auto-AFK and sends them to a reward zone (default AFK zone). */
     private void goAutoAfk(PlayerRef player, Activity state, MysticLocation current, long now) {
         state.afk = true;
+        core.networkPlayers().refreshLocalState();
         state.reason = "auto";
         state.lastActivityMillis = now;
         core.getMessageService().sendKey(player, "afk-now");
@@ -581,6 +586,7 @@ public final class AfkModule extends AbstractMysticModule implements AfkService 
         state.afk = true;
         state.reason = reason;
         state.lastActivityMillis = System.currentTimeMillis();
+        core.networkPlayers().refreshLocalState();
         MysticLocation current = safeCapture(player);
         state.lastPosition = current;
 
@@ -873,12 +879,14 @@ public final class AfkModule extends AbstractMysticModule implements AfkService 
         player.getPacketHandler().write(new EditorBlocksChange(
                 new EditorSelection(Math.min(ax, bx), Math.min(ay, by), Math.min(az, bz),
                         Math.max(ax, bx), Math.max(ay, by), Math.max(az, bz)),
-                null, null, null, 0, false, false, null, null, null));
+                null, null, null, 0, false, false, null, null, null,
+                false, null, null));
     }
 
     private void clearZoneSelectionPreview(PlayerRef player) {
         player.getPacketHandler().write(new EditorBlocksChange(
-                null, null, null, null, 0, false, false, null, null, null));
+                null, null, null, null, 0, false, false, null, null, null,
+                false, null, null));
     }
 
     private static int blockCoord(double value) {

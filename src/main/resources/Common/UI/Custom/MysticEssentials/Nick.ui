@@ -1,9 +1,12 @@
+// Nickname — current nick up top, the new one below with its colour. Apply is
+// primary; removing the nick is destructive and kept apart.
 $C = "../Common.ui";
+$M = "MysticTheme.ui";
 
 $C.@PageOverlay {}
 
 $C.@Container {
-  Anchor: (Width: 560, Height: 420);
+  Anchor: (Width: 560, Height: 440);
 
   #Title {
     Group {
@@ -16,64 +19,72 @@ $C.@Container {
   #Content {
     LayoutMode: Top;
 
-    Group {
-      LayoutMode: Left;
-      Anchor: (Height: 26, Bottom: 10);
-      Label { Anchor: (Width: 130); Style: (...$C.@DefaultLabelStyle, FontSize: 13, RenderBold: true); Text: "Current"; }
-      Label #CurrentNick { FlexWeight: 1; Style: (...$C.@DefaultLabelStyle, FontSize: 13); }
-    }
+    $M.@Panel {
+      Anchor: (Bottom: 14);
 
-    $C.@PanelSeparatorFancy {
-      @Anchor = (Bottom: 12);
-    }
+      $M.@Section {
+        @Text = "Current Nickname";
+        @Style = $M.@EyebrowGoldStyle;
+        @Anchor = (Bottom: 8);
+      }
 
-    Label {
-      Anchor: (Bottom: 6);
-      Style: (...$C.@DefaultLabelStyle, FontSize: 13, RenderBold: true);
-      Text: "New nickname";
-    }
+      Label #CurrentNick {
+        Anchor: (Height: 30, Bottom: 12);
+        Style: $M.@DisplayStyle;
+      }
 
-    Group {
-      LayoutMode: Left;
-      Anchor: (Height: 38, Bottom: 10);
+      $M.@Hairline {
+        @Anchor = (Bottom: 12);
+      }
+
+      $M.@FieldLabel { @Text = "New Nickname"; }
 
       $C.@TextField #NickInput {
-        FlexWeight: 1;
-        PlaceholderText: "Nickname (letters, digits, underscore)";
+        @Anchor = (Bottom: 6);
+        PlaceholderText: "Letters, digits and underscores";
       }
-    }
-
-    Group #ColorRow {
-      LayoutMode: Left;
-      Anchor: (Height: 38, Bottom: 14);
 
       Label {
-        Anchor: (Width: 130);
-        Style: (...$C.@DefaultLabelStyle, FontSize: 13, RenderBold: true, VerticalAlignment: Center);
-        Text: "Color";
+        Anchor: (Height: 16, Bottom: 12);
+        Style: $M.@CaptionStyle;
+        Text: "Shown in chat and on the player list in place of your username.";
       }
 
-      ColorPickerDropdownBox #NickColor {
-        Anchor: (Width: 50, Height: 32);
-        Format: Rgb;
-        Style: $C.@DefaultColorPickerDropdownBoxStyle;
-        Color: #ffffff;
-        DisplayTextField: true;
+      Group #ColorRow {
+        LayoutMode: Left;
+        Anchor: (Height: 32);
+
+        Label {
+          Anchor: (Width: 110);
+          Style: $M.@KeyStyle;
+          Text: "Colour";
+        }
+
+        ColorPickerDropdownBox #NickColor {
+          Anchor: (Width: 50, Height: 32);
+          Format: Rgb;
+          Style: $C.@DefaultColorPickerDropdownBoxStyle;
+          Color: #ffffff;
+          DisplayTextField: true;
+        }
       }
     }
 
-    Group {
-      LayoutMode: Left;
-      Anchor: (Height: 44);
+    $M.@Spacer {}
+
+    $M.@ActionBar {
+      @Anchor = (Height: 44);
 
       $C.@TextButton #ApplyButton {
         @Text = "Apply";
-        @Anchor = (Width: 170, Right: 8);
+        @Anchor = (Width: 160);
       }
 
+      $M.@Spacer {}
+
       $C.@CancelTextButton #RemoveButton {
-        @Text = "Remove Nick";
-        @Anchor = (Width: 180);
+        @Text = "Remove Nickname";
+        @Anchor = (Width: 200);
       }
     }
   }

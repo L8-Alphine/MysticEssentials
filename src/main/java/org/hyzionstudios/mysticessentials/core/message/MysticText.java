@@ -22,13 +22,14 @@ import com.hypixel.hytale.server.core.Message;
  * <p>Supported markup:</p>
  * <ul>
  *   <li>Legacy: {@code &a}, {@code &c} … colours; {@code &l} bold, {@code &o}
- *       italic, {@code &n} underline, {@code &r} reset ({@code &m}/{@code &k}
- *       have no protocol field and are ignored).</li>
+ *       italic, {@code &n} underline, {@code &m} strikethrough, {@code &r}
+ *       reset ({@code &k} obfuscated has no protocol field and is ignored).</li>
  *   <li>Hex: {@code &#ff00ff} and {@code <#ff00ff>} (also 3-digit {@code #f0f}).</li>
  *   <li>MiniMessage-style tags: {@code <red>}, {@code <color:#ff0000>},
  *       {@code <bold>}/{@code <b>}, {@code <italic>}/{@code <i>},
- *       {@code <underlined>}/{@code <u>}, {@code <reset>}, and their closing
- *       {@code </…>} forms.</li>
+ *       {@code <underlined>}/{@code <u>},
+ *       {@code <strikethrough>}/{@code <st>}/{@code <s>}, {@code <reset>}, and
+ *       their closing {@code </…>} forms.</li>
  *   <li>{@code <gradient:#a:#b[:#c…]>text</gradient>} and
  *       {@code <rainbow>text</rainbow>} (interpolated per character).</li>
  *   <li>{@code <link:https://…>text</link>} — attaches a clickable link/action to
@@ -37,8 +38,10 @@ import com.hypixel.hytale.server.core.Message;
  *       (the protocol {@code messageId} field).</li>
  * </ul>
  *
- * <p><b>Not supported:</b> hover text — the 0.5.6 {@code FormattedMessage} protocol
- * has no hover field (only {@code link}), so hover events cannot be represented.</p>
+ * <p><b>Not supported:</b> hover text — the {@code FormattedMessage} protocol
+ * still has no hover field on 0.6.2 (only {@code link}), so hover events cannot
+ * be represented. Strikethrough <em>is</em> representable as of Update 6, which
+ * added the {@code strikethrough} field; obfuscated text still has no field.</p>
  */
 public final class MysticText {
 
@@ -131,6 +134,9 @@ public final class MysticText {
             // Message exposes no underlined() setter, but the protocol field is public.
             message.getFormattedMessage().underlined = Boolean.TRUE;
         }
+        if (segment.strikethrough) {
+            message.strikethrough(true);
+        }
         if (segment.link != null) {
             message.link(segment.link);
         }
@@ -168,30 +174,33 @@ public final class MysticText {
         final boolean bold;
         final boolean italic;
         final boolean underlined;
+        final boolean strikethrough;
         final String link;
         final String translationKey;
         /** Encoded {@code <lang:key|name=value>} arguments, or {@code null}. */
         final Map<String, String> params;
 
         Segment(String text, String color, boolean bold, boolean italic, boolean underlined,
-                String link, String translationKey) {
-            this(text, color, bold, italic, underlined, link, translationKey, null);
+                boolean strikethrough, String link, String translationKey) {
+            this(text, color, bold, italic, underlined, strikethrough, link, translationKey, null);
         }
 
         Segment(String text, String color, boolean bold, boolean italic, boolean underlined,
-                String link, String translationKey, Map<String, String> params) {
+                boolean strikethrough, String link, String translationKey, Map<String, String> params) {
             this.text = text;
             this.color = color;
             this.bold = bold;
             this.italic = italic;
             this.underlined = underlined;
+            this.strikethrough = strikethrough;
             this.link = link;
             this.translationKey = translationKey;
             this.params = params;
         }
 
         boolean isPlain() {
-            return color == null && !bold && !italic && !underlined && link == null && translationKey == null;
+            return color == null && !bold && !italic && !underlined && !strikethrough
+                    && link == null && translationKey == null;
         }
     }
 
@@ -206,6 +215,7 @@ public final class MysticText {
         private boolean bold;
         private boolean italic;
         private boolean underlined;
+        private boolean strikethrough;
         private String link;
 
         Scanner(String in) {
@@ -266,8 +276,12 @@ public final class MysticText {
                     flush();
                     reset();
                 }
-                case 'm', 'k' -> {
-                    // strikethrough / obfuscated: no protocol field — drop the code.
+                case 'm' -> {
+                    flush();
+                    strikethrough = true;
+                }
+                case 'k' -> {
+                    // Obfuscated: still no protocol field on 0.6.2 — drop the code.
                 }
                 default -> {
                     // Unknown code: keep the ampersand literally.
@@ -308,7 +322,8 @@ public final class MysticText {
                 if (!key.isEmpty()) {
                     flush();
                     Map<String, String> params = bar < 0 ? null : parseLangParams(spec.substring(bar + 1));
-                    out.add(new Segment("", color, bold, italic, underlined, link, key, params));
+                    out.add(new Segment("", color, bold, italic, underlined, strikethrough,
+                            link, key, params));
                     return close + 1;
                 }
                 return -1;
@@ -358,6 +373,11 @@ public final class MysticText {
                     underlined = true;
                     return close + 1;
                 }
+                case "strikethrough", "st", "s" -> {
+                    flush();
+                    strikethrough = true;
+                    return close + 1;
+                }
                 case "reset", "r" -> {
                     flush();
                     reset();
@@ -376,6 +396,11 @@ public final class MysticText {
                 case "/underlined", "/u" -> {
                     flush();
                     underlined = false;
+                    return close + 1;
+                }
+                case "/strikethrough", "/st", "/s" -> {
+                    flush();
+                    strikethrough = false;
                     return close + 1;
                 }
                 default -> {
@@ -420,7 +445,7 @@ public final class MysticText {
             for (int i = 0; i < inner.length(); i++) {
                 float hue = inner.length() <= 1 ? 0f : (float) i / inner.length();
                 out.add(new Segment(String.valueOf(inner.charAt(i)),
-                        hsbToHex(hue), bold, italic, underlined, link, null));
+                        hsbToHex(hue), bold, italic, underlined, strikethrough, link, null));
             }
             return end < 0 ? len : end + "</rainbow>".length();
         }
@@ -430,7 +455,7 @@ public final class MysticText {
             for (int i = 0; i < n; i++) {
                 float t = n <= 1 ? 0f : (float) i / (n - 1);
                 out.add(new Segment(String.valueOf(text.charAt(i)),
-                        interpolate(stops, t), bold, italic, underlined, link, null));
+                        interpolate(stops, t), bold, italic, underlined, strikethrough, link, null));
             }
         }
 
@@ -440,7 +465,8 @@ public final class MysticText {
 
         private void flush() {
             if (run.length() > 0) {
-                out.add(new Segment(run.toString(), color, bold, italic, underlined, link, null));
+                out.add(new Segment(run.toString(), color, bold, italic, underlined, strikethrough,
+                        link, null));
                 run.setLength(0);
             }
         }
@@ -450,6 +476,7 @@ public final class MysticText {
             bold = false;
             italic = false;
             underlined = false;
+            strikethrough = false;
             link = null;
         }
 
@@ -559,7 +586,8 @@ public final class MysticText {
                 .replaceAll("&#[0-9a-fA-F]{6}", "")
                 .replaceAll("(?i)&[0-9a-fk-or]", "")
                 .replaceAll("<#([0-9a-fA-F]{3}){1,2}>", "")
-                .replaceAll("(?i)</?(color|c|gradient|rainbow|bold|b|italic|i|em|underlined|u|reset|r)(:[^>]*)?>", "")
+                .replaceAll("(?i)</?(color|c|gradient|rainbow|bold|b|italic|i|em|underlined|u"
+                        + "|strikethrough|st|s|reset|r)(:[^>]*)?>", "")
                 .replaceAll("(?i)</?(black|dark_blue|dark_green|dark_aqua|dark_red|dark_purple|gold|gr[ae]y|dark_gr[ae]y|blue|green|aqua|red|light_purple|yellow|white)>", "");
     }
 }

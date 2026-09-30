@@ -5,8 +5,8 @@ import java.util.List;
 
 /**
  * Renders the safe Markdown subset used in patch-note section bodies into a flat
- * list of typed, pre-wrapped display {@link Line}s. Hytale 0.5.6 Custom UI Labels
- * are plain-text only and cannot be coloured per-instance at runtime, so colour
+ * list of typed, pre-wrapped display {@link Line}s. Hytale Custom UI Labels are
+ * plain-text only through 0.6.2 and cannot be coloured per-instance at runtime, so colour
  * is carried as a {@link Line.Type} and mapped to a distinct row template in the
  * viewer (header = blue, addition = green, removal = red, else neutral). Inline
  * markers ({@code **bold**}, {@code *italic*}, {@code `code`}, {@code [text](t)})

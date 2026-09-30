@@ -7,6 +7,7 @@ import java.util.Set;
 
 import org.hyzionstudios.mysticessentials.api.item.ItemClassification;
 import org.hyzionstudios.mysticessentials.api.item.ItemNames;
+import org.hyzionstudios.mysticessentials.api.item.RichText;
 import org.hyzionstudios.mysticessentials.api.item.ItemViewData;
 import org.hyzionstudios.mysticessentials.api.item.ItemViewEntries.ItemBindingData;
 import org.hyzionstudios.mysticessentials.api.item.ItemViewEntries.ItemDurabilityData;
@@ -145,7 +146,7 @@ final class ItemViewSections {
 
         if (display.showQuality) {
             data.quality().ifPresentOrElse(
-                    quality -> rows.add(new Row("Quality", quality.displayName())),
+                    quality -> rows.add(new Row("Quality", classificationText(quality))),
                     () -> {
                         // Genuinely no quality. Either omit the line, or show the
                         // configured fallback — which is a statement about absence,
@@ -156,13 +157,13 @@ final class ItemViewSections {
                     });
         }
         if (display.showRarity) {
-            data.rarity().ifPresent(rarity -> rows.add(new Row("Rarity", rarity.displayName())));
+            data.rarity().ifPresent(rarity -> rows.add(new Row("Rarity", classificationText(rarity))));
         }
         if (display.showTier) {
-            data.tier().ifPresent(tier -> rows.add(new Row("Tier", tier.displayName())));
+            data.tier().ifPresent(tier -> rows.add(new Row("Tier", classificationText(tier))));
         }
         if (display.showGrade) {
-            data.grade().ifPresent(grade -> rows.add(new Row("Grade", grade.displayName())));
+            data.grade().ifPresent(grade -> rows.add(new Row("Grade", classificationText(grade))));
         }
         // An uninterpreted label stays uninterpreted: "Maelstrom — Epic" is shown
         // on one line rather than being split into a guessed tier and rarity.
@@ -190,9 +191,15 @@ final class ItemViewSections {
         List<String> lines = new ArrayList<>();
         for (ItemModifierEntry modifier : view.modifiers()) {
             String source = modifier.source();
-            lines.add(source == null || source.isBlank()
-                    ? modifier.display()
-                    : modifier.display() + "  (" + source + ")");
+            String color = modifier.amount() < 0 ? "#d46a6a" : "#8fd48f";
+            StringBuilder line = new StringBuilder("<").append(color).append(">")
+                    .append(RichText.plain(modifier.display()).markup());
+            if (source != null && !source.isBlank()) {
+                line.append("  <#8191a5>(")
+                        .append(RichText.plain(source).markup())
+                        .append(')');
+            }
+            lines.add(line.toString());
         }
         return section("modifiers", "Modifiers", List.of(), lines, toggled, accentOf(view));
     }
@@ -351,6 +358,14 @@ final class ItemViewSections {
 
     private static String accentOf(ItemViewData view) {
         return view.accentColor().orElse(null);
+    }
+
+    /** Styled classifications are emitted as TextSpans; invalid colours are ignored safely. */
+    private static String classificationText(ItemClassification classification) {
+        String text = classification.formattedName().markup();
+        String color = classification.color();
+        return color != null && color.matches("#[0-9a-fA-F]{6}")
+                ? "<" + color + ">" + text : text;
     }
 
     /**

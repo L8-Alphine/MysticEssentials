@@ -5,6 +5,7 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 import org.hyzionstudios.mysticessentials.core.module.AbstractMysticModule;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommandSender;
@@ -53,6 +54,11 @@ public final class CustomCommandsModule extends AbstractMysticModule {
 
     /** Guards listeners and delayed continuations after onDisable. */
     private volatile boolean active;
+    private final Consumer<String> redisReloadHandler = actor -> {
+        if (active && config.crossServer.syncReloads) {
+            reload(actor + " (remote)", true);
+        }
+    };
 
     public CustomCommandsModule() {
         super("customcommands", "Custom Commands", "1.0.0");
@@ -112,8 +118,10 @@ public final class CustomCommandsModule extends AbstractMysticModule {
             audit.flushCounters();
         }
         if (cooldowns != null) {
+            cooldowns.disconnectRedis();
             cooldowns.flushAll();
         }
+        core.redis().unsubscribe(REDIS_RELOAD_CHANNEL, redisReloadHandler);
     }
 
     private void registerListeners() {
@@ -131,13 +139,7 @@ public final class CustomCommandsModule extends AbstractMysticModule {
 
     private void connectRedis() {
         cooldowns.connectRedis();
-        if (core.redis().isEnabled() && config.crossServer.syncReloads) {
-            core.redis().subscribe(REDIS_RELOAD_CHANNEL, actor -> {
-                if (active) {
-                    reload(actor + " (remote)", true);
-                }
-            });
-        }
+        core.redis().subscribe(REDIS_RELOAD_CHANNEL, redisReloadHandler);
     }
 
     // ----- Loading & reloading ---------------------------------------------------------

@@ -1,31 +1,42 @@
-$C = "../Common.ui";
-
 // Row template for the incoming-request list in the Teleport Requests UI.
 // Appended per request: cmd.append("#RequestList", "MysticEssentials/TpaRequestRow.ui").
+// Accept is the primary answer; Deny is quieter and sits apart from it.
+$C = "../Common.ui";
+$M = "MysticTheme.ui";
 
 Group #Row {
-  Anchor: (Height: 68, Bottom: 8);
-  LayoutMode: Top;
-  Padding: (Left: 10, Right: 10, Top: 7, Bottom: 7);
-  Background: #000000(0.18);
+  Anchor: (Height: 76, Bottom: 6);
+  LayoutMode: Left;
+  Padding: (Left: 0, Right: 12, Top: 10, Bottom: 10);
+  Background: #0a0f16(0.38);
 
-  Label #Text {
-    Anchor: (Height: 20, Bottom: 6);
-    Style: (FontSize: 14, TextColor: #ffffff, VerticalAlignment: Center);
+  Group {
+    Anchor: (Width: 3, Height: 56, Right: 11);
+    Background: #7a9cc6;
   }
 
   Group {
-    LayoutMode: Left;
-    Anchor: (Height: 32);
+    LayoutMode: Top;
+    FlexWeight: 1;
 
-    $C.@SmallSecondaryTextButton #AcceptButton {
-      @Text = "Accept";
-      @Anchor = (Width: 110, Right: 6);
+    Label #Text {
+      Anchor: (Height: 20, Bottom: 4);
+      Style: (...$M.@RowNameStyle, FontSize: 14);
     }
 
-    $C.@SmallTertiaryTextButton #DenyButton {
-      @Text = "Deny";
-      @Anchor = (Width: 90);
+    Group {
+      LayoutMode: Left;
+      Anchor: (Height: 32);
+
+      $C.@SmallSecondaryTextButton #AcceptButton {
+        @Text = "Accept";
+        @Anchor = (Width: 110, Right: 6);
+      }
+
+      $C.@SmallTertiaryTextButton #DenyButton {
+        @Text = "Deny";
+        @Anchor = (Width: 90);
+      }
     }
   }
 }

@@ -13,6 +13,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Level;
 
 import org.hyzionstudios.mysticessentials.api.Permissions;
 import org.hyzionstudios.mysticessentials.api.model.MysticLocation;
@@ -349,9 +350,12 @@ public final class RandomTeleportServiceImpl implements RandomTeleportService {
         if (error != null || result == null || !result.found()) {
             String reason = result == null ? "error" : result.failureReason();
             RtpStatus status = "queue_full".equals(reason) ? RtpStatus.QUEUE_FULL : RtpStatus.NO_DESTINATION;
+            String detail = searchFailureDetail(reason, result, error);
+            core.log(Level.WARNING, "[RTP] Search failed for " + uuid + " with profile "
+                    + session.profile.id + ": " + detail);
             core.platform().findPlayer(uuid).ifPresent(p ->
                     message(p, session.request, "rtp-no-destination", Map.of()));
-            finishFailure(uuid, session, status, reason);
+            finishFailure(uuid, session, status, detail);
             return;
         }
 
@@ -368,7 +372,7 @@ public final class RandomTeleportServiceImpl implements RandomTeleportService {
     private void revalidateAndTeleport(UUID uuid, Session session, MysticLocation candidate) {
         RtpProfile p = session.profile;
         if (!config.searchEngine.cache.revalidateBeforeTeleport) {
-            preTeleport(uuid, session, candidate);
+            validateAndPreTeleport(uuid, session, candidate);
             return;
         }
         int blockX = (int) Math.floor(candidate.getX());
@@ -385,8 +389,21 @@ public final class RandomTeleportServiceImpl implements RandomTeleportService {
                         finishFailure(uuid, session, RtpStatus.NO_DESTINATION, "revalidation failed");
                         return;
                     }
-                    preTeleport(uuid, session, opt.get());
+                    validateAndPreTeleport(uuid, session, opt.get());
                 });
+    }
+
+    /** Re-runs every non-terrain filter, including the player's current MysticRPG level. */
+    private void validateAndPreTeleport(UUID uuid, Session session, MysticLocation destination) {
+        String rejection = engine.rejectionReason(session.profile, destination, uuid);
+        if (rejection != null) {
+            core.platform().findPlayer(uuid).ifPresent(player ->
+                    message(player, session.request, "rtp-no-destination", Map.of()));
+            finishFailure(uuid, session, RtpStatus.NO_DESTINATION,
+                    "revalidation rejected: " + rejection);
+            return;
+        }
+        preTeleport(uuid, session, destination);
     }
 
     private void preTeleport(UUID uuid, Session session, MysticLocation destination) {
@@ -493,6 +510,23 @@ public final class RandomTeleportServiceImpl implements RandomTeleportService {
     private void recordBackLocation(UUID uuid, PlayerRef player) {
         core.getPlayerProfileService().getCached(uuid).ifPresent(profile ->
                 profile.setLastTeleportedLocation(Conversions.capture(player)));
+    }
+
+    private static String searchFailureDetail(String reason, RtpDestinationResult result, Throwable error) {
+        StringBuilder detail = new StringBuilder(reason == null ? "unknown" : reason);
+        if (result != null) {
+            detail.append(", attempts=").append(result.attempts());
+            if (result.rejectionTally() != null && !result.rejectionTally().isEmpty()) {
+                detail.append(", rejections=").append(result.rejectionTally());
+            }
+        }
+        if (error != null) {
+            detail.append(", error=").append(error.getClass().getSimpleName());
+            if (error.getMessage() != null && !error.getMessage().isBlank()) {
+                detail.append(": ").append(error.getMessage());
+            }
+        }
+        return detail.toString();
     }
 
     private long remainingCooldown(UUID uuid, RtpProfile profile) {

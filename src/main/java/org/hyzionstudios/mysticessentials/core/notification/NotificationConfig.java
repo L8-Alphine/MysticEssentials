@@ -241,7 +241,7 @@ public final class NotificationConfig {
                 .banner(false).sound(false).history(false));
         map.put("broadcast", new Profile()
                 .chat(true).titles(false).actionbar(true).toast(true)
-                .banner(false).sound(true).history(true));
+                .banner(false).sound(true).history(false));
         map.put("important", new Profile()
                 .chat(true).titles(true).actionbar(false).toast(true)
                 .banner(false).sound(true).history(true)

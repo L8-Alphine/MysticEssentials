@@ -2,12 +2,15 @@
 // draw their own header. #MysticLayoutShell carries the size,
 // #MysticLayoutRoot receives the compiled layout.
 $C = "../Common.ui";
+$M = "MysticTheme.ui";
 
 $C.@PageOverlay {}
 
-$C.@SimpleContainer #MysticLayoutShell {
+Group #MysticLayoutShell {
   Anchor: (Width: 900, Height: 620);
+  Background: $M.@PanelBackground;
   LayoutMode: Top;
+  Padding: (Full: 16);
 
   Group #MysticLayoutRoot {
     FlexWeight: 1;

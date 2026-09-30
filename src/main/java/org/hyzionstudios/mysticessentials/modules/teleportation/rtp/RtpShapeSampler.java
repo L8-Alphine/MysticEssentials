@@ -21,24 +21,61 @@ final class RtpShapeSampler {
 
     /** @return {@code [x, z]} world coordinates, or {@code null} if none could be produced. */
     static double[] sample(RtpProfile profile, Random rng) {
+        return sample(profile, rng, effectiveInnerRadius(profile), effectiveOuterRadius(profile));
+    }
+
+    /** Samples a narrowed radial band while still respecting the profile shape. */
+    static double[] sample(RtpProfile profile, Random rng, double requestedInner, double requestedOuter) {
         double cx = profile.center == null ? 0 : profile.center.x;
         double cz = profile.center == null ? 0 : profile.center.z;
-        int outer = Math.max(1, profile.maximumRadius - Math.max(0, profile.borderPadding));
-        int inner = Math.max(0, Math.min(profile.minimumRadius, outer - 1));
+        double configuredOuter = effectiveOuterRadius(profile);
+        double configuredInner = effectiveInnerRadius(profile);
+        double outer = Math.max(configuredInner + 1.0,
+                Math.min(configuredOuter, requestedOuter));
+        double inner = Math.max(configuredInner,
+                Math.min(requestedInner, outer - 1.0));
 
         return switch (profile.shape) {
             case CIRCLE, RING -> sampleAnnulus(cx, cz, inner, outer, rng);
             case SQUARE, WORLD_BORDER -> sampleBox(cx, cz, outer, outer, inner, rng);
             case RECTANGLE -> {
-                int halfW = profile.halfWidth > 0 ? profile.halfWidth : outer;
-                int halfD = profile.halfDepth > 0 ? profile.halfDepth : outer;
+                double scale = outer / configuredOuter;
+                double halfW = (profile.halfWidth > 0 ? profile.halfWidth : configuredOuter) * scale;
+                double halfD = (profile.halfDepth > 0 ? profile.halfDepth : configuredOuter) * scale;
                 yield sampleBox(cx, cz, halfW, halfD, inner, rng);
             }
             case POLYGON -> samplePolygon(profile.polygon, rng);
         };
     }
 
-    private static double[] sampleAnnulus(double cx, double cz, int inner, int outer, Random rng) {
+    static double effectiveOuterRadius(RtpProfile profile) {
+        return Math.max(1, profile.maximumRadius - Math.max(0, profile.borderPadding));
+    }
+
+    static double effectiveInnerRadius(RtpProfile profile) {
+        double outer = effectiveOuterRadius(profile);
+        return Math.max(0, Math.min(profile.minimumRadius, outer - 1));
+    }
+
+    /** Radius metric matching how each supported centered shape is narrowed. */
+    static double radiusAt(RtpProfile profile, double x, double z) {
+        double cx = profile.center == null ? 0 : profile.center.x;
+        double cz = profile.center == null ? 0 : profile.center.z;
+        double dx = Math.abs(x - cx);
+        double dz = Math.abs(z - cz);
+        return switch (profile.shape) {
+            case SQUARE, WORLD_BORDER -> Math.max(dx, dz);
+            case RECTANGLE -> {
+                double outer = effectiveOuterRadius(profile);
+                double halfW = profile.halfWidth > 0 ? profile.halfWidth : outer;
+                double halfD = profile.halfDepth > 0 ? profile.halfDepth : outer;
+                yield Math.max(dx / Math.max(1.0, halfW), dz / Math.max(1.0, halfD)) * outer;
+            }
+            default -> Math.hypot(dx, dz);
+        };
+    }
+
+    private static double[] sampleAnnulus(double cx, double cz, double inner, double outer, Random rng) {
         // Uniform-area sampling of the annulus between inner and outer radii.
         double r = Math.sqrt(rng.nextDouble() * ((double) outer * outer - (double) inner * inner)
                 + (double) inner * inner);
@@ -46,7 +83,7 @@ final class RtpShapeSampler {
         return new double[] {cx + r * Math.cos(angle), cz + r * Math.sin(angle)};
     }
 
-    private static double[] sampleBox(double cx, double cz, int halfW, int halfD, int inner, Random rng) {
+    private static double[] sampleBox(double cx, double cz, double halfW, double halfD, double inner, Random rng) {
         for (int i = 0; i < MAX_REJECTION_TRIES; i++) {
             double x = cx + (rng.nextDouble() * 2.0 - 1.0) * halfW;
             double z = cz + (rng.nextDouble() * 2.0 - 1.0) * halfD;

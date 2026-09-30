@@ -153,6 +153,7 @@ public final class PlayerVaultModule extends AbstractMysticModule implements Pla
         // Save open sessions and release their locks before tearing down.
         uiController.closeAll();
         lockService.releaseAllLocal();
+        redisBridge.unsubscribeUpdates();
         if (commandRegistration != null) {
             try {
                 commandRegistration.unregister();

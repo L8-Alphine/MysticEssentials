@@ -4,6 +4,7 @@ import org.hyzionstudios.mysticessentials.core.module.ModuleManagerImpl;
 import org.hyzionstudios.mysticessentials.modules.afk.AfkModule;
 import org.hyzionstudios.mysticessentials.modules.announcements.AnnouncementModule;
 import org.hyzionstudios.mysticessentials.modules.chat.ChatModule;
+import org.hyzionstudios.mysticessentials.modules.craftblock.CraftBlockModule;
 import org.hyzionstudios.mysticessentials.modules.customcommands.CustomCommandsModule;
 import org.hyzionstudios.mysticessentials.modules.flight.FlightModule;
 import org.hyzionstudios.mysticessentials.modules.greetings.GreetingsModule;
@@ -49,6 +50,7 @@ public final class ModuleBootstrap {
         manager.register(new CustomCommandsModule());
         manager.register(new PlayerVaultModule());
         manager.register(new PortalsModule());
+        manager.register(new CraftBlockModule());
         manager.register(new CustomContentModule());
     }
 }

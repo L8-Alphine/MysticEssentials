@@ -1,37 +1,47 @@
-$C = "../Common.ui";
-
 // Row template for the favourites list in the Teleport Requests UI.
 // Appended per favourite: cmd.append("#FavoriteList", "MysticEssentials/TpaFavoriteRow.ui").
-// For offline favourites the TPA / TPA HERE buttons are hidden and #Status shows "offline".
+// For offline favourites the Go To / Bring buttons are hidden and #Status shows "offline".
+$C = "../Common.ui";
+$M = "MysticTheme.ui";
 
 Group #Row {
-  Anchor: (Height: 48, Bottom: 8);
+  Anchor: (Height: 48, Bottom: 4);
   LayoutMode: Left;
-  Padding: (Left: 10, Right: 10, Top: 7, Bottom: 7);
-  Background: #000000(0.24);
+  Padding: (Left: 12, Right: 10, Top: 8, Bottom: 8);
+  Background: #E8A93B(0.07);
+
+  $M.@IconWell {
+    @Size = 32;
+    @Anchor = (Right: 12);
+
+    Group {
+      Anchor: (Width: 12, Height: 12);
+      Background: #E8A93B;
+    }
+  }
 
   Label #Name {
     FlexWeight: 1;
-    Style: (FontSize: 16, TextColor: #ffd97a, RenderBold: true, VerticalAlignment: Center);
+    Style: (...$M.@RowNameStyle, TextColor: #e8c97a);
   }
 
   Label #Status {
-    Anchor: (Width: 70);
-    Style: (FontSize: 12, TextColor: #9fb0c4, VerticalAlignment: Center);
+    Anchor: (Width: 70, Right: 8);
+    Style: $M.@RowSideStyle;
   }
 
   $C.@SmallSecondaryTextButton #TpaButton {
-    @Text = "TPA";
-    @Anchor = (Width: 80, Right: 6);
+    @Text = "Go To";
+    @Anchor = (Width: 84, Right: 6);
   }
 
   $C.@SmallTertiaryTextButton #HereButton {
-    @Text = "TPA HERE";
-    @Anchor = (Width: 110, Right: 6);
+    @Text = "Bring";
+    @Anchor = (Width: 84, Right: 6);
   }
 
   $C.@SmallTertiaryTextButton #UnfavButton {
-    @Text = "FAV -";
-    @Anchor = (Width: 70);
+    @Text = "Unstar";
+    @Anchor = (Width: 66);
   }
 }

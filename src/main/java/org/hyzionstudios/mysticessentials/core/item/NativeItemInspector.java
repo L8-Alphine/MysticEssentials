@@ -22,11 +22,13 @@ import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.asset.type.item.config.Item;
 import com.hypixel.hytale.server.core.asset.type.item.config.ItemArmor;
 import com.hypixel.hytale.server.core.asset.type.item.config.ItemGlider;
+import com.hypixel.hytale.server.core.asset.type.item.config.ItemQuality;
 import com.hypixel.hytale.server.core.asset.type.item.config.ItemTool;
 import com.hypixel.hytale.server.core.asset.type.item.config.ItemTranslationProperties;
 import com.hypixel.hytale.server.core.asset.type.item.config.ItemUtility;
 import com.hypixel.hytale.server.core.asset.type.item.config.ItemWeapon;
 import com.hypixel.hytale.server.core.asset.type.item.config.damageData.DamageBreakdown;
+import com.hypixel.hytale.server.core.asset.type.item.config.metadata.ItemDisplayMetadata;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.modules.entitystats.asset.EntityStatType;
 import com.hypixel.hytale.server.core.modules.entitystats.modifier.StaticModifier;
@@ -49,6 +51,10 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
  * does not have that field.</p>
  */
 final class NativeItemInspector {
+
+    private static final String MYSTIC_RPG_GEAR_KEY = "mysticrpg:gear";
+    private static final String MYSTIC_RPG_DISPLAY_LORE_KEY = "MysticRPGDisplayLore";
+    private static final String MYSTIC_RPG_BASE_DESCRIPTION_KEY = "MysticRPGBaseDescription";
 
     /** Metadata keys already consumed by a structured field, excluded from the technical dump. */
     private static final Set<String> CONSUMED_KEYS = Set.of(
@@ -90,6 +96,12 @@ final class NativeItemInspector {
     // ----- Identity -------------------------------------------------------------
 
     private void readIdentity(Item item, ItemStack stack, ItemViewBuilder builder, String itemId) {
+        ItemDisplayMetadata stackDisplay = call(
+                () -> stack.getFromMetadataOrNull(ItemDisplayMetadata.KEYED_CODEC), null);
+        Message customName = call(() -> stackDisplay == null ? null : stackDisplay.getName(), null);
+        Message customDescription = call(
+                () -> stackDisplay == null ? null : stackDisplay.getDescription(), null);
+
         String translationKey = call(() -> item == null ? null : item.getTranslationKey(), null);
         if (translationKey != null && !translationKey.isBlank()) {
             builder.displayName(RichText.translated(translationKey, nameArguments(item)));
@@ -104,9 +116,12 @@ final class NativeItemInspector {
         builder.iconAsset(icon);
         builder.stackLimit(call(() -> item == null ? 0 : item.getMaxStack(), 0));
 
-        String descriptionKey = call(() -> item == null ? null : item.getDescriptionTranslationKey(), null);
-        if (descriptionKey != null && !descriptionKey.isBlank()) {
-            builder.description(RichText.translated(descriptionKey, descriptionArguments(item)));
+        if (customDescription == null) {
+            String descriptionKey = call(
+                    () -> item == null ? null : item.getDescriptionTranslationKey(), null);
+            if (descriptionKey != null && !descriptionKey.isBlank()) {
+                builder.description(RichText.translated(descriptionKey, descriptionArguments(item)));
+            }
         }
 
         int itemLevel = call(() -> item == null ? 0 : item.getItemLevel(), 0);
@@ -114,14 +129,80 @@ final class NativeItemInspector {
             builder.itemLevel(itemLevel);
         }
 
-        // The engine's own resolved name, used only as a fallback source of a
-        // plain string when there is no translation key to defer to the client.
-        if (translationKey == null) {
-            String resolved = messageText(call(stack::getDisplayName, null));
-            if (resolved != null && !resolved.isBlank()) {
-                builder.displayName(resolved);
+        // Stack-level ItemDisplay metadata is the engine's standard override
+        // channel. Reforging/enchantment mods use it even when the base asset
+        // already has a translation key, so it must be authoritative here too.
+        RichText resolvedName = messageRichText(customName);
+        if (resolvedName != null && !resolvedName.isEmpty()) {
+            builder.displayName(resolvedName);
+        } else if (translationKey == null) {
+            resolvedName = messageRichText(call(stack::getDisplayName, null));
+            if (resolvedName != null && !resolvedName.isEmpty()) {
+                builder.displayName(resolvedName);
             }
         }
+
+        RichText resolvedDescription = mysticRpgBaseDescription(stack, customDescription);
+        if (resolvedDescription != null && !resolvedDescription.isEmpty()) {
+            builder.description(resolvedDescription);
+        }
+    }
+
+    /**
+     * MysticRPG composes its generated rarity/affix block into ItemDisplay so
+     * the vanilla tooltip can render it. ItemView promotes that block into
+     * structured sections, therefore only the preserved base description (or
+     * generated flavour before the block) belongs in Description and Lore.
+     */
+    @SuppressWarnings("deprecation") // Raw BSON remains required for MysticRPG's published stack keys.
+    private static RichText mysticRpgBaseDescription(ItemStack stack, Message composed) {
+        BsonDocument metadata = call(() -> stack == null ? null : stack.getMetadata(), null);
+        if (metadata == null || metadata.get(MYSTIC_RPG_GEAR_KEY) == null) {
+            return messageRichText(composed);
+        }
+
+        Message storedBase = call(() -> {
+            BsonValue encoded = metadata.get(MYSTIC_RPG_BASE_DESCRIPTION_KEY);
+            return encoded == null || encoded.isNull()
+                    ? null
+                    : Message.CODEC.decode(encoded, new com.hypixel.hytale.codec.ExtraInfo());
+        }, null);
+        RichText base = messageRichText(storedBase);
+        if (base != null && !base.isEmpty()) {
+            return base;
+        }
+
+        RichText visible = messageRichText(composed);
+        if (visible == null || visible.isEmpty()) {
+            return visible;
+        }
+        BsonValue storedLore = metadata.get(MYSTIC_RPG_DISPLAY_LORE_KEY);
+        if (storedLore == null || !storedLore.isString()) {
+            return visible;
+        }
+        String plain = visible.plain();
+        String stripped = withoutMysticRpgLore(plain, storedLore.asString().getValue());
+        return stripped.equals(plain) ? visible : RichText.plain(stripped);
+    }
+
+    /** Package-visible for the metadata contract compatibility check. */
+    static String withoutMysticRpgLore(String composed, String mysticLore) {
+        if (composed == null || composed.isBlank() || mysticLore == null || mysticLore.isBlank()) {
+            return composed == null ? "" : composed;
+        }
+        int start = composed.lastIndexOf(mysticLore);
+        if (start < 0) {
+            return composed;
+        }
+        String before = composed.substring(0, start).stripTrailing();
+        String after = composed.substring(start + mysticLore.length()).stripLeading();
+        if (before.isEmpty()) {
+            return after;
+        }
+        if (after.isEmpty()) {
+            return before;
+        }
+        return before + "\n\n" + after;
     }
 
     /**
@@ -173,9 +254,53 @@ final class NativeItemInspector {
         return value == null ? "" : value.replaceAll("[<>|=]", "").trim();
     }
 
-    private static String messageText(Message message) {
+    /** Preserves translation segments and flattens composite raw messages safely. */
+    private static RichText messageRichText(Message message) {
         FormattedMessage formatted = call(() -> message == null ? null : message.getFormattedMessage(), null);
-        return formatted == null ? null : formatted.rawText;
+        return formatted == null ? null : formattedRichText(formatted);
+    }
+
+    /** Package-visible for the composite translated-name compatibility check. */
+    static RichText formattedRichText(FormattedMessage formatted) {
+        RichText out = RichText.empty();
+        if (formatted.rawText != null && !formatted.rawText.isEmpty()) {
+            out = out.append(RichText.plain(formatted.rawText));
+        } else if (formatted.messageId != null && !formatted.messageId.isBlank()) {
+            out = out.append(RichText.translated(formatted.messageId,
+                    formattedArguments(formatted)));
+        }
+        if (formatted.children != null) {
+            for (FormattedMessage child : formatted.children) {
+                if (child != null) {
+                    out = out.append(formattedRichText(child));
+                }
+            }
+        }
+        return out;
+    }
+
+    /** Retains message-valued parameters when a translated name is nested in a composite name. */
+    private static Map<String, String> formattedArguments(FormattedMessage formatted) {
+        Map<String, String> out = new LinkedHashMap<>();
+        if (formatted == null || formatted.messageParams == null) {
+            return out;
+        }
+        for (Map.Entry<String, FormattedMessage> entry : formatted.messageParams.entrySet()) {
+            String name = sanitizeArgument(entry.getKey());
+            FormattedMessage value = entry.getValue();
+            if (name.isEmpty() || value == null) {
+                continue;
+            }
+            if (value.messageId != null && !value.messageId.isBlank()) {
+                out.put(name, "@" + sanitizeArgument(value.messageId));
+                continue;
+            }
+            RichText literal = formattedRichText(value);
+            if (literal != null && !literal.plain().isBlank()) {
+                out.put(name, "~" + sanitizeArgument(literal.plain()));
+            }
+        }
+        return out;
     }
 
     // ----- Classification -------------------------------------------------------
@@ -184,10 +309,11 @@ final class NativeItemInspector {
         Integer qualityIndex = call(() -> item == null ? null : item.getQualityIndex(), null);
         if (qualityIndex != null) {
             ItemViewConfig.QualityDefinition definition = qualityFor(qualityIndex);
-            // No definition for this index means the server has nothing to say
-            // about the item's quality — which is absence, and absence is shown
-            // by omitting the badge, not by inventing a label.
-            if (definition != null) {
+            ItemClassification nativeQuality = nativeQuality(qualityIndex);
+            // Runtime asset identity is authoritative. Index allocation can move
+            // when packs add qualities, so an index-only configured definition
+            // is used only when its id still names the asset at that index.
+            if (definition != null && matches(definition, nativeQuality)) {
                 builder.quality(ItemClassification.builder()
                         .id(definition.id)
                         .displayName(definition.name)
@@ -195,6 +321,8 @@ final class NativeItemInspector {
                         .accentColor(definition.accentColor)
                         .sortOrder(definition.index)
                         .build());
+            } else if (nativeQuality != null) {
+                builder.quality(nativeQuality);
             }
         }
 
@@ -220,6 +348,51 @@ final class NativeItemInspector {
             }
         }
         return null;
+    }
+
+    private static boolean matches(ItemViewConfig.QualityDefinition configured,
+            ItemClassification nativeQuality) {
+        if (configured == null || nativeQuality == null) {
+            return configured != null;
+        }
+        if (configured.id == null || configured.id.isBlank()) {
+            return true;
+        }
+        String configuredId = configured.id;
+        int colon = configuredId.indexOf(':');
+        if (colon >= 0 && colon + 1 < configuredId.length()) {
+            configuredId = configuredId.substring(colon + 1);
+        }
+        String localConfiguredId = configuredId;
+        return nativeQuality.id() != null
+                && nativeQuality.id().equalsIgnoreCase(localConfiguredId);
+    }
+
+    private static ItemClassification nativeQuality(int index) {
+        ItemQuality quality = call(() -> ItemQuality.getAssetMap().getAsset(index), null);
+        if (quality == null) {
+            return null;
+        }
+        String id = call(quality::getId, null);
+        String name = ItemNames.prettify(id);
+        if (name.isBlank()) {
+            return null;
+        }
+        return ItemClassification.builder()
+                .id(id)
+                .displayName(name)
+                .color(color(call(quality::getTextColor, null)))
+                .sortOrder(call(quality::getQualityValue, index))
+                .build();
+    }
+
+    private static String color(com.hypixel.hytale.protocol.Color color) {
+        if (color == null) {
+            return null;
+        }
+        return String.format(Locale.ROOT, "#%02X%02X%02X",
+                Byte.toUnsignedInt(color.red), Byte.toUnsignedInt(color.green),
+                Byte.toUnsignedInt(color.blue));
     }
 
     /**
@@ -443,15 +616,58 @@ final class NativeItemInspector {
         if (call(item::hasBlockType, false)) {
             builder.addTag("placeable");
         }
+        readAssetTags(item, builder);
+    }
+
+    /** Imports an asset pack's declared item tags for providers and API callers. */
+    private void readAssetTags(Item item, ItemViewBuilder builder) {
+        Map<String, String[]> tags = call(() -> {
+            var data = item == null ? null : item.getData();
+            return data == null ? null : data.getRawTags();
+        }, null);
+        if (tags == null) {
+            return;
+        }
+        for (Map.Entry<String, String[]> entry : tags.entrySet()) {
+            String family = entry.getKey();
+            String[] values = entry.getValue();
+            if (family == null || family.isBlank() || values == null) {
+                continue;
+            }
+            for (String value : values) {
+                if (value != null && !value.isBlank()) {
+                    builder.addTag(family + ":" + value);
+                }
+            }
+        }
     }
 
     private void readSource(Item item, ItemViewBuilder builder, String itemId) {
-        String assetPack = call(() -> {
-            var data = item == null ? null : item.getData();
-            return data == null ? null : String.valueOf(data);
-        }, null);
+        String assetPack = config.display.showSourceMod ? sourceFromTranslation(item) : null;
         builder.source(new ItemSourceData(ItemNames.namespaceOf(itemId),
-                config.display.showSourceMod ? assetPack : null, null));
+                assetPack, null));
+    }
+
+    /**
+     * Item ids are global rather than namespaced in most Hytale packs. Their
+     * translation keys are the stable, client-visible provenance signal used by
+     * the supplied custom item packs (for example {@code MajorDungeons.items}).
+     */
+    private static String sourceFromTranslation(Item item) {
+        String key = call(() -> item == null ? null : item.getTranslationKey(), null);
+        if (key == null || key.isBlank()) {
+            return null;
+        }
+        String lower = key.toLowerCase(Locale.ROOT);
+        int items = lower.indexOf(".items.");
+        if (items <= 0) {
+            return null;
+        }
+        String source = key.substring(0, items);
+        return switch (source.toLowerCase(Locale.ROOT)) {
+            case "item", "items", "server", "hytale" -> null;
+            default -> source;
+        };
     }
 
     /**
@@ -462,6 +678,7 @@ final class NativeItemInspector {
      * {@code "Null"} — that is a name, not an absence. Only a missing key or an
      * explicit BSON null means the item lacks the field.</p>
      */
+    @SuppressWarnings("deprecation") // Hytale has no non-deprecated API for enumerating all stack metadata yet.
     private void readMetadata(ItemStack stack, ItemViewBuilder builder) {
         BsonDocument metadata = call(stack::getMetadata, null);
         if (metadata == null || metadata.isEmpty()) {
@@ -481,6 +698,7 @@ final class NativeItemInspector {
                 continue;
             }
             String normalized = key.toLowerCase(Locale.ROOT);
+            boolean promotedByModReader = ModItemMetadataInspector.inspect(key, value, builder);
             switch (normalized) {
                 case "customname", "displayname", "name" -> {
                     String text = text(value);
@@ -508,7 +726,7 @@ final class NativeItemInspector {
                 case "modifiers", "affixes" -> readModifierDocument(value, builder);
                 default -> { /* falls through to the technical dump below */ }
             }
-            if (!CONSUMED_KEYS.contains(normalized)) {
+            if (!promotedByModReader && !CONSUMED_KEYS.contains(normalized)) {
                 builder.addTechnical(key, describe(value));
             }
         }

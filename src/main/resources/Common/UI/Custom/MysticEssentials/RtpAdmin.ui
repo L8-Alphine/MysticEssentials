@@ -1,9 +1,12 @@
+// Random Teleport Admin — overview of every profile with test / toggle / cache
+// controls on each card.
 $C = "../Common.ui";
+$M = "MysticTheme.ui";
 
 $C.@PageOverlay {}
 
 $C.@Container {
-  Anchor: (Width: 820, Height: 640);
+  Anchor: (Width: 840, Height: 640);
 
   #Title {
     Group {
@@ -17,22 +20,31 @@ $C.@Container {
     LayoutMode: Top;
 
     Label #Summary {
-      Anchor: (Height: 28, Bottom: 6);
-      Style: (FontSize: 14, TextColor: #9fb0c4);
+      Anchor: (Height: 20, Bottom: 10);
+      Style: $M.@MetaStyle;
     }
 
-    Label #Empty {
-      Anchor: (Height: 40);
-      Style: (FontSize: 14, TextColor: #9fb0c4, VerticalAlignment: Center);
-      Text: "No profiles configured. Edit modules/teleportation/rtp.json.";
-      Visible: false;
+    $M.@Section {
+      @Text = "Profiles";
+      @Anchor = (Bottom: 8);
     }
 
-    Group #ProfileList {
+    $M.@Well {
       FlexWeight: 1;
-      LayoutMode: TopScrolling;
-      Padding: (Right: 10);
-      ScrollbarStyle: $C.@DefaultScrollbarStyle;
+
+      Label #Empty {
+        Anchor: (Height: 72);
+        Style: $M.@EmptyStyle;
+        Text: "No profiles configured. Edit modules/teleportation/rtp.json.";
+        Visible: false;
+      }
+
+      Group #ProfileList {
+        FlexWeight: 1;
+        LayoutMode: TopScrolling;
+        Padding: (Right: 6);
+        ScrollbarStyle: $C.@DefaultScrollbarStyle;
+      }
     }
   }
 }

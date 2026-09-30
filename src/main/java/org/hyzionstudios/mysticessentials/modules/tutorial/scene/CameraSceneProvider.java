@@ -30,8 +30,8 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
  * (the packet behind the builtin {@code /camera}) at a fixed rate, letting the
  * client lerp between updates.
  *
- * <p>This is the only mechanism that actually plays these scenes on Hytale
- * 0.5.6: the client has no receiver for {@code UpdateMachinimaScene} (machinima
+ * <p>This is the only mechanism that actually plays these scenes through Hytale
+ * 0.6.2: the client has no receiver for {@code UpdateMachinimaScene} (machinima
  * playback is editor-local), but it does process {@code SetServerCamera}. Camera
  * settings follow the verified builtin recipe — {@code ClientCameraView.Custom},
  * locked, {@code PositionType.Custom} + absolute {@code Position},

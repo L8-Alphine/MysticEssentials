@@ -1,9 +1,13 @@
+// Chat Channels — master/detail. The list is every channel the player can see;
+// the panel is the selected channel with join/listen/leave. The channel the
+// player is currently speaking in is called out at the top of the list.
 $C = "../Common.ui";
+$M = "MysticTheme.ui";
 
 $C.@PageOverlay {}
 
 $C.@Container {
-  Anchor: (Width: 940, Height: 640);
+  Anchor: (Width: 960, Height: 640);
 
   #Title {
     Group {
@@ -16,98 +20,127 @@ $C.@Container {
   #Content {
     LayoutMode: Left;
 
+    // ---- Master: channel list -----------------------------------------------
     Group {
       Anchor: (Width: 330);
       LayoutMode: Top;
 
-      Label #CurrentChannelLabel {
-        Anchor: (Height: 26, Bottom: 6);
-        Style: (FontSize: 14, TextColor: #E8A93B, RenderBold: true, VerticalAlignment: Center);
+      // Where the player is speaking right now.
+      Group {
+        LayoutMode: Left;
+        Anchor: (Height: 40, Bottom: 10);
+        Background: #E8A93B(0.10);
+        Padding: (Left: 12, Right: 8);
+
+        Group {
+          Anchor: (Width: 3, Height: 22, Right: 10);
+          Background: #E8A93B;
+        }
+
+        Label #CurrentChannelLabel {
+          FlexWeight: 1;
+          Style: (...$M.@SubheadingStyle, TextColor: #e8c97a);
+        }
+
+        $C.@SmallSecondaryTextButton #ViewMembersButton {
+          @Text = "Members";
+          @Anchor = (Width: 100, Vertical: 4);
+          Visible: false;
+        }
       }
 
-      $C.@SecondaryTextButton #ViewMembersButton {
-        @Text = "View Members";
-        @Anchor = (Height: 36, Bottom: 8);
-        Visible: false;
+      $M.@Section {
+        @Text = "Channels";
+        @Anchor = (Bottom: 10);
       }
 
-      Label #ChannelEmpty {
-        Anchor: (Height: 40);
-        Style: (FontSize: 14, TextColor: #9fb0c4, VerticalAlignment: Center);
-        Text: "No channels available.";
-        Visible: false;
-      }
-
-      Group #ChannelList {
+      $M.@Well {
         FlexWeight: 1;
-        LayoutMode: TopScrolling;
-        Padding: (Right: 10);
-        ScrollbarStyle: $C.@DefaultScrollbarStyle;
+
+        Label #ChannelEmpty {
+          Anchor: (Height: 72);
+          Style: $M.@EmptyStyle;
+          Text: "No channels are available to you.";
+          Visible: false;
+        }
+
+        Group #ChannelList {
+          FlexWeight: 1;
+          LayoutMode: TopScrolling;
+          Padding: (Right: 6);
+          ScrollbarStyle: $C.@DefaultScrollbarStyle;
+        }
       }
     }
 
+    $M.@ColumnDivider {}
+
+    // ---- Detail: selected channel -------------------------------------------
     Group {
       FlexWeight: 1;
       LayoutMode: TopScrolling;
-      Padding: (Left: 12);
+      Padding: (Right: 4);
       ScrollbarStyle: $C.@DefaultScrollbarStyle;
 
-      Group {
-        Background: (TexturePath: "../Common/ContainerPanelPatch.png", Border: 4);
-        LayoutMode: Top;
-        Padding: (Full: 16);
+      $M.@Panel {
         Anchor: (Bottom: 12);
+
+        $M.@Section {
+          @Text = "Selected Channel";
+          @Style = $M.@EyebrowGoldStyle;
+          @Anchor = (Bottom: 8);
+        }
 
         Group {
           LayoutMode: Left;
-          Anchor: (Bottom: 10);
+          Anchor: (Height: 32, Bottom: 8);
 
           Group #ChannelDetailSwatch {
-            Anchor: (Width: 10, Height: 26, Right: 10);
+            Anchor: (Width: 6, Height: 24, Top: 4, Right: 12);
             Background: #7a9cc6;
           }
 
           Label #ChannelName {
             FlexWeight: 1;
-            Style: (FontSize: 20, RenderBold: true, TextColor: #ffffff, VerticalAlignment: Center);
+            Style: $M.@DisplayStyle;
           }
         }
 
-        Group {
-          LayoutMode: Left;
-          Anchor: (Bottom: 8);
-          Label { Anchor: (Width: 100); Style: (...$C.@DefaultLabelStyle, FontSize: 13, RenderBold: true); Text: "Type"; }
-          Label #ChannelType { FlexWeight: 1; Style: (...$C.@DefaultLabelStyle, FontSize: 13); }
+        $M.@Hairline {
+          @Anchor = (Bottom: 6);
         }
 
-        Group {
-          LayoutMode: Left;
-          Anchor: (Bottom: 8);
-          Label { Anchor: (Width: 100); Style: (...$C.@DefaultLabelStyle, FontSize: 13, RenderBold: true); Text: "Prefix"; }
-          Label #ChannelPrefix { FlexWeight: 1; Style: (...$C.@DefaultLabelStyle, FontSize: 13); }
+        $M.@KvRow {
+          $M.@Key { @Text = "Type"; }
+          Label #ChannelType { FlexWeight: 1; Style: $M.@ValueStyle; }
         }
 
-        Group {
-          LayoutMode: Left;
-          Label { Anchor: (Width: 100); Style: (...$C.@DefaultLabelStyle, FontSize: 13, RenderBold: true); Text: "Status"; }
-          Label #ChannelStatus { FlexWeight: 1; Style: (...$C.@DefaultLabelStyle, FontSize: 13); }
+        $M.@KvRow {
+          $M.@Key { @Text = "Prefix"; }
+          Label #ChannelPrefix { FlexWeight: 1; Style: $M.@ValueStyle; }
+        }
+
+        $M.@KvRow {
+          $M.@Key { @Text = "Status"; }
+          Label #ChannelStatus { FlexWeight: 1; Style: $M.@ValueStyle; }
+        }
+
+        $M.@Hairline {
+          @Anchor = (Top: 6, Bottom: 12);
+        }
+
+        $M.@FieldLabel {
+          @Text = "Password";
+        }
+
+        $C.@TextField #PasswordInput {
+          @Anchor = (Bottom: 4);
+          PlaceholderText: "Only needed for locked channels";
         }
       }
 
-      Label {
-        Anchor: (Bottom: 6);
-        Style: (...$C.@DefaultLabelStyle, FontSize: 13, RenderBold: true);
-        Text: "Password (for locked channels)";
-      }
-
-      $C.@TextField #PasswordInput {
-        @Anchor = (Height: 38, Bottom: 10);
-        PlaceholderText: "Leave blank if not needed";
-      }
-
-      Group {
-        LayoutMode: Left;
-        Anchor: (Height: 44, Bottom: 8);
+      $M.@ActionBar {
+        @Anchor = (Height: 44, Bottom: 18);
 
         $C.@TextButton #SwitchButton {
           @Text = "Speak Here";
@@ -116,31 +149,39 @@ $C.@Container {
 
         $C.@SecondaryTextButton #ListenButton {
           @Text = "Listen";
-          @Anchor = (Width: 130, Right: 8);
+          @Anchor = (Width: 130);
         }
+
+        $M.@Spacer {}
 
         $C.@CancelTextButton #LeaveButton {
           @Text = "Leave";
-          @Anchor = (Width: 130);
+          @Anchor = (Width: 120);
         }
       }
 
-      $C.@PanelSeparatorFancy {
-        @Anchor = (Bottom: 10);
+      $M.@Section {
+        @Text = "Temporary Channels";
+        @Anchor = (Bottom: 6);
       }
 
-      Group {
-        LayoutMode: Left;
-        Anchor: (Height: 44);
+      Label {
+        Anchor: (Height: 18, Bottom: 8);
+        Style: $M.@CaptionStyle;
+        Text: "Spin up a private room for an event or a group; it closes itself when it goes quiet.";
+      }
+
+      $M.@ActionBar {
+        @Anchor = (Height: 44);
 
         $C.@SecondaryTextButton #OpenTempButton {
-          @Text = "Create Temp Channel";
-          @Anchor = (Width: 240, Right: 8);
+          @Text = "Create Channel";
+          @Anchor = (Width: 190, Right: 8);
         }
 
         $C.@TertiaryTextButton #ManageTempButton {
-          @Text = "Manage My Channel";
-          @Anchor = (Width: 230);
+          @Text = "Manage Mine";
+          @Anchor = (Width: 170);
           Visible: false;
         }
       }

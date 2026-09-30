@@ -1,9 +1,12 @@
+// Confirm Random Teleport — a focused confirmation with the terms laid out
+// before the player commits. Begin is the primary action; Cancel is quiet.
 $C = "../Common.ui";
+$M = "MysticTheme.ui";
 
 $C.@PageOverlay {}
 
 $C.@Container {
-  Anchor: (Width: 460, Height: 340);
+  Anchor: (Width: 480, Height: 380);
 
   #Title {
     Group {
@@ -16,43 +19,60 @@ $C.@Container {
   #Content {
     LayoutMode: Top;
 
-    Label #ProfileName {
-      Anchor: (Height: 30);
-      Style: (FontSize: 18, TextColor: #ffffff, RenderBold: true);
-    }
+    $M.@Panel {
+      Anchor: (Bottom: 14);
 
-    Label #World {
-      Anchor: (Height: 24);
-      Style: (FontSize: 14, TextColor: #9fb0c4);
-    }
-
-    Label #Range {
-      Anchor: (Height: 24);
-      Style: (FontSize: 14, TextColor: #9fb0c4);
-    }
-
-    Label #Cost {
-      Anchor: (Height: 24);
-      Style: (FontSize: 14, TextColor: #9fb0c4);
-    }
-
-    Label #Timing {
-      Anchor: (Height: 24);
-      Style: (FontSize: 14, TextColor: #9fb0c4);
-    }
-
-    Group {
-      Anchor: (Height: 46, Top: 14);
-      LayoutMode: Left;
-
-      $C.@SmallTertiaryTextButton #CancelButton {
-        @Text = "CANCEL";
-        @Anchor = (Width: 140, Right: 10);
+      $M.@Section {
+        @Text = "Destination";
+        @Style = $M.@EyebrowGoldStyle;
+        @Anchor = (Bottom: 8);
       }
 
-      $C.@SmallSecondaryTextButton #ConfirmButton {
-        @Text = "BEGIN TELEPORT";
-        @Anchor = (Width: 180);
+      Label #ProfileName {
+        Anchor: (Height: 30, Bottom: 8);
+        Style: $M.@DisplayStyle;
+      }
+
+      $M.@Hairline {
+        @Anchor = (Bottom: 6);
+      }
+
+      Label #World {
+        Anchor: (Height: 22);
+        Style: $M.@ValueStyle;
+      }
+
+      Label #Range {
+        Anchor: (Height: 22);
+        Style: $M.@ValueStyle;
+      }
+
+      Label #Cost {
+        Anchor: (Height: 22);
+        Style: $M.@ValueStyle;
+      }
+
+      Label #Timing {
+        Anchor: (Height: 22);
+        Style: $M.@ValueStyle;
+      }
+    }
+
+    $M.@Spacer {}
+
+    $M.@ActionBar {
+      @Anchor = (Height: 44);
+
+      $C.@TertiaryTextButton #CancelButton {
+        @Text = "Cancel";
+        @Anchor = (Width: 130);
+      }
+
+      $M.@Spacer {}
+
+      $C.@TextButton #ConfirmButton {
+        @Text = "Begin Teleport";
+        @Anchor = (Width: 190);
       }
     }
   }

@@ -19,6 +19,27 @@ public final class DefaultMessages {
         o.addProperty("core-info-version", "&d&lMystic Essentials &7v{version}");
         o.addProperty("core-info-status", "&7Storage: &f{storage} &7| Modules loaded: &f{modules}");
         o.addProperty("core-info-help", "&7Use &f/mystic reload &7to reload configuration.");
+        o.addProperty("network-status-disabled",
+                "&cRedis is disabled or not connected; cross-server features are local-only.");
+        o.addProperty("network-status-local",
+                "&7This server: &f{server} &7on network &f{network}&7, advertised at &f{host}:{port} &7({source})");
+        o.addProperty("network-status-local-none",
+                "&7This server: &f{server} &7on network &f{network} &c— no advertised address yet "
+                        + "(engine not bound, or set storage.redis.advertisedHost/advertisedPort)");
+        o.addProperty("network-status-private-hint",
+                "&e  {host} is a private address: only clients on that network can be transferred to "
+                        + "&f{server}&e. Set storage.redis.advertisedHost there to what players type to join it.");
+        o.addProperty("network-status-proxy",
+                "&7Proxy: &f{host}:{port} &7— players are referred to the proxy, which routes on the "
+                        + "payload's destination server; backend addresses may stay private.");
+        o.addProperty("network-status-remote-header", "&7Other servers seen ({count}):");
+        o.addProperty("network-status-remote",
+                "&7- &f{server} &7at &f{host}:{port} &7— {players} player(s), heartbeat {age}s ago");
+        o.addProperty("network-status-remote-noendpoint",
+                "&7- &f{server} &c(no advertised address) &7— {players} player(s), heartbeat {age}s ago");
+        o.addProperty("network-status-remote-none",
+                "&7No other servers seen on network &f{network}&7. Each server needs the same networkId, "
+                        + "a distinct serverId, and a reachable Redis.");
         o.addProperty("update-notifier-available",
                 "&d&lMystic Essentials update available! &7Running &fv{current}&7, latest &av{latest}&7.\n"
                         + "&e<link:{url}>Click here to open the new update on CurseForge.</link>");
@@ -39,6 +60,14 @@ public final class DefaultMessages {
                 "&e{player} &7wants to teleport to you. &a/tpaccept &7or &c/tpdeny");
         o.addProperty("teleport-request-incoming-to-them",
                 "&e{player} &7wants you to teleport to them. &a/tpaccept &7or &c/tpdeny");
+        o.addProperty("teleport-request-incoming-to-you-remote",
+                "&e{player} &7(&b{server}&7) wants to teleport to you. &a/tpaccept &7or &c/tpdeny");
+        o.addProperty("teleport-request-incoming-to-them-remote",
+                "&e{player} &7(&b{server}&7) wants you to teleport to them. &a/tpaccept &7or &c/tpdeny");
+        o.addProperty("teleport-cross-server-transferring", "&7Transferring you to &e{server}&7...");
+        o.addProperty("teleport-here-transferring", "&7Bringing &e{player} &7here from &e{server}&7...");
+        o.addProperty("teleport-cross-server-unavailable",
+                "&cCross-server teleport is not available: server &f{server} &chas no advertised address.");
         o.addProperty("teleport-request-sent", "&7Teleport request sent to &e{player}");
         o.addProperty("teleport-request-self", "&cYou cannot send a teleport request to yourself.");
         o.addProperty("teleport-request-accepted", "&aTeleport request accepted.");
@@ -272,6 +301,13 @@ public final class DefaultMessages {
         o.addProperty("flight-state", "&7Flight {state}&7.");
         o.addProperty("flight-state-other", "&7Flight {state} &7for &e{player}&7.");
         o.addProperty("flight-cost", "&7Flight costs &f{cost} &7per minute.");
+        o.addProperty("craftblock-denied", "&cYou cannot craft &f{item}&c.");
+        o.addProperty("craftblock-none", "&7No items are blocked from crafting.");
+        o.addProperty("craftblock-list-header", "&7Blocked from crafting (&f{count}&7):");
+        o.addProperty("craftblock-list-entry", "&8- &f{item}");
+        o.addProperty("craftblock-check-empty", "&7Hold the item you want to check.");
+        o.addProperty("craftblock-check-blocked", "&f{item} &cis blocked from crafting.");
+        o.addProperty("craftblock-check-allowed", "&f{item} &ais not blocked.");
         o.addProperty("inventory-cleared", "&aYour inventory was cleared (a backup snapshot was taken).");
         o.addProperty("inventory-clear-failed", "&cCould not clear your inventory.");
         o.addProperty("inventory-cleared-by-admin", "&7Your inventory was cleared by an admin.");
@@ -369,6 +405,7 @@ public final class DefaultMessages {
         o.addProperty("pm-sent", "&7[&dyou &7-> &d{target}&7] &f{message}");
         o.addProperty("pm-spy", "&8[spy] &7{sender} -> {target}: {message}");
         o.addProperty("pm-no-permission", "&cYou do not have permission to send private messages.");
+        o.addProperty("pm-blocked", "&cYou can't send private messages to &f{target}&c right now.");
         o.addProperty("pm-reply-no-permission", "&cYou do not have permission to reply to private messages.");
         o.addProperty("pm-reply-none", "&cYou have no one to reply to.");
         o.addProperty("announcement-broadcast", "{message}");

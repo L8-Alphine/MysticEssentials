@@ -32,7 +32,7 @@ import com.google.gson.reflect.TypeToken;
 import com.hypixel.hytale.server.core.command.system.arguments.system.RequiredArg;
 import com.hypixel.hytale.server.core.command.system.arguments.types.ArgTypes;
 import com.hypixel.hytale.server.core.entity.entities.Player;
-import com.hypixel.hytale.server.core.inventory.Inventory;
+import com.hypixel.hytale.server.core.inventory.InventoryComponent;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
@@ -46,12 +46,14 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 public final class MailModule extends AbstractMysticModule implements MailService {
 
     private static final String NAMESPACE = "mail";
+    private static final String REDIS_NOTIFY_CHANNEL = "mail:notify";
     private static final Type INBOX_TYPE = new TypeToken<ArrayList<MailMessage>>() {
     }.getType();
     private static final Type ANNOUNCEMENT_LOG_TYPE = new TypeToken<ArrayList<SentAnnouncement>>() {
     }.getType();
 
     private MailConfig config = new MailConfig();
+    private final Consumer<String> redisNotifyHandler = this::handleRemoteMailNotification;
 
     public MailModule() {
         super("mail", "Mail", "1.0.0");
@@ -60,6 +62,7 @@ public final class MailModule extends AbstractMysticModule implements MailServic
     @Override
     public void onEnable() {
         config = core.configManager().loadModuleConfig(id(), MailConfig.class, new MailConfig());
+        core.redis().subscribe(REDIS_NOTIFY_CHANNEL, redisNotifyHandler);
         registerCommand(new MailCommand());
         registerCommand(new MailAdminTopCommand());
         registerEvent(
@@ -75,6 +78,7 @@ public final class MailModule extends AbstractMysticModule implements MailServic
 
     @Override
     public void onDisable() {
+        core.redis().unsubscribe(REDIS_NOTIFY_CHANNEL, redisNotifyHandler);
         // Inboxes are persisted on every mutation; nothing to flush.
     }
 
@@ -130,11 +134,22 @@ public final class MailModule extends AbstractMysticModule implements MailServic
                 // This future completes on the storage thread; sendMessage only renders
                 // reliably from the player's world thread, so hop before notifying.
                 Runnable notify = () -> notifyMail(ref, "New Mail", "mail-notify-new",
-                        Map.of("sender", senderName), NotificationPriority.IMPORTANT, true);
+                        Map.of("sender", senderName), NotificationPriority.IMPORTANT, false);
                 if (!core.platform().runOnEntityThread(ref, (store, entity, world) -> notify.run())) {
                     notify.run(); // Best effort when the world lookup fails.
                 }
             });
+            if (online.isEmpty() && core.redis().isEnabled()) {
+                core.networkPlayers().find(recipient).ifPresent(remote -> {
+                    if (!remote.local(core.networkPlayers().localServerId())) {
+                        com.google.gson.JsonObject notice = new com.google.gson.JsonObject();
+                        notice.addProperty("targetServerId", remote.serverId());
+                        notice.addProperty("recipient", recipient.toString());
+                        notice.addProperty("sender", senderName);
+                        core.redis().publish(REDIS_NOTIFY_CHANNEL, Json.toString(notice));
+                    }
+                });
+            }
             String body = mail.getBody() == null ? "" : mail.getBody();
             core.getEventBus().publish(new org.hyzionstudios.mysticessentials.api.event.MailReceivedEvent(
                     recipient,
@@ -145,6 +160,22 @@ public final class MailModule extends AbstractMysticModule implements MailServic
             ));
             return saved;
         });
+    }
+
+    private void handleRemoteMailNotification(String raw) {
+        try {
+            com.google.gson.JsonObject notice = Json.asObject(Json.parse(raw));
+            if (!core.networkPlayers().localServerId().equals(notice.get("targetServerId").getAsString())) {
+                return;
+            }
+            UUID recipient = UUID.fromString(notice.get("recipient").getAsString());
+            String sender = notice.get("sender").getAsString();
+            core.platform().findPlayer(recipient).ifPresent(player ->
+                    notifyMail(player, "New Mail", "mail-notify-new",
+                            Map.of("sender", sender), NotificationPriority.IMPORTANT, false));
+        } catch (RuntimeException e) {
+            core.log(Level.WARNING, "[mail] Bad Redis notification payload: " + e.getMessage());
+        }
     }
 
     private void notifyMail(PlayerRef player, String title, String messageKey,
@@ -160,6 +191,12 @@ public final class MailModule extends AbstractMysticModule implements MailServic
                 .title(title)
                 .subtitle(message)
                 .message(message)
+                .showInChat(true)
+                .showAsTitle(false)
+                .showAsActionBar(false)
+                .showAsToast(true)
+                .showAsBanner(false)
+                .playSound(false)
                 .action(NotificationAction.command("/mail"))
                 .storeInHistory(history)
                 .source("mysticessentials:mail")
@@ -333,18 +370,20 @@ public final class MailModule extends AbstractMysticModule implements MailServic
         return false;
     }
 
-    private static List<ItemContainer> sources(Inventory inventory) {
+    private static List<ItemContainer> sources(
+            com.hypixel.hytale.component.Store<com.hypixel.hytale.server.core.universe.world.storage.EntityStore> store,
+            com.hypixel.hytale.component.Ref<com.hypixel.hytale.server.core.universe.world.storage.EntityStore> entity) {
         List<ItemContainer> sources = new ArrayList<>();
-        if (inventory.getHotbar() != null) {
-            sources.add(inventory.getHotbar());
-        }
-        if (inventory.getStorage() != null) {
-            sources.add(inventory.getStorage());
-        }
-        if (inventory.getBackpack() != null) {
-            sources.add(inventory.getBackpack());
-        }
+        addSource(sources, store.getComponent(entity, InventoryComponent.Hotbar.getComponentType()));
+        addSource(sources, store.getComponent(entity, InventoryComponent.Storage.getComponentType()));
+        addSource(sources, store.getComponent(entity, InventoryComponent.Backpack.getComponentType()));
         return sources;
+    }
+
+    private static void addSource(List<ItemContainer> sources, InventoryComponent component) {
+        if (component != null && component.getInventory() != null) {
+            sources.add(component.getInventory());
+        }
     }
 
     private static int totalOf(List<ItemContainer> containers, String itemId) {
@@ -382,14 +421,13 @@ public final class MailModule extends AbstractMysticModule implements MailServic
         CompletableFuture<List<ItemPick>> out = new CompletableFuture<>();
         boolean dispatched = core.platform().runOnEntityThread(player, (store, entity, world) -> {
             try {
-                Player entityPlayer = store.getComponent(entity, Player.getComponentType());
-                Inventory inventory = entityPlayer == null ? null : entityPlayer.getInventory();
-                if (inventory == null) {
+                List<ItemContainer> containers = sources(store, entity);
+                if (containers.isEmpty()) {
                     out.complete(List.of());
                     return;
                 }
                 LinkedHashMap<String, Integer> totals = new LinkedHashMap<>();
-                for (ItemContainer container : sources(inventory)) {
+                for (ItemContainer container : containers) {
                     for (short i = 0; i < container.getCapacity(); i++) {
                         ItemStack stack = container.getItemStack(i);
                         if (stack == null || stack.isEmpty() || isBlocked(stack.getItemId())) {
@@ -423,13 +461,11 @@ public final class MailModule extends AbstractMysticModule implements MailServic
         CompletableFuture<List<MailAttachment>> out = new CompletableFuture<>();
         boolean dispatched = core.platform().runOnEntityThread(sender, (store, entity, world) -> {
             try {
-                Player entityPlayer = store.getComponent(entity, Player.getComponentType());
-                Inventory inventory = entityPlayer == null ? null : entityPlayer.getInventory();
-                if (inventory == null) {
+                List<ItemContainer> containers = sources(store, entity);
+                if (containers.isEmpty()) {
                     out.complete(null);
                     return;
                 }
-                List<ItemContainer> containers = sources(inventory);
                 for (ItemPick pick : picks) {
                     if (isBlocked(pick.itemId()) || pick.quantity() <= 0
                             || totalOf(containers, pick.itemId()) < pick.quantity()) {
@@ -455,8 +491,7 @@ public final class MailModule extends AbstractMysticModule implements MailServic
                             if (left <= 0) {
                                 container.setItemStackForSlot(i, ItemStack.EMPTY);
                             } else {
-                                container.setItemStackForSlot(i, new ItemStack(stack.getItemId(), left,
-                                        stack.getDurability(), stack.getMaxDurability(), stack.getMetadata()));
+                                container.setItemStackForSlot(i, stack.withQuantity(left));
                             }
                             remaining -= take;
                         }
@@ -492,9 +527,8 @@ public final class MailModule extends AbstractMysticModule implements MailServic
             boolean dispatched = core.platform().runOnEntityThread(player, (store, entity, world) -> {
                 try {
                     if (!items.isEmpty()) {
-                        Player entityPlayer = store.getComponent(entity, Player.getComponentType());
-                        Inventory inventory = entityPlayer == null ? null : entityPlayer.getInventory();
-                        if (inventory == null || freeSlots(sources(inventory)) < items.size()) {
+                        List<ItemContainer> containers = sources(store, entity);
+                        if (containers.isEmpty() || freeSlots(containers) < items.size()) {
                             core.getMessageService().sendKey(player, "mail-claim-no-space");
                             refresh.run();
                             return;
@@ -967,8 +1001,14 @@ public final class MailModule extends AbstractMysticModule implements MailServic
                 return;
             }
             Optional<PlayerRef> online = core.platform().findPlayerByName(targetName);
-            if (online.isPresent()) {
-                send(sender.uuid(), sender.name(), online.get().getUuid(), body)
+            // A player online on another network server counts as online: the Redis
+            // roster resolves their UUID and the recipient's server shows the notice.
+            Optional<UUID> networkOnline = online.map(PlayerRef::getUuid)
+                    .or(() -> core.networkPlayers().findByName(targetName)
+                            .filter(player -> !player.vanished())
+                            .map(player -> player.uuid()));
+            if (networkOnline.isPresent()) {
+                send(sender.uuid(), sender.name(), networkOnline.get(), body)
                         .thenRun(() -> sender.replyKey("mail-sent", Map.of("player", targetName)));
             } else if (sender.hasPermission(org.hyzionstudios.mysticessentials.api.Permissions.MAIL_SEND_OFFLINE)) {
                 // Offline delivery: resolve the name via our username index, then write to
@@ -1056,7 +1096,7 @@ public final class MailModule extends AbstractMysticModule implements MailServic
 
         private final class MailSendCommand extends MysticCommand {
             private final RequiredArg<String> player = withRequiredArg("player", "Recipient player",
-                    MysticArgTypes.PLAYER_NAME);
+                    MysticArgTypes.NETWORK_PLAYER_NAME);
             private final RequiredArg<String> message =
                     withRequiredArg("message", "Message", ArgTypes.GREEDY_STRING);
 

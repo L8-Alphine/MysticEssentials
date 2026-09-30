@@ -25,6 +25,8 @@ public final class Permissions {
 
     public static final String RELOAD = "mysticessentials.reload";
     public static final String MIGRATE = "mysticessentials.migrate";
+    /** {@code /mystic network}: Redis network roster and this server's advertised address. */
+    public static final String NETWORK = "mysticessentials.network";
     /** View the license status and re-read {@code license.mclicense} from disk. */
     public static final String LICENSE = "mysticessentials.license";
     /** Receive a clickable update notice on join when this build is outdated. */
@@ -224,6 +226,16 @@ public final class Permissions {
     public static final String FLY_UNLIMITED = "mysticessentials.fly.unlimited";
     public static final String FLY_FREE = "mysticessentials.fly.free";
 
+    // ----- Craft blocking ------------------------------------------------------------
+
+    /** View the craft block list and check held item ids ({@code /craftblock}). */
+    public static final String CRAFTBLOCK_ADMIN = "mysticessentials.craftblock.admin";
+    /**
+     * Craft every blocked item regardless of the block list. Dynamic per-item
+     * nodes hang off this one: {@code mysticessentials.craftblock.bypass.<item id>}.
+     */
+    public static final String CRAFTBLOCK_BYPASS = "mysticessentials.craftblock.bypass";
+
     // ----- Inventory ---------------------------------------------------------------
 
     public static final String INVENTORY_CLEAR = "mysticessentials.inventory.clear";
@@ -324,6 +336,11 @@ public final class Permissions {
     /** {@code mysticessentials.kit.<name>} — access to a specific kit. */
     public static String kit(String kitName) {
         return KIT_BASE + "." + kitName.toLowerCase(java.util.Locale.ROOT);
+    }
+
+    /** {@code mysticessentials.craftblock.bypass.<item id>} — craft one blocked item. */
+    public static String craftBlockBypass(String itemId) {
+        return CRAFTBLOCK_BYPASS + "." + itemId.toLowerCase(java.util.Locale.ROOT);
     }
 
     /** {@code mysticessentials.chat.channel.<id>} — join a specific channel. */

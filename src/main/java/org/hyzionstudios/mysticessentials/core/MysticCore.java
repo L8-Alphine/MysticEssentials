@@ -31,6 +31,7 @@ import org.hyzionstudios.mysticessentials.core.message.MessageServiceImpl;
 import org.hyzionstudios.mysticessentials.core.notification.NotificationServiceImpl;
 import org.hyzionstudios.mysticessentials.core.migration.MigrationCommand;
 import org.hyzionstudios.mysticessentials.core.module.ModuleManagerImpl;
+import org.hyzionstudios.mysticessentials.core.network.NetworkPlayerService;
 import org.hyzionstudios.mysticessentials.core.path.PathManager;
 import org.hyzionstudios.mysticessentials.core.permission.PermissionServiceImpl;
 import org.hyzionstudios.mysticessentials.core.placeholder.PlaceholderServiceImpl;
@@ -68,8 +69,11 @@ public final class MysticCore implements MysticEssentialsAPI {
 
     private StorageServiceImpl storageService;
     private RedisBridge redisBridge;
+    private NetworkPlayerService networkPlayerService;
     private org.hyzionstudios.mysticessentials.core.integration.VanishBridge vanishBridge;
     private org.hyzionstudios.mysticessentials.core.integration.ModerationBridge moderationBridge;
+    private org.hyzionstudios.mysticessentials.core.integration.ManagedAccountsBridge managedAccountsBridge;
+    private org.hyzionstudios.mysticessentials.core.integration.PortalBridge portalBridge;
     private PlayerProfileServiceImpl playerProfileService;
     private PlaytimeTracker playtimeTracker;
     private MessageServiceImpl messageService;
@@ -146,6 +150,10 @@ public final class MysticCore implements MysticEssentialsAPI {
         vanishBridge.init(config.integrations.mysticVanish);
         moderationBridge = new org.hyzionstudios.mysticessentials.core.integration.ModerationBridge(this);
         moderationBridge.init(config.integrations.mysticModeration);
+        managedAccountsBridge = new org.hyzionstudios.mysticessentials.core.integration.ManagedAccountsBridge(this);
+        managedAccountsBridge.init(config.integrations.mysticIdentity);
+        networkPlayerService = new NetworkPlayerService(this);
+        networkPlayerService.start();
 
         // Messages + profiles + teleport.
         messageService = new MessageServiceImpl(this);
@@ -183,12 +191,19 @@ public final class MysticCore implements MysticEssentialsAPI {
         playerListService = new PlayerListService(this);
         playerListService.start();
 
+        // After the modules too, so the portal's first manifest already sees mail, vaults and notes.
+        portalBridge = new org.hyzionstudios.mysticessentials.core.integration.PortalBridge(this);
+        portalBridge.init(config.integrations.mysticIdentity);
+
         MysticEssentialsProvider.register(this);
         log(Level.INFO, "Mystic Essentials is ready (storage=" + storageService.activeProvider() + ").");
     }
 
     public void disable() {
         log(Level.INFO, "Shutting down Mystic Essentials...");
+        if (portalBridge != null) {
+            portalBridge.close();
+        }
         MysticEssentialsProvider.unregister();
         if (playerListService != null) {
             playerListService.stop();
@@ -209,6 +224,12 @@ public final class MysticCore implements MysticEssentialsAPI {
             } catch (Throwable t) {
                 log(Level.WARNING, "Error saving profiles on shutdown: " + t);
             }
+        }
+        if (placeholderService != null) {
+            placeholderService.shutdown();
+        }
+        if (networkPlayerService != null) {
+            networkPlayerService.stop();
         }
         if (redisBridge != null) {
             redisBridge.shutdown();
@@ -235,11 +256,7 @@ public final class MysticCore implements MysticEssentialsAPI {
             super(MysticCore.this, "notifications", "Review notifications you may have missed.");
             addAliases("notifs");
             allowExtraArguments();
-        }
-
-        @Override
-        protected boolean canGeneratePermission() {
-            return false;
+            requireNoPermission();
         }
 
         @Override
@@ -270,6 +287,7 @@ public final class MysticCore implements MysticEssentialsAPI {
         platform.onEvent(com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent.class,
                 (com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent event) -> {
                     var ref = event.getPlayerRef();
+                    networkPlayerService.onJoin(ref);
                     playerProfileService.load(ref.getUuid(), ref.getUsername());
                     playtimeTracker.onJoin(ref.getUuid());
                     updateNotifier.notifyOnJoin(ref);
@@ -277,6 +295,7 @@ public final class MysticCore implements MysticEssentialsAPI {
         platform.onEvent(com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent.class,
                 (com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent event) -> {
                     var ref = event.getPlayerRef();
+                    networkPlayerService.onQuit(ref);
                     // Credit the session before the profile is persisted and evicted.
                     playtimeTracker.onQuit(ref.getUuid());
                     // Notification history and preferences live in the profile, so
@@ -298,6 +317,7 @@ public final class MysticCore implements MysticEssentialsAPI {
             super(MysticCore.this, "mysticessentials", "Mystic Essentials core command.");
             addAliases("mystic", "me");
             addSubCommand(new ReloadCommand());
+            addSubCommand(new NetworkCommand());
             addSubCommand(new MigrationCommand(MysticCore.this));
             addSubCommand(new org.hyzionstudios.mysticessentials.core.license.LicenseCommand(
                     MysticCore.this, license));
@@ -324,12 +344,91 @@ public final class MysticCore implements MysticEssentialsAPI {
             configManager.load();
             messageService.load();
             updateNotifier.reload();
+            reloadIntegrations();
             reloadSharedServices();
             // Honour module enable/disable changes in config, not just reload the
             // already-running ones — this is the hot load/unload path.
             moduleManager.syncFromConfig();
             playerListService.reload();
             sender.replyKey("reload-success");
+        }
+    }
+
+    /**
+     * {@code /mystic network} — what this server advertises to the Redis network
+     * and which other servers it can currently see, so a failed cross-server
+     * teleport can be traced to the roster, the address, or the transfer itself.
+     */
+    private final class NetworkCommand extends MysticCommand {
+        NetworkCommand() {
+            super(MysticCore.this, "network", "Show the Redis network roster and this server's advertised address.");
+            requirePermission(org.hyzionstudios.mysticessentials.api.Permissions.NETWORK);
+        }
+
+        @Override
+        protected void run(MysticCommandSender sender) {
+            if (!networkPlayerService.isNetworked()) {
+                sender.replyKey("network-status-disabled");
+                return;
+            }
+            String network = String.valueOf(redisBridge.networkId());
+            String host = networkPlayerService.advertisedHost();
+            int port = networkPlayerService.advertisedPort();
+            if (host.isEmpty() || port <= 0) {
+                sender.replyKey("network-status-local-none", Map.of(
+                        "server", networkPlayerService.localServerId(), "network", network));
+            } else {
+                String source = "host " + (networkPlayerService.isAdvertisedHostConfigured() ? "configured" : "auto-detected")
+                        + ", port " + (networkPlayerService.isAdvertisedPortConfigured() ? "configured" : "auto-detected");
+                sender.replyKey("network-status-local", Map.of(
+                        "server", networkPlayerService.localServerId(), "network", network,
+                        "host", host, "port", Integer.toString(port), "source", source));
+                if (!networkPlayerService.hasProxy() && isPrivateAddressLiteral(host)) {
+                    sender.replyKey("network-status-private-hint", Map.of(
+                            "host", host, "server", networkPlayerService.localServerId()));
+                }
+            }
+            if (networkPlayerService.hasProxy()) {
+                sender.replyKey("network-status-proxy", Map.of(
+                        "host", config().storage.redis.proxyHost.trim(),
+                        "port", Integer.toString(config().storage.redis.proxyPort)));
+            }
+            var remotes = networkPlayerService.remoteServers();
+            if (remotes.isEmpty()) {
+                sender.replyKey("network-status-remote-none", Map.of("network", network));
+                return;
+            }
+            sender.replyKey("network-status-remote-header", Map.of("count", Integer.toString(remotes.size())));
+            long now = System.currentTimeMillis();
+            for (var remote : remotes) {
+                Map<String, String> params = Map.of(
+                        "server", remote.serverId(),
+                        "host", remote.host() == null ? "" : remote.host(),
+                        "port", Integer.toString(remote.port()),
+                        "players", Integer.toString(remote.playerCount()),
+                        "age", Long.toString(Math.max(0, (now - remote.seenAtMillis()) / 1000L)));
+                sender.replyKey(remote.hasEndpoint() ? "network-status-remote" : "network-status-remote-noendpoint",
+                        params);
+                if (!networkPlayerService.hasProxy() && remote.hasEndpoint()
+                        && isPrivateAddressLiteral(remote.host())) {
+                    sender.replyKey("network-status-private-hint", Map.of(
+                            "host", remote.host(), "server", remote.serverId()));
+                }
+            }
+        }
+
+        /**
+         * Whether {@code host} is a literal loopback/RFC 1918 IPv4 address. Only
+         * literals are examined — resolving a hostname here would block on DNS.
+         */
+        private static boolean isPrivateAddressLiteral(String host) {
+            if (host == null || !host.matches("\\d{1,3}(\\.\\d{1,3}){3}")) {
+                return false;
+            }
+            String[] parts = host.split("\\.");
+            int a = Integer.parseInt(parts[0]);
+            int b = Integer.parseInt(parts[1]);
+            return a == 10 || a == 127 || (a == 192 && b == 168) || (a == 172 && b >= 16 && b <= 31);
         }
     }
 
@@ -379,6 +478,11 @@ public final class MysticCore implements MysticEssentialsAPI {
         return redisBridge;
     }
 
+    /** Redis-backed player presence and safe server handoff. */
+    public NetworkPlayerService networkPlayers() {
+        return networkPlayerService;
+    }
+
     /** Vanish integration (MysticVanish); fails open when absent. */
     public org.hyzionstudios.mysticessentials.core.integration.VanishBridge vanish() {
         return vanishBridge;
@@ -387,6 +491,11 @@ public final class MysticCore implements MysticEssentialsAPI {
     /** Moderation integration (MysticModeration); fails open when absent. */
     public org.hyzionstudios.mysticessentials.core.integration.ModerationBridge moderation() {
         return moderationBridge;
+    }
+
+    /** Managed-account policy (MysticIdentity); fails open when absent. */
+    public org.hyzionstudios.mysticessentials.core.integration.ManagedAccountsBridge managedAccounts() {
+        return managedAccountsBridge;
     }
 
     /** Shared item inspection. Never null after {@link #enable()} has run. */
@@ -411,6 +520,22 @@ public final class MysticCore implements MysticEssentialsAPI {
         if (notificationService != null) {
             notificationService.updateConfig(loadNotificationConfig());
         }
+    }
+
+    /** Re-applies every optional bridge and the Redis transport after a config reload. */
+    private void reloadIntegrations() {
+        MainConfig config = config();
+        permissionService.init(config.integrations.luckPerms);
+        placeholderService.init(config.integrations.placeholderAPI);
+        economyService.init(config.integrations.vaultUnlocked);
+        vanishBridge.init(config.integrations.mysticVanish);
+        moderationBridge.init(config.integrations.mysticModeration);
+        managedAccountsBridge.init(config.integrations.mysticIdentity);
+        if (portalBridge != null) {
+            portalBridge.init(config.integrations.mysticIdentity);
+        }
+        redisBridge.reconfigure(config.storage.redis);
+        networkPlayerService.reload();
     }
 
     private org.hyzionstudios.mysticessentials.core.item.ItemViewConfig loadItemViewConfig() {

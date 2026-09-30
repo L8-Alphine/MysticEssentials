@@ -1,0 +1,368 @@
+// Mystic Essentials design system.
+//
+// Every page imports this file as `$M = "MysticTheme.ui";` and builds from the
+// tokens and components below, so the whole mod reads as one product rather
+// than eighty independently styled windows. Pages still take their window
+// chrome (title bar, close button, primary buttons, inputs) from the game's own
+// Common.ui, so a Mystic page sits next to a native one without a seam.
+//
+// Design rules this file encodes:
+//   * One type scale. Display for the selected item, Heading for row titles,
+//     Eyebrow for section labels, Body/Meta/Caption for everything else.
+//   * One spatial rhythm: 4 / 8 / 12 / 16 / 24.
+//   * Three surfaces: the window, a bordered Panel for the thing being looked
+//     at or edited, and a flat Well for lists and empty states.
+//   * Gold means "this one" (selected row, current channel, active tab), the
+//     same way the game uses it for the selected header tab. It is never used
+//     for decoration.
+//   * Rows are flat and quiet; hover and selection carry the emphasis.
+//
+// Every component parameter here has a default. A Common.ui component
+// instantiated without a required parameter breaks OTHER mods' documents on the
+// client (see LayoutPrimaryButton.ui), so nothing in this file may introduce a
+// parameter without one.
+$C = "../Common.ui";
+
+// ---------------------------------------------------------------- Palette --
+@Ink0 = #0a0f16;            // deepest: icon wells, list wells
+@Ink1 = #10171f;            // inset surfaces
+@Ink2 = #161f2a;            // raised cards
+@LineSoft = #ffffff(0.06);  // hairlines between rows / sections
+@LineStrong = #ffffff(0.12);
+
+@TextHi = #ffffff;
+@TextBody = #dee2ef;        // the game's value-text colour
+@TextMuted = #96a9be;       // the game's default label colour
+@TextDim = #778292;         // the game's section-title colour
+@TextFaint = #5a6a7a;
+
+@Gold = #E8A93B;            // the game's highlight gold
+@GoldSoft = #e8c97a;
+@Blue = #7a9cc6;            // the game's blue accent
+@BlueBright = #96b8e0;
+@Success = #6fd08c;
+@Warn = #ffca3a;
+@Danger = #d46a6a;
+
+// ------------------------------------------------------------- Type scale --
+@DisplayStyle = LabelStyle(
+  FontName: "Secondary",
+  FontSize: 24,
+  RenderBold: true,
+  RenderUppercase: true,
+  LetterSpacing: 1,
+  TextColor: @TextBody,
+  VerticalAlignment: Center,
+  ShrinkTextToFit: true,
+  MinShrinkTextToFitFontSize: 16
+);
+
+@DisplaySmallStyle = LabelStyle(...@DisplayStyle, FontSize: 19, MinShrinkTextToFitFontSize: 14);
+
+@HeadingStyle = LabelStyle(FontSize: 16, RenderBold: true, TextColor: @TextHi, VerticalAlignment: Center);
+@HeadingGoldStyle = LabelStyle(...@HeadingStyle, TextColor: @GoldSoft);
+@SubheadingStyle = LabelStyle(FontSize: 14, RenderBold: true, TextColor: @TextBody, VerticalAlignment: Center);
+
+@EyebrowStyle = LabelStyle(
+  FontSize: 11,
+  RenderBold: true,
+  RenderUppercase: true,
+  LetterSpacing: 1,
+  TextColor: @TextDim,
+  VerticalAlignment: Center
+);
+@EyebrowGoldStyle = LabelStyle(...@EyebrowStyle, TextColor: @Gold);
+@EyebrowBlueStyle = LabelStyle(...@EyebrowStyle, TextColor: @Blue);
+@EyebrowDangerStyle = LabelStyle(...@EyebrowStyle, TextColor: @Danger);
+
+// Right-aligned metadata in the title bar (counts, current target).
+@HeaderMetaStyle = LabelStyle(
+  FontSize: 12,
+  RenderUppercase: true,
+  LetterSpacing: 1,
+  TextColor: @TextDim,
+  HorizontalAlignment: End,
+  VerticalAlignment: Center
+);
+
+@BodyStyle = LabelStyle(FontSize: 14, TextColor: @TextBody, Wrap: true);
+@BodyMutedStyle = LabelStyle(FontSize: 14, TextColor: @TextMuted, Wrap: true);
+@MetaStyle = LabelStyle(FontSize: 12, TextColor: @TextMuted, VerticalAlignment: Center);
+@MetaGoldStyle = LabelStyle(...@MetaStyle, TextColor: @GoldSoft);
+@CaptionStyle = LabelStyle(FontSize: 11, TextColor: @TextFaint, VerticalAlignment: Center, Wrap: true);
+@CaptionWarnStyle = LabelStyle(...@CaptionStyle, TextColor: @Warn);
+
+// Key / value rows inside a Panel.
+@KeyStyle = LabelStyle(FontSize: 13, TextColor: @TextDim, VerticalAlignment: Center);
+@ValueStyle = LabelStyle(FontSize: 13, RenderBold: true, TextColor: @TextBody, VerticalAlignment: Center);
+@ValueWrapStyle = LabelStyle(...@ValueStyle, Wrap: true);
+@ValueEndStyle = LabelStyle(...@ValueStyle, HorizontalAlignment: End);
+
+// Muted, centred copy for an empty list.
+@EmptyStyle = LabelStyle(
+  FontSize: 13,
+  TextColor: @TextDim,
+  HorizontalAlignment: Center,
+  VerticalAlignment: Center,
+  Wrap: true
+);
+
+// Small runic tag text (status pills, counters).
+@PillStyle = LabelStyle(
+  FontName: "Secondary",
+  FontSize: 10,
+  RenderBold: true,
+  RenderUppercase: true,
+  LetterSpacing: 1,
+  TextColor: @TextHi,
+  HorizontalAlignment: Center,
+  VerticalAlignment: Center
+);
+
+// Row text. Name on top, meta below; both single-line.
+@RowNameStyle = LabelStyle(FontSize: 15, RenderBold: true, TextColor: @TextHi, VerticalAlignment: Center);
+@RowMetaStyle = LabelStyle(FontSize: 12, TextColor: @TextMuted, VerticalAlignment: Center);
+@RowSideStyle = LabelStyle(FontSize: 12, TextColor: @TextMuted, HorizontalAlignment: End, VerticalAlignment: Center);
+@RowSideGoldStyle = LabelStyle(...@RowSideStyle, TextColor: @GoldSoft);
+
+// --------------------------------------------------------------- Surfaces --
+// Bordered card: the game's header-tab frame, which matches the window chrome.
+@PanelBackground = PatchStyle(TexturePath: "../Common/HeaderTabBackground.png", Border: 7);
+// Gold-rimmed card: the game's selected-tab frame. Reserved for "this one".
+@PanelSelectedBackground = PatchStyle(TexturePath: "../Common/HeaderTabSelectedBackground.png", Border: 7);
+@WellBackground = #0a0f16(0.42);
+
+// Row button states. Flat like the game's own list rows; hover tints blue.
+@RowStyle = ButtonStyle(
+  Default: (Background: #0a0f16(0.38)),
+  Hovered: (Background: #7a9cc6(0.16)),
+  Pressed: (Background: #7a9cc6(0.26)),
+  Sounds: $C.@ButtonSounds
+);
+
+// Quiet in-row action (Edit / Select). Sits inside a row without shouting.
+@InlineButtonStyle = ButtonStyle(
+  Default: (Background: #7a9cc6(0.18)),
+  Hovered: (Background: #7a9cc6(0.32)),
+  Pressed: (Background: #7a9cc6(0.46)),
+  Sounds: $C.@ButtonSounds
+);
+
+// Tab strip button: flat, the active tab shows a gold rule underneath.
+@TabStyle = ButtonStyle(
+  Default: (Background: #0a0f16(0.30)),
+  Hovered: (Background: #7a9cc6(0.16)),
+  Pressed: (Background: #7a9cc6(0.26)),
+  Sounds: $C.@ButtonSounds
+);
+
+@TabLabelStyle = LabelStyle(
+  FontSize: 13,
+  RenderBold: true,
+  RenderUppercase: true,
+  LetterSpacing: 1,
+  TextColor: @TextBody,
+  HorizontalAlignment: Center,
+  VerticalAlignment: Center
+);
+
+// Text-button variants whose label the server writes at runtime.
+@TabTextButtonStyle = TextButtonStyle(
+  Default: (Background: #0a0f16(0.30), LabelStyle: @TabLabelStyle),
+  Hovered: (Background: #7a9cc6(0.16), LabelStyle: @TabLabelStyle),
+  Pressed: (Background: #7a9cc6(0.26), LabelStyle: @TabLabelStyle),
+  Sounds: $C.@ButtonSounds
+);
+
+@SettingLabelStyle = LabelStyle(FontSize: 14, RenderBold: true, TextColor: @TextBody, VerticalAlignment: Center);
+@SettingTextButtonStyle = TextButtonStyle(
+  Default: (Background: #0a0f16(0.38), LabelStyle: @SettingLabelStyle),
+  Hovered: (Background: #7a9cc6(0.16), LabelStyle: @SettingLabelStyle),
+  Pressed: (Background: #7a9cc6(0.26), LabelStyle: @SettingLabelStyle),
+  Sounds: $C.@ButtonSounds
+);
+
+// ------------------------------------------------------------- Components --
+
+// A bordered card for the thing being looked at or edited.
+@Panel = Group {
+  @Padding = 16;
+
+  Background: @PanelBackground;
+  LayoutMode: Top;
+  Padding: (Full: @Padding);
+};
+
+// Flat inset for lists and empty states. Put ONLY the list scroller inside so
+// appended rows keep their indices.
+@Well = Group {
+  Background: @WellBackground;
+  LayoutMode: Top;
+  Padding: (Full: 6);
+};
+
+// Section label with a rule running out to the right.
+@Section = Group {
+  @Text = "";
+  @Style = @EyebrowStyle;
+  @Anchor = ();
+
+  LayoutMode: Left;
+  Anchor: (...@Anchor, Height: 16);
+
+  Label {
+    Style: @Style;
+    Text: @Text;
+    Anchor: (Right: 10);
+  }
+
+  Group {
+    FlexWeight: 1;
+    Anchor: (Height: 1, Top: 8);
+    Background: @LineSoft;
+  }
+};
+
+// Plain eyebrow label above a field.
+@FieldLabel = Group {
+  @Text = "";
+
+  LayoutMode: Top;
+  Anchor: (Height: 16, Bottom: 6);
+
+  Label {
+    Style: @EyebrowStyle;
+    Text: @Text;
+  }
+};
+
+// Hairline between rows of a key/value block.
+@Hairline = Group {
+  @Anchor = ();
+
+  Anchor: (...@Anchor, Height: 1);
+  Background: @LineSoft;
+};
+
+// One key/value line. Place a @Key and a value Label (with its id) inside.
+@KvRow = Group {
+  @Anchor = ();
+
+  LayoutMode: Left;
+  Anchor: (...@Anchor, Height: 26);
+};
+
+@Key = Label {
+  @Text = "";
+  @Width = 110;
+
+  Anchor: (Width: @Width);
+  Style: @KeyStyle;
+  Text: @Text;
+};
+
+// Left spine + tinted background that marks the selected row. Hidden until the
+// server sets #Selected.Visible on the row. Sits FIRST inside an absolutely
+// positioned row so the body draws over it.
+@RowSelection = Group {
+  @Height = 56;
+
+  Anchor: (Full: 0);
+  Background: #E8A93B(0.10);
+  Visible: false;
+
+  Group {
+    Anchor: (Left: 0, Top: 0, Width: 3, Height: @Height);
+    Background: @Gold;
+  }
+};
+
+// Square well that holds a category swatch or an item icon.
+@IconWell = Group {
+  @Size = 36;
+  @Anchor = ();
+
+  Anchor: (...@Anchor, Width: @Size, Height: @Size);
+  Background: #0a0f16(0.55);
+  LayoutMode: CenterMiddle;
+};
+
+// Coloured pill for a short status word. Recolour the pill by setting
+// #<id>.Background at runtime, as the swatches do.
+@Pill = Group {
+  @Text = "";
+  @Color = #7a9cc6(0.85);
+  @Anchor = ();
+
+  Anchor: (...@Anchor, Height: 18);
+  Background: @Color;
+  Padding: (Horizontal: 8);
+  LayoutMode: CenterMiddle;
+
+  Label {
+    Style: @PillStyle;
+    Text: @Text;
+  }
+};
+
+// Vertical rule between master and detail columns.
+@ColumnDivider = Group {
+  Anchor: (Width: 1, Left: 14, Right: 14);
+  Background: @LineSoft;
+};
+
+// Standard footer action bar. Put buttons inside; use a @Spacer to push the
+// destructive action away from the primary one.
+@ActionBar = Group {
+  @Anchor = ();
+
+  LayoutMode: Left;
+  Anchor: (...@Anchor, Height: 40);
+};
+
+@Spacer = Group {
+  FlexWeight: 1;
+};
+
+// Sized gap for Top flows.
+@Gap = Group {
+  @Height = 8;
+
+  Anchor: (Height: @Height);
+};
+
+// Title-bar metadata label. Give it the id the server sets.
+@HeaderMeta = Label {
+  @Width = 220;
+
+  Anchor: (Top: 8, Right: 16, Width: @Width, Height: 24);
+  Style: @HeaderMetaStyle;
+};
+
+// Runic bullet from the game's portal pages, for empty states and tips.
+@Bullet = Group {
+  Anchor: (Width: 8, Height: 8, Right: 8);
+  Background: (TexturePath: "../Pages/Portals/IconBullet.png");
+};
+
+// Filter / view tab. The server writes the label (and its selected marker).
+@Tab = TextButton {
+  @Text = "";
+  @Anchor = ();
+
+  Anchor: (...@Anchor, Height: 32);
+  Padding: (Horizontal: 14);
+  Style: @TabTextButtonStyle;
+  Text: @Text;
+};
+
+// Full-width settings row whose label carries its own state ("Chat   ON").
+@SettingRow = TextButton {
+  @Text = "";
+  @Anchor = ();
+
+  Anchor: (...@Anchor, Height: 36);
+  Padding: (Horizontal: 14);
+  Style: @SettingTextButtonStyle;
+  Text: @Text;
+};

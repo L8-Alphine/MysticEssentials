@@ -1,9 +1,12 @@
+// Tutorial — one page of a guided walkthrough: heading, lead paragraph, the
+// page's content rows, then its navigation buttons.
 $C = "../Common.ui";
+$M = "MysticTheme.ui";
 
 $C.@PageOverlay {}
 
 $C.@Container {
-  Anchor: (Width: 560, Height: 620);
+  Anchor: (Width: 580, Height: 640);
 
   #Title {
     Group {
@@ -17,26 +20,29 @@ $C.@Container {
     LayoutMode: Top;
 
     Label #PageTitle {
-      Anchor: (Height: 30, Bottom: 4);
-      Style: (FontSize: 22, RenderBold: true, TextColor: #ffffff);
+      Anchor: (Height: 32, Bottom: 4);
+      Style: $M.@DisplayStyle;
     }
 
     Label #PageSubtitle {
       Anchor: (Height: 40, Bottom: 10);
-      Style: (FontSize: 14, TextColor: #9fb0c4, Wrap: true);
+      Style: $M.@BodyMutedStyle;
+    }
+
+    $M.@Hairline {
+      @Anchor = (Bottom: 12);
     }
 
     Group #ContentList {
       FlexWeight: 1;
       LayoutMode: TopScrolling;
-      Padding: (Right: 10);
+      Padding: (Right: 8);
       ScrollbarStyle: $C.@DefaultScrollbarStyle;
     }
 
     Group #ButtonList {
       LayoutMode: Top;
-      Anchor: (Top: 10);
-      Padding: (Right: 10);
+      Anchor: (Top: 12);
     }
   }
 }

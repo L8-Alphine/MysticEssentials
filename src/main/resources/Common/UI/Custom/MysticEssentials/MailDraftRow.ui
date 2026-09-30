@@ -1,33 +1,38 @@
-$C = "../Common.ui";
-
 // Chosen-attachment row in the Mail compose pane.
 // Appended per pending pick: cmd.append("#DraftList", "MysticEssentials/MailDraftRow.ui")
 // then cmd.set("#DraftList[i] #Name.TextSpans", ...) etc. #Remove drops the pick.
+$C = "../Common.ui";
+$M = "MysticTheme.ui";
 
 Group #Row {
-  Anchor: (Height: 34, Bottom: 4);
+  Anchor: (Height: 40, Bottom: 4);
   LayoutMode: Left;
-  Padding: (Left: 8, Right: 6);
-  Background: #000000(0.18);
+  Padding: (Left: 8, Right: 6, Top: 4, Bottom: 4);
+  Background: #0a0f16(0.38);
 
-  ItemSlot #Icon {
-    Anchor: (Width: 26, Height: 26, Right: 8);
-    ShowQualityBackground: true;
-    ShowQuantity: false;
+  $M.@IconWell {
+    @Size = 32;
+    @Anchor = (Right: 10);
+
+    ItemSlot #Icon {
+      Anchor: (Width: 28, Height: 28);
+      ShowQualityBackground: true;
+      ShowQuantity: false;
+    }
   }
 
   Label #Name {
     FlexWeight: 1;
-    Style: (FontSize: 12, TextColor: #d7e1ee, VerticalAlignment: Center);
+    Style: (...$M.@RowNameStyle, FontSize: 13);
   }
 
   Label #Qty {
-    Anchor: (Width: 50);
-    Style: (FontSize: 12, TextColor: #9fb0c4, HorizontalAlignment: End, VerticalAlignment: Center);
+    Anchor: (Width: 50, Right: 8);
+    Style: $M.@RowSideStyle;
   }
 
-  $C.@CancelTextButton #Remove {
+  $C.@SmallTertiaryTextButton #Remove {
     @Text = "X";
-    @Anchor = (Width: 34, Left: 8);
+    @Anchor = (Width: 36);
   }
 }

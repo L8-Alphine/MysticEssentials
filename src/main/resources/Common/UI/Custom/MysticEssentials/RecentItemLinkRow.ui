@@ -1,18 +1,18 @@
-$C = "../Common.ui";
-
 // One row in the Recently Shared Items list. Appended per entry:
 //   cmd.append("#RecentList", "MysticEssentials/RecentItemLinkRow.ui")
 // then set #Icon.ItemId, #Name.TextSpans, #Meta.TextSpans and bind #InspectButton.
+$C = "../Common.ui";
+$M = "MysticTheme.ui";
 
 Group #Row {
-  Anchor: (Height: 54, Bottom: 6);
+  Anchor: (Height: 56, Bottom: 4);
   LayoutMode: Left;
-  Padding: (Left: 10, Right: 10, Top: 6, Bottom: 6);
-  Background: #000000(0.18);
+  Padding: (Left: 12, Right: 12, Top: 10, Bottom: 10);
+  Background: #0a0f16(0.38);
 
-  // ItemSlotButton parent gives the native item tooltip on hover (from #Icon.ItemId).
+  // ItemSlotButton parent gives the native item tooltip on hover.
   ItemSlotButton #IconButton {
-    Anchor: (Width: 40, Height: 40, Right: 12);
+    Anchor: (Width: 36, Height: 36, Right: 12);
 
     ItemSlot #Icon {
       Anchor: (Full: 0);
@@ -27,17 +27,17 @@ Group #Row {
 
     Label #Name {
       Anchor: (Height: 20, Bottom: 2);
-      Style: (FontSize: 15, TextColor: #ffffff, RenderBold: true, VerticalAlignment: Center);
+      Style: $M.@RowNameStyle;
     }
 
     Label #Meta {
-      Anchor: (Height: 16);
-      Style: (FontSize: 12, TextColor: #9fb0c4, VerticalAlignment: Center);
+      Anchor: (Height: 14);
+      Style: $M.@RowMetaStyle;
     }
   }
 
-  $C.@SecondaryTextButton #InspectButton {
+  $C.@SmallSecondaryTextButton #InspectButton {
     @Text = "Inspect";
-    @Anchor = (Width: 140);
+    @Anchor = (Width: 110, Left: 8, Vertical: 2);
   }
 }

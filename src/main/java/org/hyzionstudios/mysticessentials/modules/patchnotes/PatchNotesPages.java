@@ -229,7 +229,10 @@ final class PatchNotesPages {
                 String row = "#SectionContent[" + index + "]";
                 cmd.append("#SectionContent", template);
                 if (line.type() != PatchMarkup.Type.BLANK) {
-                    cmd.set(row + " #Line.TextSpans", uiText(row + " #Line.TextSpans", line.text()));
+                    // The span colour wins over the template's label style, so the
+                    // added / removed tint has to travel with the text.
+                    cmd.set(row + " #Line.TextSpans", uiText(row + " #Line.TextSpans",
+                            lineTint(line.type()) + line.text()));
                 }
                 index++;
             }
@@ -240,6 +243,14 @@ final class PatchNotesPages {
                 return true;
             }
             return section.type != null && section.type.equalsIgnoreCase(filter);
+        }
+
+        private static String lineTint(PatchMarkup.Type type) {
+            return switch (type) {
+                case ADD -> "<#a9e3b7>";
+                case REMOVE -> "<#e3a3a3>";
+                default -> "";
+            };
         }
 
         private static String templateFor(PatchMarkup.Type type) {

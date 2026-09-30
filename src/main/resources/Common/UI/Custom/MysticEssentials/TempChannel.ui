@@ -1,24 +1,17 @@
+// Create Temporary Channel — a short form. Name is the only required field;
+// everything optional is labelled as such.
 $C = "../Common.ui";
+$M = "MysticTheme.ui";
 
 $C.@PageOverlay {}
 
 $C.@Container {
-  Anchor: (Width: 560, Height: 520);
+  Anchor: (Width: 560, Height: 560);
 
   #Title {
     Group {
       $C.@Title {
         @Text = "Create Temporary Channel";
-      }
-
-      Label #Subtitle {
-        Anchor: (Top: 48, Height: 24);
-        Style: (
-          FontSize: 14,
-          TextColor: #96a9be,
-          HorizontalAlignment: Center,
-          VerticalAlignment: Center
-        );
       }
     }
   }
@@ -26,65 +19,53 @@ $C.@Container {
   #Content {
     LayoutMode: Top;
 
-    Group {
-      Background: (TexturePath: "../Common/ContainerPanelPatch.png", Border: 4);
-      LayoutMode: Top;
-      Padding: (Full: 16);
-      Anchor: (Bottom: 12);
+    Label #Subtitle {
+      Anchor: (Height: 20, Bottom: 12);
+      Style: $M.@CaptionStyle;
+    }
 
-      Label {
-        Anchor: (Bottom: 6);
-        Style: (...$C.@DefaultLabelStyle, FontSize: 13, RenderBold: true);
-        Text: "Name";
-      }
+    $M.@Panel {
+      Anchor: (Bottom: 14);
+
+      $M.@FieldLabel { @Text = "Name"; }
       $C.@TextField #TempNameInput {
-        @Anchor = (Height: 40, Bottom: 12);
+        @Anchor = (Bottom: 14);
         PlaceholderText: "e.g. event";
       }
 
-      Label {
-        Anchor: (Bottom: 6);
-        Style: (...$C.@DefaultLabelStyle, FontSize: 13, RenderBold: true);
-        Text: "Password (optional)";
-      }
+      $M.@FieldLabel { @Text = "Password  ·  optional"; }
       $C.@TextField #TempPasswordInput {
-        @Anchor = (Height: 40, Bottom: 12);
-        PlaceholderText: "Leave blank for open channel";
+        @Anchor = (Bottom: 14);
+        PlaceholderText: "Leave blank for an open channel";
       }
 
-      Label {
-        Anchor: (Bottom: 6);
-        Style: (...$C.@DefaultLabelStyle, FontSize: 13, RenderBold: true);
-        Text: "Prefix (optional)";
-      }
+      $M.@FieldLabel { @Text = "Prefix  ·  optional"; }
       $C.@TextField #TempPrefixInput {
-        @Anchor = (Height: 40, Bottom: 12);
+        @Anchor = (Bottom: 14);
         PlaceholderText: "e.g. &b[EVENT]";
       }
 
-      Label {
-        Anchor: (Bottom: 6);
-        Style: (...$C.@DefaultLabelStyle, FontSize: 13, RenderBold: true);
-        Text: "Aliases (optional)";
-      }
+      $M.@FieldLabel { @Text = "Aliases  ·  optional"; }
       $C.@TextField #TempAliasesInput {
-        @Anchor = (Height: 40);
-        PlaceholderText: "comma,separated,aliases";
+        PlaceholderText: "comma, separated, aliases";
       }
     }
 
-    Group #TempButtons {
-      LayoutMode: Left;
-      Anchor: (Height: 44);
+    $M.@Spacer {}
 
-      $C.@TextButton #CreateTempButton {
-        @Text = "Create";
-        @Anchor = (Right: 8, Width: 160);
+    $M.@ActionBar #TempButtons {
+      @Anchor = (Height: 44);
+
+      $C.@TertiaryTextButton #CancelTempButton {
+        @Text = "Cancel";
+        @Anchor = (Width: 130);
       }
 
-      $C.@CancelTextButton #CancelTempButton {
-        @Text = "Cancel";
-        @Anchor = (Width: 160);
+      $M.@Spacer {}
+
+      $C.@TextButton #CreateTempButton {
+        @Text = "Create Channel";
+        @Anchor = (Width: 190);
       }
     }
   }

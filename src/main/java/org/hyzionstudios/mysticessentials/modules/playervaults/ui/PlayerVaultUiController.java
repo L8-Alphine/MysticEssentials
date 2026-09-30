@@ -34,7 +34,7 @@ import org.hyzionstudios.mysticessentials.modules.playervaults.model.VaultAdminL
 
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.entities.player.windows.ContainerWindow;
-import com.hypixel.hytale.server.core.inventory.Inventory;
+import com.hypixel.hytale.server.core.inventory.InventoryComponent;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 import com.hypixel.hytale.server.core.inventory.container.SimpleItemContainer;
@@ -446,15 +446,19 @@ public final class PlayerVaultUiController {
         return config.defaultIconItemId == null ? "" : config.defaultIconItemId;
     }
 
-    private static List<ItemContainer> depositSources(Inventory inventory) {
+    private static List<ItemContainer> depositSources(
+            com.hypixel.hytale.component.Store<com.hypixel.hytale.server.core.universe.world.storage.EntityStore> store,
+            com.hypixel.hytale.component.Ref<com.hypixel.hytale.server.core.universe.world.storage.EntityStore> entity) {
         List<ItemContainer> sources = new ArrayList<>();
-        if (inventory.getStorage() != null) {
-            sources.add(inventory.getStorage());
-        }
-        if (inventory.getBackpack() != null) {
-            sources.add(inventory.getBackpack());
-        }
+        addDepositSource(sources, store.getComponent(entity, InventoryComponent.Storage.getComponentType()));
+        addDepositSource(sources, store.getComponent(entity, InventoryComponent.Backpack.getComponentType()));
         return sources;
+    }
+
+    private static void addDepositSource(List<ItemContainer> sources, InventoryComponent component) {
+        if (component != null && component.getInventory() != null) {
+            sources.add(component.getInventory());
+        }
     }
 
     // ----- Saving & closing -----------------------------------------------------
@@ -820,12 +824,7 @@ public final class PlayerVaultUiController {
     private void consumeIconItem(PlayerRef viewer, String itemId) {
         core.platform().runOnEntityThread(viewer, (store, entity, world) -> {
             try {
-                Player playerEntity = store.getComponent(entity, Player.getComponentType());
-                Inventory inventory = playerEntity == null ? null : playerEntity.getInventory();
-                if (inventory == null) {
-                    return;
-                }
-                for (ItemContainer container : depositSources(inventory)) {
+                for (ItemContainer container : depositSources(store, entity)) {
                     for (short i = 0; i < container.getCapacity(); i++) {
                         ItemStack stack = container.getItemStack(i);
                         if (stack == null || stack.isEmpty() || !itemId.equals(stack.getItemId())) {

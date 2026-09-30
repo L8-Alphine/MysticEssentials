@@ -8,6 +8,7 @@ All permission nodes are prefixed with `mysticessentials.`. Dynamic nodes such a
 | --- | --- |
 | `mysticessentials.reload` | `/mystic reload` |
 | `mysticessentials.migrate` | `/mystic migrate scan`, `/mystic migrate import` |
+| `mysticessentials.network` | `/mystic network` — Redis roster and this server's advertised address |
 | `mysticessentials.license` | `/mystic license`, `/mystic license reload` |
 
 ## Teleportation

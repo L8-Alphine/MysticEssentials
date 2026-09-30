@@ -39,6 +39,7 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 final class RtpSearchEngine {
 
     private final MysticCore core;
+    private final MysticRpgRtpSafety mysticRpgSafety;
     private volatile RandomTeleportConfig config;
 
     private final List<RtpDestinationValidator> validators = new CopyOnWriteArrayList<>();
@@ -53,6 +54,7 @@ final class RtpSearchEngine {
 
     RtpSearchEngine(MysticCore core, RandomTeleportConfig config) {
         this.core = core;
+        this.mysticRpgSafety = new MysticRpgRtpSafety(core);
         this.config = config;
     }
 
@@ -206,8 +208,11 @@ final class RtpSearchEngine {
     private void dispatch(Search s) {
         RtpProfile p = s.profile;
         double[] candidate = s.seeded.poll();
+        while (candidate != null && !s.levelRange.contains(candidate[0], candidate[1])) {
+            candidate = s.seeded.poll();
+        }
         if (candidate == null) {
-            candidate = RtpShapeSampler.sample(p, s.rng);
+            candidate = s.levelRange.sample(s.rng);
         }
         if (candidate == null) {
             s.attempts.incrementAndGet();
@@ -229,7 +234,7 @@ final class RtpSearchEngine {
         try {
             if (err == null && opt != null && opt.isPresent()) {
                 MysticLocation loc = opt.get();
-                String reject = postCheck(s, loc);
+                String reject = rejectionReason(s.profile, loc, s.player);
                 if (reject == null) {
                     if (finish(s, RtpDestinationResult.found(loc, n, copy(s.tally)))) {
                         cachePush(s.profile.id, x, z);
@@ -237,6 +242,7 @@ final class RtpSearchEngine {
                     return;
                 }
                 bump(s, reject);
+                s.levelRange.rejected(reject, x, z);
                 fireRejected(s, x, z, reject);
             } else {
                 bump(s, "unsafe_terrain");
@@ -248,8 +254,7 @@ final class RtpSearchEngine {
     }
 
     /** Non-block filters layered on the platform's block-safety probe. @return null if accepted. */
-    private String postCheck(Search s, MysticLocation loc) {
-        RtpProfile p = s.profile;
+    String rejectionReason(RtpProfile p, MysticLocation loc, UUID player) {
         if (p.filters.minimumDistanceFromSpawn > 0) {
             double cx = p.center == null ? 0 : p.center.x;
             double cz = p.center == null ? 0 : p.center.z;
@@ -259,9 +264,13 @@ final class RtpSearchEngine {
                 return "too_close_to_spawn";
             }
         }
+        String rpgRejection = mysticRpgSafety.reject(player, loc, config.mysticRpgSafety);
+        if (rpgRejection != null) {
+            return rpgRejection;
+        }
         for (RtpExclusionProvider provider : exclusions) {
             try {
-                if (provider.isExcluded(loc.getWorld(), loc.getX(), loc.getZ(), p, s.player)) {
+                if (provider.isExcluded(loc.getWorld(), loc.getX(), loc.getZ(), p, player)) {
                     return "excluded:" + provider.name();
                 }
             } catch (Throwable t) {
@@ -413,9 +422,11 @@ final class RtpSearchEngine {
         final AtomicInteger attempts = new AtomicInteger();
         final AtomicBoolean awaiting = new AtomicBoolean(false);
         final Deque<double[]> seeded = new ConcurrentLinkedDeque<>();
+        final RtpLevelSearchRange levelRange;
 
         Search(RtpProfile profile, UUID player, int priority, long deadline, int maxAttempts) {
             this.profile = profile;
+            this.levelRange = new RtpLevelSearchRange(profile);
             this.player = player;
             this.priority = priority;
             this.deadline = deadline;

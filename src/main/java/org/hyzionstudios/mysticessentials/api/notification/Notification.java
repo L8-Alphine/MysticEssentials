@@ -36,6 +36,7 @@ public final class Notification {
     private final Boolean showAsActionBar;
     private final Boolean showAsToast;
     private final Boolean showAsBanner;
+    private final Boolean playSound;
     private final Boolean storeInHistory;
 
     private final Duration duration;
@@ -61,6 +62,7 @@ public final class Notification {
         this.showAsActionBar = builder.showAsActionBar;
         this.showAsToast = builder.showAsToast;
         this.showAsBanner = builder.showAsBanner;
+        this.playSound = builder.playSound;
         this.storeInHistory = builder.storeInHistory;
         this.duration = builder.duration;
         this.expiration = builder.expiration;
@@ -142,6 +144,11 @@ public final class Notification {
         return Optional.ofNullable(showAsBanner);
     }
 
+    /** Whether to play the notification sound selected by the sender or category. */
+    public Optional<Boolean> playSound() {
+        return Optional.ofNullable(playSound);
+    }
+
     public Optional<Boolean> storeInHistory() {
         return Optional.ofNullable(storeInHistory);
     }
@@ -209,7 +216,8 @@ public final class Notification {
                 .icon(icon).sound(sound)
                 .showInChat(showInChat).showAsTitle(showAsTitle)
                 .showAsActionBar(showAsActionBar).showAsToast(showAsToast)
-                .showAsBanner(showAsBanner).storeInHistory(storeInHistory)
+                .showAsBanner(showAsBanner).playSound(playSound)
+                .storeInHistory(storeInHistory)
                 .duration(duration).expiration(expiration)
                 .action(action).source(source).dismissible(dismissible)
                 .bypassPlayerPreferences(bypassPlayerPreferences)
@@ -230,6 +238,7 @@ public final class Notification {
         private Boolean showAsActionBar;
         private Boolean showAsToast;
         private Boolean showAsBanner;
+        private Boolean playSound;
         private Boolean storeInHistory;
         private Duration duration;
         private Duration expiration;
@@ -308,6 +317,12 @@ public final class Notification {
 
         public Builder showAsBanner(Boolean showAsBanner) {
             this.showAsBanner = showAsBanner;
+            return this;
+        }
+
+        /** Overrides whether the selected profile plays a sound for this send. */
+        public Builder playSound(Boolean playSound) {
+            this.playSound = playSound;
             return this;
         }
 

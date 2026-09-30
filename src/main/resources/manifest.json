@@ -1,21 +1,23 @@
 {
   "Group": "org.hyzionstudios",
   "Name": "MysticEssentials",
-  "Version": "1.0.2",
+  "Version": "1.0.4",
   "Main": "org.hyzionstudios.mysticessentials.MysticessentialsPlugin",
-  "ServerVersion": ">=0.5.0 <0.6.0",
+  "ServerVersion": ">=0.6.0 <0.7.0",
   "Description": "MysticEssentials is a modular essentials system for Hytale servers designed around one goal: Essentials done right.",
   "Authors": [
     {
       "Name": "Alphine"
     }
   ],
-  "Dependencies": {
-    "TheNewEconomy:VaultUnlocked": "*",
-    "LuckPerms:LuckPerms": "*"
-  },
+  "Dependencies": {},
   "OptionalDependencies": {
-    "HelpChat:PlaceholderAPI": ">=1.0.8"
+    "HelpChat:PlaceholderAPI": ">=1.0.8",
+    "LuckPerms:LuckPerms": "*",
+    "TheNewEconomy:VaultUnlocked": ">=2.20.0",
+    "org.hyzionstudios:MysticVanish": ">=1.0.0",
+    "org.hyzionstudios:mysticrpg": ">=1.0.0",
+    "org.hyzionstudios:mysticidentity": "*"
   },
   "IncludesAssetPack": true
 }

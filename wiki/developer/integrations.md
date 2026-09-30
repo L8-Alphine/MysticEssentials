@@ -10,7 +10,8 @@ Detection is controlled in the main config, `mods/MysticEssentials/config.json`:
   "placeholderAPI": true,
   "vaultUnlocked": true,
   "mysticVanish": true,
-  "mysticModeration": true
+  "mysticModeration": true,
+  "mysticIdentity": true
 }
 ```
 
@@ -58,3 +59,17 @@ Database and cache integrations (MySQL/MariaDB and Redis) are covered separately
 - [Configuration Reference](configuration)
 - [Storage](storage)
 - [Developer API](developer-api)
+
+## MysticIdentity
+
+Managed (parentally supervised) accounts. With MysticIdentity installed, chat asks its policy at
+the moment of delivery and never caches the answer:
+
+- `/msg` and `/reply` are refused between a pair the child's policy keeps apart
+  (`pm-blocked`); a relayed private message is judged again on the server the child is on.
+- A cross-server channel line is delivered per listener — a child whose public chat is closed
+  hears only their guardians and trusted staff, and only those hear them.
+- A bridged Discord line skips a child whose cross-platform chat is off.
+
+Guardians and staff holding MysticIdentity's trusted-contact node are exempt inside its own
+answer, so nothing here special-cases them. Without MysticIdentity nobody is restricted.

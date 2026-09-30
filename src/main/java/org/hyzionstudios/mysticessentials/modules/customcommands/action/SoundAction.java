@@ -11,8 +11,8 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.SoundUtil;
 
 /**
- * Plays a 2D sound event to the sender (or everyone online), using the
- * verified 0.5.6 path — {@code SoundEvent.getAssetMap().getIndex(name)} plus
+ * Plays a 2D sound event to the sender (or everyone online), using the path
+ * verified against 0.6.2 — {@code SoundEvent.getAssetMap().getIndex(name)} plus
  * {@code SoundUtil.playSoundEvent2dToPlayer} — the same resolution the vanilla
  * {@code /sound play2d} command performs.
  *

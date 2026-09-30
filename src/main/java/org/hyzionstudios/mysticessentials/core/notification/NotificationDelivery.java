@@ -24,15 +24,16 @@ import com.hypixel.hytale.server.core.util.EventTitleUtil;
  * critical alert is that it arrives, so one broken channel must never suppress
  * the other five.</p>
  *
- * <p>Surface mapping on 0.5.6, all verified against the server jar:</p>
+ * <p>Surface mapping, all verified against the 0.6.2 server jar:</p>
  * <ul>
  *   <li><b>chat</b> — {@code PlayerRef.sendMessage}</li>
  *   <li><b>title / subtitle</b> — {@code EventTitleUtil.showEventTitleToPlayer}
  *       (the {@code ShowEventTitle} packet behind the engine's own event titles)</li>
  *   <li><b>toast</b> — {@code NotificationUtil.sendNotification}</li>
  *   <li><b>sound</b> — {@code SoundUtil.playSoundEvent2dToPlayer}</li>
- *   <li><b>action bar / banner</b> — custom HUD documents, since 0.5.6 has
- *       neither natively</li>
+ *   <li><b>action bar / banner</b> — custom HUD documents; see
+ *       {@link NotificationHuds} for why Update 6's native boss bar does not
+ *       serve this purpose</li>
  * </ul>
  */
 final class NotificationDelivery {
@@ -75,9 +76,7 @@ final class NotificationDelivery {
         if (enabled(profile.toast, notification.showAsToast(), preferences.toasts, critical)) {
             toast(player, notification);
         }
-        // Sound has no per-notification override on the model — a sender picks
-        // *which* sound, the profile decides *whether* there is one at all.
-        if (enabled(profile.sound, java.util.Optional.empty(), preferences.sounds, critical)) {
+        if (enabled(profile.sound, notification.playSound(), preferences.sounds, critical)) {
             sound(player, notification, category);
         }
         if (enabled(profile.banner, notification.showAsBanner(), preferences.banners, critical)) {

@@ -28,6 +28,7 @@ import org.hyzionstudios.mysticessentials.modules.tutorial.scene.TutorialSceneRe
 import org.hyzionstudios.mysticessentials.modules.tutorial.util.TutorialPlaceholders;
 import org.hyzionstudios.mysticessentials.platform.Conversions;
 
+import com.hypixel.hytale.protocol.FlyMode;
 import com.hypixel.hytale.protocol.packets.interface_.HudComponent;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.entities.player.CameraManager;
@@ -492,7 +493,7 @@ public final class TutorialSessionManager {
                     snapshot.climbSpeedLateral = settings.climbSpeedLateral;
                     snapshot.horizontalFlySpeed = settings.horizontalFlySpeed;
                     snapshot.verticalFlySpeed = settings.verticalFlySpeed;
-                    snapshot.canFly = settings.canFly;
+                    snapshot.flyMode = settings.fly;
                     snapshot.movementCaptured = true;
 
                     settings.baseSpeed = 0f;
@@ -503,7 +504,7 @@ public final class TutorialSessionManager {
                     settings.climbSpeedLateral = 0f;
                     settings.horizontalFlySpeed = 0f;
                     settings.verticalFlySpeed = 0f;
-                    settings.canFly = false;
+                    settings.fly = FlyMode.Disabled;
                     movement.update(session.player.getPacketHandler());
                 }
             }
@@ -530,13 +531,15 @@ public final class TutorialSessionManager {
                 }
             }
 
-            // disableInteraction / hideOtherPlayers: no per-player interaction
-            // block or entity-visibility API exists in the verified 0.5.6
-            // surface. The frozen movement + camera scene covers the practical
-            // cases. TODO: wire real APIs when a later server version adds them.
+            // disableInteraction: no per-player interaction block exists
+            // through 0.6.2. hideOtherPlayers could now be built on Update 6's
+            // per-viewer HiddenPlayersManager, but that hides players globally
+            // for the viewer rather than for the duration of a step, so it is
+            // left unwired until the tutorial needs to own restore.
+            // The frozen movement + camera scene covers the practical cases.
             if (state.disableInteraction() || state.hideOtherPlayers()) {
                 module.logger().debug("disableInteraction/hideOtherPlayers requested for '"
-                        + session.definition.id + "' — not supported by Hytale 0.5.6, skipped.");
+                        + session.definition.id + "' — not supported, skipped.");
             }
         });
     }
@@ -565,7 +568,7 @@ public final class TutorialSessionManager {
                     settings.climbSpeedLateral = snapshot.climbSpeedLateral;
                     settings.horizontalFlySpeed = snapshot.horizontalFlySpeed;
                     settings.verticalFlySpeed = snapshot.verticalFlySpeed;
-                    settings.canFly = snapshot.canFly;
+                    settings.fly = snapshot.flyMode;
                     movement.update(session.player.getPacketHandler());
                 }
             }

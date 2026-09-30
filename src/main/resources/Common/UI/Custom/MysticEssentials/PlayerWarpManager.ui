@@ -1,9 +1,12 @@
+// My Player Warps — the owner's manager. Master list of their warps; the detail
+// panel edits the selected one. Delete is isolated at the end of the action bar.
 $C = "../Common.ui";
+$M = "MysticTheme.ui";
 
 $C.@PageOverlay {}
 
 $C.@Container {
-  Anchor: (Width: 900, Height: 640);
+  Anchor: (Width: 940, Height: 660);
 
   #Title {
     Group {
@@ -11,9 +14,8 @@ $C.@Container {
         @Text = "My Player Warps";
       }
 
-      Label #ManagerLimit {
-        Anchor: (Top: 8, Right: 14, Width: 120, Height: 24);
-        Style: (FontSize: 14, TextColor: #96a9be, HorizontalAlignment: End, VerticalAlignment: Center);
+      $M.@HeaderMeta #ManagerLimit {
+        @Width = 180;
       }
     }
   }
@@ -21,121 +23,145 @@ $C.@Container {
   #Content {
     LayoutMode: Left;
 
+    // ---- Master: own warps --------------------------------------------------
     Group {
       Anchor: (Width: 300);
       LayoutMode: Top;
 
-      Label #OwnEmpty {
-        Anchor: (Height: 40);
-        Style: (FontSize: 14, TextColor: #9fb0c4, VerticalAlignment: Center, Wrap: true);
-        Text: "You have no player warps. Use /pwarp create <name>.";
-        Visible: false;
+      $M.@Section {
+        @Text = "Your Warps";
+        @Anchor = (Bottom: 10);
       }
 
-      Group #OwnList {
+      $M.@Well {
         FlexWeight: 1;
-        LayoutMode: TopScrolling;
-        Padding: (Right: 10);
-        ScrollbarStyle: $C.@DefaultScrollbarStyle;
+
+        Label #OwnEmpty {
+          Anchor: (Height: 72);
+          Style: $M.@EmptyStyle;
+          Text: "You have no player warps. Use /pwarp create <name> where you stand.";
+          Visible: false;
+        }
+
+        Group #OwnList {
+          FlexWeight: 1;
+          LayoutMode: TopScrolling;
+          Padding: (Right: 6);
+          ScrollbarStyle: $C.@DefaultScrollbarStyle;
+        }
       }
     }
 
+    $M.@ColumnDivider {}
+
+    // ---- Detail: edit selected ----------------------------------------------
     Group {
       FlexWeight: 1;
       LayoutMode: TopScrolling;
-      Padding: (Left: 12);
+      Padding: (Right: 4);
       ScrollbarStyle: $C.@DefaultScrollbarStyle;
 
-      Group {
-        Background: (TexturePath: "../Common/ContainerPanelPatch.png", Border: 4);
-        LayoutMode: Top;
-        Padding: (Full: 16);
+      $M.@Panel {
         Anchor: (Bottom: 12);
 
-        Label #SelectedName {
-          Anchor: (Bottom: 10);
-          Style: (FontSize: 20, RenderBold: true, TextColor: #ffffff);
+        $M.@Section {
+          @Text = "Selected Warp";
+          @Style = $M.@EyebrowGoldStyle;
+          @Anchor = (Bottom: 8);
         }
 
-        Label {
-          Anchor: (Bottom: 6);
-          Style: (...$C.@DefaultLabelStyle, FontSize: 13, RenderBold: true);
-          Text: "Description";
+        Label #SelectedName {
+          Anchor: (Height: 32, Bottom: 10);
+          Style: $M.@DisplayStyle;
+        }
+
+        $M.@Hairline {
+          @Anchor = (Bottom: 12);
+        }
+
+        $M.@FieldLabel {
+          @Text = "Description";
         }
 
         $C.@TextField #EditDescription {
-          @Anchor = (Height: 38, Bottom: 10);
-          PlaceholderText: "Describe your warp";
+          @Anchor = (Bottom: 12);
+          PlaceholderText: "What will visitors find here?";
+        }
+
+        $M.@FieldLabel {
+          @Text = "Visit Cost";
         }
 
         Group {
           LayoutMode: Left;
-          Anchor: (Height: 38, Bottom: 10);
+          Anchor: (Height: 44, Bottom: 12);
 
           $C.@TextField #EditCost {
-            @Anchor = (Width: 140, Right: 8);
-            PlaceholderText: "Cost";
+            @Anchor = (Vertical: 3, Width: 140, Right: 8);
+            PlaceholderText: "0";
           }
+
+          $M.@Spacer {}
 
           $C.@SecondaryTextButton #SaveDetailsButton {
             @Text = "Save Details";
-            @Anchor = (Width: 170);
+            @Anchor = (Width: 160);
           }
+        }
+
+        $M.@FieldLabel {
+          @Text = "Rename";
         }
 
         Group {
           LayoutMode: Left;
-          Anchor: (Height: 38, Bottom: 4);
+          Anchor: (Height: 44);
 
           $C.@TextField #RenameInput {
-            @Anchor = (Right: 8);
+            @Anchor = (Vertical: 3, Right: 8);
             FlexWeight: 1;
             PlaceholderText: "New name";
           }
 
           $C.@SecondaryTextButton #RenameButton {
             @Text = "Rename";
-            @Anchor = (Width: 140);
+            @Anchor = (Width: 130);
           }
         }
       }
 
-      Group {
-        LayoutMode: Left;
-        Anchor: (Height: 44, Bottom: 8);
+      $M.@ActionBar {
+        @Anchor = (Height: 44, Bottom: 18);
 
         $C.@TextButton #TeleportButton {
           @Text = "Teleport";
-          @Anchor = (Width: 170, Right: 8);
+          @Anchor = (Width: 160, Right: 8);
         }
 
         $C.@SecondaryTextButton #MoveHereButton {
           @Text = "Move Here";
-          @Anchor = (Width: 170);
+          @Anchor = (Width: 150);
         }
-      }
 
-      Group {
-        LayoutMode: Left;
-        Anchor: (Height: 44, Bottom: 14);
+        $M.@Spacer {}
 
         $C.@CancelTextButton #DeleteButton {
-          @Text = "Delete Warp";
-          @Anchor = (Width: 200);
+          @Text = "Delete";
+          @Anchor = (Width: 120);
         }
       }
 
-      $C.@PanelSeparatorFancy {
-        @Anchor = (Bottom: 10);
+      $M.@Section {
+        @Text = "Everyone's Warps";
+        @Anchor = (Bottom: 8);
       }
 
-      Group {
-        LayoutMode: Left;
-        Anchor: (Height: 44);
+      $M.@ActionBar {
+        @Anchor = (Height: 44);
 
         $C.@TertiaryTextButton #BrowseAllButton {
           @Text = "Browse All Player Warps";
-          @Anchor = (Width: 280);
+          @Anchor = (Width: 260);
         }
       }
     }

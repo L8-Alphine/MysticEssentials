@@ -62,6 +62,14 @@ public final class NickModule extends AbstractMysticModule {
                 .orElse(null);
     }
 
+    /**
+     * A stored nickname as plain text — colours and nickname formatting removed — for readers
+     * away from the game, such as the MysticIdentity web portal. Null in, null out.
+     */
+    public String plainNickname(String raw) {
+        return raw == null || raw.isBlank() ? null : stripNickFormat(stripColors(raw));
+    }
+
     String editableNickname(UUID player) {
         return stripNickFormat(stripColors(nickname(player)));
     }

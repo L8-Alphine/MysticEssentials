@@ -6,6 +6,8 @@ import java.util.UUID;
 
 import org.hyzionstudios.mysticessentials.api.model.MysticLocation;
 
+import com.hypixel.hytale.protocol.FlyMode;
+
 /**
  * Snapshot of exactly the player state the tutorial module mutates, captured
  * on the player's world thread before any tutorial flag is applied and used to
@@ -33,7 +35,7 @@ public final class PlayerStateSnapshot {
     public float climbSpeedLateral;
     public float horizontalFlySpeed;
     public float verticalFlySpeed;
-    public boolean canFly;
+    public FlyMode flyMode;
 
     /** Whether the entity already had the Invulnerable component before the tutorial. */
     public boolean invulnerableApplied;

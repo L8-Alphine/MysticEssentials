@@ -26,14 +26,20 @@ Important sections:
 | `storage.redis.enabled` | `false` | Enables Redis cache/pub-sub |
 | `storage.redis.host` | `"localhost"` | Redis host |
 | `storage.redis.port` | `6379` | Redis port |
+| `storage.redis.username` | `""` | Redis ACL user (Redis 6+); blank for the `default` user |
 | `storage.redis.password` | `""` | Redis password; blank for none |
 | `storage.redis.serverId` | `"survival-1"` | Unique id for this server |
 | `storage.redis.networkId` | `"mystic-network"` | Shared id for all servers in the network |
+| `storage.redis.advertisedHost` | `""` | Hostname/IP clients use when another server refers them here (cross-server TPA); blank = auto-detected |
+| `storage.redis.advertisedPort` | `0` | Public game port paired with `advertisedHost`; `0` = the bound game port |
+| `storage.redis.presenceTtlSeconds` | `30` | How long a server's network roster entry survives without a heartbeat |
+| `storage.redis.proxyHost` / `proxyPort` | `""` / `0` | Public address of a network proxy (MysticGate); when set, players are referred there and backends may stay private |
 | `integrations.luckPerms` | `true` | Auto-detect LuckPerms |
 | `integrations.placeholderAPI` | `true` | Auto-detect PlaceholderAPI |
 | `integrations.vaultUnlocked` | `true` | Auto-detect VaultUnlocked |
 | `integrations.mysticVanish` | `true` | Auto-detect MysticVanish |
 | `integrations.mysticModeration` | `true` | Auto-detect MysticModeration |
+| `integrations.mysticIdentity` | `true` | Auto-detect MysticIdentity (managed-account chat rules) |
 | `updateNotifier.enabled` | `true` | Check CurseForge for newer builds |
 | `updateNotifier.notifyOnJoin` | `true` | Message authorized players on join |
 | `updateNotifier.checkIntervalHours` | `12` | Hours between update checks |

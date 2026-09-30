@@ -95,6 +95,16 @@ public final class PlayerVaultServiceImpl implements PlayerVaultService {
         return permissionService.allowedRows(player);
     }
 
+    /**
+     * The vault numbers this player has stored, ascending. A pure read — nothing is created or
+     * locked — for readers away from the game, such as the MysticIdentity web portal.
+     */
+    public CompletableFuture<List<Integer>> vaultNumbers(UUID ownerUuid) {
+        return storage.loadProfile(ownerUuid).thenApply(profileOpt -> profileOpt
+                .map(profile -> profile.vaultNumbers.stream().sorted().toList())
+                .orElse(List.of()));
+    }
+
     @Override
     public CompletableFuture<List<VaultMetadata>> getVaultMetadata(UUID ownerUuid) {
         return storage.loadProfile(ownerUuid).thenCompose(profileOpt -> {

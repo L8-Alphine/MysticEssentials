@@ -27,7 +27,7 @@ $C.@Container #MysticLayoutShell {
 
   #Content {
     LayoutMode: Top;
-    Padding: (Full: 12);
+    Padding: (Full: 16);
 
     Group #MysticLayoutRoot {
       FlexWeight: 1;

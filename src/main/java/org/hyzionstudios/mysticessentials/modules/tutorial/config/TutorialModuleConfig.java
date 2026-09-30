@@ -38,9 +38,10 @@ public final class TutorialModuleConfig {
     public static final class SceneProvider {
         /**
          * {@code camera} (server drives the player camera along the scene's
-         * keyframes — the only mode that plays scenes on 0.5.6), {@code machinima}
-         * (sends the machinima packet; the 0.5.6 client has no receiver, so this
-         * is a no-op — kept for a future client), {@code debug}, or {@code noop}.
+         * keyframes — still the only mode that plays scenes on 0.6.2),
+         * {@code machinima} (sends the machinima packet; no client receiver
+         * through 0.6.2, so this is a no-op — kept for a future client),
+         * {@code debug}, or {@code noop}.
          */
         public String type = "camera";
         public boolean fallbackToNoOp = true;

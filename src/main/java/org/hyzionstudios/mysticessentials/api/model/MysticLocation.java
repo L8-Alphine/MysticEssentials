@@ -12,6 +12,8 @@ import java.util.Objects;
 public final class MysticLocation {
 
     private String world;
+    /** Owning network server; null for legacy/server-local locations. */
+    private String serverId;
     private double x;
     private double y;
     private double z;
@@ -23,6 +25,11 @@ public final class MysticLocation {
     }
 
     public MysticLocation(String world, double x, double y, double z, float yaw, float pitch) {
+        this(null, world, x, y, z, yaw, pitch);
+    }
+
+    public MysticLocation(String serverId, String world, double x, double y, double z, float yaw, float pitch) {
+        this.serverId = serverId;
         this.world = world;
         this.x = x;
         this.y = y;
@@ -33,6 +40,10 @@ public final class MysticLocation {
 
     public String getWorld() {
         return world;
+    }
+
+    public String getServerId() {
+        return serverId;
     }
 
     public double getX() {
@@ -57,6 +68,10 @@ public final class MysticLocation {
 
     public void setWorld(String world) {
         this.world = world;
+    }
+
+    public void setServerId(String serverId) {
+        this.serverId = serverId;
     }
 
     public void setX(double x) {
@@ -92,16 +107,18 @@ public final class MysticLocation {
                 && Double.compare(z, other.z) == 0
                 && Float.compare(yaw, other.yaw) == 0
                 && Float.compare(pitch, other.pitch) == 0
+                && Objects.equals(serverId, other.serverId)
                 && Objects.equals(world, other.world);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(world, x, y, z, yaw, pitch);
+        return Objects.hash(serverId, world, x, y, z, yaw, pitch);
     }
 
     @Override
     public String toString() {
-        return "MysticLocation{" + world + " " + x + "," + y + "," + z + " (" + yaw + "," + pitch + ")}";
+        return "MysticLocation{" + (serverId == null ? "" : serverId + ":") + world + " "
+                + x + "," + y + "," + z + " (" + yaw + "," + pitch + ")}";
     }
 }

@@ -89,9 +89,13 @@ public final class ItemSnapshotService {
      *
      * @return the stored snapshot, or empty when the hand is empty or capture failed
      */
-    // getItemInHand() is deprecated-for-removal in 0.5.6 but is the correct
-    // held-item accessor (it honours the tools section over the hotbar) and works
-    // at runtime, like other deprecated-for-removal 0.5.6 APIs this mod relies on.
+    // getItemInHand() honours the tools section over the hotbar, which is what
+    // "held item" means to the player. Update 6 deprecated it for removal along
+    // with every other convenience accessor on Inventory (getActiveHotbarItem,
+    // getToolsItem, usingToolsItem, getActiveToolItem — the whole family), so
+    // there is no non-deprecated way to ask this question yet; the replacement
+    // direction is the Ref-based ItemContainer API. It works at runtime, so the
+    // call stands until that API can express "item in hand".
     @SuppressWarnings("removal")
     public Optional<ItemSnapshot> captureHeld(PlayerRef sender, String channelName) {
         CompletableFuture<ItemSnapshot> future = new CompletableFuture<>();

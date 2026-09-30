@@ -118,6 +118,20 @@ public abstract class AbstractMysticModule implements MysticModule {
         }
     }
 
+    /**
+     * Registers a listener for a <em>keyed</em> engine event (for example
+     * {@code PlayerReadyEvent}) across every key, tracked so it is dropped on
+     * disable. Plain {@link #registerEvent} never sees keyed events.
+     */
+    protected <K, E extends IBaseEvent<K>> void registerGlobalEvent(Class<? super E> eventType,
+            Consumer<E> listener) {
+        Registration registration = core.platform().onGlobalEvent(
+                com.hypixel.hytale.event.EventPriority.NORMAL, eventType, listener);
+        if (registration != null) {
+            eventRegistrations.add(registration);
+        }
+    }
+
     /** Registers an async event listener for this module, tracked so it can be dropped on disable. */
     protected <K, E extends IAsyncEvent<K>> void registerAsyncEvent(Class<? super E> eventType,
             Function<CompletableFuture<E>, CompletableFuture<E>> handler) {

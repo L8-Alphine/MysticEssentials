@@ -9,7 +9,7 @@ Mail lets players send messages — and optionally items — to each other, even
 | `/mail` | Open the Mail UI | `mysticessentials.mail.use` |
 | `/mail inbox` | List your inbox in chat | `mysticessentials.mail.use` |
 | `/mail read <id>` | Read a mail item | `mysticessentials.mail.use` |
-| `/mail send <player> <message>` | Send mail | `mysticessentials.mail.send`; offline targets need `mysticessentials.mail.send.offline` |
+| `/mail send <player> <message>` | Send mail (players online anywhere on a Redis network count as online) | `mysticessentials.mail.send`; offline targets need `mysticessentials.mail.send.offline` |
 | `/mail sendall <message>` | Send mail to all known players | `mysticessentials.mail.send.all` |
 | `/mail delete <id>` | Delete a mail item | `mysticessentials.mail.use` |
 | `/mail clear` | Clear your inbox | `mysticessentials.mail.use` |
