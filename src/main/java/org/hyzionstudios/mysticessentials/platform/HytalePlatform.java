@@ -35,6 +35,7 @@ import com.hypixel.hytale.math.util.ChunkUtil;
 import com.hypixel.hytale.event.IBaseEvent;
 import com.hypixel.hytale.math.vector.Rotation3f;
 import com.hypixel.hytale.math.vector.Transform;
+import com.hypixel.hytale.protocol.GameMode;
 import com.hypixel.hytale.protocol.ToClientPacket;
 import com.hypixel.hytale.protocol.io.ServerListener;
 import com.hypixel.hytale.protocol.packets.connection.PongType;
@@ -884,24 +885,29 @@ public final class HytalePlatform {
      * both the "invulnerability" and "prevent fall damage" arrival settings.
      *
      * <p>The grant runs on the entity thread; removal is scheduled off-thread and
-     * re-dispatched onto the entity thread. If the player logs out before removal
-     * the component is dropped with their entity, so no cleanup leak occurs.</p>
+     * re-dispatched onto the entity thread. Creative players and
+     * {@code /entity invulnerable} already carry the marker: it is only removed
+     * again when this grant added it, and never from a player now in Creative.</p>
      */
     public void applyArrivalProtection(PlayerRef player, int seconds) {
         if (seconds <= 0) {
             return;
         }
-        boolean dispatched = runOnEntityThread(player, (store, entity, world) ->
-                store.ensureComponent(entity,
-                        Invulnerable.getComponentType()));
-        if (!dispatched) {
-            return;
-        }
         UUID uuid = player.getUuid();
-        core.scheduler().runLater(() -> findPlayer(uuid).ifPresent(live ->
-                runOnEntityThread(live, (store, entity, world) -> store.tryRemoveComponent(entity,
-                        Invulnerable.getComponentType()))),
-                seconds, TimeUnit.SECONDS);
+        runOnEntityThread(player, (store, entity, world) -> {
+            if (store.getComponent(entity, Invulnerable.getComponentType()) != null) {
+                return;
+            }
+            store.ensureComponent(entity, Invulnerable.getComponentType());
+            core.scheduler().runLater(() -> findPlayer(uuid).ifPresent(live ->
+                    runOnEntityThread(live, (liveStore, liveEntity, liveWorld) -> {
+                        Player playerEntity = liveStore.getComponent(liveEntity, Player.getComponentType());
+                        if (playerEntity == null || playerEntity.getGameMode() != GameMode.Creative) {
+                            liveStore.tryRemoveComponent(liveEntity, Invulnerable.getComponentType());
+                        }
+                    })),
+                    seconds, TimeUnit.SECONDS);
+        });
     }
 
     /**
