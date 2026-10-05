@@ -670,6 +670,7 @@ public final class PlayerVaultUiController {
             VaultMetadata metadata = vault.metadata == null ? new VaultMetadata() : vault.metadata;
             vault.metadata = metadata;
             boolean changed = false;
+            String iconCost = null;
 
             if (edit.name() != null && permissions.canEditName(viewer)) {
                 String sanitized = sanitizeName(edit.name());
@@ -705,11 +706,12 @@ public final class PlayerVaultUiController {
                         PlayerVaultEditMetadataEvent.Field.ICON,
                         metadata.icon == null ? null : metadata.icon.itemId, iconId);
                 if (applied != null) {
+                    String previousIcon = metadata.icon == null ? null : metadata.icon.itemId;
                     metadata.icon = applied.isBlank() ? null
                             : new VaultMetadata.Icon(applied, applied, null);
                     changed = true;
-                    if (!applied.isBlank() && config.consumeIconItem) {
-                        consumeIconItem(viewer, applied);
+                    if (!applied.isBlank() && config.consumeIconItem && !applied.equals(previousIcon)) {
+                        iconCost = applied; // a new icon is paid for before it is saved
                     }
                 }
             }
@@ -728,7 +730,20 @@ public final class PlayerVaultUiController {
                 runQuietly(onDone);
                 return;
             }
-            saveMetadata(viewer, vault, vaultNumber, admin, onDone);
+            if (iconCost == null) {
+                saveMetadata(viewer, vault, vaultNumber, admin, onDone);
+                return;
+            }
+            String cost = iconCost;
+            takeIconItem(viewer, cost).thenAccept(taken -> {
+                if (!taken) {
+                    core.getMessageService().sendKey(viewer, "vault-icon-invalid");
+                    runQuietly(onDone);
+                    return;
+                }
+                core.getMessageService().sendKey(viewer, "vault-icon-consumed", Map.of("item", cost));
+                saveMetadata(viewer, vault, vaultNumber, admin, onDone);
+            });
         });
     }
 
@@ -830,9 +845,14 @@ public final class PlayerVaultUiController {
         return value; // preset name; the card renderer falls back if unknown
     }
 
-    /** Best-effort consume of one icon item from the viewer's inventory (world thread). */
-    private void consumeIconItem(PlayerRef viewer, String itemId) {
-        core.platform().runOnEntityThread(viewer, (store, entity, world) -> {
+    /**
+     * Takes one icon item from the viewer's inventory (world thread), leaving the
+     * rest of that stack (metadata, durability) intact. Completes {@code true} once
+     * an item was taken, {@code false} when the viewer has none.
+     */
+    private CompletableFuture<Boolean> takeIconItem(PlayerRef viewer, String itemId) {
+        CompletableFuture<Boolean> taken = new CompletableFuture<>();
+        boolean dispatched = core.platform().runOnEntityThread(viewer, (store, entity, world) -> {
             try {
                 for (ItemContainer container : depositSources(store, entity)) {
                     for (short i = 0; i < container.getCapacity(); i++) {
@@ -840,21 +860,22 @@ public final class PlayerVaultUiController {
                         if (stack == null || stack.isEmpty() || !itemId.equals(stack.getItemId())) {
                             continue;
                         }
-                        int remaining = stack.getQuantity() - 1;
-                        if (remaining <= 0) {
-                            container.setItemStackForSlot(i, ItemStack.EMPTY);
-                        } else {
-                            container.setItemStackForSlot(i, new ItemStack(itemId, remaining));
+                        if (container.removeItemStackFromSlot(i, 1).succeeded()) {
+                            taken.complete(true);
+                            return;
                         }
-                        core.getMessageService().sendKey(viewer, "vault-icon-consumed",
-                                Map.of("item", itemId));
-                        return;
                     }
                 }
             } catch (Throwable t) {
                 core.log(Level.WARNING, "[playervaults] icon consume failed: " + t);
+            } finally {
+                taken.complete(false); // no-op once an item was taken
             }
         });
+        if (!dispatched) {
+            taken.complete(false);
+        }
+        return taken;
     }
 
     VaultBackupService backupService() {
