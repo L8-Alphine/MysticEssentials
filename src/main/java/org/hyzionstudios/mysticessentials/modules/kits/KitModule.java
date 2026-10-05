@@ -23,6 +23,7 @@ import com.hypixel.hytale.server.core.command.system.CommandSender;
 import com.hypixel.hytale.server.core.command.system.arguments.system.RequiredArg;
 import com.hypixel.hytale.server.core.command.system.arguments.types.ArgTypes;
 import com.hypixel.hytale.server.core.command.system.arguments.types.SingleArgumentType;
+import com.hypixel.hytale.server.core.entity.ItemUtils;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
@@ -35,9 +36,9 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
  * named by {@code firstJoinKit} is granted automatically on first join.
  *
  * <p>Items are given on the player's world thread via the verified
- * {@code Player.giveItem} (overflow drops at the player's feet, matching the
- * builtin {@code /give}). Last-claim timestamps live in the player profile
- * under {@code moduleData.kits}.</p>
+ * {@code Player.giveItem}; whatever does not fit is dropped at the player's feet
+ * (the builtin {@code /give} would discard it). Last-claim timestamps live in
+ * the player profile under {@code moduleData.kits}.</p>
  */
 public final class KitModule extends AbstractMysticModule {
 
@@ -257,7 +258,7 @@ public final class KitModule extends AbstractMysticModule {
         void reply(String key, Map<String, String> params);
     }
 
-    /** Gives the kit's items on the player's world thread (overflow drops like /give). */
+    /** Gives the kit's items on the player's world thread, dropping what does not fit at their feet. */
     private void giveItems(PlayerRef player, KitConfig.Kit kit, String kitName) {
         boolean dispatched = core.platform().runOnEntityThread(player, (store, entity, world) -> {
             for (KitConfig.KitItem item : kit.items) {
@@ -266,7 +267,10 @@ public final class KitModule extends AbstractMysticModule {
                 }
                 try {
                     ItemStack stack = new ItemStack(item.itemId, Math.max(1, item.quantity));
-                    Player.giveItem(stack, entity, store);
+                    ItemStack remainder = Player.giveItem(stack, entity, store).getRemainder();
+                    if (!ItemStack.isEmpty(remainder)) {
+                        ItemUtils.dropItem(entity, remainder, store);
+                    }
                 } catch (Throwable t) {
                     core.log(Level.WARNING, "[kits] Kit '" + kitName + "': cannot give item '"
                             + item.itemId + "': " + t);
