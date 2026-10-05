@@ -69,6 +69,7 @@ import org.hyzionstudios.mysticessentials.platform.command.MysticCommandSender;
 import com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
 import com.hypixel.hytale.server.core.plugin.PluginManager;
+import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.mysticlicensing.license.LicenseGate;
 import com.mysticlicensing.license.MysticLicenseService;
 import com.mysticlicensing.license.NoopMysticLicenseService;
@@ -181,6 +182,12 @@ public final class MysticCore implements MysticEssentialsAPI {
         messageService = new MessageServiceImpl(this);
         messageService.load();
         playerProfileService = new PlayerProfileServiceImpl(this);
+        // Players already online (a runtime plugin reload) never fire a join event
+        // for this instance: load their profiles now, or nothing would be cached,
+        // credited or saved for them until they relog.
+        for (PlayerRef online : platform.onlinePlayers()) {
+            playerProfileService.load(online.getUuid(), online.getUsername());
+        }
         playtimeTracker = new PlaytimeTracker(this);
         playtimeTracker.start();
         teleportService = new TeleportServiceImpl(this);
@@ -598,6 +605,11 @@ public final class MysticCore implements MysticEssentialsAPI {
     /** Logs through the plugin's Hytale logger. */
     public void log(Level level, String message) {
         plugin.getLogger().at(level).log(message);
+    }
+
+    /** Logs {@code message} with {@code cause}'s stack trace. */
+    public void log(Level level, String message, Throwable cause) {
+        plugin.getLogger().at(level).withCause(cause).log(message);
     }
 
     // ----- MysticEssentialsAPI ----------------------------------------------
