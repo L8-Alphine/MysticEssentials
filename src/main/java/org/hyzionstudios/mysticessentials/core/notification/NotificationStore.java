@@ -59,9 +59,21 @@ final class NotificationStore {
 
     // ----- Preferences ------------------------------------------------------------
 
-    /** This player's preferences, loading them from the profile on first access. */
+    /**
+     * This player's preferences, loading them from the profile on first access.
+     * Until the profile is loaded (a send during the join, or to an offline
+     * player) defaults are returned without being cached: cached defaults would
+     * be written over the stored preferences when the session ends.
+     */
     NotificationPreferences preferences(UUID player) {
         if (player == null) {
+            return new NotificationPreferences();
+        }
+        NotificationPreferences cached = preferences.get(player);
+        if (cached != null) {
+            return cached;
+        }
+        if (!profileLoaded(player)) {
             return new NotificationPreferences();
         }
         return preferences.computeIfAbsent(player, this::loadPreferences);
@@ -204,7 +216,15 @@ final class NotificationStore {
         return changed;
     }
 
+    /** Same rule as {@link #preferences}: nothing is cached before the profile is loaded. */
     private Deque<NotificationRecord> historyFor(UUID player) {
+        Deque<NotificationRecord> cached = history.get(player);
+        if (cached != null) {
+            return cached;
+        }
+        if (!profileLoaded(player)) {
+            return new ConcurrentLinkedDeque<>();
+        }
         return history.computeIfAbsent(player, this::loadHistory);
     }
 
@@ -280,6 +300,10 @@ final class NotificationStore {
     }
 
     // ----- Profile access --------------------------------------------------------------
+
+    private boolean profileLoaded(UUID player) {
+        return core.getPlayerProfileService().getCached(player).isPresent();
+    }
 
     private JsonObject moduleData(UUID player) {
         return core.getPlayerProfileService().getCached(player)

@@ -317,9 +317,11 @@ public final class MysticCore implements MysticEssentialsAPI {
                 (PlayerConnectEvent event) -> {
                     var ref = event.getPlayerRef();
                     networkPlayerService.onJoin(ref);
-                    playerProfileService.load(ref.getUuid(), ref.getUsername());
                     playtimeTracker.onJoin(ref.getUuid());
-                    updateNotifier.notifyOnJoin(ref);
+                    // The notice is kept in notification history, which lives in the
+                    // profile: send it once the profile is loaded.
+                    playerProfileService.load(ref.getUuid(), ref.getUsername())
+                            .whenComplete((profile, failure) -> updateNotifier.notifyOnJoin(ref));
                 });
         platform.onEvent(PlayerDisconnectEvent.class,
                 (PlayerDisconnectEvent event) -> {
