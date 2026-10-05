@@ -228,8 +228,15 @@ public final class RandomTeleportServiceImpl implements RandomTeleportService {
     @Override
     public boolean cancel(UUID playerId, RtpCancelReason reason) {
         Session session = sessions.get(playerId);
-        if (session == null || !session.cancelled.compareAndSet(false, true)) {
+        if (session == null) {
             return false;
+        }
+        // Once the move is dispatched it cannot be called back: the session is
+        // settled by the move's outcome (commit on success, refund on failure).
+        synchronized (session) {
+            if (session.phase == Session.Phase.TELEPORT || !session.cancelled.compareAndSet(false, true)) {
+                return false;
+            }
         }
         session.cancelReason = reason;
         ScheduledFuture<?> warmupTask = session.warmupTask;
@@ -424,7 +431,12 @@ public final class RandomTeleportServiceImpl implements RandomTeleportService {
             return;
         }
         PlayerRef player = playerOpt.get();
-        session.phase = Session.Phase.TELEPORT;
+        synchronized (session) {
+            if (session.cancelled.get()) {
+                return;
+            }
+            session.phase = Session.Phase.TELEPORT;
+        }
         showHud(player, session, "rtp-hud-teleporting", Map.of());
         recordBackLocation(uuid, player);
 
