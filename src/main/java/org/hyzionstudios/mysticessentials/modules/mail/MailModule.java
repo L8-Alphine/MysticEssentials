@@ -834,11 +834,34 @@ public final class MailModule extends AbstractMysticModule implements MailServic
 
     private void finishSend(PlayerRef sender, UUID recipient, String targetLabel, MailMessage proto,
             Runnable refresh) {
-        deliver(recipient, proto).thenRun(() -> {
+        deliver(recipient, proto).whenComplete((ignored, failure) -> {
+            if (failure != null) {
+                // The attachments already left the sender's inventory: give them back.
+                core.log(Level.WARNING, "[mail] delivery to " + targetLabel + " failed: " + failure);
+                returnAttachments(sender, proto.items());
+                core.getMessageService().send(sender, proto.items().isEmpty()
+                        ? "&cYour mail could not be delivered. Please try again."
+                        : "&cYour mail could not be delivered; the attached items were returned to you.");
+                refresh.run();
+                return;
+            }
             recordSent(sender.getUuid(), proto, targetLabel);
             core.getMessageService().sendKey(sender, "mail-sent", Map.of("player", targetLabel));
             refresh.run();
         });
+    }
+
+    /** Gives undelivered attachments back to their sender on the sender's world thread. */
+    private void returnAttachments(PlayerRef sender, List<MailAttachment> items) {
+        if (items.isEmpty()) {
+            return;
+        }
+        boolean dispatched = core.platform().runOnEntityThread(sender, (store, entity, world) ->
+                giveAttachments(store, entity, items));
+        if (!dispatched) {
+            core.log(Level.SEVERE, "[mail] " + sender.getUsername() + " (" + sender.getUuid()
+                    + ") left before undelivered attachments could be returned: " + Json.toString(items));
+        }
     }
 
     // ----- Admin center: audiences, broadcast & history -----------------------
