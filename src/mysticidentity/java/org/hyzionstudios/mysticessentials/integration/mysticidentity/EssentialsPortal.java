@@ -39,7 +39,9 @@ public final class EssentialsPortal implements AutoCloseable {
         return portal;
     }
 
-    private void tryAttach() {
+    // Synchronized with close(): an attach finishing after close() would leave a
+    // registration nobody closes, still pointing at this (now discarded) core.
+    private synchronized void tryAttach() {
         if (closed) {
             return;
         }
@@ -64,7 +66,7 @@ public final class EssentialsPortal implements AutoCloseable {
     }
 
     @Override
-    public void close() {
+    public synchronized void close() {
         closed = true;
         attacher.shutdownNow();
         PortalRegistration current = registration;
