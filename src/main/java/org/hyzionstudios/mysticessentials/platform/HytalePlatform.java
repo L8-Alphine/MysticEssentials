@@ -355,24 +355,78 @@ public final class HytalePlatform {
      * with one thread per world, so entity access must happen on that world's
      * thread.
      *
-     * @return {@code true} if the player is online with a valid entity and the
-     *         task was dispatched; {@code false} otherwise.
+     * <p>A connected player has no entity yet while joining ({@code PlayerConnectEvent}
+     * fires before the engine adds the player to a world) and briefly while moving
+     * between worlds. Work for such a player is held and dispatched as soon as the
+     * entity exists (for up to {@value #ENTITY_WAIT_MILLIS} ms) instead of being
+     * dropped.</p>
+     *
+     * @return {@code true} if the task was dispatched, or held for a connected
+     *         player whose entity is not in a world yet; {@code false} when the
+     *         player is no longer connected.
      */
     public boolean runOnEntityThread(PlayerRef player, EntityTask task) {
         Ref<EntityStore> ref = player.getReference();
         if (ref == null || !ref.isValid()) {
-            return false;
+            if (!isConnected(player)) {
+                return false;
+            }
+            awaitEntity(player, task, System.currentTimeMillis() + ENTITY_WAIT_MILLIS);
+            return true;
         }
+        dispatch(player, ref, task);
+        return true;
+    }
+
+    /** How long work for a connected player without an entity is held. */
+    private static final long ENTITY_WAIT_MILLIS = 30_000L;
+    /** How often a held task re-checks for the player's entity. */
+    private static final long ENTITY_POLL_MILLIS = 250L;
+
+    private void dispatch(PlayerRef player, Ref<EntityStore> ref, EntityTask task) {
         Store<EntityStore> store = ref.getStore();
         World currentWorld = ((EntityStore) store.getExternalData()).getWorld();
         currentWorld.execute(() -> {
+            if (!ref.isValid()) {
+                // The player left this world between dispatch and execution:
+                // follow them to their current entity, or drop the work if they left.
+                runOnEntityThread(player, task);
+                return;
+            }
             try {
                 task.run(store, ref, currentWorld);
             } catch (Throwable t) {
                 core.log(Level.SEVERE, "Entity task for " + player.getUsername() + " threw: " + t);
             }
         });
-        return true;
+    }
+
+    private void awaitEntity(PlayerRef player, EntityTask task, long deadline) {
+        try {
+            core.scheduler().runLater(() -> {
+                Ref<EntityStore> ref = player.getReference();
+                if (ref != null && ref.isValid()) {
+                    dispatch(player, ref, task);
+                } else if (isConnected(player) && System.currentTimeMillis() < deadline) {
+                    awaitEntity(player, task, deadline);
+                } else {
+                    core.log(Level.FINE, "Dropped entity task for " + player.getUsername()
+                            + ": the player never entered a world.");
+                }
+            }, ENTITY_POLL_MILLIS, TimeUnit.MILLISECONDS);
+        } catch (RuntimeException e) {
+            // The scheduler is gone: the plugin is shutting down.
+            core.log(Level.FINE, "Dropped entity task for " + player.getUsername() + ": " + e);
+        }
+    }
+
+    /** @return whether this exact connection is still registered with the universe. */
+    private static boolean isConnected(PlayerRef player) {
+        try {
+            return Universe.get().getPlayer(player.getUuid()) == player;
+        } catch (Throwable t) {
+            return false;
+        }
     }
 
     /**
