@@ -14,6 +14,7 @@ import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommand;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommandSender;
 
+import com.hypixel.hytale.server.core.command.system.arguments.system.FlagArg;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 
 /**
@@ -30,12 +31,22 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
  * /rtp cancel | status | info [world/profile]
  * </pre>
  *
- * Trailing {@code --force}, {@code --silent}, {@code --bypass-cost} flags are
- * honoured on the admin forms.
+ * Trailing {@code --force}, {@code --silent}, {@code --bypass-cost} flags need
+ * {@code rtp.admin.force}. They are declared flag arguments: the engine parses
+ * every {@code --name} token itself and rejects undeclared ones before the
+ * command runs.
  */
 final class RtpCommand extends MysticCommand {
 
     private final RtpSubsystem rtp;
+    private final FlagArg forceFlag = withFlagArg("force",
+            "Skip the permission, cooldown, limit, cost and warmup checks.")
+            .setPermission(Permissions.RTP_ADMIN_FORCE);
+    private final FlagArg silentFlag = withFlagArg("silent", "Send the player no RTP messages.")
+            .setPermission(Permissions.RTP_ADMIN_FORCE);
+    private final FlagArg bypassCostFlag = withFlagArg("bypass-cost", "Do not charge the RTP cost.")
+            .addAliases("bypasscost")
+            .setPermission(Permissions.RTP_ADMIN_FORCE);
 
     RtpCommand(MysticCore core, RtpSubsystem rtp) {
         super(core, "rtp", "Randomly teleport to a safe location.");
@@ -51,15 +62,16 @@ final class RtpCommand extends MysticCommand {
             return;
         }
         List<String> args = new ArrayList<>();
-        Flags flags = new Flags();
         for (String token : sender.args()) {
-            switch (token.toLowerCase(Locale.ROOT)) {
-                case "--force" -> flags.force = true;
-                case "--silent" -> flags.silent = true;
-                case "--bypass-cost", "--bypasscost" -> flags.bypassCost = true;
-                default -> args.add(token);
+            // Flags arrive through the declared flag arguments; keep them out of the positional words.
+            if (!token.startsWith("--")) {
+                args.add(token);
             }
         }
+        Flags flags = new Flags();
+        flags.force = sender.get(forceFlag);
+        flags.silent = sender.get(silentFlag);
+        flags.bypassCost = sender.get(bypassCostFlag);
 
         String keyword = args.isEmpty() ? "" : args.get(0).toLowerCase(Locale.ROOT);
         boolean uiDefault = rtp.config().randomTeleport.openUiOnRtp;
