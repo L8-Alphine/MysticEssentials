@@ -41,6 +41,7 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.command.system.arguments.system.RequiredArg;
 import com.hypixel.hytale.server.core.command.system.arguments.types.ArgTypes;
+import com.hypixel.hytale.server.core.entity.ItemUtils;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
@@ -592,9 +593,7 @@ public final class MailModule extends AbstractMysticModule implements MailServic
                         }
                     }
                     handingOut = true;
-                    for (MailAttachment attachment : items) {
-                        Player.giveItem(MailItemCodec.toLive(attachment), entity, store);
-                    }
+                    giveAttachments(store, entity, items);
                     for (String command : commands) {
                         String resolved = command
                                 .replace("{player}", player.getUsername())
@@ -619,6 +618,21 @@ public final class MailModule extends AbstractMysticModule implements MailServic
                 unclaim(uuid, mailId, done);
             }
         });
+    }
+
+    /**
+     * Gives each attachment to the player; whatever does not fit (a stack larger
+     * than the free room) is dropped at their feet instead of being discarded.
+     * MUST run on the player's world thread.
+     */
+    private static void giveAttachments(Store<EntityStore> store, Ref<EntityStore> entity,
+            List<MailAttachment> items) {
+        for (MailAttachment attachment : items) {
+            ItemStack remainder = Player.giveItem(MailItemCodec.toLive(attachment), entity, store).getRemainder();
+            if (!ItemStack.isEmpty(remainder)) {
+                ItemUtils.dropItem(entity, remainder, store);
+            }
+        }
     }
 
     /** Rolls back a claim whose rewards could not be handed out, then runs {@code then}. */
@@ -887,7 +901,9 @@ public final class MailModule extends AbstractMysticModule implements MailServic
         List<MailAttachment> attachments = new ArrayList<>();
         for (ItemPick pick : picks) {
             if (!isBlocked(pick.itemId())) {
-                attachments.add(new MailAttachment(pick.itemId(), Math.max(1, pick.quantity()), 0, 0, null));
+                // A fresh stack carries the item's own durability (0/0 would make tools unbreakable).
+                int quantity = Math.max(1, pick.quantity());
+                attachments.add(MailItemCodec.toStored(new ItemStack(pick.itemId(), quantity), quantity));
             }
         }
         proto.setItems(attachments);
