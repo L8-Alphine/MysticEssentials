@@ -9,7 +9,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.logging.Level;
 
 import org.hyzionstudios.mysticessentials.api.Permissions;
@@ -30,6 +32,7 @@ import org.hyzionstudios.mysticessentials.platform.command.MysticArgTypes;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommand;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommandSender;
 
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
 import com.hypixel.hytale.component.Ref;
@@ -109,16 +112,34 @@ public final class MailModule extends AbstractMysticModule implements MailServic
 
     // ----- MailService -------------------------------------------------------
 
+    private static List<MailMessage> parseInbox(JsonElement element) {
+        List<MailMessage> inbox = element == null ? null : Json.gson().fromJson(element, INBOX_TYPE);
+        return inbox != null ? inbox : new ArrayList<>();
+    }
+
     private CompletableFuture<List<MailMessage>> loadInbox(UUID player) {
         StorageService storage = core.getStorageService();
-        return storage.load(NAMESPACE, player.toString()).thenApply(element -> {
-            List<MailMessage> inbox = element == null ? null : Json.gson().fromJson(element, INBOX_TYPE);
-            return inbox != null ? inbox : new ArrayList<>();
-        });
+        return storage.load(NAMESPACE, player.toString()).thenApply(MailModule::parseInbox);
     }
 
     private CompletableFuture<Void> saveInbox(UUID player, List<MailMessage> inbox) {
         return core.getStorageService().save(NAMESPACE, player.toString(), Json.toTree(inbox));
+    }
+
+    /**
+     * Read-modify-write of one inbox as a single {@link StorageService#update}, so
+     * concurrent deliveries, read flags and claims never overwrite each other.
+     * {@code change} edits the list in place and returns its result; returning
+     * {@code null} means nothing changed and leaves the stored inbox untouched.
+     */
+    private <T> CompletableFuture<T> updateInbox(UUID player, Function<List<MailMessage>, T> change) {
+        AtomicReference<T> result = new AtomicReference<>();
+        return core.getStorageService().update(NAMESPACE, player.toString(), element -> {
+            List<MailMessage> inbox = parseInbox(element);
+            T outcome = change.apply(inbox);
+            result.set(outcome);
+            return outcome == null ? null : Json.toTree(inbox);
+        }).thenApply(stored -> result.get());
     }
 
     @Override
@@ -130,10 +151,13 @@ public final class MailModule extends AbstractMysticModule implements MailServic
     public CompletableFuture<Void> deliver(UUID recipient, MailMessage prototype) {
         MailMessage mail = prototype.copyForDelivery();
         mail.setSubject(prototype.getSubject());
-        return loadInbox(recipient).thenCompose(inbox -> {
+        CompletableFuture<MailMessage> saved = updateInbox(recipient, inbox -> {
             enforceInboxCap(inbox);
             inbox.add(mail);
-            CompletableFuture<Void> saved = saveInbox(recipient, inbox);
+            return mail;
+        });
+        // Notify only once the mail is stored; the returned future reports the save alone.
+        saved.thenAccept(stored -> {
             String senderName = mail.getSenderName() == null || mail.getSenderName().isBlank()
                     ? "Server" : mail.getSenderName();
             var online = core.platform().findPlayer(recipient);
@@ -165,8 +189,8 @@ public final class MailModule extends AbstractMysticModule implements MailServic
                     mail.hasRewards(),
                     online.isPresent()
             ));
-            return saved;
         });
+        return saved.thenApply(stored -> null);
     }
 
     private void handleRemoteMailNotification(String raw) {
@@ -272,23 +296,20 @@ public final class MailModule extends AbstractMysticModule implements MailServic
 
     @Override
     public CompletableFuture<Boolean> markRead(UUID player, String mailId) {
-        return loadInbox(player).thenCompose(inbox -> {
+        return updateInbox(player, inbox -> {
             Optional<MailMessage> mail = inbox.stream().filter(m -> m.getId().equals(mailId)).findFirst();
             if (mail.isEmpty()) {
-                return CompletableFuture.completedFuture(false);
+                return null;
             }
             mail.get().setRead(true);
-            return saveInbox(player, inbox).thenApply(v -> true);
-        });
+            return Boolean.TRUE;
+        }).thenApply(found -> found != null);
     }
 
     @Override
     public CompletableFuture<Boolean> delete(UUID player, String mailId) {
-        return loadInbox(player).thenCompose(inbox -> {
-            boolean removed = inbox.removeIf(m -> m.getId().equals(mailId));
-            return removed ? saveInbox(player, inbox).thenApply(v -> true)
-                    : CompletableFuture.completedFuture(false);
-        });
+        return updateInbox(player, inbox -> inbox.removeIf(m -> m.getId().equals(mailId)) ? Boolean.TRUE : null)
+                .thenApply(removed -> removed != null);
     }
 
     @Override
@@ -304,7 +325,7 @@ public final class MailModule extends AbstractMysticModule implements MailServic
 
     @Override
     public CompletableFuture<Integer> markAllRead(UUID player) {
-        return loadInbox(player).thenCompose(inbox -> {
+        return updateInbox(player, inbox -> {
             int flipped = 0;
             for (MailMessage mail : inbox) {
                 if (!mail.isRead()) {
@@ -312,12 +333,8 @@ public final class MailModule extends AbstractMysticModule implements MailServic
                     flipped++;
                 }
             }
-            if (flipped == 0) {
-                return CompletableFuture.completedFuture(0);
-            }
-            int total = flipped;
-            return saveInbox(player, inbox).thenApply(v -> total);
-        });
+            return flipped == 0 ? null : Integer.valueOf(flipped);
+        }).thenApply(flipped -> flipped == null ? 0 : flipped);
     }
 
     @Override
@@ -345,16 +362,16 @@ public final class MailModule extends AbstractMysticModule implements MailServic
         return mutate(player, mailId, mail -> mail.setClaimed(true));
     }
 
-    /** Loads the inbox, applies {@code mutation} to the matching mail, and saves; false if not found. */
+    /** Atomically applies {@code mutation} to the matching mail and saves; false if not found. */
     private CompletableFuture<Boolean> mutate(UUID player, String mailId, Consumer<MailMessage> mutation) {
-        return loadInbox(player).thenCompose(inbox -> {
+        return updateInbox(player, inbox -> {
             Optional<MailMessage> match = inbox.stream().filter(m -> m.getId().equals(mailId)).findFirst();
             if (match.isEmpty()) {
-                return CompletableFuture.completedFuture(false);
+                return null;
             }
             mutation.accept(match.get());
-            return saveInbox(player, inbox).thenApply(v -> true);
-        });
+            return Boolean.TRUE;
+        }).thenApply(found -> found != null);
     }
 
     // ----- Item attachments & rewards (server-authoritative, world thread) -----
@@ -669,14 +686,12 @@ public final class MailModule extends AbstractMysticModule implements MailServic
     // ----- Sent folder --------------------------------------------------------
 
     CompletableFuture<List<MailMessage>> sentInbox(UUID player) {
-        return core.getStorageService().load(SENT_NAMESPACE, player.toString()).thenApply(element -> {
-            List<MailMessage> list = element == null ? null : Json.gson().fromJson(element, INBOX_TYPE);
-            return list != null ? list : new ArrayList<>();
-        });
+        return core.getStorageService().load(SENT_NAMESPACE, player.toString()).thenApply(MailModule::parseInbox);
     }
 
     private void recordSent(UUID sender, MailMessage prototype, String recipientLabel) {
-        sentInbox(sender).thenCompose(list -> {
+        core.getStorageService().update(SENT_NAMESPACE, sender.toString(), element -> {
+            List<MailMessage> list = parseInbox(element);
             MailMessage copy = prototype.copyForDelivery();
             copy.setRead(true);
             copy.setRecipientName(recipientLabel);
@@ -684,7 +699,7 @@ public final class MailModule extends AbstractMysticModule implements MailServic
             while (config.maxInboxSize > 0 && list.size() > config.maxInboxSize) {
                 list.remove(0);
             }
-            return core.getStorageService().save(SENT_NAMESPACE, sender.toString(), Json.toTree(list));
+            return Json.toTree(list);
         });
     }
 
@@ -903,20 +918,24 @@ public final class MailModule extends AbstractMysticModule implements MailServic
     // ----- Announcement history -----------------------------------------------
 
     CompletableFuture<List<SentAnnouncement>> announcementLog() {
-        return core.getStorageService().load(ANNOUNCEMENT_NAMESPACE, ANNOUNCEMENT_LOG_KEY).thenApply(element -> {
-            List<SentAnnouncement> log = element == null ? null
-                    : Json.gson().fromJson(element, ANNOUNCEMENT_LOG_TYPE);
-            return log != null ? log : new ArrayList<>();
-        });
+        return core.getStorageService().load(ANNOUNCEMENT_NAMESPACE, ANNOUNCEMENT_LOG_KEY)
+                .thenApply(MailModule::parseAnnouncementLog);
+    }
+
+    private static List<SentAnnouncement> parseAnnouncementLog(JsonElement element) {
+        List<SentAnnouncement> log = element == null ? null
+                : Json.gson().fromJson(element, ANNOUNCEMENT_LOG_TYPE);
+        return log != null ? log : new ArrayList<>();
     }
 
     private void recordAnnouncement(SentAnnouncement entry) {
-        announcementLog().thenCompose(log -> {
+        core.getStorageService().update(ANNOUNCEMENT_NAMESPACE, ANNOUNCEMENT_LOG_KEY, element -> {
+            List<SentAnnouncement> log = parseAnnouncementLog(element);
             log.add(entry);
             while (log.size() > ANNOUNCEMENT_LOG_CAP) {
                 log.remove(0);
             }
-            return core.getStorageService().save(ANNOUNCEMENT_NAMESPACE, ANNOUNCEMENT_LOG_KEY, Json.toTree(log));
+            return Json.toTree(log);
         });
     }
 
