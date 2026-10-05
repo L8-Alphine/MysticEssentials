@@ -162,13 +162,21 @@ public final class FlightModule extends AbstractMysticModule {
                 return;
             }
             var settings = movement.getSettings();
-            settings.fly = canFly ? FlyMode.Allowed : FlyMode.Disabled;
+            var defaults = movement.getDefaultSettings();
             if (canFly) {
-                var defaults = movement.getDefaultSettings();
+                settings.fly = FlyMode.Allowed;
                 settings.horizontalFlySpeed = defaults.horizontalFlySpeed
                         * Math.max(0.1f, config.horizontalSpeedMultiplier);
                 settings.verticalFlySpeed = defaults.verticalFlySpeed
                         * Math.max(0.1f, config.verticalSpeedMultiplier);
+            } else if (defaults != null) {
+                // Back to what the game mode and movement config grant (Creative
+                // keeps its own flight), at the default fly speeds.
+                settings.fly = defaults.fly;
+                settings.horizontalFlySpeed = defaults.horizontalFlySpeed;
+                settings.verticalFlySpeed = defaults.verticalFlySpeed;
+            } else {
+                settings.fly = FlyMode.Disabled;
             }
             movement.update(player.getPacketHandler());
         });
