@@ -1,5 +1,7 @@
 package org.hyzionstudios.mysticessentials.core.notification;
 
+import java.time.Duration;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 
@@ -15,6 +17,7 @@ import com.hypixel.hytale.server.core.asset.type.soundevent.config.SoundEvent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.SoundUtil;
 import com.hypixel.hytale.server.core.util.EventTitleUtil;
+import com.hypixel.hytale.server.core.util.NotificationUtil;
 
 /**
  * Pushes one notification onto one player's screen across every enabled surface.
@@ -93,7 +96,7 @@ final class NotificationDelivery {
      * clause is the reason this decision lives in one method instead of being
      * repeated at six call sites.</p>
      */
-    private boolean enabled(boolean profileValue, java.util.Optional<Boolean> override,
+    private boolean enabled(boolean profileValue, Optional<Boolean> override,
             boolean preference, boolean overridePreferences) {
         boolean wanted = override.orElse(profileValue);
         if (!wanted) {
@@ -180,10 +183,10 @@ final class NotificationDelivery {
                     : null;
             NotificationStyle style = toastStyle(notification.priority());
             if (secondary == null) {
-                com.hypixel.hytale.server.core.util.NotificationUtil
+                NotificationUtil
                         .sendNotification(player.getPacketHandler(), primary, style);
             } else {
-                com.hypixel.hytale.server.core.util.NotificationUtil
+                NotificationUtil
                         .sendNotification(player.getPacketHandler(), primary, secondary, style);
             }
         } catch (Throwable t) {
@@ -232,7 +235,7 @@ final class NotificationDelivery {
             return;
         }
         long seconds = notification.duration()
-                .map(java.time.Duration::toSeconds)
+                .map(Duration::toSeconds)
                 .orElse((long) profile.durationSeconds);
         seconds = Math.max(1, seconds);
         // A banner the player cannot dismiss says so, so nobody spends the

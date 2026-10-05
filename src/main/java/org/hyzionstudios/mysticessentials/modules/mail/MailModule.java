@@ -13,6 +13,7 @@ import java.util.function.Consumer;
 import java.util.logging.Level;
 
 import org.hyzionstudios.mysticessentials.api.Permissions;
+import org.hyzionstudios.mysticessentials.api.event.MailReceivedEvent;
 import org.hyzionstudios.mysticessentials.api.model.MailAttachment;
 import org.hyzionstudios.mysticessentials.api.model.MailMessage;
 import org.hyzionstudios.mysticessentials.api.notification.Notification;
@@ -24,18 +25,24 @@ import org.hyzionstudios.mysticessentials.api.service.MailService;
 import org.hyzionstudios.mysticessentials.api.service.StorageService;
 import org.hyzionstudios.mysticessentials.core.module.AbstractMysticModule;
 import org.hyzionstudios.mysticessentials.core.util.Json;
+import org.hyzionstudios.mysticessentials.modules.playervaults.service.VaultItemCatalog;
 import org.hyzionstudios.mysticessentials.platform.command.MysticArgTypes;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommand;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommandSender;
 
+import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
+import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.command.system.arguments.system.RequiredArg;
 import com.hypixel.hytale.server.core.command.system.arguments.types.ArgTypes;
 import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent;
 import com.hypixel.hytale.server.core.inventory.InventoryComponent;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
 /**
  * Virtual mail: send to online or offline players, inbox read/unread tracking,
@@ -66,8 +73,8 @@ public final class MailModule extends AbstractMysticModule implements MailServic
         registerCommand(new MailCommand());
         registerCommand(new MailAdminTopCommand());
         registerEvent(
-                com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent.class,
-                (com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent event) ->
+                PlayerConnectEvent.class,
+                (PlayerConnectEvent event) ->
                         notifyUnread(event.getPlayerRef()));
     }
 
@@ -142,7 +149,7 @@ public final class MailModule extends AbstractMysticModule implements MailServic
             if (online.isEmpty() && core.redis().isEnabled()) {
                 core.networkPlayers().find(recipient).ifPresent(remote -> {
                     if (!remote.local(core.networkPlayers().localServerId())) {
-                        com.google.gson.JsonObject notice = new com.google.gson.JsonObject();
+                        JsonObject notice = new JsonObject();
                         notice.addProperty("targetServerId", remote.serverId());
                         notice.addProperty("recipient", recipient.toString());
                         notice.addProperty("sender", senderName);
@@ -151,7 +158,7 @@ public final class MailModule extends AbstractMysticModule implements MailServic
                 });
             }
             String body = mail.getBody() == null ? "" : mail.getBody();
-            core.getEventBus().publish(new org.hyzionstudios.mysticessentials.api.event.MailReceivedEvent(
+            core.getEventBus().publish(new MailReceivedEvent(
                     recipient,
                     senderName,
                     body.length() > 140 ? body.substring(0, 140) + "…" : body,
@@ -164,7 +171,7 @@ public final class MailModule extends AbstractMysticModule implements MailServic
 
     private void handleRemoteMailNotification(String raw) {
         try {
-            com.google.gson.JsonObject notice = Json.asObject(Json.parse(raw));
+            JsonObject notice = Json.asObject(Json.parse(raw));
             if (!core.networkPlayers().localServerId().equals(notice.get("targetServerId").getAsString())) {
                 return;
             }
@@ -371,8 +378,8 @@ public final class MailModule extends AbstractMysticModule implements MailServic
     }
 
     private static List<ItemContainer> sources(
-            com.hypixel.hytale.component.Store<com.hypixel.hytale.server.core.universe.world.storage.EntityStore> store,
-            com.hypixel.hytale.component.Ref<com.hypixel.hytale.server.core.universe.world.storage.EntityStore> entity) {
+            Store<EntityStore> store,
+            Ref<EntityStore> entity) {
         List<ItemContainer> sources = new ArrayList<>();
         addSource(sources, store.getComponent(entity, InventoryComponent.Hotbar.getComponentType()));
         addSource(sources, store.getComponent(entity, InventoryComponent.Storage.getComponentType()));
@@ -634,7 +641,7 @@ public final class MailModule extends AbstractMysticModule implements MailServic
     /** The announcement picker source: any registered item (quantity chosen on add). */
     private List<ItemPick> catalogPicks(String query) {
         List<ItemPick> picks = new ArrayList<>();
-        for (String itemId : org.hyzionstudios.mysticessentials.modules.playervaults.service.VaultItemCatalog
+        for (String itemId : VaultItemCatalog
                 .search(query, 60)) {
             if (!isBlocked(itemId)) {
                 picks.add(new ItemPick(itemId, 1));
@@ -959,7 +966,7 @@ public final class MailModule extends AbstractMysticModule implements MailServic
     private final class MailCommand extends MysticCommand {
         MailCommand() {
             super(MailModule.this.core, "mail", "Send and read mail.");
-            requirePermission(org.hyzionstudios.mysticessentials.api.Permissions.MAIL_USE);
+            requirePermission(Permissions.MAIL_USE);
             addSubCommand(new MailInboxCommand());
             addSubCommand(new MailUiCommand());
             addSubCommand(new MailReadCommand());
@@ -996,7 +1003,7 @@ public final class MailModule extends AbstractMysticModule implements MailServic
         }
 
         private void sendMail(MysticCommandSender sender, String targetName, String body) {
-            if (!sender.hasPermission(org.hyzionstudios.mysticessentials.api.Permissions.MAIL_SEND)) {
+            if (!sender.hasPermission(Permissions.MAIL_SEND)) {
                 sender.replyKey("no-permission");
                 return;
             }
@@ -1010,7 +1017,7 @@ public final class MailModule extends AbstractMysticModule implements MailServic
             if (networkOnline.isPresent()) {
                 send(sender.uuid(), sender.name(), networkOnline.get(), body)
                         .thenRun(() -> sender.replyKey("mail-sent", Map.of("player", targetName)));
-            } else if (sender.hasPermission(org.hyzionstudios.mysticessentials.api.Permissions.MAIL_SEND_OFFLINE)) {
+            } else if (sender.hasPermission(Permissions.MAIL_SEND_OFFLINE)) {
                 // Offline delivery: resolve the name via our username index, then write to
                 // the recipient's stored inbox (keyed by UUID) so it works while they are offline.
                 core.getPlayerProfileService().resolveUuid(targetName).thenAccept(resolved -> {
@@ -1027,7 +1034,7 @@ public final class MailModule extends AbstractMysticModule implements MailServic
         }
 
         private void sendAllMail(MysticCommandSender sender, String body) {
-            if (!sender.hasPermission(org.hyzionstudios.mysticessentials.api.Permissions.MAIL_SEND_ALL)) {
+            if (!sender.hasPermission(Permissions.MAIL_SEND_ALL)) {
                 sender.replyKey("no-permission");
                 return;
             }
@@ -1102,7 +1109,7 @@ public final class MailModule extends AbstractMysticModule implements MailServic
 
             MailSendCommand() {
                 super(MailModule.this.core, "send", "Send mail to a player.");
-                requirePermission(org.hyzionstudios.mysticessentials.api.Permissions.MAIL_SEND);
+                requirePermission(Permissions.MAIL_SEND);
             }
 
             @Override
@@ -1117,7 +1124,7 @@ public final class MailModule extends AbstractMysticModule implements MailServic
 
             MailSendAllCommand() {
                 super(MailModule.this.core, "sendall", "Send mail to all online players.");
-                requirePermission(org.hyzionstudios.mysticessentials.api.Permissions.MAIL_SEND_ALL);
+                requirePermission(Permissions.MAIL_SEND_ALL);
             }
 
             @Override

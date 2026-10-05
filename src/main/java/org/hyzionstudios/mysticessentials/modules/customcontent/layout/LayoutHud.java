@@ -1,6 +1,7 @@
 package org.hyzionstudios.mysticessentials.modules.customcontent.layout;
 
 import com.hypixel.hytale.server.core.entity.entities.player.hud.CustomUIHud;
+import com.hypixel.hytale.server.core.ui.Anchor;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 
@@ -87,7 +88,7 @@ public final class LayoutHud extends CustomUIHud {
      * anchor the client expects. Only the edges the corner touches are pinned,
      * so the overlay keeps its distance from that corner at any resolution.
      */
-    private com.hypixel.hytale.server.core.ui.Anchor rootAnchor() {
+    private Anchor rootAnchor() {
         int x = document.hudOffsetX;
         int y = document.hudOffsetY;
         Integer width = document.width > 0 ? document.width : null;

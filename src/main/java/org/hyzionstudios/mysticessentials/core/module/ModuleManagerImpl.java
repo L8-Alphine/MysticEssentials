@@ -15,6 +15,8 @@ import org.hyzionstudios.mysticessentials.api.module.ModuleManager;
 import org.hyzionstudios.mysticessentials.api.module.MysticModule;
 import org.hyzionstudios.mysticessentials.core.MysticCore;
 
+import com.mysticlicensing.license.Products;
+
 /**
  * Default {@link ModuleManager}. Registers module instances, enables those
  * turned on in {@code config.json} in dependency-respecting order, and manages
@@ -108,7 +110,7 @@ public final class ModuleManagerImpl implements ModuleManager {
         if (feature == null) {
             return true;
         }
-        if (core.license().hasFeature(com.mysticlicensing.license.Products.ESSENTIALS, feature)) {
+        if (core.license().hasFeature(Products.ESSENTIALS, feature)) {
             return true;
         }
         core.log(Level.INFO, "Module '" + module.id() + "' needs the '" + feature

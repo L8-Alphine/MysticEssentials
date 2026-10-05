@@ -10,6 +10,7 @@ import org.hyzionstudios.mysticessentials.api.Permissions;
 import org.hyzionstudios.mysticessentials.api.rtp.RtpCancelReason;
 import org.hyzionstudios.mysticessentials.api.rtp.RtpProfile;
 import org.hyzionstudios.mysticessentials.api.rtp.RtpRequest;
+import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommand;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommandSender;
 
@@ -36,7 +37,7 @@ final class RtpCommand extends MysticCommand {
 
     private final RtpSubsystem rtp;
 
-    RtpCommand(org.hyzionstudios.mysticessentials.core.MysticCore core, RtpSubsystem rtp) {
+    RtpCommand(MysticCore core, RtpSubsystem rtp) {
         super(core, "rtp", "Randomly teleport to a safe location.");
         this.rtp = rtp;
         requirePermission(Permissions.RTP_USE);

@@ -26,6 +26,7 @@ import org.hyzionstudios.mysticessentials.modules.playervaults.storage.PlayerVau
 import org.hyzionstudios.mysticessentials.modules.playervaults.ui.PlayerVaultUiController;
 
 import com.hypixel.hytale.server.core.command.system.CommandRegistration;
+import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 
 /**
@@ -98,8 +99,8 @@ public final class PlayerVaultModule extends AbstractMysticModule implements Pla
 
         // Release a player's held vault lock cleanly if they disconnect mid-session.
         registerEvent(
-                com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent.class,
-                (com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent event) ->
+                PlayerDisconnectEvent.class,
+                (PlayerDisconnectEvent event) ->
                         uiController.closeSession(event.getPlayerRef().getUuid(), true));
 
         active = true;

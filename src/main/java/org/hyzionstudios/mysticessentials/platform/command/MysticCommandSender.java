@@ -1,5 +1,6 @@
 package org.hyzionstudios.mysticessentials.platform.command;
 
+import java.util.Arrays;
 import java.util.Optional;
 import java.util.Map;
 import java.util.UUID;
@@ -35,7 +36,7 @@ public final class MysticCommandSender {
         }
         String[] tokens = input.trim().split("\\s+");
         int skip = leadingCommandTokens(context, tokens);
-        return skip == 0 ? tokens : java.util.Arrays.copyOfRange(tokens, skip, tokens.length);
+        return skip == 0 ? tokens : Arrays.copyOfRange(tokens, skip, tokens.length);
     }
 
     /**

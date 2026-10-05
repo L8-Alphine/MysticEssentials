@@ -24,6 +24,7 @@ import org.hyzionstudios.mysticessentials.modules.playervaults.model.VaultConfli
 import org.hyzionstudios.mysticessentials.modules.playervaults.model.VaultMetadata;
 import org.hyzionstudios.mysticessentials.modules.playervaults.storage.PlayerVaultRedisBridge;
 import org.hyzionstudios.mysticessentials.modules.playervaults.storage.PlayerVaultStorage;
+import org.hyzionstudios.mysticessentials.modules.playervaults.ui.PlayerVaultUiController;
 
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 
@@ -51,7 +52,7 @@ public final class PlayerVaultServiceImpl implements PlayerVaultService {
     private PlayerVaultConfig config;
 
     /** Set after construction to break the service&harr;UI cycle. */
-    private org.hyzionstudios.mysticessentials.modules.playervaults.ui.PlayerVaultUiController uiController;
+    private PlayerVaultUiController uiController;
 
     public PlayerVaultServiceImpl(MysticCore core, PlayerVaultStorage storage,
             PlayerVaultRedisBridge redisBridge, PlayerVaultLockService lockService,
@@ -66,7 +67,7 @@ public final class PlayerVaultServiceImpl implements PlayerVaultService {
         this.config = config;
     }
 
-    public void setUiController(org.hyzionstudios.mysticessentials.modules.playervaults.ui.PlayerVaultUiController ui) {
+    public void setUiController(PlayerVaultUiController ui) {
         this.uiController = ui;
     }
 

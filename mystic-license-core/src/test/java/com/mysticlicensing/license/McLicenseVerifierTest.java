@@ -1,5 +1,6 @@
 package com.mysticlicensing.license;
 
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -12,6 +13,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.KeyPair;
 import java.time.Instant;
+import java.util.List;
+import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -727,7 +730,7 @@ class McLicenseVerifierTest {
         void binaryGarbage(@TempDir Path dir) throws Exception {
             Path path = dir.resolve("license.mclicense");
             byte[] noise = new byte[512];
-            new java.util.Random(1234).nextBytes(noise);
+            new Random(1234).nextBytes(noise);
             Files.write(path, noise);
 
             LicenseCheckResult result = assertDoesNotThrow(() ->
@@ -765,7 +768,7 @@ class McLicenseVerifierTest {
                 .grants(Products.ESSENTIALS, Products.Essentials.MODULE_CUSTOM_CONTENT)
                 .bytes()).payload();
 
-        assertThrowsUnsupported(() -> payload.products().put("x", java.util.List.of()));
+        assertThrowsUnsupported(() -> payload.products().put("x", List.of()));
         assertThrowsUnsupported(() -> payload.products().get(Products.ESSENTIALS).add("x"));
         assertThrowsUnsupported(() -> payload.serverUuids().add("x"));
     }
@@ -773,7 +776,7 @@ class McLicenseVerifierTest {
     private static void assertThrowsUnsupported(Runnable action) {
         try {
             action.run();
-            org.junit.jupiter.api.Assertions.fail("expected the collection to be unmodifiable");
+            Assertions.fail("expected the collection to be unmodifiable");
         } catch (UnsupportedOperationException expected) {
             // as intended
         }

@@ -9,6 +9,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.time.format.FormatStyle;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -251,7 +252,7 @@ final class EssentialsPortalProvider implements PortalProvider {
     static PortalBlock vaultSection(PlayerVault vault, int columns) {
         int slots = Math.max(columns, vault.rows * columns);
         PortalBlock.Slot[] grid = new PortalBlock.Slot[slots];
-        java.util.Arrays.fill(grid, PortalBlock.Slot.empty());
+        Arrays.fill(grid, PortalBlock.Slot.empty());
         int used = 0;
         for (VaultItemStack stack : vault.items) {
             if (stack == null || stack.itemId == null || stack.slot < 0 || stack.slot >= slots) {

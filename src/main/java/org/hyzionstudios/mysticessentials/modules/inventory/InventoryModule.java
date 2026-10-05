@@ -14,6 +14,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 
+import org.bson.BsonDocument;
 import org.hyzionstudios.mysticessentials.api.Permissions;
 import org.hyzionstudios.mysticessentials.core.module.AbstractMysticModule;
 import org.hyzionstudios.mysticessentials.core.util.Json;
@@ -25,6 +26,8 @@ import org.hyzionstudios.mysticessentials.platform.command.MysticCommandSender;
 import com.google.gson.reflect.TypeToken;
 import com.hypixel.hytale.server.core.command.system.arguments.system.RequiredArg;
 import com.hypixel.hytale.server.core.command.system.arguments.types.SingleArgumentType;
+import com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent;
+import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
 import com.hypixel.hytale.server.core.inventory.InventoryComponent;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
@@ -77,15 +80,15 @@ public final class InventoryModule extends AbstractMysticModule {
         registerCommand(new ClearInventoryCommand());
         registerCommand(new InventoryCommand());
         registerEvent(
-                com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent.class,
-                (com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent event) -> {
+                PlayerConnectEvent.class,
+                (PlayerConnectEvent event) -> {
                     if (config.snapshotOnJoin) {
                         snapshot(event.getPlayerRef(), "Join");
                     }
                 });
         registerEvent(
-                com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent.class,
-                (com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent event) -> {
+                PlayerDisconnectEvent.class,
+                (PlayerDisconnectEvent event) -> {
                     deathHandled.remove(event.getPlayerRef().getUuid());
                     if (config.snapshotOnLeave) {
                         snapshot(event.getPlayerRef(), "Leave");
@@ -341,9 +344,9 @@ public final class InventoryModule extends AbstractMysticModule {
     }
 
     private static ItemStack toItemStack(InventorySnapshot.SlotItem item) {
-        org.bson.BsonDocument metadata = item.metadata == null || item.metadata.isBlank()
-                ? new org.bson.BsonDocument()
-                : org.bson.BsonDocument.parse(item.metadata);
+        BsonDocument metadata = item.metadata == null || item.metadata.isBlank()
+                ? new BsonDocument()
+                : BsonDocument.parse(item.metadata);
         return new ItemStack(item.itemId, Math.max(1, item.quantity),
                 item.durability, item.maxDurability, metadata);
     }

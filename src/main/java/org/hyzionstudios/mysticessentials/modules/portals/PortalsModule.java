@@ -1,6 +1,7 @@
 package org.hyzionstudios.mysticessentials.modules.portals;
 
 import java.lang.reflect.Type;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -14,12 +15,14 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 import org.hyzionstudios.mysticessentials.api.Permissions;
+import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.core.module.AbstractMysticModule;
 import org.hyzionstudios.mysticessentials.core.util.Json;
 import org.hyzionstudios.mysticessentials.platform.command.MysticArgTypes;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommand;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommandSender;
 
+import com.google.gson.JsonElement;
 import com.google.gson.reflect.TypeToken;
 import com.hypixel.hytale.event.EventRegistration;
 import com.hypixel.hytale.server.core.command.system.arguments.system.RequiredArg;
@@ -87,7 +90,7 @@ public final class PortalsModule extends AbstractMysticModule {
     }
 
     /** Core handle for the interaction/pages, which live outside the module lifecycle. */
-    org.hyzionstudios.mysticessentials.core.MysticCore core() {
+    MysticCore core() {
         return core;
     }
 
@@ -130,13 +133,13 @@ public final class PortalsModule extends AbstractMysticModule {
 
     // ----- Storage -----------------------------------------------------------
 
-    private java.nio.file.Path portalFile() {
+    private Path portalFile() {
         return core.paths().moduleDataDir(id()).resolve("portals.json");
     }
 
     private Map<String, Portal> loadPortals() {
         try {
-            com.google.gson.JsonElement element = Json.readFile(portalFile());
+            JsonElement element = Json.readFile(portalFile());
             Map<String, Portal> loaded = element == null ? null : Json.gson().fromJson(element, PORTAL_MAP_TYPE);
             if (loaded == null) {
                 return new LinkedHashMap<>();

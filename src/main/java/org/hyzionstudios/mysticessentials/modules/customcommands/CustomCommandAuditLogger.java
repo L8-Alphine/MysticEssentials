@@ -7,6 +7,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.ConcurrentHashMap;
@@ -62,7 +63,7 @@ public final class CustomCommandAuditLogger {
             return;
         }
         countersDirty = false;
-        Map<String, Long> snapshot = new java.util.LinkedHashMap<>();
+        Map<String, Long> snapshot = new LinkedHashMap<>();
         usageCounters.forEach((command, counter) -> snapshot.put(command, counter.get()));
         storage.saveUsageStats(snapshot);
     }

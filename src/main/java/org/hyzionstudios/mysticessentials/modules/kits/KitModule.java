@@ -24,6 +24,7 @@ import com.hypixel.hytale.server.core.command.system.arguments.system.RequiredAr
 import com.hypixel.hytale.server.core.command.system.arguments.types.ArgTypes;
 import com.hypixel.hytale.server.core.command.system.arguments.types.SingleArgumentType;
 import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 
@@ -56,8 +57,8 @@ public final class KitModule extends AbstractMysticModule {
         loadConfig();
         registerCommand(new KitCommand());
         registerEvent(
-                com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent.class,
-                (com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent event) ->
+                PlayerConnectEvent.class,
+                (PlayerConnectEvent event) ->
                         onJoin(event.getPlayerRef()));
     }
 

@@ -1,6 +1,9 @@
 package org.hyzionstudios.mysticessentials.core.profile;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -94,9 +97,9 @@ public final class PlayerProfileServiceImpl implements PlayerProfileService {
     }
 
     @Override
-    public CompletableFuture<java.util.List<UUID>> knownPlayerUuids() {
+    public CompletableFuture<List<UUID>> knownPlayerUuids() {
         return core.getStorageService().listKeys(NAMESPACE).thenApply(keys -> {
-            java.util.LinkedHashSet<UUID> ids = new java.util.LinkedHashSet<>(cache.keySet());
+            LinkedHashSet<UUID> ids = new LinkedHashSet<>(cache.keySet());
             for (String key : keys) {
                 try {
                     ids.add(UUID.fromString(key));
@@ -104,7 +107,7 @@ public final class PlayerProfileServiceImpl implements PlayerProfileService {
                     // Skip non-UUID keys defensively.
                 }
             }
-            return new java.util.ArrayList<>(ids);
+            return new ArrayList<>(ids);
         });
     }
 

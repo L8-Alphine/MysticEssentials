@@ -4,9 +4,12 @@ import java.util.Optional;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
+import org.hyzionstudios.mysticessentials.api.event.PrivateMessageEvent;
 import org.hyzionstudios.mysticessentials.core.MysticCore;
+import org.hyzionstudios.mysticessentials.core.integration.ManagedAccountsBridge;
 import org.hyzionstudios.mysticessentials.core.network.NetworkPlayerService.NetworkPlayer;
 import org.hyzionstudios.mysticessentials.api.notification.Notification;
 import org.hyzionstudios.mysticessentials.api.notification.NotificationAudience;
@@ -29,7 +32,7 @@ public final class PrivateMessagingSubModule {
 
     private final MysticCore core;
     private final ChatModule chat;
-    private final java.util.Map<UUID, UUID> replyTargets = new java.util.concurrent.ConcurrentHashMap<>();
+    private final Map<UUID, UUID> replyTargets = new ConcurrentHashMap<>();
     private final Consumer<String> redisHandler = this::handleRemotePm;
 
     private ChatConfig.PrivateMessaging config = new ChatConfig.PrivateMessaging();
@@ -68,7 +71,7 @@ public final class PrivateMessagingSubModule {
         // at all; guardians and trusted staff are exempt inside that answer. Asked here so
         // /msg, /reply and API callers all refuse the same way, before any delivery path.
         if (!core.managedAccounts().allowsInteraction(from, to,
-                org.hyzionstudios.mysticessentials.core.integration.ManagedAccountsBridge.TEXT_PRIVATE)) {
+                ManagedAccountsBridge.TEXT_PRIVATE)) {
             sender.ifPresent(ref -> core.getMessageService().sendKey(ref, "pm-blocked",
                     Map.of("target", target.map(PlayerRef::getUsername).orElse("that player"))));
             return CompletableFuture.completedFuture(false);
@@ -122,7 +125,7 @@ public final class PrivateMessagingSubModule {
             replyTargets.put(from, target.getUuid());
         });
         notifySocialSpies(from, fromName, target, message);
-        core.getEventBus().publish(new org.hyzionstudios.mysticessentials.api.event.PrivateMessageEvent(
+        core.getEventBus().publish(new PrivateMessageEvent(
                 from, fromName, target.getUuid(), target.getUsername(), message, false));
     }
 
@@ -171,7 +174,7 @@ public final class PrivateMessagingSubModule {
         // does, so the pair is judged again here. Dropped quietly: the sender already saw
         // their echo on their own server.
         if (!core.managedAccounts().allowsInteraction(fromUuid, target.getUuid(),
-                org.hyzionstudios.mysticessentials.core.integration.ManagedAccountsBridge.TEXT_PRIVATE)) {
+                ManagedAccountsBridge.TEXT_PRIVATE)) {
             return;
         }
         notifyPrivateMessage(target, fromName, message);
@@ -179,7 +182,7 @@ public final class PrivateMessagingSubModule {
             replyTargets.put(target.getUuid(), fromUuid);
         }
         notifySocialSpies(fromUuid, fromName, target, message);
-        core.getEventBus().publish(new org.hyzionstudios.mysticessentials.api.event.PrivateMessageEvent(
+        core.getEventBus().publish(new PrivateMessageEvent(
                 fromUuid, fromName, target.getUuid(), target.getUsername(), message, true));
     }
 

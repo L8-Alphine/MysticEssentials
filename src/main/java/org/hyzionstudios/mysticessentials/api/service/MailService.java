@@ -1,6 +1,7 @@
 package org.hyzionstudios.mysticessentials.api.service;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
@@ -25,7 +26,7 @@ public interface MailService {
     CompletableFuture<List<MailMessage>> inbox(UUID player);
 
     /** Loads a single mail from a player's inbox by id, or empty if absent. */
-    CompletableFuture<java.util.Optional<MailMessage>> getMessage(UUID player, String mailId);
+    CompletableFuture<Optional<MailMessage>> getMessage(UUID player, String mailId);
 
     CompletableFuture<Integer> unreadCount(UUID player);
 

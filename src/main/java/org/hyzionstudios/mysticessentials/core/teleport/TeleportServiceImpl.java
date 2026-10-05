@@ -17,6 +17,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 
+import org.hyzionstudios.mysticessentials.api.Permissions;
 import org.hyzionstudios.mysticessentials.api.model.MysticLocation;
 import org.hyzionstudios.mysticessentials.api.model.TeleportRequest;
 import org.hyzionstudios.mysticessentials.api.service.TeleportService;
@@ -38,10 +39,8 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
  */
 public final class TeleportServiceImpl implements TeleportService {
 
-    private static final String BYPASS_WARMUP_PERMISSION =
-            org.hyzionstudios.mysticessentials.api.Permissions.TELEPORT_BYPASS_WARMUP;
-    private static final String BYPASS_COOLDOWN_PERMISSION =
-            org.hyzionstudios.mysticessentials.api.Permissions.TELEPORT_BYPASS_COOLDOWN;
+    private static final String BYPASS_WARMUP_PERMISSION = Permissions.TELEPORT_BYPASS_WARMUP;
+    private static final String BYPASS_COOLDOWN_PERMISSION = Permissions.TELEPORT_BYPASS_COOLDOWN;
 
     /** Poll cadence for the warmup movement check. */
     private static final long WARMUP_CHECK_MS = 250L;

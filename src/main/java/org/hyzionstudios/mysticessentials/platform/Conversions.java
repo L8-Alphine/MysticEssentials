@@ -3,6 +3,7 @@ package org.hyzionstudios.mysticessentials.platform;
 import java.util.UUID;
 
 import org.hyzionstudios.mysticessentials.api.model.MysticLocation;
+import org.joml.Vector3d;
 
 import com.hypixel.hytale.math.vector.Location;
 import com.hypixel.hytale.math.vector.Rotation3f;
@@ -37,7 +38,7 @@ public final class Conversions {
         rotation.setPitch(loc.getPitch());
         rotation.setYaw(loc.getYaw());
         rotation.setRoll(0.0f);
-        return new Transform(new org.joml.Vector3d(loc.getX(), loc.getY(), loc.getZ()), rotation);
+        return new Transform(new Vector3d(loc.getX(), loc.getY(), loc.getZ()), rotation);
     }
 
     /**
@@ -46,7 +47,7 @@ public final class Conversions {
      */
     public static MysticLocation capture(PlayerRef player) {
         Transform transform = player.getTransform();
-        org.joml.Vector3d pos = transform.getPosition();
+        Vector3d pos = transform.getPosition();
         Rotation3f rot = player.getHeadRotation();
         if (rot == null) {
             rot = transform.getRotation();

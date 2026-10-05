@@ -1,14 +1,22 @@
 package org.hyzionstudios.mysticessentials.modules.chat;
 
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.UnaryOperator;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.hyzionstudios.mysticessentials.api.event.ChatMessagePublishedEvent;
+import org.hyzionstudios.mysticessentials.api.mention.MentionScopeProvider;
 import org.hyzionstudios.mysticessentials.api.service.ChatService;
+import org.hyzionstudios.mysticessentials.api.voice.ChannelVoicePresenceProvider;
 import org.hyzionstudios.mysticessentials.core.module.AbstractMysticModule;
 import org.hyzionstudios.mysticessentials.modules.chat.itemlink.ItemLinkSubModule;
 import org.hyzionstudios.mysticessentials.modules.chat.itemlink.ItemSnapshot;
@@ -184,7 +192,7 @@ public final class ChatModule extends AbstractMysticModule implements ChatServic
             return event;
         }
 
-        java.util.List<PlayerRef> recipients = recipients(event, sender);
+        List<PlayerRef> recipients = recipients(event, sender);
         MentionSubModule.Result mentionResult = mentions == null
                 ? null
                 : mentions.process(sender, event.getContent(), senderChannelName(sender), recipients);
@@ -202,8 +210,7 @@ public final class ChatModule extends AbstractMysticModule implements ChatServic
         if (mentionResult != null && mentionResult.perViewer()) {
             deliverPerViewer(event, sender, recipients, mentionResult);
         } else {
-            java.util.Set<java.util.UUID> mentioned =
-                    mentionResult == null ? java.util.Set.of() : mentionResult.mentioned();
+            Set<UUID> mentioned = mentionResult == null ? Set.of() : mentionResult.mentioned();
             event.setFormatter((from, content) -> renderChatLine(from, content, null, mentioned));
         }
 
@@ -225,11 +232,11 @@ public final class ChatModule extends AbstractMysticModule implements ChatServic
      * echo runs through it before the (now empty) target loop.</p>
      */
     private void deliverPerViewer(PlayerChatEvent event, PlayerRef sender,
-            java.util.List<PlayerRef> recipients, MentionSubModule.Result mentionResult) {
+            List<PlayerRef> recipients, MentionSubModule.Result mentionResult) {
         String content = event.getContent();
-        java.util.Set<java.util.UUID> mentioned = mentionResult.mentioned();
+        Set<UUID> mentioned = mentionResult.mentioned();
         event.setFormatter((from, text) -> renderChatLine(from, text, null, mentioned));
-        event.setTargets(java.util.List.of());
+        event.setTargets(List.of());
         for (PlayerRef recipient : recipients) {
             if (recipient == null) {
                 continue;
@@ -257,7 +264,7 @@ public final class ChatModule extends AbstractMysticModule implements ChatServic
         UUID uuid = sender.getUuid();
         String primaryGroup = orEmpty(core.getPermissionService().primaryGroup(uuid));
         String rankPrefix = orEmpty(core.getPermissionService().prefix(uuid));
-        core.getEventBus().publish(new org.hyzionstudios.mysticessentials.api.event.ChatMessagePublishedEvent(
+        core.getEventBus().publish(new ChatMessagePublishedEvent(
                 uuid,
                 sender.getUsername(),
                 displayNameOf(sender),
@@ -274,10 +281,10 @@ public final class ChatModule extends AbstractMysticModule implements ChatServic
     }
 
     /** Recipients of a routed chat event (routed targets, or all online), including the sender. */
-    private java.util.List<PlayerRef> recipients(PlayerChatEvent event, PlayerRef sender) {
-        java.util.List<PlayerRef> targets = event.getTargets();
-        java.util.Map<UUID, PlayerRef> byUuid = new java.util.LinkedHashMap<>();
-        java.util.Collection<PlayerRef> source = targets != null
+    private List<PlayerRef> recipients(PlayerChatEvent event, PlayerRef sender) {
+        List<PlayerRef> targets = event.getTargets();
+        Map<UUID, PlayerRef> byUuid = new LinkedHashMap<>();
+        Collection<PlayerRef> source = targets != null
                 ? targets : core.platform().onlinePlayers();
         for (PlayerRef target : source) {
             if (target != null) {
@@ -287,7 +294,7 @@ public final class ChatModule extends AbstractMysticModule implements ChatServic
         if (sender != null) {
             byUuid.put(sender.getUuid(), sender);
         }
-        return new java.util.ArrayList<>(byUuid.values());
+        return new ArrayList<>(byUuid.values());
     }
 
     private String senderChannelName(PlayerRef sender) {
@@ -310,7 +317,7 @@ public final class ChatModule extends AbstractMysticModule implements ChatServic
      * defined rendering and every failure has a clean fallback, so no code path
      * here can emit a raw tag or an unresolved token into chat.
      */
-    private String expandTokens(String message, UUID viewer, java.util.Set<UUID> mentioned) {
+    private String expandTokens(String message, UUID viewer, Set<UUID> mentioned) {
         if (!ChatTokens.hasTokens(message)) {
             return message;
         }
@@ -336,7 +343,7 @@ public final class ChatModule extends AbstractMysticModule implements ChatServic
      * {@code @Aether} while everybody else sees {@code Aether}.</p>
      */
     private Message renderChatLine(PlayerRef sender, String content, UUID viewer,
-            java.util.Set<UUID> mentioned) {
+            Set<UUID> mentioned) {
         UUID uuid = sender.getUuid();
         String template = channels == null
                 ? resolveFormat(uuid)
@@ -426,8 +433,7 @@ public final class ChatModule extends AbstractMysticModule implements ChatServic
      * speaking/mute indicators (design bible §11.4). A voice mod or the MysticIdentity
      * Discord bridge calls this; passing {@code null} restores the no-op provider.
      */
-    public void registerVoicePresenceProvider(
-            org.hyzionstudios.mysticessentials.api.voice.ChannelVoicePresenceProvider provider) {
+    public void registerVoicePresenceProvider(ChannelVoicePresenceProvider provider) {
         channels.setVoicePresenceProvider(provider);
     }
 
@@ -480,15 +486,14 @@ public final class ChatModule extends AbstractMysticModule implements ChatServic
     }
 
     @Override
-    public java.util.Set<String> temporaryChannelIds() {
-        return channels == null ? java.util.Set.of() : channels.temporaryChannelIds();
+    public Set<String> temporaryChannelIds() {
+        return channels == null ? Set.of() : channels.temporaryChannelIds();
     }
 
     // ----- Mention scopes ----------------------------------------------------
 
     @Override
-    public void registerMentionScope(
-            org.hyzionstudios.mysticessentials.api.mention.MentionScopeProvider provider) {
+    public void registerMentionScope(MentionScopeProvider provider) {
         if (mentions != null) {
             mentions.registerScope(provider);
         }
@@ -500,8 +505,7 @@ public final class ChatModule extends AbstractMysticModule implements ChatServic
     }
 
     @Override
-    public java.util.List<org.hyzionstudios.mysticessentials.api.mention.MentionScopeProvider>
-            mentionScopes() {
-        return mentions == null ? java.util.List.of() : mentions.availableScopes();
+    public List<MentionScopeProvider> mentionScopes() {
+        return mentions == null ? List.of() : mentions.availableScopes();
     }
 }

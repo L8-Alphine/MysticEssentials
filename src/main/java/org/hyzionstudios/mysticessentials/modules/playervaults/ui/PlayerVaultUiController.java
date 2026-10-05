@@ -3,11 +3,13 @@ package org.hyzionstudios.mysticessentials.modules.playervaults.ui;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 
 import org.hyzionstudios.mysticessentials.core.MysticCore;
@@ -32,6 +34,9 @@ import org.hyzionstudios.mysticessentials.modules.playervaults.service.VaultItem
 import org.hyzionstudios.mysticessentials.modules.playervaults.service.VaultItemCodec;
 import org.hyzionstudios.mysticessentials.modules.playervaults.model.VaultAdminLogEntry;
 
+import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.protocol.packets.interface_.Page;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.entities.player.windows.ContainerWindow;
 import com.hypixel.hytale.server.core.inventory.InventoryComponent;
@@ -42,6 +47,7 @@ import com.hypixel.hytale.server.core.inventory.container.filter.FilterActionTyp
 import com.hypixel.hytale.server.core.inventory.container.filter.FilterType;
 import com.hypixel.hytale.server.core.inventory.container.filter.SlotFilter;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
 /**
  * Owns the lifecycle of open vault sessions: it resolves permission + lock +
@@ -108,13 +114,13 @@ public final class PlayerVaultUiController {
         int allowedRows = adminView ? config.maxRows : permissions.allowedRows(viewer);
         int limit = Math.min(Math.max(allowedVaults, 1), config.maxVaults);
 
-        List<CompletableFuture<java.util.Optional<PlayerVault>>> loads = new ArrayList<>();
+        List<CompletableFuture<Optional<PlayerVault>>> loads = new ArrayList<>();
         for (int number = 1; number <= limit; number++) {
             loads.add(service.getVault(ownerUuid, number));
         }
         CompletableFuture.allOf(loads.toArray(CompletableFuture[]::new)).whenComplete((v, error) -> {
             List<PlayerVault> vaults = new ArrayList<>(limit);
-            for (CompletableFuture<java.util.Optional<PlayerVault>> load : loads) {
+            for (CompletableFuture<Optional<PlayerVault>> load : loads) {
                 vaults.add(load.join().orElse(null));
             }
             core.platform().openPage(viewer, new VaultListUi(core, this, viewer, ownerUuid, ownerName,
@@ -328,7 +334,7 @@ public final class PlayerVaultUiController {
                 // panel CANNOT coexist with the grid (openCustomPageWithWindows hides it),
                 // so vault name / nav / edit live on the vault-list dashboard instead.
                 playerEntity.getPageManager().setPageWithWindows(entity, store,
-                        com.hypixel.hytale.protocol.packets.interface_.Page.Bench, true, window);
+                        Page.Bench, true, window);
             } catch (Throwable t) {
                 core.log(Level.SEVERE, "[playervaults] openWindow failed for "
                         + viewer.getUsername() + ": " + t);
@@ -447,8 +453,8 @@ public final class PlayerVaultUiController {
     }
 
     private static List<ItemContainer> depositSources(
-            com.hypixel.hytale.component.Store<com.hypixel.hytale.server.core.universe.world.storage.EntityStore> store,
-            com.hypixel.hytale.component.Ref<com.hypixel.hytale.server.core.universe.world.storage.EntityStore> entity) {
+            Store<EntityStore> store,
+            Ref<EntityStore> entity) {
         List<ItemContainer> sources = new ArrayList<>();
         addDepositSource(sources, store.getComponent(entity, InventoryComponent.Storage.getComponentType()));
         addDepositSource(sources, store.getComponent(entity, InventoryComponent.Backpack.getComponentType()));
@@ -872,7 +878,7 @@ public final class PlayerVaultUiController {
         volatile boolean dirty;
         volatile boolean readOnlyDowngrade;
         /** Guards against overlapping saves for this session (interval vs write-through vs close). */
-        final java.util.concurrent.atomic.AtomicBoolean saving = new java.util.concurrent.atomic.AtomicBoolean();
+        final AtomicBoolean saving = new AtomicBoolean();
         ScheduledFuture<?> renewalTask;
         ScheduledFuture<?> saveTask;
 

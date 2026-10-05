@@ -6,7 +6,10 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 
 import org.hyzionstudios.mysticessentials.api.Permissions;
 import org.hyzionstudios.mysticessentials.api.model.MailAttachment;
@@ -181,7 +184,7 @@ final class MailPages {
                     players.add(ref);
                 }
             }
-            players.sort(java.util.Comparator.comparing(PlayerRef::getUsername, String.CASE_INSENSITIVE_ORDER));
+            players.sort(Comparator.comparing(PlayerRef::getUsername, String.CASE_INSENSITIVE_ORDER));
             cmd.set("#ListEmpty.Visible", players.isEmpty());
             cmd.set("#ListEmpty.TextSpans", uiText("#ListEmpty.TextSpans", players.isEmpty() ? "No other players online." : ""));
             for (int i = 0; i < players.size(); i++) {
@@ -245,7 +248,7 @@ final class MailPages {
                 }
             }
             // Newest first (inboxes are stored oldest-first).
-            java.util.Collections.reverse(matched);
+            Collections.reverse(matched);
             return matched;
         }
 
@@ -495,7 +498,7 @@ final class MailPages {
                 case "markall" -> mail.markAllRead(player.getUuid()).thenAccept(count -> {
                     if (count > 0) {
                         core.getMessageService().sendKey(player, "mail-marked-all-read",
-                                java.util.Map.of("count", Integer.toString(count)));
+                                Map.of("count", Integer.toString(count)));
                     }
                     reopenFolder(selectedId);
                 });

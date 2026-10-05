@@ -1,10 +1,14 @@
 package org.hyzionstudios.mysticessentials.modules.customcontent.layout;
 
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.logging.Level;
 
+import org.hyzionstudios.mysticessentials.api.ui.UiActionResult;
 import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.api.Permissions;
 import org.hyzionstudios.mysticessentials.api.ui.UiActionContext;
@@ -132,7 +136,7 @@ final class LayoutActions {
     private Outcome typed(PlayerRef player, String encoded) {
         String[] parts = encoded.split(";");
         String id = parts.length == 0 ? "" : parts[0].trim();
-        java.util.Map<String, Object> payload = new java.util.LinkedHashMap<>();
+        Map<String, Object> payload = new LinkedHashMap<>();
         for (int index = 1; index < parts.length; index++) {
             int equals = parts[index].indexOf('=');
             if (equals > 0) {
@@ -144,8 +148,8 @@ final class LayoutActions {
         var result = core.getCustomUiService().actions().dispatch(id,
                 new UiActionContext(player.getUuid(), session, null,
                         session == null ? null : session.currentRoute(), payload,
-                        player::hasPermission, java.time.Instant.now()));
-        if (result.status() != org.hyzionstudios.mysticessentials.api.ui.UiActionResult.Status.SUCCESS
+                        player::hasPermission, Instant.now()));
+        if (result.status() != UiActionResult.Status.SUCCESS
                 && result.message() != null) {
             core.getMessageService().send(player, "&c" + result.message());
         }

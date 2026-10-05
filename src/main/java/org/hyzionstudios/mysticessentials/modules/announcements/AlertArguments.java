@@ -3,6 +3,7 @@ package org.hyzionstudios.mysticessentials.modules.announcements;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 import org.hyzionstudios.mysticessentials.api.notification.Notification;
 import org.hyzionstudios.mysticessentials.api.notification.NotificationAction;
@@ -69,7 +70,7 @@ final class AlertArguments {
      * @param source          the {@code source} recorded on the notification
      */
     static Parsed parse(String input, NotificationCategory defaultCategory,
-            NotificationPriority defaultPriority, java.util.Set<String> knownCategories,
+            NotificationPriority defaultPriority, Set<String> knownCategories,
             String source) {
         if (input == null || input.isBlank()) {
             return Parsed.failure("Nothing to send — provide a message.");

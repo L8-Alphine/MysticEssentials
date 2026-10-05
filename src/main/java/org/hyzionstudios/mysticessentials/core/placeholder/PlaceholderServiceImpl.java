@@ -1,5 +1,6 @@
 package org.hyzionstudios.mysticessentials.core.placeholder;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -44,7 +45,7 @@ public final class PlaceholderServiceImpl implements PlaceholderService {
     private final MysticCore core;
     private final Map<String, BiFunction<UUID, String, String>> resolvers = new ConcurrentHashMap<>();
     /** Live expansion instances; only populated when PlaceholderAPI is present. */
-    private final List<MysticExpansion> expansions = new java.util.ArrayList<>();
+    private final List<MysticExpansion> expansions = new ArrayList<>();
     private boolean placeholderApiAvailable;
     private int lifecycleGeneration;
     private ScheduledFuture<?> retryTask;

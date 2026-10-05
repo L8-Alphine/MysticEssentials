@@ -1,6 +1,7 @@
 package org.hyzionstudios.mysticessentials.modules.warps;
 
 import java.lang.reflect.Type;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -10,6 +11,7 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.UUID;
 
+import org.hyzionstudios.mysticessentials.api.Permissions;
 import org.hyzionstudios.mysticessentials.api.model.MysticLocation;
 import org.hyzionstudios.mysticessentials.api.model.TeleportRequest;
 import org.hyzionstudios.mysticessentials.api.model.Warp;
@@ -21,6 +23,7 @@ import org.hyzionstudios.mysticessentials.platform.command.MysticArgTypes;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommand;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommandSender;
 
+import com.google.gson.JsonElement;
 import com.google.gson.reflect.TypeToken;
 import com.hypixel.hytale.server.core.command.system.arguments.system.RequiredArg;
 import com.hypixel.hytale.server.core.command.system.arguments.types.ArgTypes;
@@ -38,8 +41,8 @@ public final class WarpModule extends AbstractMysticModule implements WarpServic
 
     private static final Type WARP_MAP_TYPE = new TypeToken<LinkedHashMap<String, Warp>>() {
     }.getType();
-    static final String ADMIN_PERMISSION = org.hyzionstudios.mysticessentials.api.Permissions.WARP_SET;
-    static final String PWARP_ADMIN_PERMISSION = org.hyzionstudios.mysticessentials.api.Permissions.PLAYERWARP_ADMIN;
+    static final String ADMIN_PERMISSION = Permissions.WARP_SET;
+    static final String PWARP_ADMIN_PERMISSION = Permissions.PLAYERWARP_ADMIN;
 
     private Map<String, Warp> serverWarps = new LinkedHashMap<>();
     private Map<String, Warp> playerWarps = new LinkedHashMap<>();
@@ -80,9 +83,9 @@ public final class WarpModule extends AbstractMysticModule implements WarpServic
         savePlayerWarps();
     }
 
-    private Map<String, Warp> loadWarpMap(java.nio.file.Path file, String label) {
+    private Map<String, Warp> loadWarpMap(Path file, String label) {
         try {
-            com.google.gson.JsonElement element = Json.readFile(file);
+            JsonElement element = Json.readFile(file);
             Map<String, Warp> loaded = element == null ? null : Json.gson().fromJson(element, WARP_MAP_TYPE);
             return loaded != null ? loaded : new LinkedHashMap<>();
         } catch (Exception e) {
@@ -107,11 +110,11 @@ public final class WarpModule extends AbstractMysticModule implements WarpServic
         }
     }
 
-    private java.nio.file.Path serverWarpFile() {
+    private Path serverWarpFile() {
         return core.paths().moduleDataDir(id()).resolve("server.json");
     }
 
-    private java.nio.file.Path playerWarpFile() {
+    private Path playerWarpFile() {
         return core.paths().moduleDataDir(id()).resolve("playerwarps.json");
     }
 
@@ -239,7 +242,7 @@ public final class WarpModule extends AbstractMysticModule implements WarpServic
     @Override
     public int playerWarpLimit(UUID owner) {
         OptionalInt limit = core.getPermissionService().limit(owner,
-                org.hyzionstudios.mysticessentials.api.Permissions.PLAYERWARP_LIMIT_BASE, true);
+                Permissions.PLAYERWARP_LIMIT_BASE, true);
         return limit.orElse(1);
     }
 
@@ -371,7 +374,7 @@ public final class WarpModule extends AbstractMysticModule implements WarpServic
     private final class WarpCommand extends MysticCommand {
         WarpCommand() {
             super(WarpModule.this.core, "warp", "Teleport to a server warp.");
-            requirePermission(org.hyzionstudios.mysticessentials.api.Permissions.WARP_USE);
+            requirePermission(Permissions.WARP_USE);
             addUsageVariant(new WarpNamedVariant());
         }
 
@@ -390,7 +393,7 @@ public final class WarpModule extends AbstractMysticModule implements WarpServic
 
         WarpNamedVariant() {
             super(WarpModule.this.core, "Teleport to a named server warp.");
-            requirePermission(org.hyzionstudios.mysticessentials.api.Permissions.WARP_USE);
+            requirePermission(Permissions.WARP_USE);
         }
 
         @Override
@@ -412,7 +415,7 @@ public final class WarpModule extends AbstractMysticModule implements WarpServic
     private final class WarpsCommand extends MysticCommand {
         WarpsCommand() {
             super(WarpModule.this.core, "warps", "List available warps.");
-            requirePermission(org.hyzionstudios.mysticessentials.api.Permissions.WARP_USE);
+            requirePermission(Permissions.WARP_USE);
         }
 
         @Override
@@ -489,7 +492,7 @@ public final class WarpModule extends AbstractMysticModule implements WarpServic
             addAliases("pwarps");
             addAliases("playerwarp");
             addAliases("playerwarps");
-            requirePermission(org.hyzionstudios.mysticessentials.api.Permissions.PLAYERWARP_USE);
+            requirePermission(Permissions.PLAYERWARP_USE);
             addUsageVariant(new PlayerWarpNamedVariant());
             addSubCommand(new PlayerWarpCreateCommand());
             addSubCommand(new PlayerWarpDeleteCommand());
@@ -511,7 +514,7 @@ public final class WarpModule extends AbstractMysticModule implements WarpServic
 
         PlayerWarpNamedVariant() {
             super(WarpModule.this.core, "Teleport to a player warp.");
-            requirePermission(org.hyzionstudios.mysticessentials.api.Permissions.PLAYERWARP_USE);
+            requirePermission(Permissions.PLAYERWARP_USE);
         }
 
         @Override
@@ -536,7 +539,7 @@ public final class WarpModule extends AbstractMysticModule implements WarpServic
 
         PlayerWarpCreateCommand() {
             super(WarpModule.this.core, "create", "Create a player warp at your location.");
-            requirePermission(org.hyzionstudios.mysticessentials.api.Permissions.PLAYERWARP_CREATE);
+            requirePermission(Permissions.PLAYERWARP_CREATE);
         }
 
         @Override

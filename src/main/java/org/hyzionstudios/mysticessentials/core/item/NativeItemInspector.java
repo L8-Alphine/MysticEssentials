@@ -4,7 +4,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.function.Consumer;
 
 import org.bson.BsonArray;
 import org.bson.BsonDocument;
@@ -18,6 +20,8 @@ import org.hyzionstudios.mysticessentials.api.item.ItemViewEntries.ItemSourceDat
 import org.hyzionstudios.mysticessentials.api.item.RichText;
 import org.hyzionstudios.mysticessentials.platform.ItemStackMetadata;
 
+import com.hypixel.hytale.codec.ExtraInfo;
+import com.hypixel.hytale.protocol.Color;
 import com.hypixel.hytale.protocol.FormattedMessage;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.asset.type.item.config.Item;
@@ -165,7 +169,7 @@ final class NativeItemInspector {
             BsonValue encoded = metadata.get(MYSTIC_RPG_BASE_DESCRIPTION_KEY);
             return encoded == null || encoded.isNull()
                     ? null
-                    : Message.CODEC.decode(encoded, new com.hypixel.hytale.codec.ExtraInfo());
+                    : Message.CODEC.decode(encoded, new ExtraInfo());
         }, null);
         RichText base = messageRichText(storedBase);
         if (base != null && !base.isEmpty()) {
@@ -386,7 +390,7 @@ final class NativeItemInspector {
                 .build();
     }
 
-    private static String color(com.hypixel.hytale.protocol.Color color) {
+    private static String color(Color color) {
         if (color == null) {
             return null;
         }
@@ -748,7 +752,7 @@ final class NativeItemInspector {
         }
     }
 
-    private static void forEachLine(BsonValue value, java.util.function.Consumer<String> sink) {
+    private static void forEachLine(BsonValue value, Consumer<String> sink) {
         if (value.isArray()) {
             BsonArray array = value.asArray();
             for (BsonValue element : array) {
@@ -774,15 +778,15 @@ final class NativeItemInspector {
      * produces one, whatever it spells — {@code "Null"} yields a quality named
      * {@code Null}. Only an absent or non-scalar value yields nothing.
      */
-    private static java.util.Optional<ItemClassification> classificationFrom(BsonValue value) {
+    private static Optional<ItemClassification> classificationFrom(BsonValue value) {
         if (value.isDocument()) {
             BsonDocument document = value.asDocument();
             String name = text(document.get("name"));
             String id = text(document.get("id"));
             if (name == null && id == null) {
-                return java.util.Optional.empty();
+                return Optional.empty();
             }
-            return java.util.Optional.of(ItemClassification.builder()
+            return Optional.of(ItemClassification.builder()
                     .id(id)
                     .displayName(name)
                     .color(text(document.get("color")))
@@ -791,9 +795,9 @@ final class NativeItemInspector {
         }
         String text = text(value);
         if (text == null) {
-            return java.util.Optional.empty();
+            return Optional.empty();
         }
-        return java.util.Optional.ofNullable(ItemClassification.named(text));
+        return Optional.ofNullable(ItemClassification.named(text));
     }
 
     // ----- BSON helpers ---------------------------------------------------------
@@ -819,10 +823,10 @@ final class NativeItemInspector {
         return null;
     }
 
-    private static java.util.Optional<Integer> integer(BsonValue value) {
+    private static Optional<Integer> integer(BsonValue value) {
         Double number = number(value);
-        return number == null ? java.util.Optional.empty()
-                : java.util.Optional.of((int) Math.round(number));
+        return number == null ? Optional.empty()
+                : Optional.of((int) Math.round(number));
     }
 
     private static Double number(BsonValue value) {

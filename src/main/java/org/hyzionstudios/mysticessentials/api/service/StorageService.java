@@ -1,5 +1,6 @@
 package org.hyzionstudios.mysticessentials.api.service;
 
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 import com.google.gson.JsonElement;
@@ -30,5 +31,5 @@ public interface StorageService {
     CompletableFuture<Boolean> exists(String namespace, String key);
 
     /** Lists every key stored under {@code namespace} (empty if none). */
-    CompletableFuture<java.util.List<String>> listKeys(String namespace);
+    CompletableFuture<List<String>> listKeys(String namespace);
 }

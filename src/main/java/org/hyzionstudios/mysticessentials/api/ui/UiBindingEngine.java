@@ -4,6 +4,7 @@ import java.lang.reflect.Method;
 import java.text.NumberFormat;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -93,7 +94,7 @@ public final class UiBindingEngine {
         for (String segment : path.split("\\.")) {
             if (current == null) return null;
             if (current instanceof Map<?, ?> map) current = map.get(segment);
-            else if (segment.equals("size") && current instanceof java.util.Collection<?> collection) current = collection.size();
+            else if (segment.equals("size") && current instanceof Collection<?> collection) current = collection.size();
             else current = property(current, segment);
         }
         return current;

@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -120,7 +121,7 @@ public final class PatchNotesModule extends AbstractMysticModule {
         if (search == null || search.isBlank()) {
             return true;
         }
-        String needle = search.toLowerCase(java.util.Locale.ROOT).trim();
+        String needle = search.toLowerCase(Locale.ROOT).trim();
         if (contains(note.title, needle) || contains(note.version, needle)
                 || contains(note.summary, needle) || contains(note.author, needle)) {
             return true;
@@ -136,7 +137,7 @@ public final class PatchNotesModule extends AbstractMysticModule {
     }
 
     private static boolean contains(String haystack, String lowerNeedle) {
-        return haystack != null && haystack.toLowerCase(java.util.Locale.ROOT).contains(lowerNeedle);
+        return haystack != null && haystack.toLowerCase(Locale.ROOT).contains(lowerNeedle);
     }
 
     PatchNote noteById(String id) {

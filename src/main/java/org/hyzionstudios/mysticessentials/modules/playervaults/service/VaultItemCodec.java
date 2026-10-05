@@ -3,6 +3,7 @@ package org.hyzionstudios.mysticessentials.modules.playervaults.service;
 import java.util.List;
 import java.util.Locale;
 
+import org.bson.BsonDocument;
 import org.hyzionstudios.mysticessentials.modules.playervaults.config.PlayerVaultConfig;
 import org.hyzionstudios.mysticessentials.modules.playervaults.model.VaultItemStack;
 import org.hyzionstudios.mysticessentials.platform.ItemStackMetadata;
@@ -32,9 +33,9 @@ public final class VaultItemCodec {
 
     /** Rebuilds a live item from stored data, restoring full metadata. */
     public static ItemStack toLive(VaultItemStack stored) {
-        org.bson.BsonDocument metadata = stored.metadata == null || stored.metadata.isBlank()
-                ? new org.bson.BsonDocument()
-                : org.bson.BsonDocument.parse(stored.metadata);
+        BsonDocument metadata = stored.metadata == null || stored.metadata.isBlank()
+                ? new BsonDocument()
+                : BsonDocument.parse(stored.metadata);
         return new ItemStack(stored.itemId, Math.max(1, stored.quantity),
                 stored.durability, stored.maxDurability, metadata);
     }

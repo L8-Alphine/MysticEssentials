@@ -6,10 +6,14 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
+import java.util.function.BiConsumer;
+import java.util.function.Function;
 import java.util.logging.Level;
 
 import org.hyzionstudios.mysticessentials.core.MysticCore;
@@ -70,8 +74,8 @@ public final class TutorialConfigLoader {
     }
 
     private <T> void loadDirectory(Path dir, Class<T> type,
-            java.util.function.Function<T, String> idOf,
-            java.util.function.BiConsumer<String, T> sink) {
+            Function<T, String> idOf,
+            BiConsumer<String, T> sink) {
         if (!Files.isDirectory(dir)) {
             return;
         }
@@ -114,21 +118,21 @@ public final class TutorialConfigLoader {
 
     // ----- Lookups -----------------------------------------------------------
 
-    public java.util.Optional<TutorialDefinition> tutorial(String id) {
-        return id == null ? java.util.Optional.empty()
-                : java.util.Optional.ofNullable(tutorials.get(id.toLowerCase(Locale.ROOT)));
+    public Optional<TutorialDefinition> tutorial(String id) {
+        return id == null ? Optional.empty()
+                : Optional.ofNullable(tutorials.get(id.toLowerCase(Locale.ROOT)));
     }
 
-    public java.util.Collection<TutorialDefinition> tutorials() {
+    public Collection<TutorialDefinition> tutorials() {
         return Collections.unmodifiableCollection(tutorials.values());
     }
 
-    public java.util.Optional<TutorialPageDefinition> page(String id) {
-        return id == null ? java.util.Optional.empty()
-                : java.util.Optional.ofNullable(pages.get(id.toLowerCase(Locale.ROOT)));
+    public Optional<TutorialPageDefinition> page(String id) {
+        return id == null ? Optional.empty()
+                : Optional.ofNullable(pages.get(id.toLowerCase(Locale.ROOT)));
     }
 
-    public java.util.Collection<TutorialPageDefinition> pages() {
+    public Collection<TutorialPageDefinition> pages() {
         return Collections.unmodifiableCollection(pages.values());
     }
 

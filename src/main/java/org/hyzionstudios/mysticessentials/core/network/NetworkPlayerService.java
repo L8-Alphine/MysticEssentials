@@ -1,5 +1,6 @@
 package org.hyzionstudios.mysticessentials.core.network;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -13,6 +14,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 
 import org.hyzionstudios.mysticessentials.core.MysticCore;
@@ -46,7 +48,7 @@ public final class NetworkPlayerService {
 
     private final MysticCore core;
     private final Map<String, ServerSnapshot> remoteServers = new ConcurrentHashMap<>();
-    private final java.util.function.Consumer<String> redisHandler = this::handleSnapshot;
+    private final Consumer<String> redisHandler = this::handleSnapshot;
 
     private ScheduledFuture<?> heartbeat;
     private volatile boolean running;
@@ -231,7 +233,7 @@ public final class NetworkPlayerService {
         JsonObject route = new JsonObject();
         route.addProperty("kind", "mysticessentials:route");
         route.addProperty("destinationServerId", destinationServerId);
-        return Json.toString(route).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        return Json.toString(route).getBytes(StandardCharsets.UTF_8);
     }
 
     /** Every other server currently on the roster, for diagnostics. */

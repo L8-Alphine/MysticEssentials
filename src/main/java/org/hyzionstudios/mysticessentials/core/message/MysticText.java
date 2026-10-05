@@ -1,5 +1,6 @@
 package org.hyzionstudios.mysticessentials.core.message;
 
+import java.awt.Color;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -568,7 +569,7 @@ public final class MysticText {
     }
 
     private static String hsbToHex(float hue) {
-        int rgb = java.awt.Color.HSBtoRGB(hue, 0.9f, 1.0f);
+        int rgb = Color.HSBtoRGB(hue, 0.9f, 1.0f);
         return toHex((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF);
     }
 

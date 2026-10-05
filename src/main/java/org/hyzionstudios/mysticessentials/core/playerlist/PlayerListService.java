@@ -22,6 +22,7 @@ import com.hypixel.hytale.event.EventPriority;
 import com.hypixel.hytale.protocol.packets.interface_.AddToServerPlayerList;
 import com.hypixel.hytale.protocol.packets.interface_.RemoveFromServerPlayerList;
 import com.hypixel.hytale.protocol.packets.interface_.ServerPlayerListPlayer;
+import com.hypixel.hytale.registry.Registration;
 import com.hypixel.hytale.server.core.HytaleServer;
 import com.hypixel.hytale.server.core.entity.entities.player.HiddenPlayersManager;
 import com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent;
@@ -79,9 +80,9 @@ public final class PlayerListService {
     private final Map<UUID, Row> overrides = new ConcurrentHashMap<>();
 
     private ScheduledFuture<?> refreshTask;
-    private com.hypixel.hytale.registry.Registration connectListener;
-    private com.hypixel.hytale.registry.Registration readyListener;
-    private com.hypixel.hytale.registry.Registration disconnectListener;
+    private Registration connectListener;
+    private Registration readyListener;
+    private Registration disconnectListener;
 
     /**
      * Everything in a list row that this service decides. Ping is excluded: the
@@ -151,8 +152,7 @@ public final class PlayerListService {
         disconnectListener = unregister(disconnectListener);
     }
 
-    private com.hypixel.hytale.registry.Registration unregister(
-            com.hypixel.hytale.registry.Registration registration) {
+    private Registration unregister(Registration registration) {
         if (registration != null) {
             try {
                 registration.unregister();

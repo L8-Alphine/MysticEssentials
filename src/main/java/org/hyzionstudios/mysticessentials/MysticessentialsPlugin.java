@@ -5,7 +5,9 @@ import java.util.logging.Level;
 import javax.annotation.Nonnull;
 
 import org.hyzionstudios.mysticessentials.core.MysticCore;
+import org.hyzionstudios.mysticessentials.modules.portals.PortalInteraction;
 
+import com.hypixel.hytale.server.core.modules.interaction.interaction.config.Interaction;
 import com.hypixel.hytale.server.core.plugin.JavaPlugin;
 import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
 
@@ -19,7 +21,7 @@ import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
  *
  * <p>Do not rename this class or its package: the Hytale mod manifest
  * ({@code manifest.json}) references {@code Main} =
- * {@code org.hyzionstudios.mysticessentials.MysticessentialsPlugin}.</p>
+ * {@code MysticessentialsPlugin}.</p>
  */
 public class MysticessentialsPlugin extends JavaPlugin {
 
@@ -34,10 +36,10 @@ public class MysticessentialsPlugin extends JavaPlugin {
         // Codec registrations must happen in setup(), before the asset system
         // parses block definitions that reference them. The interaction stays
         // inert until the portals module enables and installs itself.
-        getCodecRegistry(com.hypixel.hytale.server.core.modules.interaction.interaction.config.Interaction.CODEC)
-                .register(org.hyzionstudios.mysticessentials.modules.portals.PortalInteraction.TYPE_ID,
-                        org.hyzionstudios.mysticessentials.modules.portals.PortalInteraction.class,
-                        org.hyzionstudios.mysticessentials.modules.portals.PortalInteraction.CODEC);
+        getCodecRegistry(Interaction.CODEC)
+                .register(PortalInteraction.TYPE_ID,
+                        PortalInteraction.class,
+                        PortalInteraction.CODEC);
     }
 
     @Override

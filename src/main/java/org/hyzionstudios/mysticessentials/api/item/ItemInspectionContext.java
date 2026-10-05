@@ -1,5 +1,6 @@
 package org.hyzionstudios.mysticessentials.api.item;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -109,7 +110,7 @@ public final class ItemInspectionContext {
         private UUID viewerId;
         private String channelId;
         private String worldName;
-        private final Map<String, String> attributes = new java.util.LinkedHashMap<>();
+        private final Map<String, String> attributes = new LinkedHashMap<>();
 
         private Builder(Purpose purpose) {
             this.purpose = purpose;

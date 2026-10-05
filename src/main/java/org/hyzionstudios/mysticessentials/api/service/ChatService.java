@@ -1,7 +1,11 @@
 package org.hyzionstudios.mysticessentials.api.service;
 
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+
+import org.hyzionstudios.mysticessentials.api.mention.MentionScopeProvider;
 
 /**
  * Full chat framework: rank/permission formatting, colors, private messages,
@@ -25,8 +29,8 @@ public interface ChatService {
     boolean createTemporaryChannel(UUID owner, String channelId, String permissionGate);
 
     /** The ids of temporary channels currently active on this server. */
-    default java.util.Set<String> temporaryChannelIds() {
-        return java.util.Set.of();
+    default Set<String> temporaryChannelIds() {
+        return Set.of();
     }
 
     /**
@@ -64,8 +68,7 @@ public interface ChatService {
      * <p>Re-registering the same id replaces the previous provider, so a mod
      * reload does not accumulate duplicates.</p>
      */
-    default void registerMentionScope(
-            org.hyzionstudios.mysticessentials.api.mention.MentionScopeProvider provider) {
+    default void registerMentionScope(MentionScopeProvider provider) {
     }
 
     /** Removes a scope by id. @return whether one was registered. */
@@ -77,8 +80,7 @@ public interface ChatService {
      * The currently available scopes, in display order. Excludes providers whose
      * {@code isAvailable()} is false.
      */
-    default java.util.List<
-            org.hyzionstudios.mysticessentials.api.mention.MentionScopeProvider> mentionScopes() {
-        return java.util.List.of();
+    default List<MentionScopeProvider> mentionScopes() {
+        return List.of();
     }
 }

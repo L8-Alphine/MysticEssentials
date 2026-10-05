@@ -1,6 +1,8 @@
 package org.hyzionstudios.mysticessentials.modules.customcontent.layout;
 
 import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Geometry and paint values resolved from a document element's
@@ -216,8 +218,8 @@ public final class UiStyle {
         if (trimmed.matches(HEX)) {
             return trimmed.toLowerCase(Locale.ROOT);
         }
-        java.util.regex.Matcher alpha =
-                java.util.regex.Pattern.compile("^(" + HEX + ")\\(\\s*(0?\\.\\d+|0|1(?:\\.0+)?)\\s*\\)$")
+        Matcher alpha =
+                Pattern.compile("^(" + HEX + ")\\(\\s*(0?\\.\\d+|0|1(?:\\.0+)?)\\s*\\)$")
                         .matcher(trimmed);
         return alpha.matches() ? alpha.group(1).toLowerCase(Locale.ROOT) + "(" + alpha.group(2) + ")" : null;
     }

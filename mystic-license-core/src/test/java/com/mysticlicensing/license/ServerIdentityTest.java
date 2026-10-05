@@ -7,6 +7,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Locale;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -75,7 +76,7 @@ class ServerIdentityTest {
     void canonicalFormIsLowercase(@TempDir Path dir) {
         String canonical = ServerIdentity.resolve(dir).canonical().orElseThrow();
 
-        assertEquals(canonical.toLowerCase(java.util.Locale.ROOT), canonical);
+        assertEquals(canonical.toLowerCase(Locale.ROOT), canonical);
         assertDoesNotThrow(() -> UUID.fromString(canonical));
     }
 

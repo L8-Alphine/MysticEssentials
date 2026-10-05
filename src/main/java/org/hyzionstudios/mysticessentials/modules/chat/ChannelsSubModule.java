@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -18,12 +19,18 @@ import java.util.logging.Level;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.hyzionstudios.mysticessentials.api.event.ChannelModeratorChangedEvent;
+import org.hyzionstudios.mysticessentials.api.event.ChannelOwnershipTransferredEvent;
+import org.hyzionstudios.mysticessentials.api.event.TemporaryChannelClosedEvent;
+import org.hyzionstudios.mysticessentials.api.event.TemporaryChannelCreatedEvent;
+import org.hyzionstudios.mysticessentials.api.event.TemporaryChannelMembershipChangedEvent;
 import org.hyzionstudios.mysticessentials.api.voice.ChannelVoicePresenceProvider;
 import org.hyzionstudios.mysticessentials.api.notification.Notification;
 import org.hyzionstudios.mysticessentials.api.notification.NotificationAudience;
 import org.hyzionstudios.mysticessentials.api.notification.NotificationCategory;
 import org.hyzionstudios.mysticessentials.api.notification.NotificationPriority;
 import org.hyzionstudios.mysticessentials.core.MysticCore;
+import org.hyzionstudios.mysticessentials.core.integration.ManagedAccountsBridge;
 import org.hyzionstudios.mysticessentials.core.util.Json;
 import org.hyzionstudios.mysticessentials.modules.chat.roster.ChannelActivity;
 import org.hyzionstudios.mysticessentials.modules.chat.roster.ChannelMemberRole;
@@ -37,6 +44,7 @@ import org.hyzionstudios.mysticessentials.platform.command.MysticCommandSender;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.hypixel.hytale.registry.Registration;
 import com.hypixel.hytale.server.core.command.system.CommandSender;
 import com.hypixel.hytale.server.core.command.system.arguments.system.RequiredArg;
 import com.hypixel.hytale.server.core.command.system.arguments.types.ArgTypes;
@@ -96,8 +104,8 @@ public final class ChannelsSubModule {
     private Map<String, ChatConfig.Channel> configuredChannels = Map.of();
     private Map<String, String> aliasToChannel = Map.of();
     private Consumer<MysticCommand> commandRegistrar;
-    private com.hypixel.hytale.registry.Registration disconnectListener;
-    private com.hypixel.hytale.registry.Registration connectListener;
+    private Registration disconnectListener;
+    private Registration connectListener;
     private boolean stateSubscribed;
 
     public ChannelsSubModule(MysticCore core, ChatModule chat) {
@@ -121,7 +129,7 @@ public final class ChannelsSubModule {
         this.config = config == null ? new ChatConfig.Channels() : config;
         Map<String, ChatConfig.Channel> next = new HashMap<>();
         Map<String, String> aliases = new HashMap<>();
-        Set<String> desiredRedisTopics = new java.util.HashSet<>();
+        Set<String> desiredRedisTopics = new HashSet<>();
         if (this.config.channels != null) {
             for (ChatConfig.Channel channel : this.config.channels) {
                 if (channel.id == null || channel.id.isBlank()) {
@@ -139,7 +147,7 @@ public final class ChannelsSubModule {
                 }
             }
         }
-        for (String oldTopic : new java.util.HashSet<>(subscribedRedisTopics)) {
+        for (String oldTopic : new HashSet<>(subscribedRedisTopics)) {
             if (!desiredRedisTopics.contains(oldTopic)) {
                 core.redis().unsubscribe(oldTopic, redisMessageHandler);
                 subscribedRedisTopics.remove(oldTopic);
@@ -257,8 +265,7 @@ public final class ChannelsSubModule {
     // ----- Temporary-channel lifecycle events (external bridges) -------------
 
     private void publishTempCreated(String channelId, UUID owner) {
-        core.getEventBus().publish(
-                new org.hyzionstudios.mysticessentials.api.event.TemporaryChannelCreatedEvent(channelId, owner));
+        core.getEventBus().publish(new TemporaryChannelCreatedEvent(channelId, owner));
     }
 
     /** No-op for configured channels: only temporary channels report membership. */
@@ -267,13 +274,12 @@ public final class ChannelsSubModule {
             return;
         }
         core.getEventBus().publish(
-                new org.hyzionstudios.mysticessentials.api.event.TemporaryChannelMembershipChangedEvent(
+                new TemporaryChannelMembershipChangedEvent(
                         channelId, player, joined));
     }
 
     private void publishTempClosed(String channelId) {
-        core.getEventBus().publish(
-                new org.hyzionstudios.mysticessentials.api.event.TemporaryChannelClosedEvent(channelId));
+        core.getEventBus().publish(new TemporaryChannelClosedEvent(channelId));
     }
 
     /**
@@ -669,7 +675,7 @@ public final class ChannelsSubModule {
         persist(channelId, temp);
         audit.record("MODERATOR_ASSIGNED", channelId, actor.getUuid(), target, null);
         core.getEventBus().publish(
-                new org.hyzionstudios.mysticessentials.api.event.ChannelModeratorChangedEvent(
+                new ChannelModeratorChangedEvent(
                         resolveChannelId(channelId), target, actor.getUuid(), true));
         notify(target, "chat-channel-mod-assigned", Map.of("channel", displayNameOfId(channelId)));
         return ManageResult.OK;
@@ -689,7 +695,7 @@ public final class ChannelsSubModule {
         persist(channelId, temp);
         audit.record("MODERATOR_REMOVED", channelId, actor.getUuid(), target, null);
         core.getEventBus().publish(
-                new org.hyzionstudios.mysticessentials.api.event.ChannelModeratorChangedEvent(
+                new ChannelModeratorChangedEvent(
                         resolveChannelId(channelId), target, actor.getUuid(), false));
         notify(target, "chat-channel-mod-removed", Map.of("channel", displayNameOfId(channelId)));
         return ManageResult.OK;
@@ -994,7 +1000,7 @@ public final class ChannelsSubModule {
         persist(id, temp);
         audit.record("OWNERSHIP_TRANSFERRED", id, previous, newOwner, "source=" + source);
         core.getEventBus().publish(
-                new org.hyzionstudios.mysticessentials.api.event.ChannelOwnershipTransferredEvent(
+                new ChannelOwnershipTransferredEvent(
                         id, previous, newOwner, source));
         notify(newOwner, "chat-channel-transfer-received", Map.of("channel", displayNameOfId(id)));
         if (previous != null) {
@@ -1673,7 +1679,7 @@ public final class ChannelsSubModule {
             }
         }
         for (PlayerRef recipient : core.managedAccounts().reachable(placeholderContext, listening,
-                org.hyzionstudios.mysticessentials.core.integration.ManagedAccountsBridge.TEXT_PUBLIC)) {
+                ManagedAccountsBridge.TEXT_PUBLIC)) {
             recipient.sendMessage(core.getMessageService().formatFor(placeholderContext, line));
         }
     }

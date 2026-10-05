@@ -1,5 +1,6 @@
 package org.hyzionstudios.mysticessentials.modules.mail;
 
+import org.bson.BsonDocument;
 import org.hyzionstudios.mysticessentials.api.model.MailAttachment;
 import org.hyzionstudios.mysticessentials.platform.ItemStackMetadata;
 
@@ -28,9 +29,9 @@ final class MailItemCodec {
 
     /** Rebuilds a live item from a stored attachment, restoring full metadata. */
     static ItemStack toLive(MailAttachment stored) {
-        org.bson.BsonDocument metadata = stored.metadata == null || stored.metadata.isBlank()
-                ? new org.bson.BsonDocument()
-                : org.bson.BsonDocument.parse(stored.metadata);
+        BsonDocument metadata = stored.metadata == null || stored.metadata.isBlank()
+                ? new BsonDocument()
+                : BsonDocument.parse(stored.metadata);
         return new ItemStack(stored.itemId, Math.max(1, stored.quantity),
                 stored.durability, stored.maxDurability, metadata);
     }

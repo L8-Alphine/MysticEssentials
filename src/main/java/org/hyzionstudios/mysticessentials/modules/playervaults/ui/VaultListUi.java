@@ -5,6 +5,7 @@ import static org.hyzionstudios.mysticessentials.platform.ui.MysticPage.uiText;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -254,7 +255,7 @@ final class VaultListUi extends MysticPage {
         Optional<PlayerRef> target = core.platform().findPlayerByName(targetName.trim());
         if (target.isEmpty()) {
             core.getMessageService().sendKey(player, "player-not-found",
-                    java.util.Map.of("player", targetName.trim()));
+                    Map.of("player", targetName.trim()));
             return;
         }
         close(ref, store);

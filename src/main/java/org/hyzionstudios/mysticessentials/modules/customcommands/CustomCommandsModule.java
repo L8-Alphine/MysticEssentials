@@ -2,6 +2,7 @@ package org.hyzionstudios.mysticessentials.modules.customcommands;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -192,7 +193,7 @@ public final class CustomCommandsModule extends AbstractMysticModule {
         if (definition.isEmpty()) {
             // A stub whose label was removed but whose unregistration did not
             // take effect; behave like an unknown command.
-            sender.replyKey("customcommands-unknown", java.util.Map.of("command", label));
+            sender.replyKey("customcommands-unknown", Map.of("command", label));
             return;
         }
         executor.invoke(definition.get(), sender.raw().sender(), sender.player().orElse(null),

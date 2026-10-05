@@ -25,6 +25,7 @@ import org.hyzionstudios.mysticessentials.modules.tutorial.player.TutorialPlayer
 import org.hyzionstudios.mysticessentials.modules.tutorial.scene.TutorialSceneProvider;
 import org.hyzionstudios.mysticessentials.modules.tutorial.scene.TutorialSceneRequest;
 import org.hyzionstudios.mysticessentials.modules.tutorial.scene.TutorialSceneResult;
+import org.hyzionstudios.mysticessentials.modules.tutorial.scene.TutorialSceneResultType;
 import org.hyzionstudios.mysticessentials.modules.tutorial.util.TutorialPlaceholders;
 import org.hyzionstudios.mysticessentials.platform.Conversions;
 
@@ -260,7 +261,7 @@ public final class TutorialSessionManager {
         provider.playScene(request).whenComplete((result, error) -> {
             if (error != null) {
                 handleSceneResult(session, TutorialSceneResult.of(
-                        org.hyzionstudios.mysticessentials.modules.tutorial.scene.TutorialSceneResultType.FAILED,
+                        TutorialSceneResultType.FAILED,
                         String.valueOf(error)));
             } else {
                 handleSceneResult(session, result);

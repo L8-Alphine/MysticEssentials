@@ -10,6 +10,8 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.function.Consumer;
+import java.util.function.UnaryOperator;
 import java.util.logging.Level;
 
 import org.hyzionstudios.mysticessentials.api.model.PlayerProfile;
@@ -181,7 +183,7 @@ final class NotificationStore {
     }
 
     private boolean replace(UUID player, String notificationId,
-            java.util.function.UnaryOperator<NotificationRecord> mapper) {
+            UnaryOperator<NotificationRecord> mapper) {
         Deque<NotificationRecord> entries = historyFor(player);
         List<NotificationRecord> updated = new ArrayList<>(entries.size());
         boolean changed = false;
@@ -290,7 +292,7 @@ final class NotificationStore {
      * dirty. A no-op when the profile is not loaded — an offline player's history
      * is written when their own session ends, not by somebody else's send.
      */
-    private void mutateModuleData(UUID player, java.util.function.Consumer<JsonObject> mutation) {
+    private void mutateModuleData(UUID player, Consumer<JsonObject> mutation) {
         Optional<PlayerProfile> profile = core.getPlayerProfileService().getCached(player);
         if (profile.isEmpty()) {
             return;

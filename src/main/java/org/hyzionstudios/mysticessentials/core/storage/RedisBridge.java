@@ -2,6 +2,7 @@ package org.hyzionstudios.mysticessentials.core.storage;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.logging.Level;
@@ -258,15 +259,15 @@ public final class RedisBridge {
     }
 
     /** Returns a snapshot of a namespaced Redis set, or an empty set when unavailable. */
-    public java.util.Set<String> cacheSetMembers(String key) {
+    public Set<String> cacheSetMembers(String key) {
         if (!enabled) {
-            return java.util.Set.of();
+            return Set.of();
         }
         try {
-            return java.util.Set.copyOf(commands.smembers(cacheKey(key)));
+            return Set.copyOf(commands.smembers(cacheKey(key)));
         } catch (Throwable t) {
             core.log(Level.WARNING, "Redis cacheSetMembers '" + key + "' failed: " + t);
-            return java.util.Set.of();
+            return Set.of();
         }
     }
 

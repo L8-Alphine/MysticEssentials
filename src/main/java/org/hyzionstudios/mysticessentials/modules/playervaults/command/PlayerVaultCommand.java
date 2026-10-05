@@ -1,5 +1,7 @@
 package org.hyzionstudios.mysticessentials.modules.playervaults.command;
 
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -303,8 +305,8 @@ public final class PlayerVaultCommand extends MysticCommand {
     }
 
     private static String shortTime(long epochMillis) {
-        return java.time.Instant.ofEpochMilli(epochMillis)
-                .atZone(java.time.ZoneId.systemDefault())
+        return Instant.ofEpochMilli(epochMillis)
+                .atZone(ZoneId.systemDefault())
                 .toLocalDate().toString();
     }
 }

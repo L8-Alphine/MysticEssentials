@@ -3,6 +3,7 @@ package org.hyzionstudios.mysticessentials.modules.customcontent;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 
 /** Mutable JSON model used by the dialog builder. */
 final class DialogDefinition {
@@ -32,7 +33,7 @@ final class DialogDefinition {
         if (pages == null) {
             pages = new ArrayList<>();
         }
-        pages.removeIf(java.util.Objects::isNull);
+        pages.removeIf(Objects::isNull);
         pages.forEach(Page::normalize);
     }
 
@@ -60,7 +61,7 @@ final class DialogDefinition {
             if (buttons == null) {
                 buttons = new ArrayList<>();
             }
-            buttons.removeIf(java.util.Objects::isNull);
+            buttons.removeIf(Objects::isNull);
             buttons.forEach(Button::normalize);
         }
     }

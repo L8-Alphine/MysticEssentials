@@ -22,7 +22,7 @@ public final class CustomCommandRegistry {
 
     /** Replaces the registry contents with {@code definitions} (already validated). */
     public void rebuild(Collection<CustomCommand> definitions) {
-        rebuild(definitions, java.util.Set.of());
+        rebuild(definitions, Set.of());
     }
 
     /**
@@ -31,7 +31,7 @@ public final class CustomCommandRegistry {
      * The primary name is always kept — a command whose primary name conflicts is
      * excluded upstream by the validator, so it never reaches here.
      */
-    public void rebuild(Collection<CustomCommand> definitions, java.util.Set<String> excludedLabels) {
+    public void rebuild(Collection<CustomCommand> definitions, Set<String> excludedLabels) {
         Map<String, CustomCommand> names = new LinkedHashMap<>();
         Map<String, CustomCommand> labels = new LinkedHashMap<>();
         for (CustomCommand definition : definitions) {

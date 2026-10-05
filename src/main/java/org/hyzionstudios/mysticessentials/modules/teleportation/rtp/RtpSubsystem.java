@@ -3,11 +3,13 @@ package org.hyzionstudios.mysticessentials.modules.teleportation.rtp;
 import java.nio.file.Path;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 
 import org.hyzionstudios.mysticessentials.api.rtp.RtpRequest;
 import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.core.util.Json;
+import org.hyzionstudios.mysticessentials.platform.command.MysticCommand;
 
 import com.google.gson.JsonObject;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
@@ -43,8 +45,7 @@ public final class RtpSubsystem {
      * through the supplied registrar (the module's tracked
      * {@code registerCommand}, so the commands are dropped on module disable).
      */
-    public void enable(java.util.function.Consumer<
-            org.hyzionstudios.mysticessentials.platform.command.MysticCommand> commandRegistrar) {
+    public void enable(Consumer<MysticCommand> commandRegistrar) {
         loadConfig();
         audit = new RtpAudit(core);
         engine = new RtpSearchEngine(core, config);

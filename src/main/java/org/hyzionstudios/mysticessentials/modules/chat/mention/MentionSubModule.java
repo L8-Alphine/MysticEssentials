@@ -3,21 +3,25 @@ package org.hyzionstudios.mysticessentials.modules.chat.mention;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiPredicate;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 
 import org.hyzionstudios.mysticessentials.api.Permissions;
 import org.hyzionstudios.mysticessentials.api.mention.MentionScopeProvider;
 import org.hyzionstudios.mysticessentials.api.notification.Notification;
+import org.hyzionstudios.mysticessentials.api.notification.NotificationAction;
 import org.hyzionstudios.mysticessentials.api.notification.NotificationAudience;
 import org.hyzionstudios.mysticessentials.api.notification.NotificationCategory;
 import org.hyzionstudios.mysticessentials.api.notification.NotificationPriority;
@@ -138,22 +142,22 @@ public final class MentionSubModule {
                 out.add(provider);
             }
         }
-        out.sort(java.util.Comparator
+        out.sort(Comparator
                 .comparingInt(MentionSubModule::safeSortOrder)
                 .thenComparing(MentionSubModule::safeDisplayName));
         return out;
     }
 
     /** A registered scope by id, or empty when nothing currently implements it. */
-    public java.util.Optional<MentionScopeProvider> scope(String scopeId) {
+    public Optional<MentionScopeProvider> scope(String scopeId) {
         return scopeId == null
-                ? java.util.Optional.empty()
-                : java.util.Optional.ofNullable(scopes.get(scopeId.trim().toLowerCase(Locale.ROOT)));
+                ? Optional.empty()
+                : Optional.ofNullable(scopes.get(scopeId.trim().toLowerCase(Locale.ROOT)));
     }
 
     /** A built-in scope with a fixed answer; no external system behind it. */
     private record BuiltInScope(String id, String displayName, int sortOrder,
-            java.util.function.BiPredicate<UUID, UUID> rule) implements MentionScopeProvider {
+            BiPredicate<UUID, UUID> rule) implements MentionScopeProvider {
 
         @Override
         public String getId() {
@@ -347,7 +351,7 @@ public final class MentionSubModule {
                             && (staffOverride || preferences.mentionActionBar))
                     .bypassPlayerPreferences(staffOverride)
                     .storeInHistory(true)
-                    .action(org.hyzionstudios.mysticessentials.api.notification.NotificationAction
+                    .action(NotificationAction
                             .channel(channel))
                     .source("mysticessentials:chat")
                     .build(),

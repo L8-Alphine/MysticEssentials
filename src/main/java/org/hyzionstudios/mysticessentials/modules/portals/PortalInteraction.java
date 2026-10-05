@@ -2,6 +2,8 @@ package org.hyzionstudios.mysticessentials.modules.portals;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -178,7 +180,7 @@ public final class PortalInteraction extends SimpleInstantInteraction {
                 if (universe != null && universe.isWorldLoadable(targetName)) {
                     universe.loadWorld(targetName);
                     portals.core().getMessageService().sendKey(playerRef, "portal-world-loading",
-                            java.util.Map.of("world", targetName));
+                            Map.of("world", targetName));
                     lockTeleport(playerRef.getUuid());
                     return;
                 }
@@ -186,7 +188,7 @@ public final class PortalInteraction extends SimpleInstantInteraction {
                 // Fall through to the unknown-world message.
             }
             portals.core().getMessageService().sendKey(playerRef, "portal-world-unknown",
-                    java.util.Map.of("world", targetName));
+                    Map.of("world", targetName));
             return;
         }
         Transform destination = portal.isUseLocation()
@@ -194,7 +196,7 @@ public final class PortalInteraction extends SimpleInstantInteraction {
                 : spawnTransform(target, playerRef.getUuid());
         if (destination == null) {
             portals.core().getMessageService().sendKey(playerRef, "portal-world-unknown",
-                    java.util.Map.of("world", targetName));
+                    Map.of("world", targetName));
             return;
         }
         lockTeleport(playerRef.getUuid());
@@ -374,7 +376,7 @@ public final class PortalInteraction extends SimpleInstantInteraction {
     }
 
     private static Long parseWait(String entry) {
-        String lower = entry.toLowerCase(java.util.Locale.ROOT);
+        String lower = entry.toLowerCase(Locale.ROOT);
         if (!lower.startsWith("wait ") && !lower.startsWith("sleep ")) {
             return null;
         }

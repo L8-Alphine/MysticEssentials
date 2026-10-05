@@ -1,34 +1,57 @@
 package org.hyzionstudios.mysticessentials.platform;
 
+import java.net.Inet4Address;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.NetworkInterface;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.logging.Level;
 
 import org.hyzionstudios.mysticessentials.MysticessentialsPlugin;
 import org.hyzionstudios.mysticessentials.api.model.MysticLocation;
 import org.hyzionstudios.mysticessentials.api.service.TeleportService;
 import org.hyzionstudios.mysticessentials.core.MysticCore;
+import org.joml.Vector3d;
 
 import java.time.Instant;
 
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.component.system.ISystem;
+import com.hypixel.hytale.event.EventPriority;
+import com.hypixel.hytale.event.EventRegistration;
+import com.hypixel.hytale.event.IAsyncEvent;
 import com.hypixel.hytale.math.util.ChunkUtil;
 import com.hypixel.hytale.event.IBaseEvent;
 import com.hypixel.hytale.math.vector.Rotation3f;
 import com.hypixel.hytale.math.vector.Transform;
+import com.hypixel.hytale.protocol.ToClientPacket;
+import com.hypixel.hytale.protocol.io.ServerListener;
+import com.hypixel.hytale.protocol.packets.connection.PongType;
+import com.hypixel.hytale.server.core.NameMatching;
 import com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType;
 import com.hypixel.hytale.server.core.asset.type.fluid.Fluid;
 import com.hypixel.hytale.server.core.command.system.AbstractCommand;
+import com.hypixel.hytale.server.core.command.system.CommandManager;
+import com.hypixel.hytale.server.core.command.system.CommandRegistration;
+import com.hypixel.hytale.server.core.console.ConsoleSender;
 import com.hypixel.hytale.server.core.entity.damage.DamageDataComponent;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.entities.player.hud.CustomUIHud;
 import com.hypixel.hytale.server.core.entity.entities.player.pages.CustomUIPage;
+import com.hypixel.hytale.server.core.io.PacketHandler;
+import com.hypixel.hytale.server.core.io.ServerManager;
+import com.hypixel.hytale.server.core.modules.entity.component.Invulnerable;
 import com.hypixel.hytale.server.core.modules.entity.teleport.Teleport;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.Universe;
@@ -77,7 +100,7 @@ public final class HytalePlatform {
         }
         try {
             return Optional.ofNullable(Universe.get()
-                    .getPlayerByUsername(username, com.hypixel.hytale.server.core.NameMatching.EXACT_IGNORE_CASE));
+                    .getPlayerByUsername(username, NameMatching.EXACT_IGNORE_CASE));
         } catch (Throwable t) {
             return Optional.empty();
         }
@@ -137,18 +160,17 @@ public final class HytalePlatform {
      * listeners. Empty until the engine has bound (it binds after plugins start,
      * so callers should retry rather than cache an empty answer).
      */
-    public java.util.OptionalInt boundPort() {
+    public OptionalInt boundPort() {
         try {
-            for (com.hypixel.hytale.protocol.io.ServerListener listener
-                    : com.hypixel.hytale.server.core.io.ServerManager.get().getListeners()) {
-                if (listener.localAddress() instanceof java.net.InetSocketAddress bound && bound.getPort() > 0) {
-                    return java.util.OptionalInt.of(bound.getPort());
+            for (ServerListener listener : ServerManager.get().getListeners()) {
+                if (listener.localAddress() instanceof InetSocketAddress bound && bound.getPort() > 0) {
+                    return OptionalInt.of(bound.getPort());
                 }
             }
         } catch (Throwable ignored) {
             // Not bound yet, or the server manager is unavailable.
         }
-        return java.util.OptionalInt.empty();
+        return OptionalInt.empty();
     }
 
     /**
@@ -161,27 +183,25 @@ public final class HytalePlatform {
      */
     public Optional<String> reachableHost() {
         try {
-            for (com.hypixel.hytale.protocol.io.ServerListener listener
-                    : com.hypixel.hytale.server.core.io.ServerManager.get().getListeners()) {
-                if (listener.localAddress() instanceof java.net.InetSocketAddress bound
+            for (ServerListener listener : ServerManager.get().getListeners()) {
+                if (listener.localAddress() instanceof InetSocketAddress bound
                         && bound.getAddress() != null
                         && !bound.getAddress().isAnyLocalAddress()
                         && !bound.getAddress().isLoopbackAddress()) {
                     return Optional.of(bound.getAddress().getHostAddress());
                 }
             }
-            java.net.InetAddress fallback = null;
-            for (java.net.NetworkInterface nic
-                    : java.util.Collections.list(java.net.NetworkInterface.getNetworkInterfaces())) {
+            InetAddress fallback = null;
+            for (NetworkInterface nic : Collections.list(NetworkInterface.getNetworkInterfaces())) {
                 if (!nic.isUp() || nic.isLoopback()) {
                     continue;
                 }
-                for (java.net.InetAddress address : java.util.Collections.list(nic.getInetAddresses())) {
+                for (InetAddress address : Collections.list(nic.getInetAddresses())) {
                     if (address.isLoopbackAddress() || address.isLinkLocalAddress()
                             || address.isMulticastAddress() || address.isAnyLocalAddress()) {
                         continue;
                     }
-                    if (address instanceof java.net.Inet4Address) {
+                    if (address instanceof Inet4Address) {
                         return Optional.of(address.getHostAddress());
                     }
                     if (fallback == null) {
@@ -189,7 +209,7 @@ public final class HytalePlatform {
                     }
                 }
             }
-            return Optional.ofNullable(fallback).map(java.net.InetAddress::getHostAddress);
+            return Optional.ofNullable(fallback).map(InetAddress::getHostAddress);
         } catch (Throwable ignored) {
             return Optional.empty();
         }
@@ -251,7 +271,7 @@ public final class HytalePlatform {
             if (spawn == null) {
                 return Optional.empty();
             }
-            org.joml.Vector3d position = spawn.getPosition();
+            Vector3d position = spawn.getPosition();
             Rotation3f rotation = spawn.getRotation();
             return Optional.of(new MysticLocation(world.getName(),
                     position.x, position.y, position.z,
@@ -377,7 +397,7 @@ public final class HytalePlatform {
         rotation.setYaw(destination.getYaw());
         rotation.setRoll(0.0f);
         Transform transform = new Transform(
-                new org.joml.Vector3d(destination.getX(), destination.getY(), destination.getZ()), rotation);
+                new Vector3d(destination.getX(), destination.getY(), destination.getZ()), rotation);
 
         boolean dispatched = runOnEntityThread(player, (store, entity, currentWorld) -> {
             try {
@@ -412,7 +432,7 @@ public final class HytalePlatform {
                             + (int) destination.getX() + ", " + (int) destination.getY() + ", "
                             + (int) destination.getZ());
                 }
-            }, 10, java.util.concurrent.TimeUnit.SECONDS);
+            }, 10, TimeUnit.SECONDS);
         }
         return outcome;
     }
@@ -819,15 +839,15 @@ public final class HytalePlatform {
         }
         boolean dispatched = runOnEntityThread(player, (store, entity, world) ->
                 store.ensureComponent(entity,
-                        com.hypixel.hytale.server.core.modules.entity.component.Invulnerable.getComponentType()));
+                        Invulnerable.getComponentType()));
         if (!dispatched) {
             return;
         }
         UUID uuid = player.getUuid();
         core.scheduler().runLater(() -> findPlayer(uuid).ifPresent(live ->
                 runOnEntityThread(live, (store, entity, world) -> store.tryRemoveComponent(entity,
-                        com.hypixel.hytale.server.core.modules.entity.component.Invulnerable.getComponentType()))),
-                seconds, java.util.concurrent.TimeUnit.SECONDS);
+                        Invulnerable.getComponentType()))),
+                seconds, TimeUnit.SECONDS);
     }
 
     /**
@@ -857,7 +877,7 @@ public final class HytalePlatform {
      *
      * @return {@code true} if the packet was handed to the player's packet handler.
      */
-    public boolean sendPacket(PlayerRef player, com.hypixel.hytale.protocol.ToClientPacket packet) {
+    public boolean sendPacket(PlayerRef player, ToClientPacket packet) {
         if (player == null || packet == null) {
             return false;
         }
@@ -882,9 +902,9 @@ public final class HytalePlatform {
     public int pingMillis(PlayerRef player) {
         try {
             var info = player.getPacketHandler()
-                    .getPingInfo(com.hypixel.hytale.protocol.packets.connection.PongType.Direct);
+                    .getPingInfo(PongType.Direct);
             double average = info.getPingMetricSet().getAverage(0);
-            return (int) com.hypixel.hytale.server.core.io.PacketHandler.PingInfo.TIME_UNIT
+            return (int) PacketHandler.PingInfo.TIME_UNIT
                     .toMillis((long) Math.ceil(average));
         } catch (Throwable t) {
             return 0;
@@ -903,7 +923,7 @@ public final class HytalePlatform {
      *         engine rejected the registration. Callers that never unregister
      *         may ignore the return value.
      */
-    public com.hypixel.hytale.server.core.command.system.CommandRegistration registerCommand(
+    public CommandRegistration registerCommand(
             AbstractCommand command) {
         return plugin.getCommandRegistry().registerCommand(command);
     }
@@ -919,8 +939,8 @@ public final class HytalePlatform {
             return false;
         }
         try {
-            com.hypixel.hytale.server.core.command.system.CommandManager.get()
-                    .handleCommand(com.hypixel.hytale.server.core.console.ConsoleSender.INSTANCE, command);
+            CommandManager.get()
+                    .handleCommand(ConsoleSender.INSTANCE, command);
             return true;
         } catch (Throwable t) {
             core.log(Level.WARNING, "Console command failed: '" + command + "': " + t);
@@ -941,7 +961,7 @@ public final class HytalePlatform {
             return false;
         }
         try {
-            com.hypixel.hytale.server.core.command.system.CommandManager.get()
+            CommandManager.get()
                     .handleCommand(player, command);
             return true;
         } catch (Throwable t) {
@@ -964,9 +984,7 @@ public final class HytalePlatform {
      *
      * @return {@code true} when the system was accepted
      */
-    public boolean registerEntitySystem(
-            com.hypixel.hytale.component.system.ISystem<
-                    com.hypixel.hytale.server.core.universe.world.storage.EntityStore> system) {
+    public boolean registerEntitySystem(ISystem<EntityStore> system) {
         try {
             plugin.getEntityStoreRegistry().registerSystem(system);
             return true;
@@ -984,21 +1002,21 @@ public final class HytalePlatform {
      *         the listener again. Callers that never unregister may ignore the
      *         return value.
      */
-    public <E extends IBaseEvent<Void>> com.hypixel.hytale.event.EventRegistration<Void, E> onEvent(
+    public <E extends IBaseEvent<Void>> EventRegistration<Void, E> onEvent(
             Class<? super E> eventType, Consumer<E> listener) {
         return plugin.getEventRegistry().register(eventType, listener);
     }
 
     /**
      * Registers a listener for a Hytale server event at an explicit priority.
-     * {@link com.hypixel.hytale.event.EventPriority#LAST} is how Mystic runs
+     * {@link EventPriority#LAST} is how Mystic runs
      * after the engine's own core modules have handled the same event.
      *
      * @return the registration handle — its public {@code unregister()} removes
      *         the listener again.
      */
-    public <E extends IBaseEvent<Void>> com.hypixel.hytale.event.EventRegistration<Void, E> onEvent(
-            com.hypixel.hytale.event.EventPriority priority, Class<? super E> eventType, Consumer<E> listener) {
+    public <E extends IBaseEvent<Void>> EventRegistration<Void, E> onEvent(
+            EventPriority priority, Class<? super E> eventType, Consumer<E> listener) {
         return plugin.getEventRegistry().register(priority, eventType, listener);
     }
 
@@ -1014,8 +1032,8 @@ public final class HytalePlatform {
      * @return the registration handle — its public {@code unregister()} removes
      *         the listener again.
      */
-    public <K, E extends IBaseEvent<K>> com.hypixel.hytale.event.EventRegistration<K, E> onGlobalEvent(
-            com.hypixel.hytale.event.EventPriority priority, Class<? super E> eventType, Consumer<E> listener) {
+    public <K, E extends IBaseEvent<K>> EventRegistration<K, E> onGlobalEvent(
+            EventPriority priority, Class<? super E> eventType, Consumer<E> listener) {
         return plugin.getEventRegistry().registerGlobal(priority, eventType, listener);
     }
 
@@ -1028,10 +1046,9 @@ public final class HytalePlatform {
      *         the listener again. Callers that never unregister may ignore the
      *         return value.
      */
-    public <K, E extends com.hypixel.hytale.event.IAsyncEvent<K>> com.hypixel.hytale.event.EventRegistration<K, E> onAsyncEvent(
+    public <K, E extends IAsyncEvent<K>> EventRegistration<K, E> onAsyncEvent(
             Class<? super E> eventType,
-            java.util.function.Function<java.util.concurrent.CompletableFuture<E>,
-                    java.util.concurrent.CompletableFuture<E>> handler) {
+            Function<CompletableFuture<E>, CompletableFuture<E>> handler) {
         return plugin.getEventRegistry().registerAsyncGlobal(eventType, handler);
     }
 }

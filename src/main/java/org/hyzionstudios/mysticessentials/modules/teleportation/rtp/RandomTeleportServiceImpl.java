@@ -1,8 +1,10 @@
 package org.hyzionstudios.mysticessentials.modules.teleportation.rtp;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -13,6 +15,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 
 import org.hyzionstudios.mysticessentials.api.Permissions;
@@ -98,7 +101,7 @@ public final class RandomTeleportServiceImpl implements RandomTeleportService {
         if (session == null) {
             return Optional.empty();
         }
-        return Optional.of(session.phase.name().toLowerCase(java.util.Locale.ROOT) + ":" + session.profile.id);
+        return Optional.of(session.phase.name().toLowerCase(Locale.ROOT) + ":" + session.profile.id);
     }
 
     /** Remaining cooldown seconds for a profile (0 if ready or unknown). */
@@ -268,11 +271,10 @@ public final class RandomTeleportServiceImpl implements RandomTeleportService {
         showHud(player, session, "rtp-hud-warmup",
                 Map.of("seconds", Integer.toString(warmupSeconds)));
 
-        java.util.concurrent.atomic.AtomicReference<java.time.Instant> damageBaseline =
-                new java.util.concurrent.atomic.AtomicReference<>();
+        AtomicReference<Instant> damageBaseline = new AtomicReference<>();
         if (cfg.warmup.cancelOnDamage) {
             core.platform().lastDamageTime(player)
-                    .thenAccept(instant -> damageBaseline.set(instant == null ? java.time.Instant.MIN : instant));
+                    .thenAccept(instant -> damageBaseline.set(instant == null ? Instant.MIN : instant));
         }
 
         session.warmupTask = core.scheduler().runRepeating(() -> {
@@ -306,7 +308,7 @@ public final class RandomTeleportServiceImpl implements RandomTeleportService {
                 }
             }
             if (cfg.warmup.cancelOnDamage && damageBaseline.get() != null) {
-                java.time.Instant baseline = damageBaseline.get();
+                Instant baseline = damageBaseline.get();
                 core.platform().lastDamageTime(ref).thenAccept(current -> {
                     if (!session.cancelled.get() && current != null && current.isAfter(baseline)) {
                         cancel(uuid, RtpCancelReason.DAMAGE_TAKEN);

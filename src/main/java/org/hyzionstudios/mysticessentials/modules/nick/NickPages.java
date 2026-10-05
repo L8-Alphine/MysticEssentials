@@ -2,6 +2,8 @@ package org.hyzionstudios.mysticessentials.modules.nick;
 
 import static org.hyzionstudios.mysticessentials.platform.ui.MysticPage.uiText;
 
+import java.util.Map;
+
 import org.hyzionstudios.mysticessentials.api.Permissions;
 import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.platform.ui.MysticPage;
@@ -89,7 +91,7 @@ final class NickPages {
                         core.getMessageService().sendKey(player, error.key(), error.params());
                     } else {
                         core.getMessageService().sendKey(player, "nick-set",
-                                java.util.Map.of("nickname", nick.nickname(player.getUuid())));
+                                Map.of("nickname", nick.nickname(player.getUuid())));
                     }
                     reopen(ref, store, new NickPage(core, nick, player));
                 }

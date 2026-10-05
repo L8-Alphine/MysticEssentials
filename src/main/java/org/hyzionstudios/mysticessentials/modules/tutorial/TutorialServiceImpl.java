@@ -1,6 +1,7 @@
 package org.hyzionstudios.mysticessentials.modules.tutorial;
 
 import java.util.Collection;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
@@ -84,7 +85,7 @@ public final class TutorialServiceImpl implements TutorialService {
         }
         module.storage().load(player.getUuid(), player.getUsername()).thenAccept(data -> {
             synchronized (data) {
-                data.tutorials.remove(tutorialId.toLowerCase(java.util.Locale.ROOT));
+                data.tutorials.remove(tutorialId.toLowerCase(Locale.ROOT));
                 data.addHistory(tutorialId, "reset", System.currentTimeMillis());
             }
             module.storage().markDirty(player.getUuid());

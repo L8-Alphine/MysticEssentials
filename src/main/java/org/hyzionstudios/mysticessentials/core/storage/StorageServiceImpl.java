@@ -1,5 +1,6 @@
 package org.hyzionstudios.mysticessentials.core.storage;
 
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
 
@@ -81,7 +82,7 @@ public final class StorageServiceImpl implements StorageService {
     }
 
     @Override
-    public CompletableFuture<java.util.List<String>> listKeys(String namespace) {
+    public CompletableFuture<List<String>> listKeys(String namespace) {
         return provider.listKeys(namespace);
     }
 

@@ -1,6 +1,7 @@
 package org.hyzionstudios.mysticessentials.modules.spawn;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -21,10 +22,12 @@ import org.hyzionstudios.mysticessentials.platform.command.MysticArgTypes;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommand;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommandSender;
 
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.hypixel.hytale.server.core.command.system.arguments.system.RequiredArg;
 import com.hypixel.hytale.server.core.command.system.arguments.types.ArgTypes;
 import com.hypixel.hytale.server.core.command.system.arguments.types.SingleArgumentType;
+import com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 
 /**
@@ -76,8 +79,8 @@ public final class SpawnModule extends AbstractMysticModule implements SpawnServ
         // diverge from the published spawn.
         if (config.teleportOnFirstJoin || config.teleportOnJoin) {
             registerEvent(
-                    com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent.class,
-                    (com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent event) ->
+                    PlayerConnectEvent.class,
+                    (PlayerConnectEvent event) ->
                             onJoin(event.getPlayerRef()));
         }
     }
@@ -220,7 +223,7 @@ public final class SpawnModule extends AbstractMysticModule implements SpawnServ
                 || newName == null || newName.isBlank() || homes.has(newName)) {
             return false;
         }
-        com.google.gson.JsonElement location = homes.get(oldName);
+        JsonElement location = homes.get(oldName);
         homes.remove(oldName);
         homes.add(newName.trim(), location);
         core.getPlayerProfileService().getCached(player).ifPresent(core.getPlayerProfileService()::save);
@@ -284,7 +287,7 @@ public final class SpawnModule extends AbstractMysticModule implements SpawnServ
 
     private void normalizeConfig() {
         if (config.worldSpawns == null) {
-            config.worldSpawns = new java.util.LinkedHashMap<>();
+            config.worldSpawns = new LinkedHashMap<>();
         }
     }
 

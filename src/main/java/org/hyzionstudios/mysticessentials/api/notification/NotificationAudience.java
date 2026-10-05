@@ -2,6 +2,7 @@ package org.hyzionstudios.mysticessentials.api.notification;
 
 import java.util.Collection;
 import java.util.LinkedHashSet;
+import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Predicate;
@@ -171,7 +172,7 @@ public final class NotificationAudience {
             case PLAYERS -> players.size() + " player(s)";
             case NAMED -> qualifier + ":" + value;
             case PREDICATE -> "predicate";
-            default -> kind.name().toLowerCase(java.util.Locale.ROOT) + ":" + value;
+            default -> kind.name().toLowerCase(Locale.ROOT) + ":" + value;
         };
     }
 }

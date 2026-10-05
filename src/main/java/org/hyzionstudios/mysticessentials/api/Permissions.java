@@ -1,5 +1,7 @@
 package org.hyzionstudios.mysticessentials.api;
 
+import java.util.Locale;
+
 /**
  * Central registry of every permission node Mystic Essentials uses. All
  * command gates, feature checks, and dynamic node prefixes live here so the
@@ -335,17 +337,17 @@ public final class Permissions {
 
     /** {@code mysticessentials.kit.<name>} — access to a specific kit. */
     public static String kit(String kitName) {
-        return KIT_BASE + "." + kitName.toLowerCase(java.util.Locale.ROOT);
+        return KIT_BASE + "." + kitName.toLowerCase(Locale.ROOT);
     }
 
     /** {@code mysticessentials.craftblock.bypass.<item id>} — craft one blocked item. */
     public static String craftBlockBypass(String itemId) {
-        return CRAFTBLOCK_BYPASS + "." + itemId.toLowerCase(java.util.Locale.ROOT);
+        return CRAFTBLOCK_BYPASS + "." + itemId.toLowerCase(Locale.ROOT);
     }
 
     /** {@code mysticessentials.chat.channel.<id>} — join a specific channel. */
     public static String chatChannel(String channelId) {
-        return CHAT_CHANNEL_BASE + "." + channelId.toLowerCase(java.util.Locale.ROOT);
+        return CHAT_CHANNEL_BASE + "." + channelId.toLowerCase(Locale.ROOT);
     }
 
     /**
@@ -353,12 +355,12 @@ public final class Permissions {
      * for a custom command with permission mode {@code single} and no explicit node.
      */
     public static String customCommand(String commandName) {
-        return CUSTOMCOMMANDS_COMMAND_BASE + "." + commandName.toLowerCase(java.util.Locale.ROOT);
+        return CUSTOMCOMMANDS_COMMAND_BASE + "." + commandName.toLowerCase(Locale.ROOT);
     }
 
     /** {@code mysticessentials.customcommands.bypass.cooldown.<name>} — per-command cooldown bypass. */
     public static String customCommandCooldownBypass(String commandName) {
-        return CUSTOMCOMMANDS_BYPASS_COOLDOWN + "." + commandName.toLowerCase(java.util.Locale.ROOT);
+        return CUSTOMCOMMANDS_BYPASS_COOLDOWN + "." + commandName.toLowerCase(Locale.ROOT);
     }
 
     /** {@code mysticessentials.vaults.vault.<n>} — highest accessible vault number. */
@@ -373,11 +375,11 @@ public final class Permissions {
 
     /** {@code mysticessentials.teleport.rtp.world.<world>} — permission to RTP in a world. */
     public static String rtpWorld(String world) {
-        return RTP_WORLD_BASE + "." + world.toLowerCase(java.util.Locale.ROOT);
+        return RTP_WORLD_BASE + "." + world.toLowerCase(Locale.ROOT);
     }
 
     /** {@code mysticessentials.teleport.rtp.profile.<profile>} — permission to use a profile. */
     public static String rtpProfile(String profile) {
-        return RTP_PROFILE_BASE + "." + profile.toLowerCase(java.util.Locale.ROOT);
+        return RTP_PROFILE_BASE + "." + profile.toLowerCase(Locale.ROOT);
     }
 }

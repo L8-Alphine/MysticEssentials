@@ -1,5 +1,6 @@
 package org.hyzionstudios.mysticessentials.core.storage;
 
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 import com.google.gson.JsonElement;
@@ -26,7 +27,7 @@ public interface StorageProvider {
     CompletableFuture<Boolean> exists(String namespace, String key);
 
     /** Lists every key stored under {@code namespace} (empty if none). */
-    CompletableFuture<java.util.List<String>> listKeys(String namespace);
+    CompletableFuture<List<String>> listKeys(String namespace);
 
     /** Flushes and closes the provider. Called during Core shutdown. */
     void shutdown();

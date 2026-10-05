@@ -2,6 +2,7 @@ package org.hyzionstudios.mysticessentials.modules.patchnotes;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Renders the safe Markdown subset used in patch-note section bodies into a flat
@@ -85,7 +86,7 @@ final class PatchMarkup {
         if (sectionType == null) {
             return Type.BULLET;
         }
-        return switch (sectionType.toLowerCase(java.util.Locale.ROOT)) {
+        return switch (sectionType.toLowerCase(Locale.ROOT)) {
             case "additions", "added", "add" -> Type.ADD;
             case "removals", "removed", "remove" -> Type.REMOVE;
             default -> Type.BULLET;

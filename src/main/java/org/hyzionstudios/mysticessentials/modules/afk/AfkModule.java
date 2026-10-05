@@ -7,6 +7,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -15,6 +16,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import java.util.function.ToIntFunction;
 
 import org.hyzionstudios.mysticessentials.api.Permissions;
 import org.hyzionstudios.mysticessentials.api.model.MysticLocation;
@@ -743,7 +745,7 @@ public final class AfkModule extends AbstractMysticModule implements AfkService 
         blockedIdsResolved = true;
     }
 
-    private Set<Integer> resolveIds(List<String> names, String kind, java.util.function.ToIntFunction<String> lookup) {
+    private Set<Integer> resolveIds(List<String> names, String kind, ToIntFunction<String> lookup) {
         if (names == null || names.isEmpty()) {
             return Set.of();
         }
@@ -854,7 +856,7 @@ public final class AfkModule extends AbstractMysticModule implements AfkService 
         if (config == null || config.rewards == null || config.rewards.zones == null) {
             return List.of();
         }
-        return config.rewards.zones.stream().map(zone -> zone.name).filter(java.util.Objects::nonNull).toList();
+        return config.rewards.zones.stream().map(zone -> zone.name).filter(Objects::nonNull).toList();
     }
 
     private static String formatPos(MysticLocation pos) {

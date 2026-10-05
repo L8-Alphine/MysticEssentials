@@ -2,10 +2,12 @@ package org.hyzionstudios.mysticessentials.platform.command;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import java.util.function.Function;
+import java.util.logging.Level;
 
 import org.hyzionstudios.mysticessentials.core.MysticCore;
 
@@ -108,7 +110,7 @@ public final class MysticArgTypes {
         if (instance == null || instance.networkPlayers() == null) {
             return visiblePlayerNames(sender);
         }
-        java.util.LinkedHashSet<String> names = new java.util.LinkedHashSet<>(visiblePlayerNames(sender));
+        LinkedHashSet<String> names = new LinkedHashSet<>(visiblePlayerNames(sender));
         UUID viewer = sender == null ? null : sender.getUuid();
         for (var player : instance.networkPlayers().onlinePlayers()) {
             if (player.local(instance.networkPlayers().localServerId())) {
@@ -163,7 +165,7 @@ public final class MysticArgTypes {
                 // A suggestion failure must never break the sender's command input.
                 MysticCore instance = core;
                 if (instance != null) {
-                    instance.log(java.util.logging.Level.WARNING, "Argument suggestion failed: " + t);
+                    instance.log(Level.WARNING, "Argument suggestion failed: " + t);
                 }
             }
         }

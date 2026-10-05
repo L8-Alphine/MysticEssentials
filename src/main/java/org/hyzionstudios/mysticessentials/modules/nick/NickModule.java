@@ -2,7 +2,10 @@ package org.hyzionstudios.mysticessentials.modules.nick;
 
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.hyzionstudios.mysticessentials.api.Permissions;
 import org.hyzionstudios.mysticessentials.core.module.AbstractMysticModule;
@@ -74,8 +77,8 @@ public final class NickModule extends AbstractMysticModule {
         return stripNickFormat(stripColors(nickname(player)));
     }
 
-    java.util.Optional<String> nicknameColor(UUID player) {
-        return java.util.Optional.ofNullable(extractColor(nickname(player)));
+    Optional<String> nicknameColor(UUID player) {
+        return Optional.ofNullable(extractColor(nickname(player)));
     }
 
     record NickError(String key, Map<String, String> params) {
@@ -147,7 +150,7 @@ public final class NickModule extends AbstractMysticModule {
         for (Map.Entry<String, String> entry : config.colors.entrySet()) {
             String hex = resolveHexOnly(entry.getValue());
             if (hex != null) {
-                out = out.replaceAll("(?i)<" + java.util.regex.Pattern.quote(entry.getKey()) + ">", "<" + hex + ">");
+                out = out.replaceAll("(?i)<" + Pattern.quote(entry.getKey()) + ">", "<" + hex + ">");
             }
         }
         return out;
@@ -208,7 +211,7 @@ public final class NickModule extends AbstractMysticModule {
             return null;
         }
         String t = value.trim();
-        java.util.regex.Matcher rgb = java.util.regex.Pattern
+        Matcher rgb = Pattern
                 .compile("^(\\d{1,3})\\s*,\\s*(\\d{1,3})\\s*,\\s*(\\d{1,3})$").matcher(t);
         if (rgb.matches()) {
             int r = clampByte(Integer.parseInt(rgb.group(1)));
@@ -324,17 +327,17 @@ public final class NickModule extends AbstractMysticModule {
         if (value == null) {
             return null;
         }
-        java.util.regex.Matcher hexTag = java.util.regex.Pattern
+        Matcher hexTag = Pattern
                 .compile("(?i)<#([0-9a-f]{6})>").matcher(value);
         if (hexTag.find()) {
             return "#" + hexTag.group(1).toUpperCase(Locale.ROOT);
         }
-        java.util.regex.Matcher ampHex = java.util.regex.Pattern
+        Matcher ampHex = Pattern
                 .compile("(?i)&#([0-9a-f]{6})").matcher(value);
         if (ampHex.find()) {
             return "#" + ampHex.group(1).toUpperCase(Locale.ROOT);
         }
-        java.util.regex.Matcher legacy = java.util.regex.Pattern
+        Matcher legacy = Pattern
                 .compile("(?i)&([0-9a-f])").matcher(value);
         return legacy.find() ? legacyColor(legacy.group(1).charAt(0)) : null;
     }

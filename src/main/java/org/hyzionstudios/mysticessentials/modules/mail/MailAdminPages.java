@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.hyzionstudios.mysticessentials.core.MysticCore;
+import org.hyzionstudios.mysticessentials.core.message.MysticText;
 import org.hyzionstudios.mysticessentials.modules.mail.MailModule.Audience;
 import org.hyzionstudios.mysticessentials.modules.mail.MailModule.ItemPick;
 import org.hyzionstudios.mysticessentials.platform.ui.MysticPage;
@@ -253,7 +254,7 @@ final class MailAdminPages {
             if (body == null) {
                 return "";
             }
-            String plain = org.hyzionstudios.mysticessentials.core.message.MysticText.stripMarkup(body);
+            String plain = MysticText.stripMarkup(body);
             return plain.length() <= 48 ? plain : plain.substring(0, 48) + "…";
         }
 
