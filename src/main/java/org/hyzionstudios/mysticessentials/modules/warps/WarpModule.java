@@ -44,6 +44,10 @@ public final class WarpModule extends AbstractMysticModule implements WarpServic
     static final String ADMIN_PERMISSION = Permissions.WARP_SET;
     static final String PWARP_ADMIN_PERMISSION = Permissions.PLAYERWARP_ADMIN;
 
+    /**
+     * Both maps are shared by the command pool, world threads (UI pages) and
+     * Netty (tab completion), so every access holds this module's monitor.
+     */
     private Map<String, Warp> serverWarps = new LinkedHashMap<>();
     private Map<String, Warp> playerWarps = new LinkedHashMap<>();
 
@@ -52,10 +56,10 @@ public final class WarpModule extends AbstractMysticModule implements WarpServic
             listServerWarps(commandSender.getUuid()).stream().map(Warp::getName).toList());
     /** Every server warp, for admin commands. */
     private final SingleArgumentType<String> allWarpArg = MysticArgTypes.dynamic(commandSender ->
-            serverWarps.values().stream().map(Warp::getName).toList());
+            serverWarpNames());
     /** Every player warp. */
     private final SingleArgumentType<String> playerWarpArg = MysticArgTypes.dynamic(commandSender ->
-            playerWarps.values().stream().map(Warp::getName).toList());
+            listAllPlayerWarps().stream().map(Warp::getName).toList());
 
     public WarpModule() {
         super("warps", "Warps", "1.0.0");
@@ -68,13 +72,27 @@ public final class WarpModule extends AbstractMysticModule implements WarpServic
 
     @Override
     public void onEnable() {
-        serverWarps = loadWarpMap(serverWarpFile(), "server warps");
-        playerWarps = loadWarpMap(playerWarpFile(), "player warps");
+        synchronized (this) {
+            serverWarps = loadWarpMap(serverWarpFile(), "server warps", new LinkedHashMap<>());
+            playerWarps = loadWarpMap(playerWarpFile(), "player warps", new LinkedHashMap<>());
+        }
         registerCommand(new WarpCommand());
         registerCommand(new WarpsCommand());
         registerCommand(new SetWarpCommand());
         registerCommand(new DelWarpCommand());
         registerCommand(new PlayerWarpCommand());
+    }
+
+    /**
+     * Re-reads both warp files from disk without writing the in-memory maps
+     * first, so files rewritten behind the module's back (a legacy import) take
+     * effect. Every change is saved as it is made, so nothing is lost; a file
+     * that cannot be read keeps the warps already loaded.
+     */
+    @Override
+    public synchronized void onReload() {
+        serverWarps = loadWarpMap(serverWarpFile(), "server warps", serverWarps);
+        playerWarps = loadWarpMap(playerWarpFile(), "player warps", playerWarps);
     }
 
     @Override
@@ -83,18 +101,18 @@ public final class WarpModule extends AbstractMysticModule implements WarpServic
         savePlayerWarps();
     }
 
-    private Map<String, Warp> loadWarpMap(Path file, String label) {
+    private Map<String, Warp> loadWarpMap(Path file, String label, Map<String, Warp> fallback) {
         try {
             JsonElement element = Json.readFile(file);
             Map<String, Warp> loaded = element == null ? null : Json.gson().fromJson(element, WARP_MAP_TYPE);
             return loaded != null ? loaded : new LinkedHashMap<>();
         } catch (Exception e) {
             log("Failed to load " + label + ": " + e.getMessage());
-            return new LinkedHashMap<>();
+            return fallback;
         }
     }
 
-    private void saveServerWarps() {
+    private synchronized void saveServerWarps() {
         try {
             Json.writeFile(serverWarpFile(), serverWarps);
         } catch (Exception e) {
@@ -102,7 +120,7 @@ public final class WarpModule extends AbstractMysticModule implements WarpServic
         }
     }
 
-    private void savePlayerWarps() {
+    private synchronized void savePlayerWarps() {
         try {
             Json.writeFile(playerWarpFile(), playerWarps);
         } catch (Exception e) {
@@ -125,12 +143,12 @@ public final class WarpModule extends AbstractMysticModule implements WarpServic
     // ----- WarpService: server warps -----------------------------------------
 
     @Override
-    public Optional<Warp> getWarp(String name) {
+    public synchronized Optional<Warp> getWarp(String name) {
         return Optional.ofNullable(serverWarps.get(key(name)));
     }
 
     @Override
-    public List<Warp> listServerWarps(UUID viewer) {
+    public synchronized List<Warp> listServerWarps(UUID viewer) {
         List<Warp> visible = new ArrayList<>();
         for (Warp warp : serverWarps.values()) {
             if (canSee(viewer, warp)) {
@@ -138,6 +156,10 @@ public final class WarpModule extends AbstractMysticModule implements WarpServic
             }
         }
         return visible;
+    }
+
+    private synchronized List<String> serverWarpNames() {
+        return serverWarps.values().stream().map(Warp::getName).toList();
     }
 
     private boolean canSee(UUID viewer, Warp warp) {
@@ -150,13 +172,13 @@ public final class WarpModule extends AbstractMysticModule implements WarpServic
     }
 
     @Override
-    public void setServerWarp(Warp warp) {
+    public synchronized void setServerWarp(Warp warp) {
         serverWarps.put(key(warp.getName()), warp);
         saveServerWarps();
     }
 
     @Override
-    public boolean deleteServerWarp(String name) {
+    public synchronized boolean deleteServerWarp(String name) {
         boolean removed = serverWarps.remove(key(name)) != null;
         if (removed) {
             saveServerWarps();
@@ -167,7 +189,7 @@ public final class WarpModule extends AbstractMysticModule implements WarpServic
     // ----- WarpService: player warps -----------------------------------------
 
     @Override
-    public List<Warp> getPlayerWarps(UUID owner) {
+    public synchronized List<Warp> getPlayerWarps(UUID owner) {
         List<Warp> result = new ArrayList<>();
         String ownerId = owner.toString();
         for (Warp warp : playerWarps.values()) {
@@ -179,17 +201,17 @@ public final class WarpModule extends AbstractMysticModule implements WarpServic
     }
 
     @Override
-    public List<Warp> listAllPlayerWarps() {
+    public synchronized List<Warp> listAllPlayerWarps() {
         return new ArrayList<>(playerWarps.values());
     }
 
     @Override
-    public Optional<Warp> getPlayerWarp(String name) {
+    public synchronized Optional<Warp> getPlayerWarp(String name) {
         return Optional.ofNullable(playerWarps.get(key(name)));
     }
 
     @Override
-    public boolean createPlayerWarp(UUID owner, String name, MysticLocation location) {
+    public synchronized boolean createPlayerWarp(UUID owner, String name, MysticLocation location) {
         String id = key(name);
         if (id.isBlank() || playerWarps.containsKey(id)
                 || getPlayerWarps(owner).size() >= playerWarpLimit(owner)) {
@@ -204,7 +226,7 @@ public final class WarpModule extends AbstractMysticModule implements WarpServic
     }
 
     @Override
-    public boolean deletePlayerWarp(UUID owner, String name) {
+    public synchronized boolean deletePlayerWarp(UUID owner, String name) {
         Warp warp = playerWarps.get(key(name));
         if (warp == null || !owner.toString().equals(warp.getOwner())) {
             return false;
@@ -215,7 +237,7 @@ public final class WarpModule extends AbstractMysticModule implements WarpServic
     }
 
     /** Admin path: removes any player warp regardless of owner. */
-    boolean deleteAnyPlayerWarp(String name) {
+    synchronized boolean deleteAnyPlayerWarp(String name) {
         boolean removed = playerWarps.remove(key(name)) != null;
         if (removed) {
             savePlayerWarps();
@@ -224,7 +246,7 @@ public final class WarpModule extends AbstractMysticModule implements WarpServic
     }
 
     @Override
-    public boolean renamePlayerWarp(UUID owner, String oldName, String newName) {
+    public synchronized boolean renamePlayerWarp(UUID owner, String oldName, String newName) {
         String oldId = key(oldName);
         String newId = key(newName);
         Warp warp = playerWarps.get(oldId);
@@ -251,7 +273,7 @@ public final class WarpModule extends AbstractMysticModule implements WarpServic
         return getPlayerWarp(name).filter(warp -> owner.toString().equals(warp.getOwner()));
     }
 
-    boolean updatePlayerWarpDetails(UUID owner, String name, String description, double cost) {
+    synchronized boolean updatePlayerWarpDetails(UUID owner, String name, String description, double cost) {
         Warp warp = getOwnPlayerWarp(owner, name).orElse(null);
         if (warp == null) {
             return false;
@@ -262,7 +284,7 @@ public final class WarpModule extends AbstractMysticModule implements WarpServic
         return true;
     }
 
-    boolean relocatePlayerWarp(PlayerRef player, String name) {
+    synchronized boolean relocatePlayerWarp(PlayerRef player, String name) {
         Warp warp = getOwnPlayerWarp(player.getUuid(), name).orElse(null);
         if (warp == null) {
             return false;
@@ -323,7 +345,7 @@ public final class WarpModule extends AbstractMysticModule implements WarpServic
      * the warp already exists, only the details change; a brand-new warp always
      * captures the admin's location.
      */
-    SaveResult saveServerWarpFromUi(PlayerRef player, String editingName, String name, String description,
+    synchronized SaveResult saveServerWarpFromUi(PlayerRef player, String editingName, String name, String description,
             String permission, double cost, Warp.Visibility visibility, boolean captureLocation) {
         if (!canSetWarps(player) || name == null || name.isBlank()) {
             return SaveResult.INVALID;
@@ -454,12 +476,14 @@ public final class WarpModule extends AbstractMysticModule implements WarpServic
                 return;
             }
             String warpName = sender.get(name);
-            Warp existing = serverWarps.get(key(warpName));
-            if (existing != null) {
-                existing.setLocation(core.platform().capture(player));
-                setServerWarp(existing);
-            } else {
-                setServerWarp(new Warp(warpName, core.platform().capture(player)));
+            synchronized (WarpModule.this) {
+                Warp existing = serverWarps.get(key(warpName));
+                if (existing != null) {
+                    existing.setLocation(core.platform().capture(player));
+                    setServerWarp(existing);
+                } else {
+                    setServerWarp(new Warp(warpName, core.platform().capture(player)));
+                }
             }
             sender.replyKey("warp-saved", Map.of("warp", warpName));
         }
