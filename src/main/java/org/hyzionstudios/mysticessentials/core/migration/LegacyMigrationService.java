@@ -72,8 +72,20 @@ public final class LegacyMigrationService {
 
         if (!options.dryRun()) {
             apply(data, options.replace(), report);
+            reloadImportedModules();
         }
         return report.freeze();
+    }
+
+    /**
+     * The warps, spawn and kits modules keep what they manage in memory and write
+     * it back on disable or on their next change, so a running module would
+     * overwrite the files just imported: each re-reads them now.
+     */
+    private void reloadImportedModules() {
+        for (String module : List.of("warps", "spawn", "kits")) {
+            core.getModuleManager().reload(module);
+        }
     }
 
     private Path resolveRoot(Source source, Path requested) {
