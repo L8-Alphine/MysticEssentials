@@ -2,6 +2,7 @@ package org.hyzionstudios.mysticessentials.core;
 
 import java.nio.file.Path;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 
 import org.hyzionstudios.mysticessentials.MysticessentialsPlugin;
@@ -215,6 +216,9 @@ public final class MysticCore implements MysticEssentialsAPI {
         moduleManager = new ModuleManagerImpl(this);
         ModuleBootstrap.registerBuiltins(moduleManager);
         moduleManager.enableAll();
+        // A license that expires while the server runs must switch its modules off
+        // without waiting for a reload or restart.
+        scheduler.runRepeating(this::enforceLicenses, 1, 1, TimeUnit.HOURS);
 
         // After the modules, so the first refresh already sees the AFK service.
         playerListService = new PlayerListService(this);
@@ -617,6 +621,13 @@ public final class MysticCore implements MysticEssentialsAPI {
             return onFailure;
         }
         return defaults;
+    }
+
+    /** Stops running modules whose license feature is no longer granted. */
+    public void enforceLicenses() {
+        if (moduleManager != null) {
+            moduleManager.enforceLicenses();
+        }
     }
 
     /** Logs through the plugin's Hytale logger. */

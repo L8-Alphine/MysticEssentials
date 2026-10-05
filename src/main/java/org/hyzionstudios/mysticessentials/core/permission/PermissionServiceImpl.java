@@ -29,23 +29,25 @@ import net.luckperms.api.model.user.User;
 public final class PermissionServiceImpl implements PermissionService {
 
     private final MysticCore core;
-    private LuckPerms luckPerms;
+    /** Replaced in one write on reload, so chat threads never see it cleared mid-reload. */
+    private volatile LuckPerms luckPerms;
 
     public PermissionServiceImpl(MysticCore core) {
         this.core = core;
     }
 
     public void init(boolean enabledInConfig) {
-        luckPerms = null;
+        LuckPerms resolved = null;
         if (enabledInConfig) {
             try {
-                luckPerms = LuckPermsProvider.get();
+                resolved = LuckPermsProvider.get();
             } catch (Throwable t) {
-                luckPerms = null;
+                resolved = null;
             }
         }
+        luckPerms = resolved;
         core.log(Level.INFO, "Permission integration: LuckPerms "
-                + (luckPerms != null ? "connected" : "not present, using Hytale permissions"));
+                + (resolved != null ? "connected" : "not present, using Hytale permissions"));
     }
 
     @Override
