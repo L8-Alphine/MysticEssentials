@@ -13,6 +13,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.logging.Level;
@@ -454,7 +455,22 @@ public final class HytalePlatform {
         Transform transform = new Transform(
                 new Vector3d(destination.getX(), destination.getY(), destination.getZ()), rotation);
 
+        Runnable timeout = () -> {
+            if (outcome.complete(TeleportService.Result.FAILED)) {
+                core.log(Level.WARNING, "Teleport timed out for " + player.getUsername()
+                        + " to " + destination.getWorld() + " at "
+                        + (int) destination.getX() + ", " + (int) destination.getY() + ", "
+                        + (int) destination.getZ());
+            }
+        };
+        // Work for a player with no entity yet (joining, changing worlds) is held
+        // before it runs, so the move is timed from when it is queued; a move
+        // given up on while held is never performed afterwards.
+        AtomicBoolean started = new AtomicBoolean();
         boolean dispatched = runOnEntityThread(player, (store, entity, currentWorld) -> {
+            if (!started.compareAndSet(false, true)) {
+                return;
+            }
             try {
                 // Teleport is a one-shot component. Hytale's own teleport command
                 // adds it; setting/replacing an existing component is ignored by
@@ -472,6 +488,7 @@ public final class HytalePlatform {
                 store.addComponent(entity, Teleport.getComponentType(), teleport);
                 applied.whenComplete((v, error) -> outcome.complete(
                         error == null ? TeleportService.Result.SUCCESS : TeleportService.Result.FAILED));
+                core.scheduler().runLater(timeout, 10, TimeUnit.SECONDS);
             } catch (Throwable error) {
                 core.log(Level.SEVERE, "Could not queue teleport for " + player.getUsername() + ": " + error);
                 outcome.complete(TeleportService.Result.FAILED);
@@ -481,13 +498,10 @@ public final class HytalePlatform {
             outcome.complete(TeleportService.Result.FAILED);
         } else {
             core.scheduler().runLater(() -> {
-                if (outcome.complete(TeleportService.Result.FAILED)) {
-                    core.log(Level.WARNING, "Teleport timed out for " + player.getUsername()
-                            + " to " + destination.getWorld() + " at "
-                            + (int) destination.getX() + ", " + (int) destination.getY() + ", "
-                            + (int) destination.getZ());
+                if (started.compareAndSet(false, true)) {
+                    timeout.run();
                 }
-            }, 10, TimeUnit.SECONDS);
+            }, ENTITY_WAIT_MILLIS + 10_000L, TimeUnit.MILLISECONDS);
         }
         return outcome;
     }
