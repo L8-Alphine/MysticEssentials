@@ -1,6 +1,7 @@
 package org.hyzionstudios.mysticessentials.modules.mail;
 
 import org.hyzionstudios.mysticessentials.api.model.MailAttachment;
+import org.hyzionstudios.mysticessentials.platform.ItemStackMetadata;
 
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 
@@ -16,13 +17,11 @@ final class MailItemCodec {
     }
 
     /** Serializes an occupied item stack; returns {@code null} for empty stacks. */
-    @SuppressWarnings("deprecation") // Full BSON is required for lossless attachment round-trips.
     static MailAttachment toStored(ItemStack stack, int quantity) {
         if (stack == null || stack.isEmpty()) {
             return null;
         }
-        var metadata = stack.getMetadata();
-        String json = metadata == null || metadata.isEmpty() ? null : metadata.toJson();
+        String json = ItemStackMetadata.toJson(stack);
         return new MailAttachment(stack.getItemId(), Math.max(1, quantity),
                 stack.getDurability(), stack.getMaxDurability(), json);
     }

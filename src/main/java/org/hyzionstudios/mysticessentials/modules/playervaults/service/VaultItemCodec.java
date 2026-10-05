@@ -5,6 +5,7 @@ import java.util.Locale;
 
 import org.hyzionstudios.mysticessentials.modules.playervaults.config.PlayerVaultConfig;
 import org.hyzionstudios.mysticessentials.modules.playervaults.model.VaultItemStack;
+import org.hyzionstudios.mysticessentials.platform.ItemStackMetadata;
 
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 
@@ -20,13 +21,11 @@ public final class VaultItemCodec {
     }
 
     /** Serializes an occupied slot's item; returns {@code null} for empty slots. */
-    @SuppressWarnings("deprecation") // Full BSON is required for lossless vault round-trips.
     public static VaultItemStack toStored(int slot, ItemStack stack) {
         if (stack == null || stack.isEmpty()) {
             return null;
         }
-        var metadata = stack.getMetadata();
-        String json = metadata == null || metadata.isEmpty() ? null : metadata.toJson();
+        String json = ItemStackMetadata.toJson(stack);
         return new VaultItemStack(slot, stack.getItemId(), stack.getQuantity(),
                 stack.getDurability(), stack.getMaxDurability(), json);
     }

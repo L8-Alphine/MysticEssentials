@@ -257,7 +257,6 @@ public final class AfkModule extends AbstractMysticModule implements AfkService 
     }
 
     /** One-time upgrade: the old single {@code zoneCornerA/B} pair becomes a named zone. */
-    @SuppressWarnings("deprecation") // One-time reader for the deprecated pre-zone config fields.
     private void convertLegacyZoneCorners() {
         AfkConfig.Rewards r = config.rewards;
         if (r.zoneCornerA == null || r.zoneCornerB == null) {

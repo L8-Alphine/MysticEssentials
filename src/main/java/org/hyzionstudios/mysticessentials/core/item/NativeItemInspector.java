@@ -16,6 +16,7 @@ import org.hyzionstudios.mysticessentials.api.item.ItemViewEntries.ItemBindingDa
 import org.hyzionstudios.mysticessentials.api.item.ItemViewEntries.ItemDurabilityData;
 import org.hyzionstudios.mysticessentials.api.item.ItemViewEntries.ItemSourceData;
 import org.hyzionstudios.mysticessentials.api.item.RichText;
+import org.hyzionstudios.mysticessentials.platform.ItemStackMetadata;
 
 import com.hypixel.hytale.protocol.FormattedMessage;
 import com.hypixel.hytale.server.core.Message;
@@ -154,9 +155,8 @@ final class NativeItemInspector {
      * structured sections, therefore only the preserved base description (or
      * generated flavour before the block) belongs in Description and Lore.
      */
-    @SuppressWarnings("deprecation") // Raw BSON remains required for MysticRPG's published stack keys.
     private static RichText mysticRpgBaseDescription(ItemStack stack, Message composed) {
-        BsonDocument metadata = call(() -> stack == null ? null : stack.getMetadata(), null);
+        BsonDocument metadata = call(() -> ItemStackMetadata.read(stack), null);
         if (metadata == null || metadata.get(MYSTIC_RPG_GEAR_KEY) == null) {
             return messageRichText(composed);
         }
@@ -678,9 +678,8 @@ final class NativeItemInspector {
      * {@code "Null"} — that is a name, not an absence. Only a missing key or an
      * explicit BSON null means the item lacks the field.</p>
      */
-    @SuppressWarnings("deprecation") // Hytale has no non-deprecated API for enumerating all stack metadata yet.
     private void readMetadata(ItemStack stack, ItemViewBuilder builder) {
-        BsonDocument metadata = call(stack::getMetadata, null);
+        BsonDocument metadata = call(() -> ItemStackMetadata.read(stack), null);
         if (metadata == null || metadata.isEmpty()) {
             return;
         }

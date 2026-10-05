@@ -17,6 +17,7 @@ import java.util.logging.Level;
 import org.hyzionstudios.mysticessentials.api.Permissions;
 import org.hyzionstudios.mysticessentials.core.module.AbstractMysticModule;
 import org.hyzionstudios.mysticessentials.core.util.Json;
+import org.hyzionstudios.mysticessentials.platform.ItemStackMetadata;
 import org.hyzionstudios.mysticessentials.platform.command.MysticArgTypes;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommand;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommandSender;
@@ -205,7 +206,6 @@ public final class InventoryModule extends AbstractMysticModule {
         }
     }
 
-    @SuppressWarnings("deprecation") // Full BSON is required for lossless snapshot round-trips.
     private static List<InventorySnapshot.SlotItem> captureContainer(ItemContainer container) {
         List<InventorySnapshot.SlotItem> slots = new ArrayList<>();
         for (short slot = 0; slot < container.getCapacity(); slot++) {
@@ -219,8 +219,7 @@ public final class InventoryModule extends AbstractMysticModule {
             item.quantity = stack.getQuantity();
             item.durability = stack.getDurability();
             item.maxDurability = stack.getMaxDurability();
-            var metadata = stack.getMetadata();
-            item.metadata = metadata == null || metadata.isEmpty() ? null : metadata.toJson();
+            item.metadata = ItemStackMetadata.toJson(stack);
             slots.add(item);
         }
         return slots;

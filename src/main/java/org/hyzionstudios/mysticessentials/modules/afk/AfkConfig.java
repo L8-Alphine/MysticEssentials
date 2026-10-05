@@ -187,11 +187,9 @@ public final class AfkConfig {
                     "Lava", "Lava_Source", "Fire", "Poison", "Poison_Source", "Tar", "Tar_Source"));
         }
 
-        /** @deprecated pre-zone-list corners; converted into {@link #zones} on load. */
-        @Deprecated
+        /** Legacy pre-zone-list corner, read only to convert it into {@link #zones} on load. */
         public MysticLocation zoneCornerA;
-        /** @deprecated pre-zone-list corners; converted into {@link #zones} on load. */
-        @Deprecated
+        /** Legacy pre-zone-list corner, read only to convert it into {@link #zones} on load. */
         public MysticLocation zoneCornerB;
     }
 }
