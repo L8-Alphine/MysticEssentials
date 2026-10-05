@@ -76,23 +76,30 @@ public final class SpawnModule extends AbstractMysticModule implements SpawnServ
         // GlobalSpawnProvider, which is what the engine respawns against.
         // Update 6 does add a cancellable ECS RespawnEvent, so overriding the
         // respawn destination directly is now possible if this ever needs to
-        // diverge from the published spawn.
-        if (config.teleportOnFirstJoin || config.teleportOnJoin) {
-            registerEvent(
-                    PlayerConnectEvent.class,
-                    (PlayerConnectEvent event) ->
-                            onJoin(event.getPlayerRef()));
-        }
+        // diverge from the published spawn. Always registered: the join flags
+        // are read per join, so a reload (or an import) can switch them on.
+        registerEvent(
+                PlayerConnectEvent.class,
+                (PlayerConnectEvent event) ->
+                        onJoin(event.getPlayerRef()));
     }
 
+    /**
+     * Runs at {@code PlayerConnectEvent}, before the player has an entity: the
+     * teleport is held by the platform until the player is placed in a world.
+     */
     private void onJoin(PlayerRef player) {
+        SpawnConfig current = config;
+        if (!current.teleportOnFirstJoin && !current.teleportOnJoin) {
+            return;
+        }
         Optional<MysticLocation> spawn = getGlobalSpawn();
         if (spawn.isEmpty()) {
             return;
         }
         core.getPlayerProfileService().load(player.getUuid(), player.getUsername()).thenAccept(profile -> {
-            boolean shouldTeleport = (profile.isFirstJoin() && config.teleportOnFirstJoin)
-                    || (!profile.isFirstJoin() && config.teleportOnJoin);
+            boolean shouldTeleport = (profile.isFirstJoin() && current.teleportOnFirstJoin)
+                    || (!profile.isFirstJoin() && current.teleportOnJoin);
             if (shouldTeleport) {
                 core.getTeleportService().teleportNow(player, spawn.get());
             }
