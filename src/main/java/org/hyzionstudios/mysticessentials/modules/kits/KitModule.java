@@ -17,6 +17,8 @@ import org.hyzionstudios.mysticessentials.platform.command.MysticCommand;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommandSender;
 
 import com.google.gson.JsonObject;
+import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.asset.type.item.config.Item;
 import com.hypixel.hytale.server.core.command.system.CommandSender;
@@ -28,6 +30,7 @@ import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
 /**
  * Kits: named item bundles with per-kit cooldowns (including single-use),
@@ -92,9 +95,20 @@ public final class KitModule extends AbstractMysticModule {
                 log("firstJoinKit '" + kitName + "' is not defined in modules/kits/config.json");
                 return;
             }
-            giveItems(player, kit, kitName);
-            recordClaim(player.getUuid(), normalize(kitName));
-            core.getMessageService().sendKey(player, "kit-claimed", Map.of("kit", kitName));
+            String id = normalize(kitName);
+            // Record the claim only once the items were actually given, on the world
+            // thread; checking it there first means a repeated join cannot grant it twice.
+            boolean dispatched = core.platform().runOnEntityThread(player, (store, entity, world) -> {
+                if (lastClaim(player.getUuid(), id) != null) {
+                    return;
+                }
+                giveItemsNow(store, entity, kit, kitName);
+                recordClaim(player.getUuid(), id);
+                core.getMessageService().sendKey(player, "kit-claimed", Map.of("kit", kitName));
+            });
+            if (!dispatched) {
+                log("Could not give first-join kit '" + kitName + "' to " + player.getUsername() + " (left).");
+            }
         });
     }
 
@@ -260,25 +274,30 @@ public final class KitModule extends AbstractMysticModule {
 
     /** Gives the kit's items on the player's world thread, dropping what does not fit at their feet. */
     private void giveItems(PlayerRef player, KitConfig.Kit kit, String kitName) {
-        boolean dispatched = core.platform().runOnEntityThread(player, (store, entity, world) -> {
-            for (KitConfig.KitItem item : kit.items) {
-                if (item == null || item.itemId == null || item.itemId.isBlank()) {
-                    continue;
-                }
-                try {
-                    ItemStack stack = new ItemStack(item.itemId, Math.max(1, item.quantity));
-                    ItemStack remainder = Player.giveItem(stack, entity, store).getRemainder();
-                    if (!ItemStack.isEmpty(remainder)) {
-                        ItemUtils.dropItem(entity, remainder, store);
-                    }
-                } catch (Throwable t) {
-                    core.log(Level.WARNING, "[kits] Kit '" + kitName + "': cannot give item '"
-                            + item.itemId + "': " + t);
-                }
-            }
-        });
+        boolean dispatched = core.platform().runOnEntityThread(player, (store, entity, world) ->
+                giveItemsNow(store, entity, kit, kitName));
         if (!dispatched) {
             log("Could not give kit '" + kitName + "' to " + player.getUsername() + " (invalid entity).");
+        }
+    }
+
+    /** Gives the kit's items to {@code entity}. MUST run on the player's world thread. */
+    private void giveItemsNow(Store<EntityStore> store, Ref<EntityStore> entity, KitConfig.Kit kit,
+            String kitName) {
+        for (KitConfig.KitItem item : kit.items) {
+            if (item == null || item.itemId == null || item.itemId.isBlank()) {
+                continue;
+            }
+            try {
+                ItemStack stack = new ItemStack(item.itemId, Math.max(1, item.quantity));
+                ItemStack remainder = Player.giveItem(stack, entity, store).getRemainder();
+                if (!ItemStack.isEmpty(remainder)) {
+                    ItemUtils.dropItem(entity, remainder, store);
+                }
+            } catch (Throwable t) {
+                core.log(Level.WARNING, "[kits] Kit '" + kitName + "': cannot give item '"
+                        + item.itemId + "': " + t);
+            }
         }
     }
 
