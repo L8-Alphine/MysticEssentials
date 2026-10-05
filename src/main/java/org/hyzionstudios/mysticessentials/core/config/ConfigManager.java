@@ -35,6 +35,8 @@ public final class ConfigManager {
 
     private final MysticCore core;
     private MainConfig config;
+    /** Whether the last {@link #load} fell back to defaults because the file was unreadable. */
+    private boolean lastLoadFailed;
 
     /** Registered migrations per config id ("main" or a module id). */
     private final Map<String, List<Migration>> migrations = new HashMap<>();
@@ -64,8 +66,26 @@ public final class ConfigManager {
         return currentVersions.getOrDefault(configId, 1);
     }
 
+    /**
+     * Re-reads config.json for a reload. Unlike startup, a file that cannot be
+     * read does not swap in the built-in defaults (which would silently turn
+     * modules on/off and reset storage/Redis): the running config stays.
+     *
+     * @return {@code true} if the file was read and applied
+     */
+    public boolean reload() {
+        MainConfig previous = config;
+        load();
+        if (lastLoadFailed && previous != null) {
+            config = previous;
+            return false;
+        }
+        return !lastLoadFailed;
+    }
+
     /** Loads the main config, writing defaults if the file is missing, then migrates and validates it. */
     public void load() {
+        lastLoadFailed = false;
         Path file = core.paths().configFile();
         try {
             JsonElement raw = Json.readFile(file);
@@ -86,6 +106,7 @@ public final class ConfigManager {
         } catch (Exception e) {
             core.log(Level.SEVERE, "Failed to read config.json (" + e.getMessage()
                     + "); falling back to in-memory defaults. The file was NOT overwritten.");
+            lastLoadFailed = true;
             config = new MainConfig();
         }
         validate();

@@ -372,7 +372,11 @@ public final class MysticCore implements MysticEssentialsAPI {
 
         @Override
         protected void run(MysticCommandSender sender) {
-            configManager.load();
+            if (!configManager.reload()) {
+                sender.reply("&cconfig.json could not be read, so nothing was reloaded."
+                        + " Fix the file (see the server log) and reload again.");
+                return;
+            }
             messageService.load();
             updateNotifier.reload();
             reloadIntegrations();
@@ -545,11 +549,20 @@ public final class MysticCore implements MysticEssentialsAPI {
      * drift from everything else on the server.
      */
     public void reloadSharedServices() {
+        // An unreadable file keeps the running settings instead of resetting them.
         if (itemInspectionService != null) {
-            itemInspectionService.updateConfig(loadItemViewConfig());
+            ItemViewConfig itemView = loadSharedConfig("chat", "item-view.json",
+                    ItemViewConfig.class, new ItemViewConfig(), null);
+            if (itemView != null) {
+                itemInspectionService.updateConfig(itemView.normalized());
+            }
         }
         if (notificationService != null) {
-            notificationService.updateConfig(loadNotificationConfig());
+            NotificationConfig notifications = loadSharedConfig("core", "notifications.json",
+                    NotificationConfig.class, new NotificationConfig(), null);
+            if (notifications != null) {
+                notificationService.updateConfig(notifications.normalized());
+            }
         }
     }
 
@@ -570,25 +583,25 @@ public final class MysticCore implements MysticEssentialsAPI {
     }
 
     private ItemViewConfig loadItemViewConfig() {
-        return loadSharedConfig("chat", "item-view.json",
-                ItemViewConfig.class,
-                new ItemViewConfig())
+        ItemViewConfig defaults = new ItemViewConfig();
+        return loadSharedConfig("chat", "item-view.json", ItemViewConfig.class, defaults, defaults)
                 .normalized();
     }
 
     private NotificationConfig loadNotificationConfig() {
-        return loadSharedConfig("core", "notifications.json",
-                NotificationConfig.class,
-                new NotificationConfig())
+        NotificationConfig defaults = new NotificationConfig();
+        return loadSharedConfig("core", "notifications.json", NotificationConfig.class, defaults, defaults)
                 .normalized();
     }
 
     /**
      * Loads a shared config file, writing the defaults on first run. A corrupt
-     * file logs and yields the defaults rather than aborting startup — losing a
-     * customised notification profile is recoverable; failing to boot is not.
+     * file logs and yields {@code onFailure} (the defaults at startup) rather than
+     * aborting startup — losing a customised notification profile is
+     * recoverable; failing to boot is not.
      */
-    private <T> T loadSharedConfig(String module, String fileName, Class<T> type, T defaults) {
+    private <T> T loadSharedConfig(String module, String fileName, Class<T> type, T defaults,
+            T onFailure) {
         Path file = paths.moduleExtraConfigFile(module, fileName);
         try {
             T loaded = Json.readFile(file, type);
@@ -598,8 +611,10 @@ public final class MysticCore implements MysticEssentialsAPI {
             Json.writeFile(file, Json.toTree(defaults));
             log(Level.INFO, "Generated default modules/" + module + "/" + fileName);
         } catch (Exception e) {
-            log(Level.WARNING, "Failed to load " + fileName + " (using defaults): "
+            log(Level.WARNING, "Failed to load " + fileName
+                    + (onFailure == defaults ? " (using defaults): " : " (keeping current settings): ")
                     + e.getMessage());
+            return onFailure;
         }
         return defaults;
     }
