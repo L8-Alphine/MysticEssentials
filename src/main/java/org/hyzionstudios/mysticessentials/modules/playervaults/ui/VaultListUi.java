@@ -10,7 +10,6 @@ import java.util.Optional;
 import java.util.UUID;
 
 import org.hyzionstudios.mysticessentials.core.MysticCore;
-import org.hyzionstudios.mysticessentials.modules.playervaults.api.VaultOpenMode;
 import org.hyzionstudios.mysticessentials.modules.playervaults.config.PlayerVaultConfig;
 import org.hyzionstudios.mysticessentials.modules.playervaults.model.PlayerVault;
 import org.hyzionstudios.mysticessentials.platform.ui.MysticPage;
@@ -225,7 +224,7 @@ final class VaultListUi extends MysticPage {
                 close(ref, store);
                 if (adminView) {
                     controller.openAdminVault(player, ownerUuid, ownerName, vault,
-                            VaultOpenMode.ADMIN_EDIT, isOnline(ownerUuid));
+                            controller.permissions().adminOpenMode(player), isOnline(ownerUuid));
                 } else {
                     controller.openOwnVault(player, vault);
                 }

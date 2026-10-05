@@ -250,21 +250,9 @@ public final class PlayerVaultCommand extends MysticCommand {
             sender.replyKey("no-permission");
             return;
         }
-        VaultOpenMode mode = resolveAdminMode(viewer);
+        VaultOpenMode mode = perms().adminOpenMode(viewer);
         resolveTarget(sender, viewer, targetName, (uuid, name, online) ->
                 module.ui().openAdminVault(viewer, uuid, name, number, mode, online));
-    }
-
-    private VaultOpenMode resolveAdminMode(PlayerRef viewer) {
-        boolean canEdit = perms().canAdminEdit(viewer);
-        boolean preferReadOnly = "READ_ONLY".equalsIgnoreCase(config().admin.defaultAdminMode);
-        if (canEdit && !preferReadOnly) {
-            return VaultOpenMode.ADMIN_EDIT;
-        }
-        if (perms().canAdminReadOnly(viewer)) {
-            return VaultOpenMode.ADMIN_READONLY;
-        }
-        return canEdit ? VaultOpenMode.ADMIN_EDIT : VaultOpenMode.ADMIN_READONLY;
     }
 
     // ----- Target resolution (online, then offline by UUID) ---------------------

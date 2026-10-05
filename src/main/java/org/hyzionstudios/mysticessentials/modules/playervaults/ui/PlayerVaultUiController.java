@@ -175,8 +175,9 @@ public final class PlayerVaultUiController {
 
     /**
      * Opens another player's vault for staff. Permission, mode, and offline
-     * eligibility are decided by the caller; this fires the admin-open event,
-     * writes an audit entry, and starts the session.
+     * eligibility are decided by the caller (an edit mode is still downgraded to
+     * read-only without the admin edit permission); this fires the admin-open
+     * event, writes an audit entry, and starts the session.
      */
     public void openAdminVault(PlayerRef viewer, UUID ownerUuid, String ownerName, int vaultNumber,
             VaultOpenMode mode, boolean onlineTarget) {
@@ -184,6 +185,9 @@ public final class PlayerVaultUiController {
             core.getMessageService().sendKey(viewer, "vault-invalid-number",
                     Map.of("max", Integer.toString(config.maxVaults)));
             return;
+        }
+        if (mode.isMutable() && !permissions.canAdminEdit(viewer)) {
+            mode = VaultOpenMode.ADMIN_READONLY; // never grant item edits without the edit node
         }
         PlayerVaultAdminOpenEvent event = new PlayerVaultAdminOpenEvent(viewer.getUuid(), ownerUuid,
                 vaultNumber, mode, onlineTarget);
