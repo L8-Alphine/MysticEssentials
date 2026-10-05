@@ -107,7 +107,10 @@ final class WarpPages {
             switch (action) {
                 case "select" -> reopen(ref, store, new WarpsPage(core, warps, player, warpName, search));
                 case "teleport" -> {
-                    warps.getWarp(warpName).ifPresent(warp -> warps.warpPlayer(player, warp));
+                    // The client names the warp: apply the same visibility rule as /warp <name>.
+                    warps.getWarp(warpName)
+                            .filter(warp -> warps.canSee(player.getUuid(), warp))
+                            .ifPresent(warp -> warps.warpPlayer(player, warp));
                     reopen(ref, store, new WarpsPage(core, warps, player, warpName, search));
                 }
                 case "manage" -> {

@@ -5,6 +5,7 @@ import static org.hyzionstudios.mysticessentials.platform.ui.MysticPage.uiText;
 import java.util.List;
 import java.util.Map;
 
+import org.hyzionstudios.mysticessentials.api.Permissions;
 import org.hyzionstudios.mysticessentials.api.model.Home;
 import org.hyzionstudios.mysticessentials.api.model.MysticLocation;
 import org.hyzionstudios.mysticessentials.core.MysticCore;
@@ -99,6 +100,10 @@ final class HomePages {
                     reopen(ref, store, new HomesPage(core, spawn, player, homeName));
                 }
                 case "movehere" -> {
+                    if (!mayEditHomes(true)) {
+                        reopen(ref, store, new HomesPage(core, spawn, player, homeName));
+                        return;
+                    }
                     boolean moved = spawn.relocateHome(player, homeName);
                     core.getMessageService().sendKey(player, moved
                             ? "home-moved"
@@ -106,6 +111,10 @@ final class HomePages {
                     reopen(ref, store, new HomesPage(core, spawn, player, homeName));
                 }
                 case "delete" -> {
+                    if (!mayEditHomes(false)) {
+                        reopen(ref, store, new HomesPage(core, spawn, player, homeName));
+                        return;
+                    }
                     boolean deleted = spawn.deleteHome(player.getUuid(), homeName);
                     core.getMessageService().sendKey(player, deleted
                             ? "home-deleted"
@@ -113,6 +122,10 @@ final class HomePages {
                     reopen(ref, store, new HomesPage(core, spawn, player, null));
                 }
                 case "rename" -> {
+                    if (!mayEditHomes(false)) {
+                        reopen(ref, store, new HomesPage(core, spawn, player, homeName));
+                        return;
+                    }
                     String newName = field(payload, "newname");
                     boolean renamed = spawn.renameHome(player.getUuid(), homeName, newName);
                     core.getMessageService().sendKey(player, renamed
@@ -127,6 +140,10 @@ final class HomePages {
                         reopen(ref, store, new HomesPage(core, spawn, player, selectedName));
                         return;
                     }
+                    if (!mayEditHomes(true)) {
+                        reopen(ref, store, new HomesPage(core, spawn, player, selectedName));
+                        return;
+                    }
                     boolean created = spawn.setHome(player.getUuid(), name, core.platform().capture(player));
                     core.getMessageService().sendKey(player, created
                             ? "home-set"
@@ -138,6 +155,23 @@ final class HomePages {
                 default -> {
                 }
             }
+        }
+
+        /**
+         * The checks {@code /sethome}, {@code /delhome} and {@code /renamehome}
+         * apply: the set-home permission, and no home anchored in a temporary
+         * world when the action stores the player's position.
+         */
+        private boolean mayEditHomes(boolean anchorsHere) {
+            if (!player.hasPermission(Permissions.HOME_SET)) {
+                core.getMessageService().sendKey(player, "no-permission");
+                return false;
+            }
+            if (anchorsHere && core.platform().isInTemporaryWorld(player)) {
+                core.getMessageService().sendKey(player, "spawn-temp-world", Map.of("target", "a home"));
+                return false;
+            }
+            return true;
         }
 
         private static Home selectedHome(List<Home> homes, String selectedName) {

@@ -162,7 +162,7 @@ public final class WarpModule extends AbstractMysticModule implements WarpServic
         return serverWarps.values().stream().map(Warp::getName).toList();
     }
 
-    private boolean canSee(UUID viewer, Warp warp) {
+    boolean canSee(UUID viewer, Warp warp) {
         return switch (warp.getVisibility()) {
             case PUBLIC -> true;
             case HIDDEN -> false;
