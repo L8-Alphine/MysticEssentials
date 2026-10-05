@@ -344,8 +344,9 @@ public final class InventoryModule extends AbstractMysticModule {
     }
 
     private static ItemStack toItemStack(InventorySnapshot.SlotItem item) {
+        // No stored metadata means none: an empty document would not stack with fresh items.
         BsonDocument metadata = item.metadata == null || item.metadata.isBlank()
-                ? new BsonDocument()
+                ? null
                 : BsonDocument.parse(item.metadata);
         return new ItemStack(item.itemId, Math.max(1, item.quantity),
                 item.durability, item.maxDurability, metadata);

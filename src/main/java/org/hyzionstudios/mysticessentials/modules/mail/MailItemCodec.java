@@ -29,8 +29,9 @@ final class MailItemCodec {
 
     /** Rebuilds a live item from a stored attachment, restoring full metadata. */
     static ItemStack toLive(MailAttachment stored) {
+        // No stored metadata means none: an empty document would not stack with fresh items.
         BsonDocument metadata = stored.metadata == null || stored.metadata.isBlank()
-                ? new BsonDocument()
+                ? null
                 : BsonDocument.parse(stored.metadata);
         return new ItemStack(stored.itemId, Math.max(1, stored.quantity),
                 stored.durability, stored.maxDurability, metadata);
