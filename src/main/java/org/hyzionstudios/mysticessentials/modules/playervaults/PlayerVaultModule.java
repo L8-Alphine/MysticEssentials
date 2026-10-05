@@ -4,6 +4,9 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.logging.Level;
 
 import org.hyzionstudios.mysticessentials.api.MysticEssentialsAPI;
@@ -44,6 +47,9 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
  * vaults without the distributed lock that prevents cross-server duplication.</p>
  */
 public final class PlayerVaultModule extends AbstractMysticModule implements PlayerVaultService {
+
+    /** How long disabling waits for open vaults' final saves before giving up on them. */
+    private static final long SHUTDOWN_SAVE_SECONDS = 10L;
 
     private PlayerVaultConfig config = new PlayerVaultConfig();
 
@@ -151,9 +157,25 @@ public final class PlayerVaultModule extends AbstractMysticModule implements Pla
         if (!active) {
             return;
         }
-        // Save open sessions and release their locks before tearing down.
-        uiController.closeAll();
-        lockService.releaseAllLocal();
+        // Save open sessions and release their locks before tearing down. The saves
+        // are multi-step chains: wait for them (bounded) before any lock is dropped,
+        // and on a timeout leave the locks to their TTL rather than unlock unsaved data.
+        boolean saved = false;
+        try {
+            CompletableFuture.allOf(uiController.closeAll(), service.pendingSaves())
+                    .get(SHUTDOWN_SAVE_SECONDS, TimeUnit.SECONDS);
+            saved = true;
+        } catch (TimeoutException e) {
+            core.log(Level.WARNING, "[playervaults] vault saves still pending after " + SHUTDOWN_SAVE_SECONDS
+                    + "s; leaving their locks to expire.");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } catch (ExecutionException e) {
+            saved = true; // every save finished; failures were reported to their callers
+        }
+        if (saved) {
+            lockService.releaseAllLocal();
+        }
         redisBridge.unsubscribeUpdates();
         if (commandRegistration != null) {
             try {
