@@ -49,7 +49,7 @@ public class MysticessentialsPlugin extends JavaPlugin {
             core = new MysticCore(this);
             core.enable();
         } catch (Throwable t) {
-            getLogger().at(Level.SEVERE).log("MysticEssentials failed to start: " + t);
+            getLogger().at(Level.SEVERE).withCause(t).log("MysticEssentials failed to start");
         }
     }
 
@@ -59,7 +59,7 @@ public class MysticessentialsPlugin extends JavaPlugin {
             try {
                 core.disable();
             } catch (Throwable t) {
-                getLogger().at(Level.SEVERE).log("Error during MysticEssentials shutdown: " + t);
+                getLogger().at(Level.SEVERE).withCause(t).log("Error during MysticEssentials shutdown");
             }
             core = null;
         }
