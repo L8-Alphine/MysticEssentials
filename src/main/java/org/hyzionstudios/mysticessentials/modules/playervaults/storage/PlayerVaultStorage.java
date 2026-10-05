@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
+import java.util.function.UnaryOperator;
 
 import org.hyzionstudios.mysticessentials.api.service.StorageService;
 import org.hyzionstudios.mysticessentials.core.MysticCore;
@@ -94,8 +96,14 @@ public final class PlayerVaultStorage {
                         : Optional.ofNullable(Json.gson().fromJson(element, PlayerVaultProfile.class)));
     }
 
-    public CompletableFuture<Void> saveProfile(PlayerVaultProfile profile) {
-        return storage().save(PROFILE_NS, profile.playerUuid, Json.toTree(profile));
+    /**
+     * Read-modify-write of a profile ({@code change} gets {@code null} when none is
+     * stored), atomic against every other write of it on this server.
+     */
+    public CompletableFuture<Void> updateProfile(UUID owner, UnaryOperator<PlayerVaultProfile> change) {
+        return storage().update(PROFILE_NS, owner.toString(), element -> Json.toTree(change.apply(
+                element == null ? null : Json.gson().fromJson(element, PlayerVaultProfile.class))))
+                .thenApply(stored -> null);
     }
 
     // ----- Backups --------------------------------------------------------------
@@ -107,8 +115,14 @@ public final class PlayerVaultStorage {
         });
     }
 
-    public CompletableFuture<Void> saveBackups(UUID owner, int vaultNumber, List<VaultBackup> backups) {
-        return storage().save(BACKUP_NS, vaultKey(owner, vaultNumber), Json.toTree(backups));
+    /** Read-modify-write of a vault's backup ring, atomic against every other write of it on this server. */
+    public CompletableFuture<Void> updateBackups(UUID owner, int vaultNumber, Consumer<List<VaultBackup>> change) {
+        return storage().update(BACKUP_NS, vaultKey(owner, vaultNumber), element -> {
+            List<VaultBackup> list = element == null ? null : Json.gson().fromJson(element, BACKUP_LIST);
+            list = list != null ? list : new ArrayList<>();
+            change.accept(list);
+            return Json.toTree(list);
+        }).thenApply(stored -> null);
     }
 
     // ----- Conflict snapshots ---------------------------------------------------
@@ -121,8 +135,16 @@ public final class PlayerVaultStorage {
         });
     }
 
-    public CompletableFuture<Void> saveConflicts(UUID owner, int vaultNumber, List<VaultConflictSnapshot> snapshots) {
-        return storage().save(CONFLICT_NS, vaultKey(owner, vaultNumber), Json.toTree(snapshots));
+    /** Read-modify-write of a vault's conflict snapshots, atomic against every other write of them on this server. */
+    public CompletableFuture<Void> updateConflicts(UUID owner, int vaultNumber,
+            Consumer<List<VaultConflictSnapshot>> change) {
+        return storage().update(CONFLICT_NS, vaultKey(owner, vaultNumber), element -> {
+            List<VaultConflictSnapshot> list = element == null ? null
+                    : Json.gson().fromJson(element, CONFLICT_LIST);
+            list = list != null ? list : new ArrayList<>();
+            change.accept(list);
+            return Json.toTree(list);
+        }).thenApply(stored -> null);
     }
 
     // ----- Admin logs -----------------------------------------------------------
@@ -134,8 +156,14 @@ public final class PlayerVaultStorage {
         });
     }
 
-    public CompletableFuture<Void> saveLogs(UUID target, List<VaultAdminLogEntry> entries) {
-        return storage().save(LOG_NS, target.toString(), Json.toTree(entries));
+    /** Read-modify-write of a player's admin log, atomic against every other write of it on this server. */
+    public CompletableFuture<Void> updateLogs(UUID target, Consumer<List<VaultAdminLogEntry>> change) {
+        return storage().update(LOG_NS, target.toString(), element -> {
+            List<VaultAdminLogEntry> list = element == null ? null : Json.gson().fromJson(element, LOG_LIST);
+            list = list != null ? list : new ArrayList<>();
+            change.accept(list);
+            return Json.toTree(list);
+        }).thenApply(stored -> null);
     }
 
     /** Raw element passthrough (used by admin export). */

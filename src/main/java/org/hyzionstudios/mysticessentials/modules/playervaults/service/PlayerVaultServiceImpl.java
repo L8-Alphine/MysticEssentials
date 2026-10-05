@@ -267,15 +267,14 @@ public final class PlayerVaultServiceImpl implements PlayerVaultService {
     }
 
     private CompletableFuture<Void> trackProfile(UUID owner, PlayerVault vault) {
-        return storage.loadProfile(owner).thenCompose(profileOpt -> {
-            PlayerVaultProfile profile = profileOpt.orElseGet(() ->
-                    new PlayerVaultProfile(owner, resolveName(owner)));
+        String name = resolveName(owner);
+        return storage.updateProfile(owner, stored -> {
+            PlayerVaultProfile profile = stored != null ? stored : new PlayerVaultProfile(owner, name);
             profile.trackVault(vault.vaultNumber);
-            String name = resolveName(owner);
             if (name != null) {
                 profile.lastKnownName = name;
             }
-            return storage.saveProfile(profile);
+            return profile;
         });
     }
 
