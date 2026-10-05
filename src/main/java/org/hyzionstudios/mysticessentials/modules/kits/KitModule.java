@@ -239,6 +239,11 @@ public final class KitModule extends AbstractMysticModule {
                     Map.of("duration", formatDuration(kit.requiredOnlineSeconds - onlineSeconds)));
             return;
         }
+        if (kitData(playerId) == null) {
+            // Without the loaded profile the cooldown can be neither checked nor recorded.
+            reply.reply("nick-error-profile", Map.of());
+            return;
+        }
         if (!player.hasPermission(Permissions.KIT_BYPASS_COOLDOWN)) {
             Long lastClaim = lastClaim(playerId, id);
             if (lastClaim != null) {
@@ -257,13 +262,18 @@ public final class KitModule extends AbstractMysticModule {
             }
         }
         if (kit.cost > 0) {
-            if (!core.getEconomyService().has(playerId, kit.cost)) {
+            if (!core.getEconomyService().has(playerId, kit.cost)
+                    || !core.getEconomyService().withdraw(playerId, kit.cost)) {
                 reply.reply("kit-cannot-afford", Map.of("cost", Double.toString(kit.cost)));
                 return;
             }
-            core.getEconomyService().withdraw(playerId, kit.cost);
         }
-        giveItems(player, kit, id);
+        if (!giveItems(player, kit, id)) {
+            if (kit.cost > 0) {
+                core.getEconomyService().deposit(playerId, kit.cost); // Refund: the player is gone.
+            }
+            return;
+        }
         recordClaim(playerId, id);
         reply.reply("kit-claimed", Map.of("kit", id));
     }
@@ -272,13 +282,17 @@ public final class KitModule extends AbstractMysticModule {
         void reply(String key, Map<String, String> params);
     }
 
-    /** Gives the kit's items on the player's world thread, dropping what does not fit at their feet. */
-    private void giveItems(PlayerRef player, KitConfig.Kit kit, String kitName) {
+    /**
+     * Gives the kit's items on the player's world thread, dropping what does not fit
+     * at their feet. @return {@code false} when the player is no longer connected.
+     */
+    private boolean giveItems(PlayerRef player, KitConfig.Kit kit, String kitName) {
         boolean dispatched = core.platform().runOnEntityThread(player, (store, entity, world) ->
                 giveItemsNow(store, entity, kit, kitName));
         if (!dispatched) {
             log("Could not give kit '" + kitName + "' to " + player.getUsername() + " (invalid entity).");
         }
+        return dispatched;
     }
 
     /** Gives the kit's items to {@code entity}. MUST run on the player's world thread. */
