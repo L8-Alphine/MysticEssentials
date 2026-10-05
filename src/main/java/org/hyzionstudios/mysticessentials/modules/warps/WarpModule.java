@@ -570,6 +570,7 @@ public final class WarpModule extends AbstractMysticModule implements WarpServic
 
         PlayerWarpDeleteCommand() {
             super(WarpModule.this.core, "delete", "Delete one of your player warps.");
+            requirePermission(Permissions.PLAYERWARP_USE);
         }
 
         @Override
@@ -589,6 +590,7 @@ public final class WarpModule extends AbstractMysticModule implements WarpServic
     private final class PlayerWarpManageCommand extends MysticCommand {
         PlayerWarpManageCommand() {
             super(WarpModule.this.core, "manage", "Open the player-warp manager.");
+            requirePermission(Permissions.PLAYERWARP_USE);
         }
 
         @Override
