@@ -28,9 +28,9 @@ import org.hyzionstudios.mysticessentials.platform.Conversions;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 
 /**
- * Central teleport pipeline: cost check &rarr; cooldown check &rarr; record back
- * location &rarr; warmup (with movement cancellation) &rarr; ECS move on the
- * player's world thread &rarr; apply cooldown.
+ * Central teleport pipeline: cost check &rarr; cooldown check &rarr; warmup (with
+ * movement cancellation) &rarr; charge &rarr; ECS move on the player's world
+ * thread &rarr; record back location and apply cooldown (refund on failure).
  *
  * <p>During a warmup the player's position is polled; if they move (and
  * {@code cancelOnMove} is set) the teleport is cancelled. The physical move
@@ -89,21 +89,14 @@ public final class TeleportServiceImpl implements TeleportService {
             return CompletableFuture.completedFuture(Result.INVALID_DESTINATION);
         }
 
-        if (request.isRecordBackLocation()) {
-            recordBackLocation(uuid, player);
-        }
-        if (request.getCost() > 0) {
-            core.getEconomyService().withdraw(uuid, request.getCost());
-            core.getMessageService().sendKey(player, "teleport-cost-charged",
-                    Map.of("cost", core.getEconomyService().format(request.getCost())));
-        }
-
+        // Cost, /back and cooldown are only committed once the move succeeds
+        // (see finish), so a cancelled warmup or a failed move costs nothing.
         CompletableFuture<Result> outcome = new CompletableFuture<>();
         int warmup = bypassWarmup ? 0 : request.getWarmupSeconds();
         if (warmup <= 0) {
-            finish(player, request, destination, outcome);
+            finish(player, request, outcome);
         } else {
-            startWarmup(player, request, destination, outcome, warmup);
+            startWarmup(player, request, outcome, warmup);
         }
         return outcome;
     }
@@ -118,7 +111,7 @@ public final class TeleportServiceImpl implements TeleportService {
      * later timestamp means the player took damage. {@code Instant.MIN} is the
      * "never damaged" baseline so a first-ever hit still cancels.</p>
      */
-    private void startWarmup(PlayerRef player, TeleportRequest request, MysticLocation destination,
+    private void startWarmup(PlayerRef player, TeleportRequest request,
             CompletableFuture<Result> outcome, int warmupSeconds) {
         UUID uuid = player.getUuid();
         MysticLocation start = safeCapture(player);
@@ -149,7 +142,7 @@ public final class TeleportServiceImpl implements TeleportService {
                 settle(settled, holder, () -> {
                     hideWarmupHud(ref);
                     core.getMessageService().sendKey(ref, "teleport-starting");
-                    finish(ref, request, destination, outcome);
+                    finish(ref, request, outcome);
                 });
                 return;
             }
@@ -248,18 +241,60 @@ public final class TeleportServiceImpl implements TeleportService {
         return core.cooldowns().remaining(player, cooldownKey);
     }
 
-    private void finish(PlayerRef player, TeleportRequest request, MysticLocation destination,
-            CompletableFuture<Result> outcome) {
-        dispatchMove(player, destination, outcome);
-        outcome.thenAccept(result -> {
-            if (result == Result.SUCCESS) {
+    /**
+     * Performs the move once the warmup is over. A player target is resolved
+     * here, at execution time, so the mover lands where the target is now. The
+     * cost is withdrawn just before the move and refunded if the move fails;
+     * the {@code /back} entry and the cooldown are only recorded on success.
+     */
+    private void finish(PlayerRef player, TeleportRequest request, CompletableFuture<Result> outcome) {
+        UUID uuid = player.getUuid();
+        MysticLocation destination = resolveDestination(request);
+        if (destination == null || destination.getWorld() == null) {
+            core.getMessageService().sendKey(player, "teleport-invalid-destination");
+            outcome.complete(Result.INVALID_DESTINATION);
+            return;
+        }
+        if (!worldAccess.get().allows(destination.getWorld())) {
+            core.getMessageService().sendKey(player, "teleport-world-disabled",
+                    Map.of("world", destination.getWorld()));
+            outcome.complete(Result.INVALID_DESTINATION);
+            return;
+        }
+        double cost = request.getCost();
+        if (cost > 0 && !core.getEconomyService().withdraw(uuid, cost)) {
+            core.getMessageService().sendKey(player, "not-enough-money",
+                    Map.of("cost", core.getEconomyService().format(cost)));
+            outcome.complete(Result.NOT_ENOUGH_MONEY);
+            return;
+        }
+        MysticLocation back = request.isRecordBackLocation() ? safeCapture(player) : null;
+        CompletableFuture<Result> move = new CompletableFuture<>();
+        dispatchMove(player, destination, move);
+        move.thenAccept(result -> {
+            try {
+                if (result != Result.SUCCESS) {
+                    if (cost > 0) {
+                        core.getEconomyService().deposit(uuid, cost);
+                    }
+                    return;
+                }
+                if (back != null) {
+                    recordBackLocation(uuid, back);
+                }
+                if (cost > 0) {
+                    core.getMessageService().sendKey(player, "teleport-cost-charged",
+                            Map.of("cost", core.getEconomyService().format(cost)));
+                }
+                if (!player.hasPermission(BYPASS_COOLDOWN_PERMISSION)
+                        && request.getCooldownKey() != null && request.getCooldownSeconds() > 0) {
+                    core.cooldowns().set(uuid, request.getCooldownKey(), request.getCooldownSeconds());
+                }
                 core.getMessageService().sendKey(player, "teleport-success");
+            } finally {
+                outcome.complete(result);
             }
         });
-        if (!player.hasPermission(BYPASS_COOLDOWN_PERMISSION)
-                && request.getCooldownKey() != null && request.getCooldownSeconds() > 0) {
-            core.cooldowns().set(player.getUuid(), request.getCooldownKey(), request.getCooldownSeconds());
-        }
     }
 
     private void dispatchMove(PlayerRef player, MysticLocation destination, CompletableFuture<Result> outcome) {
@@ -284,9 +319,9 @@ public final class TeleportServiceImpl implements TeleportService {
         return null;
     }
 
-    private void recordBackLocation(UUID uuid, PlayerRef player) {
+    private void recordBackLocation(UUID uuid, MysticLocation location) {
         core.getPlayerProfileService().getCached(uuid).ifPresent(profile ->
-                profile.setLastTeleportedLocation(Conversions.capture(player)));
+                profile.setLastTeleportedLocation(location));
     }
 
     private record WorldAccessRules(Set<String> whitelist, Set<String> blacklist) {
