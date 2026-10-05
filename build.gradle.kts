@@ -1,34 +1,54 @@
 import java.util.zip.ZipFile
 
 plugins {
+    idea
     java
-    id("com.gradleup.shadow") version "9.3.1"
+    id("com.azuredoom.hytale-tools") version "1.+"
+    id("com.gradleup.shadow") version "9.6.1"
 }
 
-group = "org.hyzionstudios"
-version = "1.0.4"
+tasks.withType<Javadoc>().configureEach {
+    (options as org.gradle.external.javadoc.StandardJavadocDocletOptions).addStringOption("Xdoclint:-missing", "-quiet")
+}
+
+group = project.property("group").toString()
+
+java {
+    toolchain.languageVersion.set(JavaLanguageVersion.of(property("java_version").toString().toInt()))
+}
+
+hytaleTools {
+    javaVersion = property("java_version").toString().toInt()
+    hytaleVersion = property("hytale_version").toString()
+    manifestServerVersion = property("manifestServerVersion").toString()
+    manifestGroup = property("manifest_group").toString()
+    modId = property("mod_id").toString()
+    modDescription = property("mod_description").toString()
+    modUrl = property("mod_url").toString()
+    mainClass = property("main_class").toString()
+    modCredits = property("mod_author").toString()
+    manifestDependencies = property("manifest_dependencies").toString()
+    manifestOptionalDependencies = property("manifest_opt_dependencies").toString()
+    curseforgeId = property("curseforgeID").toString()
+    disabledByDefault = property("disabled_by_default").toString().toBoolean()
+    includesPack = property("includes_pack").toString().toBoolean()
+    injectServerJavadocsIntoSources = property("inject_server_javadocs_into_sources").toString().toBoolean()
+    generateAssetsBinary = property("generateAssetsBinary").toString().toBoolean()
+    patchline = property("patchline").toString()
+}
 
 repositories {
     mavenCentral()
-    maven ( url = "https://maven.hytale.com/release")
-    maven ( url = "https://maven.hytale.com/pre-release")
-
-    // PlaceholderAPI
-    maven ( url = "https://repo.helpch.at/releases/")
+    // The Hytale and PlaceholderAPI repositories are added by hytale-tools.
 
     // Vault Unlocked Repo
-    maven ( url = "https://repo.codemc.io/repository/creatorfromhell/")
+    maven(url = "https://repo.codemc.io/repository/creatorfromhell/")
 }
 
-val hytaleInstallPath: String by project
-val hytaleServerJarPath: String by project
-
-val resolvedServerJar = hytaleServerJarPath.ifBlank { "$hytaleInstallPath/Server/HytaleServer.jar" }
-
 dependencies {
-    // Hytale Server API from official Maven repository
-    compileOnly("com.hypixel.hytale:Server:0.6.2")
-    testCompileOnly("com.hypixel.hytale:Server:0.6.2")
+    // The Hytale Server API is added to compileOnly by hytale-tools from hytale_version.
+    // testCompileOnly does not inherit compileOnly, so the tests name the server jar explicitly.
+    testCompileOnly("com.hypixel.hytale:Server:${property("hytale_version")}")
 
     // Offline license verification. Zero runtime dependencies of its own, so it
     // shades in cleanly and cannot collide with anything on the server.
@@ -64,12 +84,6 @@ dependencies {
     implementation("org.jsoup:jsoup:1.23.2")
 }
 
-java {
-    toolchain {
-        languageVersion.set(JavaLanguageVersion.of(25))
-    }
-}
-
 tasks.withType<JavaCompile>().configureEach {
     options.compilerArgs.add("-Xlint:deprecation")
 }
@@ -78,14 +92,32 @@ tasks.withType<JavaCompile>().configureEach {
 // deployed: give it a classifier so it cannot overwrite the shaded jar, which
 // keeps the bare MysticEssentials-<version>.jar name. (`gradle build` runs both
 // tasks, and whichever finished last used to win.)
-tasks.jar {
+tasks.named<Jar>("jar") {
+    archiveBaseName.set(project.property("mod_name").toString())
+    archiveVersion.set(project.property("version").toString())
     archiveClassifier.set("thin")
 }
 
 tasks.shadowJar {
+    archiveBaseName.set(project.property("mod_name").toString())
     archiveClassifier.set("")
     // Preserve JDBC driver auto-registration (META-INF/services/java.sql.Driver).
+    // MariaDB and MySQL both ship that file. Shadow 9 defaults to EXCLUDE, which drops
+    // the duplicate path before mergeServiceFiles can combine them, leaving only one
+    // driver discoverable.
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
     mergeServiceFiles()
+}
+
+tasks.assemble {
+    dependsOn(tasks.shadowJar)
+}
+
+idea {
+    module {
+        isDownloadSources = true
+        isDownloadJavadoc = true
+    }
 }
 
 // The MysticIdentity web-portal adapter (Player Portal bible §8). A portal provider must
@@ -94,7 +126,7 @@ tasks.shadowJar {
 // source set of its own: compiled against the MysticIdentity API jar and our main classes,
 // bundled into the mod jar, and loaded by name by core.integration.PortalBridge only when
 // MysticIdentity is installed.
-val mysticIdentity: SourceSet by sourceSets.creating {
+val mysticIdentity: SourceSet = sourceSets.create("mysticIdentity") {
     java.srcDir("src/mysticidentity/java")
     compileClasspath += sourceSets.main.get().output + sourceSets.main.get().compileClasspath
 }
@@ -108,7 +140,7 @@ tasks.shadowJar {
 }
 
 // Its checks, in the same dependency-free main-method style as the other verify tasks below.
-val mysticIdentityCheck: SourceSet by sourceSets.creating {
+val mysticIdentityCheck: SourceSet = sourceSets.create("mysticIdentityCheck") {
     java.srcDir("src/mysticidentityCheck/java")
     compileClasspath += mysticIdentity.output + mysticIdentity.compileClasspath
     runtimeClasspath += output + compileClasspath
@@ -124,24 +156,6 @@ tasks.register<JavaExec>("verifyPortalAdapter") {
 
 tasks.named("check") { dependsOn("verifyPortalAdapter") }
 
-tasks.register<Copy>("deployMod") {
-    group = "hytale"
-    description = "Builds the mod and copies it to the project-local server mods folder."
-    dependsOn(tasks.shadowJar)
-    from(tasks.shadowJar.flatMap { it.archiveFile })
-    into("$projectDir/.hytale-server/mods")
-}
-
-tasks.register("cleanDeploy") {
-    group = "hytale"
-    description = "Cleans, rebuilds, and deploys the mod."
-    dependsOn("clean", "deployMod")
-}
-
-tasks.named("deployMod") {
-    mustRunAfter("clean")
-}
-
 /**
  * Validates every `$C.@Component { ... }` instantiation in our shipped `.ui`
  * documents against the parameter contract declared in the game's `Common.ui`.
@@ -154,20 +168,34 @@ tasks.named("deployMod") {
  * (diagnosed 2026-07-28). Build time is the only place this cannot reach a
  * client.
  *
- * Skips when the game assets are not installed so CI still builds.
+ * The game's Assets.zip comes from `hytale_home` (an Assets.zip, a folder holding
+ * one, or a Hytale install root -- what runServer accepts), else from the copy
+ * hytale-tools downloads for runServer. Skips when neither exists so CI still builds.
  */
+val uiAssetsZipCandidates: List<File> = run {
+    val patchline = property("patchline").toString()
+    val hytaleHome = providers.gradleProperty("hytale_home").orNull?.trim().orEmpty()
+    (if (hytaleHome.isEmpty()) emptyList() else listOf(
+        File(hytaleHome),
+        File(hytaleHome, "Assets.zip"),
+        File(hytaleHome, "install/$patchline/package/game/latest/Assets.zip")
+    )) + gradle.gradleUserHomeDir.resolve(
+        "caches/hytale-assets/$patchline-${property("hytale_version")}-Assets.zip"
+    )
+}
+
 tasks.register("validateUiDocuments") {
     group = "verification"
     description = "Checks shipped .ui documents supply every required Common.ui parameter."
 
     val uiDir = layout.projectDirectory.dir("src/main/resources/Common/UI/Custom")
-    val assetsZip = File("$hytaleInstallPath/Assets.zip")
     inputs.dir(uiDir)
     outputs.upToDateWhen { false }
 
     doLast {
-        if (!assetsZip.isFile) {
-            logger.lifecycle("validateUiDocuments: ${assetsZip.path} not found, skipping.")
+        val assetsZip = uiAssetsZipCandidates.firstOrNull { it.isFile }
+        if (assetsZip == null) {
+            logger.lifecycle("validateUiDocuments: no Assets.zip (set hytale_home), skipping.")
             return@doLast
         }
         val commonUi = ZipFile(assetsZip).use { zip ->

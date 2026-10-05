@@ -786,7 +786,21 @@ Hytale API surface, and how to build addons against
 ```bash
 ./gradlew shadowJar     # -> build/libs/MysticEssentials-1.0.4.jar (the one to deploy)
                         #    MysticEssentials-1.0.4-thin.jar has no bundled Jedis/JDBC — never deploy it
-./gradlew deployMod     # build + copy to the project-local server mods folder
 ```
 
 Requires JDK 25 (configured via the Gradle toolchain).
+
+The build uses AzureDoom's `com.azuredoom.hytale-tools` Gradle plugin: the
+Hytale version, mod identity and manifest fields live in `gradle.properties`,
+and `src/main/resources/manifest.json` is rewritten from them on every build.
+
+## Running a dev server
+
+```bash
+./gradlew runServer
+```
+
+Starts a local Hytale server in `run/` with the mod loaded from the compiled
+classes. Set `hytale_home` (ideally in `~/.gradle/gradle.properties`) to your
+Hytale install to use its `Assets.zip` instead of downloading one; the
+`validateUiDocuments` check also reads `Common.ui` from that `Assets.zip`.

@@ -582,7 +582,9 @@ explicitly supplied.
 ./gradlew shadowJar        # -> build/libs/MysticEssentials-1.0.4.jar (deploy this one)
                            #    the plain `jar` task now writes *-thin.jar so it can no longer
                            #    overwrite the shaded jar during `gradle build`
-./gradlew deployMod        # builds + copies to .hytale-server/mods
+./gradlew runServer        # local dev server in run/ (hytale-tools)
 ```
 
-Requires JDK 25 (configured via the Gradle toolchain).
+Requires JDK 25 (configured via the Gradle toolchain). The build uses AzureDoom's
+`com.azuredoom.hytale-tools` plugin; the Hytale version and manifest fields live in
+`gradle.properties`, and `manifest.json` is rewritten from them on every build.
