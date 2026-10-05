@@ -7,8 +7,10 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -41,6 +43,7 @@ import com.hypixel.hytale.server.core.command.system.arguments.system.RequiredAr
 import com.hypixel.hytale.server.core.command.system.arguments.types.ArgTypes;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent;
+import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
 import com.hypixel.hytale.server.core.inventory.InventoryComponent;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
@@ -64,6 +67,8 @@ public final class MailModule extends AbstractMysticModule implements MailServic
 
     private MailConfig config = new MailConfig();
     private final Consumer<String> redisNotifyHandler = this::handleRemoteMailNotification;
+    /** Players with a reward claim in progress, so a double click cannot claim twice. */
+    private final Set<UUID> claimsInProgress = ConcurrentHashMap.newKeySet();
 
     public MailModule() {
         super("mail", "Mail", "1.0.0");
@@ -79,6 +84,12 @@ public final class MailModule extends AbstractMysticModule implements MailServic
                 PlayerConnectEvent.class,
                 (PlayerConnectEvent event) ->
                         notifyUnread(event.getPlayerRef()));
+        // A claim whose world-thread work was dropped because the player left never
+        // finishes; release its guard so the player can claim again next session.
+        registerEvent(
+                PlayerDisconnectEvent.class,
+                (PlayerDisconnectEvent event) ->
+                        claimsInProgress.remove(event.getPlayerRef().getUuid()));
     }
 
     @Override
@@ -534,32 +545,55 @@ public final class MailModule extends AbstractMysticModule implements MailServic
     }
 
     /**
-     * Claims a mail's rewards once: gives the escrowed items to the recipient's
-     * inventory (refusing if there is not enough room) and runs any reward
-     * commands as console, then flips the mail to claimed. Runs on the recipient's
-     * world thread.
+     * Claims a mail's rewards once. The mail is first flipped to claimed in a single
+     * atomic storage update, so no other claim can still see it claimable; then, on
+     * the recipient's world thread, the escrowed items are given (refusing if there
+     * is not enough room) and any reward commands run as console. A claim that
+     * hands nothing out is rolled back.
      */
     void claimRewards(PlayerRef player, String mailId, Runnable refresh) {
-        getMessage(player.getUuid(), mailId).thenAccept(opt -> {
-            if (opt.isEmpty() || !opt.get().isClaimable()) {
-                core.getMessageService().sendKey(player, "mail-nothing-to-claim");
-                refresh.run();
+        UUID uuid = player.getUuid();
+        if (!claimsInProgress.add(uuid)) {
+            return; // A claim is already running (e.g. a double click); it refreshes the UI itself.
+        }
+        Runnable done = () -> {
+            claimsInProgress.remove(uuid);
+            refresh.run();
+        };
+        updateInbox(uuid, inbox -> {
+            MailMessage mail = inbox.stream().filter(m -> m.getId().equals(mailId)).findFirst().orElse(null);
+            if (mail == null || !mail.isClaimable()) {
+                return null;
+            }
+            mail.setClaimed(true);
+            return mail;
+        }).whenComplete((claimed, failure) -> {
+            if (failure != null) {
+                core.log(Level.WARNING, "[mail] claim failed: " + failure);
+                done.run();
                 return;
             }
-            List<MailAttachment> items = new ArrayList<>(opt.get().items());
-            List<String> commands = new ArrayList<>(opt.get().commands());
+            if (claimed == null) {
+                core.getMessageService().sendKey(player, "mail-nothing-to-claim");
+                done.run();
+                return;
+            }
+            List<MailAttachment> items = new ArrayList<>(claimed.items());
+            List<String> commands = new ArrayList<>(claimed.commands());
             boolean dispatched = core.platform().runOnEntityThread(player, (store, entity, world) -> {
+                boolean handingOut = false;
                 try {
                     if (!items.isEmpty()) {
                         List<ItemContainer> containers = sources(store, entity);
                         if (containers.isEmpty() || freeSlots(containers) < items.size()) {
                             core.getMessageService().sendKey(player, "mail-claim-no-space");
-                            refresh.run();
+                            unclaim(uuid, mailId, done);
                             return;
                         }
-                        for (MailAttachment attachment : items) {
-                            Player.giveItem(MailItemCodec.toLive(attachment), entity, store);
-                        }
+                    }
+                    handingOut = true;
+                    for (MailAttachment attachment : items) {
+                        Player.giveItem(MailItemCodec.toLive(attachment), entity, store);
                     }
                     for (String command : commands) {
                         String resolved = command
@@ -570,18 +604,31 @@ public final class MailModule extends AbstractMysticModule implements MailServic
                         }
                         core.platform().dispatchConsoleCommand(resolved);
                     }
-                    markClaimed(player.getUuid(), mailId).thenRun(() -> {
-                        core.getMessageService().sendKey(player, "mail-claimed");
-                        refresh.run();
-                    });
+                    core.getMessageService().sendKey(player, "mail-claimed");
+                    done.run();
                 } catch (Throwable t) {
                     core.log(Level.WARNING, "[mail] claim failed: " + t);
-                    refresh.run();
+                    if (handingOut) {
+                        done.run(); // Some rewards may already be out: never re-open the claim.
+                    } else {
+                        unclaim(uuid, mailId, done);
+                    }
                 }
             });
             if (!dispatched) {
-                refresh.run();
+                unclaim(uuid, mailId, done);
             }
+        });
+    }
+
+    /** Rolls back a claim whose rewards could not be handed out, then runs {@code then}. */
+    private void unclaim(UUID player, String mailId, Runnable then) {
+        mutate(player, mailId, mail -> mail.setClaimed(false)).whenComplete((found, failure) -> {
+            if (failure != null) {
+                core.log(Level.WARNING, "[mail] could not re-open claim " + mailId + " for " + player
+                        + ": " + failure);
+            }
+            then.run();
         });
     }
 
