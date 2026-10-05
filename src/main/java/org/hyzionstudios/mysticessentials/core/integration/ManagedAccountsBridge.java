@@ -41,48 +41,54 @@ public final class ManagedAccountsBridge {
     public static final String TEXT_CROSS_PLATFORM = "TEXT_CROSS_PLATFORM";
 
     private final MysticCore core;
-    private boolean enabled;
-    private boolean present;
-    private Method providerGet;
-    private Method apiManaged;
-    private Method check;
-    private Method checkInteraction;
-    private Method isAllowed;
-    private Class<?> capabilityClass;
+    /**
+     * The resolved MysticIdentity hooks, or {@code null} when unavailable. Published
+     * as one immutable value so a chat thread racing a reload sees either the old
+     * or the new set, never a half-cleared one (which used to fail open).
+     */
+    private volatile Hooks hooks;
+
+    /** The reflective handles, resolved together. */
+    private record Hooks(Method providerGet, Method apiManaged, Method check,
+            Method checkInteraction, Method isAllowed, Class<?> capabilityClass) {
+    }
 
     public ManagedAccountsBridge(MysticCore core) {
         this.core = core;
     }
 
     public void init(boolean enabledInConfig) {
-        enabled = enabledInConfig;
-        clear();
-        if (!enabled) {
+        if (!enabledInConfig) {
+            hooks = null;
             core.log(Level.INFO, "Managed accounts integration: disabled in config");
             return;
         }
+        Hooks resolved;
         try {
             ClassLoader loader = ManagedAccountsBridge.class.getClassLoader();
             Class<?> provider = Class.forName(PROVIDER_CLASS, false, loader);
-            providerGet = provider.getMethod("get");
+            Method providerGet = provider.getMethod("get");
             Class<?> api = Class.forName(
                     "org.hyzionstudios.mysticidentity.api.service.MysticIdentityApi", false, loader);
-            apiManaged = api.getMethod("managed");
+            Method apiManaged = api.getMethod("managed");
             Class<?> service = apiManaged.getReturnType();
-            capabilityClass = Class.forName(CAPABILITY_CLASS, false, loader);
-            check = service.getMethod("check", UUID.class, capabilityClass);
-            checkInteraction = service.getMethod("checkInteraction", UUID.class, UUID.class, capabilityClass);
-            isAllowed = check.getReturnType().getMethod("isAllowed");
-            present = true;
+            Class<?> capabilityClass = Class.forName(CAPABILITY_CLASS, false, loader);
+            Method check = service.getMethod("check", UUID.class, capabilityClass);
+            Method checkInteraction = service.getMethod("checkInteraction", UUID.class, UUID.class,
+                    capabilityClass);
+            Method isAllowed = check.getReturnType().getMethod("isAllowed");
+            resolved = new Hooks(providerGet, apiManaged, check, checkInteraction, isAllowed,
+                    capabilityClass);
         } catch (Throwable t) {
-            clear();
+            resolved = null;
         }
+        hooks = resolved;
         core.log(Level.INFO, "Managed accounts integration: MysticIdentity "
-                + (present ? "detected" : "not present"));
+                + (resolved != null ? "detected" : "not present"));
     }
 
     public boolean isAvailable() {
-        return enabled && present;
+        return hooks != null;
     }
 
     /**
@@ -91,16 +97,18 @@ public final class ManagedAccountsBridge {
      *         MysticIdentity.
      */
     public boolean allowsInteraction(UUID source, UUID target, String capability) {
-        if (!isAvailable() || source == null || target == null || source.equals(target)) {
+        Hooks h = hooks;
+        if (h == null || source == null || target == null || source.equals(target)) {
             return true;
         }
         try {
-            Object service = service();
+            Object service = service(h);
             if (service == null) {
                 return true;
             }
-            Object decision = checkInteraction.invoke(service, source, target, capability(capability));
-            return Boolean.TRUE.equals(isAllowed.invoke(decision));
+            Object decision = h.checkInteraction().invoke(service, source, target,
+                    capability(h, capability));
+            return Boolean.TRUE.equals(h.isAllowed().invoke(decision));
         } catch (Throwable t) {
             return true;
         }
@@ -108,16 +116,17 @@ public final class ManagedAccountsBridge {
 
     /** @return whether {@code player} has {@code capability}; {@code true} without MysticIdentity. */
     public boolean allows(UUID player, String capability) {
-        if (!isAvailable() || player == null) {
+        Hooks h = hooks;
+        if (h == null || player == null) {
             return true;
         }
         try {
-            Object service = service();
+            Object service = service(h);
             if (service == null) {
                 return true;
             }
-            Object decision = check.invoke(service, player, capability(capability));
-            return Boolean.TRUE.equals(isAllowed.invoke(decision));
+            Object decision = h.check().invoke(service, player, capability(h, capability));
+            return Boolean.TRUE.equals(h.isAllowed().invoke(decision));
         } catch (Throwable t) {
             return true;
         }
@@ -151,12 +160,12 @@ public final class ManagedAccountsBridge {
         return kept == null ? listeners : kept;
     }
 
-    private Object service() throws Exception {
-        Object maybe = providerGet.invoke(null);
+    private static Object service(Hooks h) throws Exception {
+        Object maybe = h.providerGet().invoke(null);
         if (maybe instanceof Optional<?> optional) {
             return optional.map(api -> {
                 try {
-                    return apiManaged.invoke(api);
+                    return h.apiManaged().invoke(api);
                 } catch (Exception e) {
                     return null;
                 }
@@ -166,17 +175,7 @@ public final class ManagedAccountsBridge {
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private Object capability(String name) {
-        return Enum.valueOf((Class<? extends Enum>) capabilityClass, name);
-    }
-
-    private void clear() {
-        present = false;
-        providerGet = null;
-        apiManaged = null;
-        check = null;
-        checkInteraction = null;
-        isAllowed = null;
-        capabilityClass = null;
+    private static Object capability(Hooks h, String name) {
+        return Enum.valueOf((Class<? extends Enum>) h.capabilityClass(), name);
     }
 }
