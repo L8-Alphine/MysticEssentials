@@ -10,6 +10,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
 import java.util.logging.Level;
 
 import org.bson.BsonDocument;
@@ -135,23 +136,28 @@ public final class InventoryModule extends AbstractMysticModule {
         }
     }
 
-    /** Captures a snapshot on the player's world thread and persists it. */
+    /** Captures a snapshot on the player's world thread; completes once it is stored. */
     public CompletableFuture<Boolean> snapshot(PlayerRef player, String cause) {
         CompletableFuture<Boolean> outcome = new CompletableFuture<>();
         boolean dispatched = core.platform().runOnEntityThread(player, (store, entity, world) ->
-                outcome.complete(captureOnThread(player, cause)));
+                captureOnThread(player, cause).thenAccept(outcome::complete));
         if (!dispatched) {
             outcome.complete(false);
         }
         return outcome;
     }
 
-    /** MUST run on the player's world thread. */
-    private boolean captureOnThread(PlayerRef player, String cause) {
+    /**
+     * Captures the inventory (MUST run on the player's world thread) and stores it.
+     *
+     * @return a future completing {@code true} once the snapshot is stored, or
+     *         {@code false} when there was nothing to capture or the save failed
+     */
+    private CompletableFuture<Boolean> captureOnThread(PlayerRef player, String cause) {
         try {
             Map<String, ItemContainer> inventorySections = sections(player);
             if (inventorySections.isEmpty()) {
-                return false;
+                return CompletableFuture.completedFuture(false);
             }
             InventorySnapshot snapshot = InventorySnapshot.create(cause);
             for (Map.Entry<String, ItemContainer> section : inventorySections.entrySet()) {
@@ -160,12 +166,18 @@ public final class InventoryModule extends AbstractMysticModule {
                     snapshot.sections.put(section.getKey(), slots);
                 }
             }
-            persist(player.getUuid(), snapshot);
-            return true;
+            return persist(player.getUuid(), snapshot).handle((stored, failure) -> {
+                if (failure != null) {
+                    core.log(Level.WARNING, "[inventory] Saving the " + cause + " snapshot of "
+                            + player.getUsername() + " failed: " + failure);
+                    return false;
+                }
+                return true;
+            });
         } catch (Throwable t) {
             core.log(Level.WARNING, "[inventory] Snapshot (" + cause + ") failed for "
                     + player.getUsername() + ": " + t);
-            return false;
+            return CompletableFuture.completedFuture(false);
         }
     }
 
@@ -237,38 +249,64 @@ public final class InventoryModule extends AbstractMysticModule {
         });
     }
 
-    private void persist(UUID player, InventorySnapshot snapshot) {
-        snapshots(player).thenCompose(list -> {
+    /** Prepends {@code snapshot} to the player's list in one atomic storage update. */
+    private CompletableFuture<Void> persist(UUID player, InventorySnapshot snapshot) {
+        return core.getStorageService().update(NAMESPACE, player.toString(), element -> {
+            List<InventorySnapshot> list = element == null ? null
+                    : Json.gson().fromJson(element, SNAPSHOT_LIST_TYPE);
+            if (list == null) {
+                list = new ArrayList<>();
+            }
             list.add(0, snapshot);
             int max = Math.max(1, config.maxSnapshotsPerPlayer);
             while (list.size() > max) {
                 list.remove(list.size() - 1);
             }
-            return core.getStorageService().save(NAMESPACE, player.toString(), Json.toTree(list));
-        });
+            return Json.toTree(list);
+        }).thenApply(stored -> null);
     }
 
     // ----- Clear & restore -----------------------------------------------------
 
-    /** Clears a player's inventory (with a PreClear backup snapshot). */
-    public CompletableFuture<Boolean> clearInventory(PlayerRef player) {
+    /**
+     * Stores a {@code cause} backup snapshot, then runs {@code change} on the
+     * player's world thread, never before the backup is stored, so a failed save
+     * cannot cost the player their items.
+     *
+     * @return {@code change}'s result, or {@code false} when the backup failed
+     */
+    private CompletableFuture<Boolean> afterBackup(PlayerRef player, String cause, BooleanSupplier change) {
         CompletableFuture<Boolean> outcome = new CompletableFuture<>();
-        boolean dispatched = core.platform().runOnEntityThread(player, (store, entity, world) -> {
-            captureOnThread(player, "PreClear");
-            Map<String, ItemContainer> inventorySections = sections(player);
-            if (inventorySections.isEmpty()) {
-                outcome.complete(false);
-                return;
-            }
-            for (ItemContainer container : inventorySections.values()) {
-                container.clear();
-            }
-            outcome.complete(true);
-        });
+        boolean dispatched = core.platform().runOnEntityThread(player, (store, entity, world) ->
+                captureOnThread(player, cause).thenAccept(backedUp -> {
+                    if (!backedUp) {
+                        outcome.complete(false);
+                        return;
+                    }
+                    boolean changing = core.platform().runOnEntityThread(player,
+                            (changeStore, changeEntity, changeWorld) -> outcome.complete(change.getAsBoolean()));
+                    if (!changing) {
+                        outcome.complete(false);
+                    }
+                }));
         if (!dispatched) {
             outcome.complete(false);
         }
         return outcome;
+    }
+
+    /** Clears a player's inventory (after a PreClear backup snapshot is stored). */
+    public CompletableFuture<Boolean> clearInventory(PlayerRef player) {
+        return afterBackup(player, "PreClear", () -> {
+            Map<String, ItemContainer> inventorySections = sections(player);
+            if (inventorySections.isEmpty()) {
+                return false;
+            }
+            for (ItemContainer container : inventorySections.values()) {
+                container.clear();
+            }
+            return true;
+        });
     }
 
     /**
@@ -288,16 +326,13 @@ public final class InventoryModule extends AbstractMysticModule {
         return cleared;
     }
 
-    /** Restores a snapshot onto an online player (with a PreRestore backup first). */
+    /** Restores a snapshot onto an online player (after a PreRestore backup is stored). */
     public CompletableFuture<Boolean> restore(PlayerRef target, InventorySnapshot snapshot) {
-        CompletableFuture<Boolean> outcome = new CompletableFuture<>();
-        boolean dispatched = core.platform().runOnEntityThread(target, (store, entity, world) -> {
+        return afterBackup(target, "PreRestore", () -> {
             try {
-                captureOnThread(target, "PreRestore");
                 Map<String, ItemContainer> sections = sections(target);
                 if (sections.isEmpty()) {
-                    outcome.complete(false);
-                    return;
+                    return false;
                 }
                 for (ItemContainer container : sections.values()) {
                     container.clear();
@@ -319,17 +354,13 @@ public final class InventoryModule extends AbstractMysticModule {
                         }
                     }
                 }
-                outcome.complete(true);
+                return true;
             } catch (Throwable t) {
                 core.log(Level.WARNING, "[inventory] Restore failed for "
                         + target.getUsername() + ": " + t);
-                outcome.complete(false);
+                return false;
             }
         });
-        if (!dispatched) {
-            outcome.complete(false);
-        }
-        return outcome;
     }
 
     private static ItemStack toItemStack(InventorySnapshot.SlotItem item) {
