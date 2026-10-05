@@ -76,10 +76,17 @@ public final class PortalsModule extends AbstractMysticModule {
     private final SingleArgumentType<String> portalIdArg = MysticArgTypes.dynamic(commandSender ->
             snapshot().stream().map(Portal::getId).toList());
 
-    /** Worlds (by uuid string) that already have break/join listeners attached. */
+    /** Worlds (by uuid string) that already have join listeners attached. */
     private final Set<String> listenedWorlds = ConcurrentHashMap.newKeySet();
     private final List<EventRegistration<?, ?>> worldRegistrations = new ArrayList<>();
     private ScheduledFuture<?> worldScanTask;
+
+    /**
+     * Anchor-break cleanup. Stays registered for the plugin's lifetime: the
+     * entity store registry rejects a second registration of the same system
+     * class, so the system checks {@link #active} instead of being removed.
+     */
+    private PortalBreakSystem breakSystem;
 
     public PortalsModule() {
         super("portals", "Portals", "1.0.0");
@@ -102,8 +109,16 @@ public final class PortalsModule extends AbstractMysticModule {
     public void onEnable() {
         portals = loadPortals();
         registerCommand(new PortalCommand());
+        if (breakSystem == null) {
+            PortalBreakSystem candidate = new PortalBreakSystem();
+            if (core.platform().registerEntitySystem(candidate)) {
+                breakSystem = candidate;
+            } else {
+                log("Could not install the block-break listener — broken portal blocks will keep their portal.");
+            }
+        }
         // Worlds load dynamically and world event registries are per world, so a
-        // cheap repeating scan attaches break/join listeners to new worlds.
+        // cheap repeating scan attaches join listeners to new worlds.
         worldScanTask = core.scheduler().runRepeating(this::attachWorldListeners, 1, 2, TimeUnit.SECONDS);
         core.scheduler().runLater(this::reapplyAllMarkers, 3, TimeUnit.SECONDS);
         active = this;
@@ -306,8 +321,6 @@ public final class PortalsModule extends AbstractMysticModule {
                 World target = world;
                 synchronized (worldRegistrations) {
                     worldRegistrations.add(target.getEventRegistry().registerGlobal(
-                            BreakBlockEvent.class, event -> onBreakBlock(target, event)));
-                    worldRegistrations.add(target.getEventRegistry().registerGlobal(
                             AddPlayerToWorldEvent.class, event -> scheduleMarkerReapply(target)));
                 }
                 scheduleMarkerReapply(world);
@@ -318,7 +331,8 @@ public final class PortalsModule extends AbstractMysticModule {
         }
     }
 
-    private void onBreakBlock(World world, BreakBlockEvent event) {
+    /** Called by {@link PortalBreakSystem} on the world thread of the entity that broke the block. */
+    void onBreakBlock(World world, BreakBlockEvent event) {
         try {
             Vector3i pos = event.getTargetBlock();
             if (pos == null) {
@@ -347,34 +361,50 @@ public final class PortalsModule extends AbstractMysticModule {
 
     /** Adds/refreshes or removes the world-map marker to match the portal config. */
     private void applyMarker(World world, Portal portal) {
-        try {
-            BlockMapMarkersResource markers = markers(world);
-            if (markers == null) {
-                return;
-            }
-            Vector3i pos = new Vector3i(portal.getX(), portal.getY(), portal.getZ());
-            markers.removeMarker(pos);
-            if (portal.isMarkerEnabled()) {
-                String text = portal.getMarkerText().isBlank() ? portal.getName() : portal.getMarkerText();
-                if (text.isBlank()) {
-                    text = portal.getId();
+        runOnWorld(world, () -> {
+            try {
+                BlockMapMarkersResource markers = markers(world);
+                if (markers == null) {
+                    return;
                 }
-                String icon = portal.getMarkerIcon().isBlank() ? DEFAULT_MARKER_ICON : portal.getMarkerIcon();
-                markers.addMarker(pos, text, icon);
+                Vector3i pos = new Vector3i(portal.getX(), portal.getY(), portal.getZ());
+                markers.removeMarker(pos);
+                if (portal.isMarkerEnabled()) {
+                    String text = portal.getMarkerText().isBlank() ? portal.getName() : portal.getMarkerText();
+                    if (text.isBlank()) {
+                        text = portal.getId();
+                    }
+                    String icon = portal.getMarkerIcon().isBlank() ? DEFAULT_MARKER_ICON : portal.getMarkerIcon();
+                    markers.addMarker(pos, text, icon);
+                }
+            } catch (Throwable t) {
+                log("Failed to apply map marker for " + portal.getId() + ": " + t);
             }
-        } catch (Throwable t) {
-            log("Failed to apply map marker for " + portal.getId() + ": " + t);
-        }
+        });
     }
 
     private void removeMarkerAt(World world, int x, int y, int z) {
-        try {
-            BlockMapMarkersResource markers = markers(world);
-            if (markers != null) {
-                markers.removeMarker(new Vector3i(x, y, z));
+        runOnWorld(world, () -> {
+            try {
+                BlockMapMarkersResource markers = markers(world);
+                if (markers != null) {
+                    markers.removeMarker(new Vector3i(x, y, z));
+                }
+            } catch (Throwable t) {
+                log("Failed to remove map marker: " + t);
             }
+        });
+    }
+
+    /**
+     * The marker map is a plain hash map the world map's marker provider reads
+     * on the world thread, so every change to it is queued onto that thread.
+     */
+    private void runOnWorld(World world, Runnable task) {
+        try {
+            world.execute(task);
         } catch (Throwable t) {
-            log("Failed to remove map marker: " + t);
+            // The world is shutting down and no longer accepts tasks.
         }
     }
 
