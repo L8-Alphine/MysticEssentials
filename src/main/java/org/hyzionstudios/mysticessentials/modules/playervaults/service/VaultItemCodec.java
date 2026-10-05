@@ -31,10 +31,14 @@ public final class VaultItemCodec {
                 stack.getDurability(), stack.getMaxDurability(), json);
     }
 
-    /** Rebuilds a live item from stored data, restoring full metadata. */
+    /**
+     * Rebuilds a live item from stored data, restoring full metadata. An item stored
+     * without metadata gets none ({@code null}, like a fresh stack) so it still
+     * stacks with fresh items of the same id.
+     */
     public static ItemStack toLive(VaultItemStack stored) {
         BsonDocument metadata = stored.metadata == null || stored.metadata.isBlank()
-                ? new BsonDocument()
+                ? null
                 : BsonDocument.parse(stored.metadata);
         return new ItemStack(stored.itemId, Math.max(1, stored.quantity),
                 stored.durability, stored.maxDurability, metadata);
