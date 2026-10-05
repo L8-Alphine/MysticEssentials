@@ -3,9 +3,12 @@ package org.hyzionstudios.mysticessentials.core.migration;
 import java.io.IOException;
 import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -19,7 +22,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Stream;
 
 import org.hyzionstudios.mysticessentials.api.model.MysticLocation;
 import org.hyzionstudios.mysticessentials.api.model.PlayerProfile;
@@ -33,7 +35,6 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
-import com.google.gson.JsonSyntaxException;
 import com.google.gson.reflect.TypeToken;
 
 /** File-only migration support for legacy essentials-style Hytale mods. */
@@ -100,12 +101,24 @@ public final class LegacyMigrationService {
     }
 
     private void scan(Path root, Source source, LegacyData data, MutableReport report) throws IOException {
-        try (Stream<Path> paths = Files.walk(root)) {
-            paths.filter(Files::isRegularFile)
-                    .filter(path -> !isUnder(path, core.paths().root()))
-                    .filter(this::isSupportedFile)
-                    .forEach(path -> scanFile(path, source, data, report));
-        }
+        // One unreadable folder (the auto source walks every mod's directory) is
+        // reported and skipped instead of aborting the whole scan.
+        Files.walkFileTree(root, new SimpleFileVisitor<>() {
+            @Override
+            public FileVisitResult visitFile(Path path, BasicFileAttributes attributes) {
+                if (attributes.isRegularFile() && !isUnder(path, core.paths().root())
+                        && isSupportedFile(path)) {
+                    scanFile(path, source, data, report);
+                }
+                return FileVisitResult.CONTINUE;
+            }
+
+            @Override
+            public FileVisitResult visitFileFailed(Path path, IOException e) {
+                report.warn("Could not read " + path.getFileName() + ": " + e.getMessage());
+                return FileVisitResult.CONTINUE;
+            }
+        });
     }
 
     private boolean isSupportedFile(Path path) {
@@ -126,7 +139,9 @@ public final class LegacyMigrationService {
             } else if (lower.endsWith(".toml")) {
                 scanToml(path, data);
             }
-        } catch (JsonSyntaxException | IOException | IllegalStateException e) {
+        } catch (IOException | RuntimeException e) {
+            // Any odd file (a number field holding text, an array where an object was
+            // expected, another mod's unrelated JSON) loses that file, not the scan.
             report.filesFailed++;
             report.warn("Could not read " + path.getFileName() + ": " + e.getMessage());
         }
