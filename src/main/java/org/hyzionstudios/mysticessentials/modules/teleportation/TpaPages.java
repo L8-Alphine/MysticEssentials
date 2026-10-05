@@ -7,6 +7,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.core.network.NetworkPlayerService.NetworkPlayer;
@@ -117,10 +118,10 @@ final class TpaPages {
                         new EventData().put("action", "favorite").put("target", other.uuid().toString()));
             }
 
-            // Pulls requests other network servers stored in Redis, so a request
-            // sent while this player was elsewhere (or whose announcement was
-            // missed) still shows up here.
-            List<PendingRequest> requests = teleport.syncIncomingRequests(player.getUuid());
+            // The memory copy only: building runs on the world thread, so the
+            // requests other network servers stored in Redis are pulled before
+            // the page is opened (TeleportationModule.openTpaUi), never here.
+            List<PendingRequest> requests = teleport.incomingRequests(player.getUuid());
             cmd.set("#RequestsEmpty.Visible", requests.isEmpty());
             for (int i = 0; i < requests.size(); i++) {
                 PendingRequest request = requests.get(i);
@@ -174,13 +175,19 @@ final class TpaPages {
                     }
                     reopen(ref, store, new TpaPage(core, teleport, player, search));
                 }
-                case "accept" -> {
-                    teleport.acceptRequest(player, parseUuid(field(payload, "requester")));
-                    reopen(ref, store, new TpaPage(core, teleport, player, search));
-                }
-                case "deny" -> {
-                    teleport.denyRequest(player, parseUuid(field(payload, "requester")));
-                    reopen(ref, store, new TpaPage(core, teleport, player, search));
+                case "accept", "deny" -> {
+                    UUID requester = parseUuid(field(payload, "requester"));
+                    boolean accept = "accept".equals(action);
+                    // Taking a request reads and updates its Redis copy: keep that
+                    // I/O off the world thread, then reopen on the player's thread.
+                    core.scheduler().runLater(() -> {
+                        if (accept) {
+                            teleport.acceptRequest(player, requester);
+                        } else {
+                            teleport.denyRequest(player, requester);
+                        }
+                        core.platform().openPage(player, new TpaPage(core, teleport, player, search));
+                    }, 0, TimeUnit.MILLISECONDS);
                 }
                 case "search" -> reopen(ref, store,
                         new TpaPage(core, teleport, player, field(payload, "search")));

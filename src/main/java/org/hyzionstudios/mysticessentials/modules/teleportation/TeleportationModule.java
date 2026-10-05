@@ -1067,8 +1067,17 @@ public final class TeleportationModule extends AbstractMysticModule {
         }
     }
 
+    /**
+     * Pulls the requests other network servers stored in Redis (so a request
+     * sent while this player was elsewhere, or whose announcement was missed,
+     * still shows up) off the world thread, then opens the page, which only
+     * reads the memory copy.
+     */
     void openTpaUi(PlayerRef player) {
-        core.platform().openPage(player, new TpaPages.TpaPage(core, this, player));
+        core.scheduler().runLater(() -> {
+            pullRemoteRequests(player.getUuid());
+            core.platform().openPage(player, new TpaPages.TpaPage(core, this, player));
+        }, 0, TimeUnit.MILLISECONDS);
     }
 
     private void requestTo(MysticCommandSender sender, String targetName, boolean requesterTeleports) {
