@@ -156,6 +156,12 @@ final class TestLicenses {
             return this;
         }
 
+        /** Raw binding mode, for malformed-payload tests. */
+        Builder bindingMode(String value) {
+            this.bindingMode = value;
+            return this;
+        }
+
         Builder boundTo(String... uuids) {
             this.bindingMode = "server_uuid";
             this.serverUuids = new ArrayList<>(Arrays.asList(uuids));

@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * The decrypted license contents, in the shape a mod actually needs.
@@ -24,6 +25,10 @@ public final class LicensePayload {
 
     /** Wildcard token, valid both as a product id and as a feature id. */
     public static final String WILDCARD = "*";
+
+    static final String SERVER_UUID_MODE = "server_uuid";
+    /** Every binding mode this library knows how to honour. */
+    static final Set<String> KNOWN_BINDING_MODES = Set.of("unbound", SERVER_UUID_MODE, "discord_user");
 
     private final String licenseId;
     private final String licenseType;
@@ -169,7 +174,7 @@ public final class LicensePayload {
      * meaningful - the portal enforces it at issue time.
      */
     public boolean allowsServer(String serverUuid) {
-        if (!"server_uuid".equals(bindingMode)) {
+        if (!SERVER_UUID_MODE.equals(bindingMode)) {
             return true;
         }
         if (serverUuid == null) {

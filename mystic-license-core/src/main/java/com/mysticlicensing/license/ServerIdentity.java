@@ -3,6 +3,8 @@ package com.mysticlicensing.license;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.FileSystemException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -65,7 +67,12 @@ public final class ServerIdentity {
             return Optional.empty();
         }
         try {
-            String text = Files.readString(file, StandardCharsets.UTF_8).trim();
+            String text = Files.readString(file, StandardCharsets.UTF_8);
+            // Editors on Windows like to save UTF-8 with a byte-order mark.
+            if (text.startsWith("\uFEFF")) {
+                text = text.substring(1);
+            }
+            text = text.trim();
             // Tolerate trailing lines so operators can annotate the file.
             int newline = text.indexOf('\n');
             if (newline >= 0) {
@@ -100,7 +107,13 @@ public final class ServerIdentity {
         UUID created = UUID.randomUUID();
         try {
             Files.createDirectories(dataDir);
-            writeAtomically(file, created + System.lineSeparator());
+            if (!createAtomically(file, created + System.lineSeparator())) {
+                // Another start (a reload racing this one) created it first: use theirs.
+                return load(dataDir)
+                        .map(uuid -> new Result(uuid, Outcome.LOADED, null))
+                        .orElseGet(() -> new Result(null, Outcome.CORRUPT,
+                                file + " exists but does not contain a valid UUID."));
+            }
             return new Result(created, Outcome.CREATED, null);
         } catch (IOException | RuntimeException e) {
             // A read-only data directory must not stop the server booting.
@@ -181,6 +194,34 @@ public final class ServerIdentity {
      * Write via a temporary file plus a move, so a crash mid-write cannot leave
      * a half-written identity file behind.
      */
+    /**
+     * Like {@link #writeAtomically} but never replaces an existing target.
+     *
+     * @return {@code false} if the target already existed (and was left alone)
+     */
+    private static boolean createAtomically(Path target, String content) throws IOException {
+        Path temp = Files.createTempFile(target.toAbsolutePath().getParent(),
+                target.getFileName() + ".", ".tmp");
+        try {
+            Files.writeString(temp, content, StandardCharsets.UTF_8);
+            try {
+                // A hard link appears atomically and fails if the target exists. (An
+                // atomic move would not do: on Windows it replaces an existing file.)
+                Files.createLink(target, temp);
+            } catch (UnsupportedOperationException | FileSystemException e) {
+                if (e instanceof FileAlreadyExistsException exists) {
+                    throw exists;
+                }
+                Files.move(temp, target); // no REPLACE_EXISTING: fails if it exists
+            }
+            return true;
+        } catch (FileAlreadyExistsException e) {
+            return false;
+        } finally {
+            Files.deleteIfExists(temp);
+        }
+    }
+
     private static void writeAtomically(Path target, String content) throws IOException {
         Path temp = target.resolveSibling(target.getFileName() + ".tmp");
         Files.writeString(temp, content, StandardCharsets.UTF_8);

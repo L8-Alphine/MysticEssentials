@@ -11,6 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
@@ -94,6 +95,40 @@ class LicenseGateTest {
         assertTrue(license.isProductLicensed(Products.ESSENTIALS));
         assertEquals("lic_01TESTTESTTESTTESTTESTTEST", license.licenseId().orElseThrow());
         assertTrue(license.expiresAt().isPresent());
+    }
+
+    @Test
+    @DisplayName("a license that expires while the server runs stops granting without a reload")
+    void expiryIsEnforcedWhileRunning(@TempDir Path dir) throws Exception {
+        writeLicense(dir, licenses.license().grants(Products.ESSENTIALS, "*").bytes());
+        Instant[] now = {DURING};
+        Clock clock = new Clock() {
+            @Override
+            public ZoneOffset getZone() {
+                return ZoneOffset.UTC;
+            }
+
+            @Override
+            public Clock withZone(ZoneId zone) {
+                return this;
+            }
+
+            @Override
+            public Instant instant() {
+                return now[0];
+            }
+        };
+        LicenseGate license = gate(dir, new RecordingLog()).clock(clock).build();
+        assertEquals(LicenseStatus.VALID, license.start());
+
+        now[0] = Instant.parse("2026-08-11T00:00:00Z"); // expired, inside the 3-day grace
+        assertEquals(LicenseStatus.GRACE_PERIOD, license.status());
+        assertTrue(license.hasFeature(Products.Essentials.MODULE_CUSTOM_CONTENT));
+
+        now[0] = Instant.parse("2026-08-14T00:00:00Z"); // grace over
+        assertEquals(LicenseStatus.EXPIRED, license.status());
+        assertFalse(license.isValid());
+        assertFalse(license.hasFeature(Products.Essentials.MODULE_CUSTOM_CONTENT));
     }
 
     @Test

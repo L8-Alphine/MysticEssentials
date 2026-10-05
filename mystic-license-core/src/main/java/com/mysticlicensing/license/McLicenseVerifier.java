@@ -12,8 +12,9 @@ import java.security.KeyFactory;
 import java.security.PublicKey;
 import java.security.Signature;
 import java.security.spec.X509EncodedKeySpec;
+import java.time.DateTimeException;
+import java.time.Duration;
 import java.time.Instant;
-import java.time.format.DateTimeParseException;
 import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -72,6 +73,8 @@ public final class McLicenseVerifier {
     private static final int TAG_BYTES = 16;
     private static final int TAG_BITS = TAG_BYTES * Byte.SIZE;
     private static final int CONTENT_KEY_BYTES = 32;
+    /** Tolerated clock lag on {@code not_before}. */
+    private static final Duration NOT_BEFORE_SKEW = Duration.ofMinutes(5);
 
     /** Refuse absurdly large files before allocating anything. */
     static final long MAX_FILE_BYTES = 256L * 1024L;
@@ -353,8 +356,11 @@ public final class McLicenseVerifier {
         }
 
         // --- 9. not_before ---------------------------------------------------
+        // The portal sets not_before to the issue time, so a server clock running a
+        // little behind would reject a license downloaded a moment ago.
         Instant checkTime = now == null ? Instant.now() : now;
-        if (payload.notBefore() != null && checkTime.isBefore(payload.notBefore())) {
+        if (payload.notBefore() != null
+                && checkTime.plus(NOT_BEFORE_SKEW).isBefore(payload.notBefore())) {
             return LicenseCheckResult.of(LicenseStatus.NOT_YET_VALID, payload,
                     "valid from " + payload.notBefore());
         }
@@ -364,7 +370,7 @@ public final class McLicenseVerifier {
         String detail = null;
         Instant expiresAt = payload.expiresAtOrNull();
         if (expiresAt != null && checkTime.isAfter(expiresAt)) {
-            Instant graceEnd = expiresAt.plusSeconds(payload.gracePeriodSeconds());
+            Instant graceEnd = graceEnd(expiresAt, payload.gracePeriodSeconds());
             if (checkTime.isAfter(graceEnd)) {
                 return LicenseCheckResult.of(LicenseStatus.EXPIRED, payload,
                         "expired at " + expiresAt);
@@ -405,6 +411,15 @@ public final class McLicenseVerifier {
         return result.status();
     }
 
+    /** End of the grace period, saturating instead of overflowing on absurd values. */
+    static Instant graceEnd(Instant expiresAt, long gracePeriodSeconds) {
+        try {
+            return expiresAt.plusSeconds(gracePeriodSeconds);
+        } catch (ArithmeticException | DateTimeException e) {
+            return Instant.MAX;
+        }
+    }
+
     // -------------------------------------------------------- payload reading
 
     private static LicensePayload readPayload(Map<String, Object> json) {
@@ -415,6 +430,11 @@ public final class McLicenseVerifier {
 
         if (binding != null) {
             bindingMode = MiniJson.asString(binding.get("mode"));
+            // Only the modes this verifier understands are accepted; a missing or
+            // unknown mode must not silently become "valid on any server".
+            if (!LicensePayload.KNOWN_BINDING_MODES.contains(bindingMode)) {
+                throw new IllegalArgumentException("unknown binding mode " + bindingMode);
+            }
             serverUuids = MiniJson.asStringList(binding.get("server_uuids")).stream()
                     .map(uuid -> uuid.toLowerCase(Locale.ROOT))
                     .toList();
@@ -440,22 +460,29 @@ public final class McLicenseVerifier {
                 serverUuids,
                 boundDiscordUserId,
                 products,
-                instant(MiniJson.asString(json.get("issued_at"))),
-                instant(MiniJson.asString(json.get("not_before"))),
-                instant(MiniJson.asString(json.get("expires_at"))),
+                instant(json, "issued_at"),
+                instant(json, "not_before"),
+                instant(json, "expires_at"),
                 grace == null ? 0L : grace,
                 generation == null ? 1 : generation.intValue());
     }
 
-    private static Instant instant(String value) {
-        if (value == null || value.isEmpty()) {
+    /**
+     * Reads an ISO-8601 instant. Only an absent field or JSON {@code null} means
+     * "none" (for {@code expires_at}: never expires); a value that is present but
+     * not an instant fails the payload, rather than silently turning a license
+     * perpetual or skipping its start date.
+     */
+    private static Instant instant(Map<String, Object> json, String key) {
+        Object raw = json.get(key);
+        if (raw == null) {
             return null;
         }
-        try {
-            return Instant.parse(value);
-        } catch (DateTimeParseException e) {
-            return null;
+        String value = MiniJson.asString(raw);
+        if (value == null) {
+            throw new IllegalArgumentException(key + " is not a timestamp");
         }
+        return Instant.parse(value); // DateTimeParseException fails the payload
     }
 
     /** Exception messages vary by JDK; never let a null one produce "null". */

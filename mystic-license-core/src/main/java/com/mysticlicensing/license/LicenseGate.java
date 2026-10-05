@@ -203,18 +203,18 @@ public final class LicenseGate implements MysticLicenseService {
 
     @Override
     public LicenseStatus status() {
-        return state.status();
+        return effectiveStatus(state);
     }
 
     @Override
     public boolean isValid() {
-        return state.status().grantsAccess();
+        return effectiveStatus(state).grantsAccess();
     }
 
     @Override
     public boolean isProductLicensed(String product) {
         State current = state;
-        return current.status().grantsAccess()
+        return effectiveStatus(current).grantsAccess()
                 && current.payload() != null
                 && current.payload().coversProduct(product);
     }
@@ -222,9 +222,33 @@ public final class LicenseGate implements MysticLicenseService {
     @Override
     public boolean hasFeature(String product, String featureId) {
         State current = state;
-        return current.status().grantsAccess()
+        return effectiveStatus(current).grantsAccess()
                 && current.payload() != null
                 && current.payload().coversFeature(product, featureId);
+    }
+
+    /**
+     * The verified status, aged to now: a license verified while valid (or in
+     * grace) stops granting once its grace period ends, even if the server has
+     * been running since before that and nobody reloaded it.
+     */
+    private LicenseStatus effectiveStatus(State current) {
+        LicenseStatus status = current.status();
+        LicensePayload payload = current.payload();
+        if (!status.grantsAccess() || payload == null) {
+            return status;
+        }
+        Instant expiresAt = payload.expiresAtOrNull();
+        if (expiresAt == null) {
+            return status;
+        }
+        Instant now = clock.instant();
+        if (!now.isAfter(expiresAt)) {
+            return status;
+        }
+        return now.isAfter(McLicenseVerifier.graceEnd(expiresAt, payload.gracePeriodSeconds()))
+                ? LicenseStatus.EXPIRED
+                : LicenseStatus.GRACE_PERIOD;
     }
 
     @Override
