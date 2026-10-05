@@ -6,10 +6,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
@@ -31,7 +29,6 @@ import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
 import com.hypixel.hytale.server.core.inventory.InventoryComponent;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
-import com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 
 /**
@@ -41,10 +38,8 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
  * ({@code /inventory restore <player>}).
  *
  * <p>All ECS inventory access runs on the owning player's world thread. Death
- * still has no plugin or ECS event on 0.6.2 — Update 6 added
- * {@code RespawnEvent} but nothing for the death itself, and {@code DeathSystems}
- * stays internal — so a poll watches online players for the
- * {@code DeathComponent} and snapshots on the first sighting per death.
+ * has no plugin event, so {@link DeathSnapshotSystem} snapshots when the
+ * {@code DeathComponent} is added, before the engine drops the lost items.
  * Snapshots are stored through the {@code StorageService} under the
  * {@code inventory_snapshots} namespace keyed by player UUID.</p>
  */
@@ -53,14 +48,16 @@ public final class InventoryModule extends AbstractMysticModule {
     private static final String NAMESPACE = "inventory_snapshots";
     private static final Type SNAPSHOT_LIST_TYPE = new TypeToken<ArrayList<InventorySnapshot>>() {
     }.getType();
-    /** Death-poll cadence; also bounds how late a death snapshot can be. */
-    private static final long DEATH_POLL_MS = 2000L;
 
     private InventoryConfig config = new InventoryConfig();
-    private ScheduledFuture<?> deathPollTask;
     private ScheduledFuture<?> timedTask;
-    /** Players whose current death has already been snapshotted. */
-    private final Set<UUID> deathHandled = ConcurrentHashMap.newKeySet();
+    /**
+     * The death listener stays registered for the plugin's lifetime: the entity
+     * store registry rejects a second registration of the same system class, so
+     * hot-disabling this module flips {@link #active} instead of unregistering.
+     */
+    private DeathSnapshotSystem deathSystem;
+    private volatile boolean active;
 
     /** Online player names plus the {@code all} literal, for the clear commands. */
     private final SingleArgumentType<String> playerOrAllArg = MysticArgTypes.dynamic(commandSender -> {
@@ -89,15 +86,19 @@ public final class InventoryModule extends AbstractMysticModule {
         registerEvent(
                 PlayerDisconnectEvent.class,
                 (PlayerDisconnectEvent event) -> {
-                    deathHandled.remove(event.getPlayerRef().getUuid());
                     if (config.snapshotOnLeave) {
                         snapshot(event.getPlayerRef(), "Leave");
                     }
                 });
-        if (config.snapshotOnDeath) {
-            deathPollTask = core.scheduler().runRepeating(this::pollDeaths,
-                    DEATH_POLL_MS, DEATH_POLL_MS, TimeUnit.MILLISECONDS);
+        if (deathSystem == null) {
+            DeathSnapshotSystem candidate = new DeathSnapshotSystem(this);
+            if (core.platform().registerEntitySystem(candidate)) {
+                deathSystem = candidate;
+            } else {
+                log("Could not install the death listener — no Death snapshots will be taken.");
+            }
         }
+        active = true;
         if (config.timedSnapshotMinutes > 0) {
             long minutes = config.timedSnapshotMinutes;
             timedTask = core.scheduler().runRepeating(this::timedSnapshots,
@@ -112,31 +113,19 @@ public final class InventoryModule extends AbstractMysticModule {
 
     @Override
     public void onDisable() {
-        if (deathPollTask != null) {
-            deathPollTask.cancel(false);
-            deathPollTask = null;
-        }
+        active = false;
         if (timedTask != null) {
             timedTask.cancel(false);
             timedTask = null;
         }
-        deathHandled.clear();
     }
 
     // ----- Snapshot capture -----------------------------------------------------
 
-    /** Watches for the DeathComponent (no death event exists through 0.6.2). */
-    private void pollDeaths() {
-        for (PlayerRef player : core.platform().onlinePlayers()) {
-            UUID uuid = player.getUuid();
-            core.platform().runOnEntityThread(player, (store, entity, world) -> {
-                boolean dead = store.getComponent(entity, DeathComponent.getComponentType()) != null;
-                if (dead && deathHandled.add(uuid)) {
-                    captureOnThread(player, "Death");
-                } else if (!dead) {
-                    deathHandled.remove(uuid);
-                }
-            });
+    /** Called by {@link DeathSnapshotSystem} on the player's world thread, before the death drop. */
+    void onDeath(PlayerRef player) {
+        if (active && config.snapshotOnDeath) {
+            captureOnThread(player, "Death");
         }
     }
 
