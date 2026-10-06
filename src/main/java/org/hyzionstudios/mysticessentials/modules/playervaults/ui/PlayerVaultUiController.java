@@ -38,6 +38,7 @@ import org.hyzionstudios.mysticessentials.modules.playervaults.model.VaultAdminL
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.protocol.packets.interface_.Page;
+import com.hypixel.hytale.server.core.entity.ItemUtils;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.entities.player.windows.ContainerWindow;
 import com.hypixel.hytale.server.core.inventory.InventoryComponent;
@@ -260,8 +261,8 @@ public final class PlayerVaultUiController {
                     return;
                 }
                 vault.lastOpenedAt = System.currentTimeMillis();
-                VaultSession session = new VaultSession(viewer.getUuid(), ownerUuid, ownerName, vaultNumber,
-                        mode, allowedRows, lock.token(), vault, vault.version);
+                VaultSession session = new VaultSession(viewer.getUuid(), viewer.getUsername(), ownerUuid,
+                        ownerName, vaultNumber, mode, allowedRows, lock.token(), vault, vault.version);
                 VaultSession replaced = sessions.put(viewer.getUuid(), session);
                 if (replaced != null) {
                     closeSession(replaced, true); // a racing open: never orphan its lock
@@ -680,7 +681,7 @@ public final class PlayerVaultUiController {
                         session.vaultNumber, willSave));
             }
             if (session.mode.isAdmin() && config.admin.logAdminEdits && willSave) {
-                return logService.record(VaultAdminLogEntry.create(session.viewerUuid, session.ownerName,
+                return logService.record(VaultAdminLogEntry.create(session.viewerUuid, session.viewerName,
                         session.ownerUuid, session.vaultNumber, "ADMIN_EDIT", logService.serverId())
                         .with("items", Integer.toString(session.working.totalItemCount())));
             }
@@ -923,18 +924,18 @@ public final class PlayerVaultUiController {
                 return;
             }
             if (iconCost == null) {
-                saveMetadata(viewer, vault, vaultNumber, admin, onDone);
+                saveMetadata(viewer, vault, vaultNumber, admin, onDone, null);
                 return;
             }
             String cost = iconCost;
             takeIconItem(viewer, cost).thenAccept(taken -> {
-                if (!taken) {
+                if (taken == null) {
                     core.getMessageService().sendKey(viewer, "vault-icon-invalid");
                     runQuietly(onDone);
                     return;
                 }
                 core.getMessageService().sendKey(viewer, "vault-icon-consumed", Map.of("item", cost));
-                saveMetadata(viewer, vault, vaultNumber, admin, onDone);
+                saveMetadata(viewer, vault, vaultNumber, admin, onDone, taken);
             });
         });
     }
@@ -942,7 +943,7 @@ public final class PlayerVaultUiController {
     /** Resets a vault's metadata to defaults (contents untouched). {@code onDone} runs when settled. */
     void resetMetadata(PlayerRef viewer, UUID ownerUuid, String ownerName, int vaultNumber, boolean admin,
             Runnable onDone) {
-        if (!permissions.canResetMetadata(viewer)) {
+        if (!permissions.canResetMetadata(viewer) || (admin && !permissions.canAdminEdit(viewer))) {
             core.getMessageService().sendKey(viewer, "no-permission");
             runQuietly(onDone);
             return;
@@ -956,14 +957,20 @@ public final class PlayerVaultUiController {
             }
             fireEdit(viewer, ownerUuid, vaultNumber, PlayerVaultEditMetadataEvent.Field.RESET, "custom", "default");
             vault.metadata = new VaultMetadata();
-            saveMetadata(viewer, vault, vaultNumber, admin, onDone);
+            saveMetadata(viewer, vault, vaultNumber, admin, onDone, null);
         });
     }
 
-    private void saveMetadata(PlayerRef viewer, PlayerVault vault, int vaultNumber, boolean admin, Runnable onDone) {
+    /** {@code paidIcon}: the icon item taken as payment, given back if the save does not happen. */
+    private void saveMetadata(PlayerRef viewer, PlayerVault vault, int vaultNumber, boolean admin, Runnable onDone,
+            ItemStack paidIcon) {
         service.versionedSave(vault, vault.version, viewer.getUuid(), false, "METADATA_EDIT")
                 .whenComplete((result, error) -> {
                     try {
+                        if (paidIcon != null && (result == null || error != null
+                                || result.status() != VaultSaveResult.Status.SAVED)) {
+                            refundIconItem(viewer, paidIcon);
+                        }
                         if (result == null || error != null) {
                             core.getMessageService().sendKey(viewer, "vault-storage-unavailable");
                             return;
@@ -1042,8 +1049,8 @@ public final class PlayerVaultUiController {
      * rest of that stack (metadata, durability) intact. Completes {@code true} once
      * an item was taken, {@code false} when the viewer has none.
      */
-    private CompletableFuture<Boolean> takeIconItem(PlayerRef viewer, String itemId) {
-        CompletableFuture<Boolean> taken = new CompletableFuture<>();
+    private CompletableFuture<ItemStack> takeIconItem(PlayerRef viewer, String itemId) {
+        CompletableFuture<ItemStack> taken = new CompletableFuture<>();
         boolean dispatched = core.platform().runOnEntityThread(viewer, (store, entity, world) -> {
             try {
                 for (ItemContainer container : depositSources(store, entity)) {
@@ -1052,8 +1059,9 @@ public final class PlayerVaultUiController {
                         if (stack == null || stack.isEmpty() || !itemId.equals(stack.getItemId())) {
                             continue;
                         }
+                        ItemStack one = stack.withQuantity(1);
                         if (container.removeItemStackFromSlot(i, 1).succeeded()) {
-                            taken.complete(true);
+                            taken.complete(one);
                             return;
                         }
                     }
@@ -1061,13 +1069,27 @@ public final class PlayerVaultUiController {
             } catch (Throwable t) {
                 core.log(Level.WARNING, "[playervaults] icon consume failed: " + t);
             } finally {
-                taken.complete(false); // no-op once an item was taken
+                taken.complete(null); // no-op once an item was taken
             }
         });
         if (!dispatched) {
-            taken.complete(false);
+            taken.complete(null);
         }
         return taken;
+    }
+
+    /** Gives a taken icon item back (world thread), dropping it at the player's feet if full. */
+    private void refundIconItem(PlayerRef viewer, ItemStack item) {
+        boolean dispatched = core.platform().runOnEntityThread(viewer, (store, entity, world) -> {
+            ItemStack remainder = Player.giveItem(item, entity, store).getRemainder();
+            if (!ItemStack.isEmpty(remainder)) {
+                ItemUtils.dropItem(entity, remainder, store);
+            }
+        });
+        if (!dispatched) {
+            core.log(Level.WARNING, "[playervaults] Could not return icon item " + item.getItemId()
+                    + " to " + viewer.getUsername() + " (offline).");
+        }
     }
 
     VaultBackupService backupService() {
@@ -1083,6 +1105,7 @@ public final class PlayerVaultUiController {
     /** Mutable per-viewer state for one open vault; save and close state is guarded by its monitor. */
     static final class VaultSession {
         final UUID viewerUuid;
+        final String viewerName;
         final UUID ownerUuid;
         final String ownerName;
         final int vaultNumber;
@@ -1108,9 +1131,10 @@ public final class PlayerVaultUiController {
         ScheduledFuture<?> renewalTask;
         ScheduledFuture<?> saveTask;
 
-        VaultSession(UUID viewerUuid, UUID ownerUuid, String ownerName, int vaultNumber, VaultOpenMode mode,
-                int allowedRows, String token, PlayerVault working, long expectedVersion) {
+        VaultSession(UUID viewerUuid, String viewerName, UUID ownerUuid, String ownerName, int vaultNumber,
+                VaultOpenMode mode, int allowedRows, String token, PlayerVault working, long expectedVersion) {
             this.viewerUuid = viewerUuid;
+            this.viewerName = viewerName;
             this.ownerUuid = ownerUuid;
             this.ownerName = ownerName;
             this.vaultNumber = vaultNumber;
