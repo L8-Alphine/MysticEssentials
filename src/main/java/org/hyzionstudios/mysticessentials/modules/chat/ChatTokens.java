@@ -38,8 +38,11 @@ public final class ChatTokens {
     private static final Pattern TOKEN =
             Pattern.compile("\\x00(item|mention):([^\\x00]*)\\x00");
 
-    /** Any residual chat markup, used by the final safety net. */
-    private static final Pattern ANY_MARKUP = Pattern.compile("(?i)</?(?:link|url|lang)(:[^>]*)?>");
+    /**
+     * Any residual chat markup, used by the final safety net. Matches the way
+     * MysticText reads a tag: trimmed, and lower-cased in Unicode.
+     */
+    private static final Pattern ANY_MARKUP = Pattern.compile("(?iu)<[\\x00-\\x20]*/?(?:link|url|lang)[^>]*>");
 
     private ChatTokens() {
     }
@@ -127,7 +130,7 @@ public final class ChatTokens {
         if (message == null) {
             return null;
         }
-        return ANY_MARKUP.matcher(expand(message, ChatTokens::plainFor)).replaceAll("");
+        return stripMarkup(expand(message, ChatTokens::plainFor));
     }
 
     /**
@@ -146,7 +149,18 @@ public final class ChatTokens {
             String label = itemLabels.apply(token.value());
             return "[" + (label == null || label.isBlank() ? "Item" : label) + "]";
         });
-        return ANY_MARKUP.matcher(expanded).replaceAll("");
+        return stripMarkup(expanded);
+    }
+
+    /** Removes {@link #ANY_MARKUP} until none is left, since a removal can join a new tag. */
+    private static String stripMarkup(String text) {
+        String result = text;
+        String previous;
+        do {
+            previous = result;
+            result = ANY_MARKUP.matcher(result).replaceAll("");
+        } while (!result.equals(previous));
+        return result;
     }
 
     private static String plainFor(Token token) {

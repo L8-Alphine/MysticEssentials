@@ -486,7 +486,7 @@ public final class MysticText {
                 return false;
             }
             for (int i = start; i < start + count; i++) {
-                if (Character.digit(in.charAt(i), 16) < 0) {
+                if (!isAsciiHexDigit(in.charAt(i))) {
                     return false;
                 }
             }
@@ -530,11 +530,20 @@ public final class MysticText {
             return false;
         }
         for (int i = 0; i < hex.length(); i++) {
-            if (Character.digit(hex.charAt(i), 16) < 0) {
+            if (!isAsciiHexDigit(hex.charAt(i))) {
                 return false;
             }
         }
         return true;
+    }
+
+    /**
+     * ASCII only: {@link Character#digit} also accepts fullwidth and other Unicode
+     * digits, which chat filters do not treat as hex and the protocol colour field
+     * does not accept.
+     */
+    private static boolean isAsciiHexDigit(char c) {
+        return c < 128 && Character.digit(c, 16) >= 0;
     }
 
     private static String normalizeHex(String hex) {
