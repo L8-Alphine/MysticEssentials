@@ -213,7 +213,8 @@ Bypass: `mysticessentials.craftblock.bypass` (all items) or
 | `/channel join <name> [password]` | Listen to a channel you can access | — |
 | `/channel leave <name>` | Stop listening to a channel | — |
 | `/channel temp <id> [password\|-] [prefix\|-] [alias1,alias2\|-] [permission]` | Create a temporary channel | `mysticessentials.chat.channel.create.temp` |
-| `/channel manage` | Open the manager UI for your temporary channel | — |
+| `/channel manage [channel]` | Open the manager UI for your temporary channel (name it when you own several) | — |
+| `/channel close\|lock\|unlock [channel]` | Close, lock or unlock a temporary channel you manage: the one named, else the one you are in, else the only one you own | Owner/moderator rules apply |
 | Configured aliases, e.g. `/g`, `/global`, `/sc`, `/schat`, `/staffchat` | Quickly switch speaking channel | — |
 | `/mentions` | Configure who may mention you and how you are notified (alias `/mentionsettings`) | — |
 | `/iteminspect [code\|n\|latest]` | Open the Item Details panel for a shared item (alias `/itemview`) | — |
@@ -666,6 +667,9 @@ Notable per-module settings:
   `maxTemporaryChannelsPerOwner` (default `1`; `0` = unlimited) caps how many
   temporary channels one player may own at once, across all servers when Redis
   is enabled; holders of `mysticessentials.channel.staff.override` are exempt.
+  An owner of several names the one to act on (`/channel manage <channel>`,
+  `/channel close <channel>`, or the channel selected in the browser before
+  pressing Manage); with one, nothing changes.
 - **announcements** — `autoBroadcastEnabled`, `intervalSeconds`, `randomOrder`,
   and `messages`. Message entries may be legacy strings or JSON objects:
   `{"lines":["&7Line one","&fLine two"],"click":{"action":"command","value":"/spawn"}}`.

@@ -37,7 +37,8 @@ Channels split chat into separate streams such as global and staff.
 | `/channel join <name> [password]` | Listen to a channel |
 | `/channel leave <name>` | Stop listening to a channel |
 | `/channel temp <id> ...` | Create a temporary channel (`mysticessentials.chat.channel.create.temp`) |
-| `/channel manage` | Manage your temporary channel |
+| `/channel manage [channel]` | Manage your temporary channel; name it when you own several |
+| `/channel close\|lock\|unlock [channel]` | Close, lock or unlock a temporary channel you manage (the one named, else the one you are in, else the only one you own) |
 | `/mentions` | Open mention settings |
 
 Servers can define quick aliases such as `/g`, `/global`, `/sc`, `/schat`, and `/staffchat`. Channels are gated by dynamic permissions: `mysticessentials.chat.channel.<id>` and its `.speak`, `.listen`, and `.moderator` variants. The bundled defaults are a server-wide `global` channel and a permission-gated cross-server `staff` channel.

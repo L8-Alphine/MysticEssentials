@@ -109,7 +109,8 @@ Alias: `/portals`. Portals are configured in-game by pressing Use (F) on a porta
 | `/channel join <name> [password]` | Listen to a channel | Channel permissions may apply |
 | `/channel leave <name>` | Stop listening to a channel | None by default |
 | `/channel temp <id> [password|-] [prefix|-] [alias1,alias2|-] [permission]` | Create a temporary channel | `mysticessentials.chat.channel.create.temp` |
-| `/channel manage` | Manage your temporary channel | Owner/moderator rules apply |
+| `/channel manage [channel]` | Manage your temporary channel; name it when you own several | Owner/moderator rules apply |
+| `/channel close\|lock\|unlock [channel]` | Close, lock or unlock a temporary channel you manage | Owner/moderator rules apply |
 | `/mentions`, `/mentionsettings` | Configure mention scope, delivery, block list, and do-not-disturb | None |
 | Configured aliases such as `/g`, `/global`, `/sc`, `/schat`, `/staffchat` | Switch channel quickly | Channel permissions may apply |
 | `[item]` (chat tag) | Share your held item in chat as an [item link](itemlinks-module) | `mysticessentials.chat.itemlink.use` |
