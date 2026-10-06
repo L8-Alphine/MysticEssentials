@@ -22,6 +22,8 @@ import org.hyzionstudios.mysticessentials.modules.chat.itemlink.ItemLinkSubModul
 import org.hyzionstudios.mysticessentials.modules.chat.itemlink.ItemSnapshot;
 import org.hyzionstudios.mysticessentials.modules.chat.mention.MentionSubModule;
 
+import com.hypixel.hytale.event.EventPriority;
+import com.hypixel.hytale.registry.Registration;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.event.events.player.PlayerChatEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
@@ -40,6 +42,8 @@ public final class ChatModule extends AbstractMysticModule implements ChatServic
     private ChannelsSubModule channels;
     private ItemLinkSubModule itemLinks;
     private MentionSubModule mentions;
+    /** The chat pipeline listener; registered at a set priority, so tracked here rather than by the base class. */
+    private Registration chatListener;
 
     public ChatModule() {
         super("chat", "Chat", "1.0.0");
@@ -65,8 +69,11 @@ public final class ChatModule extends AbstractMysticModule implements ChatServic
         });
 
         if (config.formatChat) {
-            registerAsyncEvent(PlayerChatEvent.class,
-                    future -> future.thenApply(this::applyChatPipeline));
+            // LATE, so NORMAL handlers that cancel chat (the tutorial chat block,
+            // other plugins) run first: the relay, the publish hook and mention
+            // pings all happen inside the pipeline and must never see a blocked line.
+            chatListener = core.plugin().getEventRegistry().registerAsyncGlobal(EventPriority.LATE,
+                    PlayerChatEvent.class, future -> future.thenApply(this::applyChatPipeline));
         }
         log("Enabled chat submodules: privateMessaging=" + config.privateMessaging.enabled
                 + ", channels=" + config.channels.enabled);
@@ -144,6 +151,14 @@ public final class ChatModule extends AbstractMysticModule implements ChatServic
 
     @Override
     public void onDisable() {
+        if (chatListener != null) {
+            try {
+                chatListener.unregister();
+            } catch (Throwable ignored) {
+                // One-shot handle; already gone or engine shutting down.
+            }
+            chatListener = null;
+        }
         if (privateMessaging != null) {
             privateMessaging.disable();
         }
