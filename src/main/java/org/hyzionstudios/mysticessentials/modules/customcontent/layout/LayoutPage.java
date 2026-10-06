@@ -222,8 +222,9 @@ public final class LayoutPage extends MysticPage {
 
     /**
      * Replaces {@code {name}} in actions with the matching input's value. Typed
-     * actions are left alone: {@link LayoutActions} fills their payload values
-     * after splitting, so an input cannot add or override payload keys.
+     * and message/broadcast actions are left alone: {@link LayoutActions} fills
+     * them itself (payload values after splitting, so an input cannot add or
+     * override payload keys; message text after placeholders, as plain text).
      */
     private static List<String> substitute(List<String> actions, Map<String, String> inputs) {
         if (actions.isEmpty() || inputs.isEmpty()) {
@@ -231,7 +232,7 @@ public final class LayoutPage extends MysticPage {
         }
         List<String> resolved = new ArrayList<>(actions.size());
         for (String action : actions) {
-            if (LayoutActions.isTyped(action)) {
+            if (LayoutActions.fillsInputsItself(action)) {
                 resolved.add(action);
                 continue;
             }

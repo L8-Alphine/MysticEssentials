@@ -121,11 +121,11 @@ final class LayoutActions {
                 yield Outcome.CONTINUE;
             }
             case "message", "msg", "tell", "send" -> {
-                core.getMessageService().send(player, resolve(player, argument));
+                core.getMessageService().send(player, fillInputs(resolve(player, argument), plain(inputs)));
                 yield Outcome.CONTINUE;
             }
             case "broadcast", "announce" -> {
-                String text = resolve(player, argument);
+                String text = fillInputs(resolve(player, argument), plain(inputs));
                 core.platform().onlinePlayers()
                         .forEach(online -> core.getMessageService().send(online, text));
                 yield Outcome.CONTINUE;
@@ -137,11 +137,30 @@ final class LayoutActions {
         };
     }
 
-    /** @return whether {@code action} is a typed action ({@code typed:id;key=value;...}). */
-    static boolean isTyped(String action) {
+    /**
+     * Whether this action fills {@code {input}} tokens itself, after its own
+     * placeholder pass: typed actions (per payload value) and message/broadcast
+     * text (player-typed text must not become markup or placeholders that the
+     * message formatter would then render for every recipient).
+     */
+    static boolean fillsInputsItself(String action) {
+        return switch (verbOf(action)) {
+            case "typed", "message", "msg", "tell", "send", "broadcast", "announce" -> true;
+            default -> false;
+        };
+    }
+
+    private static String verbOf(String action) {
         String trimmed = action == null ? "" : action.trim();
         int split = separator(trimmed);
-        return (split < 0 ? trimmed : trimmed.substring(0, split)).trim().equalsIgnoreCase("typed");
+        return (split < 0 ? trimmed : trimmed.substring(0, split)).trim().toLowerCase(Locale.ROOT);
+    }
+
+    /** Inputs reduced to plain text: no markup, link tags or placeholder delimiters. */
+    private static Map<String, String> plain(Map<String, String> inputs) {
+        Map<String, String> plain = new LinkedHashMap<>();
+        inputs.forEach((name, value) -> plain.put(name, value.replaceAll("[<>&{}%]", "")));
+        return plain;
     }
 
     private Outcome typed(PlayerRef player, String encoded, Map<String, String> inputs) {
