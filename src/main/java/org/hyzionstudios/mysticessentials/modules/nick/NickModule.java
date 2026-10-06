@@ -110,10 +110,10 @@ public final class NickModule extends AbstractMysticModule {
         if (!allowColors) {
             toStore = stripped;
         } else {
-            // Preserve any colour markup the player typed; translate config preset
-            // names (<red>) to hex so MysticText renders them, and if they chose no
-            // colour at all, fall back to the configured default colour.
-            String raw = translateNamedColors(stripLeadingMarker(rawNick).trim());
+            // Preserve the colour markup the player typed (and only that); translate
+            // config preset names (<red>) to hex so MysticText renders them, and if they
+            // chose no colour at all, fall back to the configured default colour.
+            String raw = keepColorMarkup(translateNamedColors(stripLeadingMarker(rawNick).trim()));
             if (!hasColorMarkup(raw)) {
                 String fallback = resolveColor(config.defaultColor);
                 raw = fallback != null ? "<" + fallback + ">" + raw : raw;
@@ -139,6 +139,54 @@ public final class NickModule extends AbstractMysticModule {
     /** @return {@code true} if the string carries any legacy/hex/tag colour markup. */
     boolean hasColorMarkup(String value) {
         return value != null && value.matches("(?is).*(&[0-9a-fk-or]|&#[0-9a-f]{3,6}|<[^>]+>).*");
+    }
+
+    /**
+     * Keeps only plain colour markup in a nickname: legacy {@code &} codes and hex
+     * colours ({@code <#hex>}, {@code <color:#hex>}, {@code &#hex}), the hex limited
+     * to the configured presets unless {@code allowCustomHex}. Every other tag
+     * (links, translations, gradients) is dropped, since the nickname is rendered
+     * into every chat line.
+     */
+    private String keepColorMarkup(String value) {
+        Matcher tag = Pattern.compile("<([^>]*)>").matcher(value);
+        StringBuilder tagged = new StringBuilder(value.length());
+        while (tag.find()) {
+            String inner = tag.group(1).trim();
+            int colon = inner.indexOf(':');
+            if (colon > 0) {
+                String prefix = inner.substring(0, colon).trim().toLowerCase(Locale.ROOT);
+                if (prefix.equals("color") || prefix.equals("c")) {
+                    inner = inner.substring(colon + 1).trim();
+                }
+            }
+            String hex = inner.startsWith("#") ? allowedHex(resolveHexOnly(inner)) : null;
+            tag.appendReplacement(tagged, hex == null ? "" : Matcher.quoteReplacement("<" + hex + ">"));
+        }
+        tag.appendTail(tagged);
+        Matcher ampHex = Pattern.compile("(?i)&#([0-9a-f]{6})").matcher(tagged.toString());
+        StringBuilder out = new StringBuilder(tagged.length());
+        while (ampHex.find()) {
+            String hex = allowedHex(resolveHexOnly(ampHex.group(1)));
+            ampHex.appendReplacement(out, hex == null ? "" : Matcher.quoteReplacement("&" + hex));
+        }
+        ampHex.appendTail(out);
+        return out.toString();
+    }
+
+    /** {@code hex} when custom hex is allowed or it is one of the configured presets, else null. */
+    private String allowedHex(String hex) {
+        if (hex == null || config.allowCustomHex) {
+            return hex;
+        }
+        if (config.colors != null) {
+            for (String preset : config.colors.values()) {
+                if (hex.equals(resolveHexOnly(preset))) {
+                    return hex;
+                }
+            }
+        }
+        return null;
     }
 
     /** Replaces {@code <presetName>} tokens with their configured hex so they render. */
