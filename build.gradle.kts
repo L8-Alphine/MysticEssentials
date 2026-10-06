@@ -63,10 +63,10 @@ dependencies {
     // Vault Unlocked
     compileOnly("net.cfh.vault:VaultUnlocked:2.20.1") { isTransitive = false }
 
-    // SQL storage: connection pool + JDBC drivers (shaded into the mod jar).
-    // Hytale gives each plugin an isolated PluginClassLoader, so these are bundled
-    // without relocation. protobuf is excluded from the MySQL driver (only used by
-    // the unused X DevAPI) to keep the jar lean and avoid duplicating the server's.
+    // SQL storage: connection pool + JDBC drivers (shaded into the mod jar and
+    // relocated in the shadowJar block below). protobuf is excluded from the MySQL
+    // driver (only used by the unused X DevAPI) to keep the jar lean and avoid
+    // duplicating the server's.
     implementation("com.zaxxer:HikariCP:7.0.2")
     implementation("org.mariadb.jdbc:mariadb-java-client:3.5.8")
     implementation("com.mysql:mysql-connector-j:26.7.0") {
@@ -76,7 +76,9 @@ dependencies {
     // Redis: cache + pub/sub for cross-server features. Jedis is netty-free, so it
     // avoids clashing with the server's bundled netty (gson comes from the server).
     implementation("redis.clients:jedis:7.4.1") {
-        exclude(group = "com.google.gson")
+        // gson's group is com.google.code.gson - the old "com.google.gson" spelling
+        // never matched, so a second copy shipped alongside the server's.
+        exclude(group = "com.google.code.gson")
     }
 
     // CustomGUIs: parse declarative .gui.html documents, including the legacy
@@ -107,6 +109,26 @@ tasks.shadowJar {
     // driver discoverable.
     duplicatesStrategy = DuplicatesStrategy.INCLUDE
     mergeServiceFiles()
+
+    // Move every bundled library into our own namespace. Sibling Mystic mods bundle
+    // the same libraries at other versions, and a PluginClassLoader still resolves
+    // classes and META-INF/services entries that other plugins bundle, so an
+    // unrelocated copy lets theirs and ours mix (a newer mariadb's codec list loaded
+    // against an older Codec interface fails with "not a subtype"). Shadow also
+    // rewrites the driver class-name strings (SqlStorageProvider) and the service
+    // files. Our own packages, the public api included, are not touched.
+    // verifyShadedJar checks the result.
+    listOf(
+        "com.zaxxer.hikari",
+        "org.mariadb",
+        "com.mysql",
+        "redis.clients",
+        "org.jsoup",
+        "org.slf4j",
+        "org.json",
+        "org.apache.commons",
+        "com.google.errorprone"
+    ).forEach { relocate(it, "org.hyzionstudios.mysticessentials.libs.$it") }
 }
 
 tasks.assemble {
@@ -350,6 +372,23 @@ tasks.register<JavaExec>("verifyIntegrationContracts") {
     )
 }
 
+// Runs against the shipped jar itself, with only the JDK beside it: every bundled
+// library relocated, both JDBC drivers loadable through ServiceLoader, relocated
+// resources and class-name strings working, the public api package unchanged.
+tasks.register<JavaExec>("verifyShadedJar") {
+    group = "verification"
+    description = "Checks the shaded jar's relocated libraries, JDBC drivers and api package."
+    dependsOn(tasks.testClasses, tasks.shadowJar)
+    classpath = sourceSets.test.get().output
+    mainClass.set("org.hyzionstudios.mysticessentials.core.storage.ShadedJarTest")
+    val shadedJar = tasks.shadowJar.flatMap { it.archiveFile }
+    val mainClasses = sourceSets.main.get().java.classesDirectory
+    inputs.file(shadedJar)
+    argumentProviders.add(CommandLineArgumentProvider {
+        listOf(shadedJar.get().asFile.absolutePath, mainClasses.get().asFile.absolutePath)
+    })
+}
+
 // Compatibility checks use a dependency-free main method rather than a test
 // framework; Gradle 9 otherwise treats their presence as a discovery failure.
 tasks.test { failOnNoDiscoveredTests = false }
@@ -359,6 +398,7 @@ tasks.named("check") {
         "verifyItemDetailsLayout",
         "verifyMysticRpgRtpSafety",
         "verifyRtpFluidSafety",
-        "verifyIntegrationContracts"
+        "verifyIntegrationContracts",
+        "verifyShadedJar"
     )
 }

@@ -269,9 +269,10 @@ CREATE TABLE mystic_documents (
 
 Reads/writes run on a dedicated pool-sized executor (`INSERT ... ON DUPLICATE KEY
 UPDATE` for upserts). HikariCP, the MariaDB driver, the MySQL Connector/J driver,
-and slf4j-api are **shaded into the mod jar** (no relocation — Hytale gives each
-plugin an isolated `PluginClassLoader`); protobuf is excluded from the MySQL
-driver. The driver class is set explicitly per flavour, so JDBC auto-discovery is
+and slf4j-api (like Jedis and jsoup) are **shaded into the mod jar and relocated**
+under `org.hyzionstudios.mysticessentials.libs`, so another plugin's copy of the
+same library can never mix with ours (`verifyShadedJar` checks the shipped jar);
+protobuf is excluded from the MySQL driver. The driver class is set explicitly per flavour, so JDBC auto-discovery is
 not relied on. If the DB is unreachable at start, the Core logs and **falls back
 to JSON** so the server still boots. Configure host/port/db/credentials/poolSize
 under `storage.mysql` in `config.json`.
