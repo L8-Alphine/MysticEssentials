@@ -269,17 +269,18 @@ public final class PatchNotesModule extends AbstractMysticModule {
     }
 
     /**
-     * Opens the Patch Notes UI shortly after join. A delay is required because
-     * the player entity is not ready to receive a Custom UI page the instant
-     * {@code PlayerConnectEvent} fires; the player is re-resolved after the delay
-     * so a fast disconnect is a no-op.
+     * Opens the Patch Notes UI shortly after join. The player entity does not
+     * exist yet when {@code PlayerConnectEvent} fires and joining a world can
+     * take far longer than the delay, so the delay counts from the moment the
+     * entity is in its world; the player is re-resolved after the delay so a
+     * fast disconnect is a no-op.
      */
     private void scheduleOpenOnJoin(PlayerRef player) {
         long delayMillis = Math.max(0, config.openOnJoinDelayTicks) * 50L;
         UUID uuid = player.getUuid();
-        core.scheduler().runLater(() ->
+        core.platform().runOnEntityThread(player, (store, ref, world) -> core.scheduler().runLater(() ->
                 core.platform().findPlayer(uuid).ifPresent(this::openUi),
-                delayMillis, TimeUnit.MILLISECONDS);
+                delayMillis, TimeUnit.MILLISECONDS));
     }
 
     // ----- UI opening --------------------------------------------------------
