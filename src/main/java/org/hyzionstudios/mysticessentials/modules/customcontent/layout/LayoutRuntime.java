@@ -181,13 +181,24 @@ public final class LayoutRuntime {
         core.platform().removeHud(player, key);
     }
 
-    /** Hides every overlay this runtime is showing, for every viewer. */
+    /**
+     * Hides every overlay this runtime is showing, for every viewer — static
+     * ones too ({@code huds} only tracks the ones that refresh).
+     */
     public void hideAllHuds() {
-        for (LayoutHud hud : List.copyOf(huds.keySet())) {
+        for (LayoutHud hud : List.copyOf(openHuds)) {
             core.platform().removeHud(hud.viewer(), hud.getKey());
         }
         huds.clear();
         openHuds.clear();
+    }
+
+    /** Forgets every surface of a player who disconnected; their client dropped them already. */
+    public void forgetViewer(PlayerRef player) {
+        huds.keySet().removeIf(hud -> sameViewer(hud.viewer(), player));
+        openHuds.removeIf(hud -> sameViewer(hud.viewer(), player));
+        pages.keySet().removeIf(page -> sameViewer(page.viewer(), player));
+        openPages.removeIf(page -> sameViewer(page.viewer(), player));
     }
 
     void trackPage(LayoutPage page) {

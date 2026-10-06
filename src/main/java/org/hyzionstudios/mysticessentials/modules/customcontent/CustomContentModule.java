@@ -68,6 +68,9 @@ public final class CustomContentModule extends AbstractMysticModule {
             if (portraits != null) {
                 portraits.handlerClosed(event.getPlayerRef().getPacketHandler());
             }
+            if (layouts != null) {
+                layouts.forgetViewer(event.getPlayerRef());
+            }
         });
         log("Loaded " + dialogs.ids().size() + " dialog(s) and " + guis.all().size()
                 + " CustomGUI(s); compatibility bridge "
