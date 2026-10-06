@@ -2,11 +2,13 @@ package org.hyzionstudios.mysticessentials.modules.afk;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -15,17 +17,23 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import java.util.function.ToIntFunction;
 
 import org.hyzionstudios.mysticessentials.api.Permissions;
 import org.hyzionstudios.mysticessentials.api.model.MysticLocation;
+import org.hyzionstudios.mysticessentials.api.model.PlayerProfile;
 import org.hyzionstudios.mysticessentials.api.service.AfkService;
+import org.hyzionstudios.mysticessentials.api.service.TeleportService;
+import org.hyzionstudios.mysticessentials.core.message.MysticText;
 import org.hyzionstudios.mysticessentials.core.module.AbstractMysticModule;
 import org.hyzionstudios.mysticessentials.core.util.Json;
+import org.hyzionstudios.mysticessentials.modules.announcements.AnnouncementModule;
 import org.hyzionstudios.mysticessentials.platform.Conversions;
 import org.hyzionstudios.mysticessentials.platform.command.MysticArgTypes;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommand;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommandSender;
 
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.hypixel.hytale.server.core.command.system.arguments.system.RequiredArg;
 import com.hypixel.hytale.server.core.command.system.arguments.types.ArgTypes;
@@ -80,6 +88,10 @@ public final class AfkModule extends AbstractMysticModule implements AfkService 
     private static final String DATA_KEY = "afk";
     /** Pre-zone-teleport location, persisted so it survives restarts. */
     private static final String RETURN_KEY = "returnLocation";
+    /** UTC day ({@code yyyy-MM-dd}) the persisted daily reward counts below belong to. */
+    private static final String REWARD_DAY_KEY = "rewardDay";
+    private static final String DAILY_TOTAL_KEY = "dailyTotal";
+    private static final String ROLLS_TODAY_KEY = "rollsToday";
 
     private static final class Activity {
         boolean afk;
@@ -93,6 +105,8 @@ public final class AfkModule extends AbstractMysticModule implements AfkService 
         double dailyTotal;
         int rollsToday;
         long dayIndex = -1;
+        /** Whether today's persisted counts were read from the profile since the player came online. */
+        boolean synced;
         /** When the next roll is due for a player earning outside a zone (no ZoneSession clock). */
         long nextRollAtMillis;
     }
@@ -257,7 +271,6 @@ public final class AfkModule extends AbstractMysticModule implements AfkService 
     }
 
     /** One-time upgrade: the old single {@code zoneCornerA/B} pair becomes a named zone. */
-    @SuppressWarnings("deprecation") // One-time reader for the deprecated pre-zone config fields.
     private void convertLegacyZoneCorners() {
         AfkConfig.Rewards r = config.rewards;
         if (r.zoneCornerA == null || r.zoneCornerB == null) {
@@ -465,12 +478,28 @@ public final class AfkModule extends AbstractMysticModule implements AfkService 
         return (dx * dx + dy * dy + dz * dz) > MOVE_EPSILON_SQ;
     }
 
-    /** Broadcasts an AFK status line, unless the player is vanished. */
+    /**
+     * Broadcasts an AFK status line to this server's players, unless the player is
+     * vanished. Local only: {@code announce} is "to the server", and the network
+     * relay would carry every status line (and its reason) to every server.
+     */
     private void announce(UUID player, String message) {
-        if (config.announce && core.getAnnouncementService() != null
+        if (config.announce && core.getAnnouncementService() instanceof AnnouncementModule announcements
                 && !core.vanish().isVanished(player)) {
-            core.getAnnouncementService().broadcast("&8* &7" + message);
+            announcements.broadcastLocal("&8* &7" + message);
         }
+    }
+
+    /**
+     * A player-written AFK reason is shown to others through the formatting
+     * pipeline, so it is reduced to plain text: no markup and no placeholder syntax.
+     */
+    private static String plainReason(String reason) {
+        String plain = MysticText.stripMarkup(reason)
+                .replaceAll("<[^>]*>", "")
+                .replaceAll("[<>&{}%]", "")
+                .trim();
+        return plain.isEmpty() ? null : plain;
     }
 
     // ----- Reward zones ------------------------------------------------------
@@ -744,7 +773,7 @@ public final class AfkModule extends AbstractMysticModule implements AfkService 
         blockedIdsResolved = true;
     }
 
-    private Set<Integer> resolveIds(List<String> names, String kind, java.util.function.ToIntFunction<String> lookup) {
+    private Set<Integer> resolveIds(List<String> names, String kind, ToIntFunction<String> lookup) {
         if (names == null || names.isEmpty()) {
             return Set.of();
         }
@@ -795,8 +824,10 @@ public final class AfkModule extends AbstractMysticModule implements AfkService 
     private void saveReturnLocation(UUID uuid, MysticLocation location) {
         returnLocations.put(uuid, location);
         core.getPlayerProfileService().getCached(uuid).ifPresent(profile -> {
-            profile.getModuleData().computeIfAbsent(DATA_KEY, k -> new JsonObject())
-                    .add(RETURN_KEY, Json.gson().toJsonTree(location));
+            synchronized (profile) {
+                profile.getModuleData().computeIfAbsent(DATA_KEY, k -> new JsonObject())
+                        .add(RETURN_KEY, Json.gson().toJsonTree(location));
+            }
             core.getPlayerProfileService().save(profile);
         });
     }
@@ -806,17 +837,19 @@ public final class AfkModule extends AbstractMysticModule implements AfkService 
         MysticLocation location = returnLocations.remove(uuid);
         var cached = core.getPlayerProfileService().getCached(uuid);
         if (cached.isPresent()) {
-            JsonObject data = cached.get().getModuleData().get(DATA_KEY);
-            if (data != null && data.has(RETURN_KEY)) {
-                if (location == null) {
-                    try {
-                        location = Json.gson().fromJson(data.get(RETURN_KEY), MysticLocation.class);
-                    } catch (RuntimeException ignored) {
-                        // Corrupt entry; drop it below.
+            synchronized (cached.get()) {
+                JsonObject data = cached.get().getModuleData().get(DATA_KEY);
+                if (data != null && data.has(RETURN_KEY)) {
+                    if (location == null) {
+                        try {
+                            location = Json.gson().fromJson(data.get(RETURN_KEY), MysticLocation.class);
+                        } catch (RuntimeException ignored) {
+                            // Corrupt entry; drop it below.
+                        }
                     }
+                    data.remove(RETURN_KEY);
+                    core.getPlayerProfileService().save(cached.get());
                 }
-                data.remove(RETURN_KEY);
-                core.getPlayerProfileService().save(cached.get());
             }
         }
         return Optional.ofNullable(location);
@@ -825,22 +858,47 @@ public final class AfkModule extends AbstractMysticModule implements AfkService 
     /** On join: if a return location survived a restart, send the player back. */
     private void restoreReturnLocation(PlayerRef player) {
         core.getPlayerProfileService().load(player.getUuid(), player.getUsername()).thenAccept(profile -> {
-            JsonObject data = profile.getModuleData().get(DATA_KEY);
-            if (data == null || !data.has(RETURN_KEY)) {
+            JsonObject data;
+            JsonElement stored;
+            synchronized (profile) {
+                data = profile.getModuleData().get(DATA_KEY);
+                stored = data == null ? null : data.get(RETURN_KEY);
+            }
+            if (stored == null) {
                 return;
             }
             MysticLocation location = null;
             try {
-                location = Json.gson().fromJson(data.get(RETURN_KEY), MysticLocation.class);
+                location = Json.gson().fromJson(stored, MysticLocation.class);
             } catch (RuntimeException ignored) {
-                // Corrupt entry; cleared below either way.
+                // Corrupt entry; cleared below.
             }
-            data.remove(RETURN_KEY);
-            core.getPlayerProfileService().save(profile);
-            if (location != null) {
-                core.getTeleportService().teleportNow(player, location);
+            if (location == null) {
+                synchronized (profile) {
+                    data.remove(RETURN_KEY);
+                }
+                core.getPlayerProfileService().save(profile);
+                return;
+            }
+            // The entry is only consumed once the player is actually back; a failed
+            // move keeps it for the next join.
+            core.getTeleportService().teleportNow(player, location).thenAccept(result -> {
+                if (result != TeleportService.Result.SUCCESS) {
+                    return;
+                }
+                // Leave a newer return point (a zone entered since) alone.
+                boolean consumed;
+                synchronized (profile) {
+                    consumed = stored.equals(data.get(RETURN_KEY));
+                    if (consumed) {
+                        data.remove(RETURN_KEY);
+                    }
+                }
+                if (consumed) {
+                    core.getPlayerProfileService().save(profile);
+                }
                 core.getMessageService().sendKey(player, "afk-zone-returned");
-            }
+            });
         });
     }
 
@@ -855,7 +913,7 @@ public final class AfkModule extends AbstractMysticModule implements AfkService 
         if (config == null || config.rewards == null || config.rewards.zones == null) {
             return List.of();
         }
-        return config.rewards.zones.stream().map(zone -> zone.name).filter(java.util.Objects::nonNull).toList();
+        return config.rewards.zones.stream().map(zone -> zone.name).filter(Objects::nonNull).toList();
     }
 
     private static String formatPos(MysticLocation pos) {
@@ -939,6 +997,11 @@ public final class AfkModule extends AbstractMysticModule implements AfkService 
                 state.dailyTotal = 0;
                 state.rollsToday = 0;
             }
+            // Until the profile is loaded today's persisted counts are unknown, so
+            // nothing is granted rather than granting past the daily caps.
+            if (!state.synced && !syncDailyCounts(uuid, state)) {
+                continue;
+            }
             if (r.maxRollsPerDay > 0 && state.rollsToday >= r.maxRollsPerDay) {
                 continue;
             }
@@ -990,7 +1053,71 @@ public final class AfkModule extends AbstractMysticModule implements AfkService 
                 }
             });
         }
-        rewards.keySet().retainAll(onlineUuids());
+        // The daily caps must survive a relog, so a logged-out player keeps today's
+        // entry (only its session part resets); entries from past days are dropped.
+        // They are re-read from the profile on return, which may have earned on
+        // another server meanwhile.
+        rewards.values().removeIf(state -> state.dayIndex != today);
+        Set<UUID> online = onlineUuids();
+        rewards.forEach((uuid, state) -> {
+            if (!online.contains(uuid)) {
+                state.session = 0;
+                state.nextRollAtMillis = 0;
+                state.synced = false;
+            }
+        });
+    }
+
+    /**
+     * Merges today's daily reward counts persisted in the player's profile into
+     * {@code state}; counts stored for another day are ignored.
+     *
+     * @return {@code false} while the profile is not loaded yet
+     */
+    private boolean syncDailyCounts(UUID uuid, RewardState state) {
+        PlayerProfile profile = core.getPlayerProfileService().getCached(uuid).orElse(null);
+        if (profile == null) {
+            return false;
+        }
+        synchronized (profile) {
+            JsonObject data = profile.getModuleData().get(DATA_KEY);
+            if (data != null && storedRewardDay(data) == state.dayIndex) {
+                try {
+                    if (data.has(DAILY_TOTAL_KEY)) {
+                        state.dailyTotal = Math.max(state.dailyTotal, data.get(DAILY_TOTAL_KEY).getAsDouble());
+                    }
+                    if (data.has(ROLLS_TODAY_KEY)) {
+                        state.rollsToday = Math.max(state.rollsToday, data.get(ROLLS_TODAY_KEY).getAsInt());
+                    }
+                } catch (RuntimeException ignored) {
+                    // Corrupt entry; the next reward overwrites it.
+                }
+            }
+        }
+        state.synced = true;
+        return true;
+    }
+
+    /** The UTC epoch day of the persisted daily reward counts, or {@code -1} when absent or unreadable. */
+    private static long storedRewardDay(JsonObject data) {
+        try {
+            return data.has(REWARD_DAY_KEY) ? LocalDate.parse(data.get(REWARD_DAY_KEY).getAsString()).toEpochDay() : -1;
+        } catch (RuntimeException ignored) {
+            return -1;
+        }
+    }
+
+    /** Persists today's daily reward counts in the player profile so a restart cannot reset them. */
+    private void saveDailyCounts(UUID uuid, RewardState state) {
+        core.getPlayerProfileService().getCached(uuid).ifPresent(profile -> {
+            synchronized (profile) {
+                JsonObject data = profile.getModuleData().computeIfAbsent(DATA_KEY, k -> new JsonObject());
+                data.addProperty(REWARD_DAY_KEY, LocalDate.ofEpochDay(state.dayIndex).toString());
+                data.addProperty(DAILY_TOTAL_KEY, state.dailyTotal);
+                data.addProperty(ROLLS_TODAY_KEY, state.rollsToday);
+            }
+            core.getPlayerProfileService().save(profile);
+        });
     }
 
     /**
@@ -1057,11 +1184,13 @@ public final class AfkModule extends AbstractMysticModule implements AfkService 
                 state.session += amount;
                 state.dailyTotal += amount;
                 state.rollsToday++;
+                saveDailyCounts(uuid, state);
                 sendRewardMessage(player, entry, "afk-reward",
                         Map.of("amount", core.getEconomyService().format(amount)));
             }
             case "item" -> {
                 state.rollsToday++;
+                saveDailyCounts(uuid, state);
                 giveItemReward(player, entry);
                 sendRewardMessage(player, entry, "afk-reward-item", Map.of(
                         "item", entry.itemId,
@@ -1069,6 +1198,7 @@ public final class AfkModule extends AbstractMysticModule implements AfkService 
             }
             case "command" -> {
                 state.rollsToday++;
+                saveDailyCounts(uuid, state);
                 String command = entry.command
                         .replace("{player}", player.getUsername())
                         .replace("{uuid}", uuid.toString());
@@ -1147,7 +1277,7 @@ public final class AfkModule extends AbstractMysticModule implements AfkService 
                 markActivity(uuid);
                 return;
             }
-            String reason = sender.args().length > 0 ? String.join(" ", sender.args()) : null;
+            String reason = sender.args().length > 0 ? plainReason(String.join(" ", sender.args())) : null;
             // With several zones to choose from (and not already inside one),
             // let the player pick in a UI; going AFK happens on selection.
             PlayerRef player = sender.player().orElse(null);

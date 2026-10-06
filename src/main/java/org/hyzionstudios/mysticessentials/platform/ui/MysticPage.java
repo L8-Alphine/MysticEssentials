@@ -12,6 +12,7 @@ import com.google.gson.JsonObject;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.protocol.packets.interface_.CustomPageLifetime;
+import com.hypixel.hytale.protocol.packets.interface_.Page;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.entities.player.pages.CustomUIPage;
@@ -215,7 +216,7 @@ public abstract class MysticPage extends CustomUIPage {
             Player entity = store.getComponent(ref, Player.getComponentType());
             if (entity != null) {
                 entity.getPageManager().setPage(ref, store,
-                        com.hypixel.hytale.protocol.packets.interface_.Page.None);
+                        Page.None);
             }
         } catch (Throwable ignored) {
             // The player can close the page manually.

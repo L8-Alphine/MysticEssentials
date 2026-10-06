@@ -1,5 +1,6 @@
 package com.mysticlicensing.license;
 
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -12,6 +13,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.KeyPair;
 import java.time.Instant;
+import java.util.List;
+import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -140,6 +143,42 @@ class McLicenseVerifierTest {
         }
 
         @Test
+        @DisplayName("not_before a few minutes ahead of a lagging clock is tolerated")
+        void notBeforeClockSkew() {
+            byte[] license = licenses.license()
+                    .notBefore("2026-08-01T00:03:00.000Z")
+                    .expiresAt("2026-10-01T00:00:00.000Z")
+                    .grants(Products.ESSENTIALS, "*")
+                    .bytes();
+
+            assertEquals(LicenseStatus.VALID, verifyAt(license, "2026-08-01T00:00:00Z").status());
+            assertEquals(LicenseStatus.NOT_YET_VALID,
+                    verifyAt(license, "2026-07-31T23:50:00Z").status());
+        }
+
+        @Test
+        @DisplayName("an expires_at that is present but unreadable is INVALID_FORMAT, not perpetual")
+        void unreadableExpiry() {
+            byte[] license = licenses.license()
+                    .expiresAt("2026-08-10 18:00:00")
+                    .grants(Products.ESSENTIALS, "*")
+                    .bytes();
+
+            assertEquals(LicenseStatus.INVALID_FORMAT, verify(license).status());
+        }
+
+        @Test
+        @DisplayName("an absurd grace period does not overflow")
+        void hugeGracePeriod() {
+            byte[] license = licenses.license()
+                    .gracePeriodSeconds(Long.MAX_VALUE)
+                    .grants(Products.ESSENTIALS, "*")
+                    .bytes();
+
+            assertEquals(LicenseStatus.GRACE_PERIOD, verifyAt(license, "2030-01-01T00:00:00Z").status());
+        }
+
+        @Test
         @DisplayName("a null expires_at never expires")
         void nonExpiringLicense() {
             byte[] license = licenses.license()
@@ -158,6 +197,18 @@ class McLicenseVerifierTest {
     @Nested
     @DisplayName("server binding")
     class BindingChecks {
+
+        @ParameterizedTest
+        @ValueSource(strings = {"Server_UUID", "server-uuid", "future_mode"})
+        @DisplayName("an unknown binding mode is INVALID_FORMAT, never valid anywhere")
+        void unknownBindingMode(String mode) {
+            byte[] license = licenses.license()
+                    .bindingMode(mode)
+                    .grants(Products.ESSENTIALS, "*")
+                    .bytes();
+
+            assertEquals(LicenseStatus.INVALID_FORMAT, verify(license).status());
+        }
 
         @Test
         @DisplayName("a license for another server is WRONG_SERVER")
@@ -727,7 +778,7 @@ class McLicenseVerifierTest {
         void binaryGarbage(@TempDir Path dir) throws Exception {
             Path path = dir.resolve("license.mclicense");
             byte[] noise = new byte[512];
-            new java.util.Random(1234).nextBytes(noise);
+            new Random(1234).nextBytes(noise);
             Files.write(path, noise);
 
             LicenseCheckResult result = assertDoesNotThrow(() ->
@@ -765,7 +816,7 @@ class McLicenseVerifierTest {
                 .grants(Products.ESSENTIALS, Products.Essentials.MODULE_CUSTOM_CONTENT)
                 .bytes()).payload();
 
-        assertThrowsUnsupported(() -> payload.products().put("x", java.util.List.of()));
+        assertThrowsUnsupported(() -> payload.products().put("x", List.of()));
         assertThrowsUnsupported(() -> payload.products().get(Products.ESSENTIALS).add("x"));
         assertThrowsUnsupported(() -> payload.serverUuids().add("x"));
     }
@@ -773,7 +824,7 @@ class McLicenseVerifierTest {
     private static void assertThrowsUnsupported(Runnable action) {
         try {
             action.run();
-            org.junit.jupiter.api.Assertions.fail("expected the collection to be unmodifiable");
+            Assertions.fail("expected the collection to be unmodifiable");
         } catch (UnsupportedOperationException expected) {
             // as intended
         }

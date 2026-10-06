@@ -190,6 +190,7 @@ Top-level settings:
 | `autoLinkPlainUrls` | `true` | Converts plain URLs into clickable links |
 | `autoLinkPermission` | `null` | Optional permission required for auto-linking |
 | `defaultFormat` | `{luckperms_prefix}{display_name} &8» &f{message}` | Fallback chat format |
+| `deliveryFormat` | `&8[&d{channel}&8] &f{display_name} &8» &7{message}` | Format for chat another mod hands over (guild, party...) without its own; `{channel}` is that mod's label |
 | `formats` | Owner example | Priority-ordered permission formats |
 | `messageColorPermissions` | See below | Permission gates for player-supplied chat formatting |
 
@@ -223,6 +224,7 @@ Channel settings:
 | `channels.allowTemporaryChannels` | `true` | Allows session channels |
 | `channels.temporaryChannelDefaultMinutes` | `120` | Redis TTL restore window for temporary channels |
 | `channels.createTemporaryPermission` | `mysticessentials.chat.channel.create.temp` | Temporary channel permission |
+| `channels.maxTemporaryChannelsPerOwner` | `1` | Temporary channels one player may own at once; `0` = unlimited |
 | `channels.roster.enabled` | `true` | Enables compact/full member rosters |
 | `channels.roster.viewPermission` | `mysticessentials.channel.members.view` | Permission required to open rosters; blank allows everyone |
 | `channels.roster.showServerRanks` | `true` | Show LuckPerms/server rank below the channel role |
@@ -277,7 +279,12 @@ Mention matching and delivery use `modules/chat/mentions.json`. Defaults require
 exact case-insensitive names, cap mentions at 3 per message and 10 per minute,
 apply 5-second sender/15-second same-target cooldowns, throttle recipient sounds
 to 3 seconds, and apply a 300-second mass-mention cooldown. Player preferences
-and block lists are managed with `/mentions`.
+are managed with `/mentions`, ignore lists with `/ignore`.
+
+| Setting | Default | Description |
+| --- | --- | --- |
+| `rules.ignoredPlayersCanNotNotify` | `true` | A player on the recipient's ignore list cannot mention them |
+| `rules.mutedPlayersCanNotNotify` | `true` | A player MysticModeration has muted (shadow mutes included) mentions nobody |
 
 See the [Item Links](itemlinks-module) page for the full workflow, commands, and rarity rules.
 
@@ -342,7 +349,7 @@ Rewards:
 | `rewards.intervalSeconds` | `60` | Reward interval |
 | `rewards.amountPerInterval` | `5.0` | Economy payout per interval |
 | `rewards.maxSessionReward` | `500.0` | Per-session cap; `0` disables |
-| `rewards.maxDailyReward` | `2000.0` | Daily cap; `0` disables |
+| `rewards.maxDailyReward` | `2000.0` | Daily cap (per player per UTC day, survives restarts); `0` disables |
 | `rewards.requireInZone` | `false` | Require reward zone |
 | `rewards.zones` | `[]` | Named X/Z footprints; height is not bounded |
 | `rewards.teleportToZoneOnAfk` | `true` | Safely move to a permitted zone and restore on return |

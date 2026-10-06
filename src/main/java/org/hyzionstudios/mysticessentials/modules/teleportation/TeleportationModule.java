@@ -1,10 +1,13 @@
 package org.hyzionstudios.mysticessentials.modules.teleportation;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -284,7 +287,7 @@ public final class TeleportationModule extends AbstractMysticModule {
         if (pulled.isEmpty()) {
             return;
         }
-        pulled.sort(java.util.Comparator.comparing(PendingRequest::created));
+        pulled.sort(Comparator.comparing(PendingRequest::created));
         LinkedHashMap<UUID, PendingRequest> inbound =
                 pending.computeIfAbsent(target, uuid -> new LinkedHashMap<>());
         synchronized (inbound) {
@@ -504,7 +507,7 @@ public final class TeleportationModule extends AbstractMysticModule {
 
     /** The arrival record as referral bytes (well under the engine's 4 KiB limit). */
     private static byte[] referralPayload(JsonObject arrival) {
-        return Json.toString(arrival).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        return Json.toString(arrival).getBytes(StandardCharsets.UTF_8);
     }
 
     /**
@@ -534,7 +537,7 @@ public final class TeleportationModule extends AbstractMysticModule {
             return;
         }
         try {
-            JsonObject arrival = Json.asObject(Json.parse(new String(data, java.nio.charset.StandardCharsets.UTF_8)));
+            JsonObject arrival = Json.asObject(Json.parse(new String(data, StandardCharsets.UTF_8)));
             if (!REFERRAL_KIND.equals(string(arrival, "kind"))
                     || !core.networkPlayers().localServerId().equals(string(arrival, "destinationServerId"))) {
                 return;
@@ -1064,8 +1067,17 @@ public final class TeleportationModule extends AbstractMysticModule {
         }
     }
 
+    /**
+     * Pulls the requests other network servers stored in Redis (so a request
+     * sent while this player was elsewhere, or whose announcement was missed,
+     * still shows up) off the world thread, then opens the page, which only
+     * reads the memory copy.
+     */
     void openTpaUi(PlayerRef player) {
-        core.platform().openPage(player, new TpaPages.TpaPage(core, this, player));
+        core.scheduler().runLater(() -> {
+            pullRemoteRequests(player.getUuid());
+            core.platform().openPage(player, new TpaPages.TpaPage(core, this, player));
+        }, 0, TimeUnit.MILLISECONDS);
     }
 
     private void requestTo(MysticCommandSender sender, String targetName, boolean requesterTeleports) {
@@ -1169,7 +1181,7 @@ public final class TeleportationModule extends AbstractMysticModule {
                         if (result != TeleportService.Result.SUCCESS) {
                             sender.replyKey("teleport-to-failed", Map.of(
                                     "player", targetPlayer.getUsername(),
-                                    "reason", result.name().toLowerCase(java.util.Locale.ROOT).replace('_', ' ')));
+                                    "reason", result.name().toLowerCase(Locale.ROOT).replace('_', ' ')));
                         }
                     });
         }
@@ -1230,7 +1242,7 @@ public final class TeleportationModule extends AbstractMysticModule {
                     sender.replyKey("teleport-world-failed", Map.of(
                             "player", targetPlayer.getUsername(),
                             "world", destination.getWorld(),
-                            "reason", result.name().toLowerCase(java.util.Locale.ROOT).replace('_', ' ')));
+                            "reason", result.name().toLowerCase(Locale.ROOT).replace('_', ' ')));
                 }
             });
         }
@@ -1493,7 +1505,7 @@ public final class TeleportationModule extends AbstractMysticModule {
                         } else {
                             sender.replyKey("teleport-here-failed", Map.of(
                                     "player", targetPlayer.getUsername(),
-                                    "reason", result.name().toLowerCase(java.util.Locale.ROOT).replace('_', ' ')));
+                                    "reason", result.name().toLowerCase(Locale.ROOT).replace('_', ' ')));
                         }
                     });
         }

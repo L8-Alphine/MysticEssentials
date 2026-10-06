@@ -9,11 +9,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 
 import org.hyzionstudios.mysticessentials.api.module.ModuleManager;
 import org.hyzionstudios.mysticessentials.api.module.MysticModule;
 import org.hyzionstudios.mysticessentials.core.MysticCore;
+
+import com.mysticlicensing.license.Products;
 
 /**
  * Default {@link ModuleManager}. Registers module instances, enables those
@@ -25,7 +28,8 @@ public final class ModuleManagerImpl implements ModuleManager {
 
     private final MysticCore core;
     private final Map<String, MysticModule> modules = new LinkedHashMap<>();
-    private final Map<String, Boolean> enabled = new LinkedHashMap<>();
+    /** Read from any thread (commands, chat, scheduler); written under this manager's lock. */
+    private final Map<String, Boolean> enabled = new ConcurrentHashMap<>();
     private final Set<String> externalModules = new LinkedHashSet<>();
     private boolean startupComplete;
 
@@ -34,18 +38,28 @@ public final class ModuleManagerImpl implements ModuleManager {
     }
 
     @Override
-    public void register(MysticModule module) {
+    public synchronized void register(MysticModule module) {
+        add(module);
+    }
+
+    /** @return {@code false} when the id is taken and {@code module} was ignored. */
+    private boolean add(MysticModule module) {
         if (modules.containsKey(module.id())) {
             core.log(Level.WARNING, "Duplicate module id '" + module.id() + "' ignored.");
-            return;
+            return false;
         }
         modules.put(module.id(), module);
         enabled.put(module.id(), false);
+        return true;
     }
 
     @Override
-    public void registerExternalModule(MysticModule module) {
-        register(module);
+    public synchronized void registerExternalModule(MysticModule module) {
+        // A rejected duplicate must not be marked external or enabled: the id
+        // belongs to the module already registered under it.
+        if (!add(module)) {
+            return;
+        }
         externalModules.add(module.id());
         if (startupComplete && Boolean.FALSE.equals(enabled.get(module.id()))) {
             enableModule(module);
@@ -53,7 +67,7 @@ public final class ModuleManagerImpl implements ModuleManager {
     }
 
     /** Loads and enables every registered module that is enabled in config. */
-    public void enableAll() {
+    public synchronized void enableAll() {
         for (MysticModule module : orderedByDependencies()) {
             enableModule(module);
         }
@@ -81,7 +95,19 @@ public final class ModuleManagerImpl implements ModuleManager {
             enabled.put(id, true);
             core.log(Level.INFO, "Enabled module '" + id + "' v" + module.version());
         } catch (Throwable t) {
-            core.log(Level.SEVERE, "Failed to enable module '" + id + "': " + t);
+            core.log(Level.SEVERE, "Failed to enable module '" + id + "'", t);
+            // Whatever onEnable registered before it threw (commands, listeners,
+            // tasks) must not outlive it: the module counts as disabled, so no
+            // later disable would clean up, and a reload would register it twice.
+            try {
+                module.onDisable();
+            } catch (Throwable ignored) {
+                // Best effort on a half-enabled module.
+            }
+            if (module instanceof AbstractMysticModule base) {
+                base.unregisterCommands();
+                base.unregisterEventListeners();
+            }
         }
     }
 
@@ -103,12 +129,14 @@ public final class ModuleManagerImpl implements ModuleManager {
         try {
             feature = base.licensedFeature();
         } catch (Throwable t) {
-            return true;
+            core.log(Level.WARNING, "Module '" + module.id() + "' could not report its license feature;"
+                    + " treating it as unlicensed.", t);
+            return false;
         }
         if (feature == null) {
             return true;
         }
-        if (core.license().hasFeature(com.mysticlicensing.license.Products.ESSENTIALS, feature)) {
+        if (core.license().hasFeature(Products.ESSENTIALS, feature)) {
             return true;
         }
         core.log(Level.INFO, "Module '" + module.id() + "' needs the '" + feature
@@ -163,7 +191,7 @@ public final class ModuleManagerImpl implements ModuleManager {
     }
 
     /** Disables all enabled modules in reverse enable order. */
-    public void disableAll() {
+    public synchronized void disableAll() {
         List<MysticModule> ordered = orderedByDependencies();
         Collections.reverse(ordered);
         for (MysticModule module : ordered) {
@@ -178,7 +206,7 @@ public final class ModuleManagerImpl implements ModuleManager {
         try {
             module.onDisable();
         } catch (Throwable t) {
-            core.log(Level.SEVERE, "Error disabling module '" + module.id() + "': " + t);
+            core.log(Level.SEVERE, "Error disabling module '" + module.id() + "'", t);
         }
         if (module instanceof AbstractMysticModule base) {
             base.unregisterCommands();
@@ -196,14 +224,35 @@ public final class ModuleManagerImpl implements ModuleManager {
      * that stay enabled are reloaded. This is what lets an operator toggle a
      * module and reload without restarting the server.
      */
-    public void syncFromConfig() {
+    public synchronized void syncFromConfig() {
         List<MysticModule> ordered = orderedByDependencies();
 
-        // Stop modules turned off in config — dependents before dependencies.
+        // Modules turned off in config, plus every running module that hard-depends
+        // (directly or not) on one of them: a dependent must not outlive what it needs.
+        // A module whose license lapsed (expired, revoked, reloaded as invalid) stops too.
+        Set<String> stopping = new LinkedHashSet<>();
+        for (MysticModule module : ordered) {
+            if (isEnabled(module.id()) && (!moduleEnabledInConfig(module.id()) || !licensed(module))) {
+                stopping.add(module.id());
+            }
+        }
+        boolean grew = true;
+        while (grew) {
+            grew = false;
+            for (MysticModule module : ordered) {
+                if (isEnabled(module.id()) && !stopping.contains(module.id())
+                        && hardDependenciesOf(module).stream().anyMatch(stopping::contains)) {
+                    stopping.add(module.id());
+                    grew = true;
+                }
+            }
+        }
+
+        // Stop them — dependents before dependencies.
         List<MysticModule> reversed = new ArrayList<>(ordered);
         Collections.reverse(reversed);
         for (MysticModule module : reversed) {
-            if (isEnabled(module.id()) && !moduleEnabledInConfig(module.id())) {
+            if (stopping.contains(module.id())) {
                 disableModule(module);
             }
         }
@@ -218,11 +267,58 @@ public final class ModuleManagerImpl implements ModuleManager {
                 try {
                     module.onReload();
                 } catch (Throwable t) {
-                    core.log(Level.SEVERE, "Error reloading module '" + id + "': " + t);
+                    core.log(Level.SEVERE, "Error reloading module '" + id + "'", t);
                 }
             } else {
                 enableModule(module);
             }
+        }
+    }
+
+    /**
+     * Stops every running module whose license feature is no longer granted (and
+     * its hard dependents). Called periodically, so a license that expires while
+     * the server runs takes effect without a reload.
+     */
+    public synchronized void enforceLicenses() {
+        List<MysticModule> ordered = orderedByDependencies();
+        Set<String> stopping = new LinkedHashSet<>();
+        for (MysticModule module : ordered) {
+            if (isEnabled(module.id()) && module instanceof AbstractMysticModule base
+                    && licensedFeatureOf(base) != null && !licensed(module)) {
+                stopping.add(module.id());
+            }
+        }
+        if (stopping.isEmpty()) {
+            return;
+        }
+        boolean grew = true;
+        while (grew) {
+            grew = false;
+            for (MysticModule module : ordered) {
+                if (isEnabled(module.id()) && !stopping.contains(module.id())
+                        && hardDependenciesOf(module).stream().anyMatch(stopping::contains)) {
+                    stopping.add(module.id());
+                    grew = true;
+                }
+            }
+        }
+        List<MysticModule> reversed = new ArrayList<>(ordered);
+        Collections.reverse(reversed);
+        for (MysticModule module : reversed) {
+            if (stopping.contains(module.id())) {
+                core.log(Level.WARNING, "Module '" + module.id()
+                        + "' is no longer licensed; stopping it. Run /mystic license for details.");
+                disableModule(module);
+            }
+        }
+    }
+
+    private static String licensedFeatureOf(AbstractMysticModule module) {
+        try {
+            return module.licensedFeature();
+        } catch (Throwable t) {
+            return "?";
         }
     }
 
@@ -256,7 +352,7 @@ public final class ModuleManagerImpl implements ModuleManager {
             module.onReload();
             return true;
         } catch (Throwable t) {
-            core.log(Level.SEVERE, "Error reloading module '" + moduleId + "': " + t);
+            core.log(Level.SEVERE, "Error reloading module '" + moduleId + "'", t);
             return false;
         }
     }

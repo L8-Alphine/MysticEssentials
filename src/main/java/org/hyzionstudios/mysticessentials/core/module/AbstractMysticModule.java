@@ -12,6 +12,7 @@ import org.hyzionstudios.mysticessentials.api.module.MysticModule;
 import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommand;
 
+import com.hypixel.hytale.event.EventPriority;
 import com.hypixel.hytale.event.IAsyncEvent;
 import com.hypixel.hytale.event.IBaseEvent;
 import com.hypixel.hytale.registry.Registration;
@@ -126,7 +127,7 @@ public abstract class AbstractMysticModule implements MysticModule {
     protected <K, E extends IBaseEvent<K>> void registerGlobalEvent(Class<? super E> eventType,
             Consumer<E> listener) {
         Registration registration = core.platform().onGlobalEvent(
-                com.hypixel.hytale.event.EventPriority.NORMAL, eventType, listener);
+                EventPriority.NORMAL, eventType, listener);
         if (registration != null) {
             eventRegistrations.add(registration);
         }

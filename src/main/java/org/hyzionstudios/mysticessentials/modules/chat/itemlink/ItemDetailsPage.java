@@ -7,6 +7,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.logging.Level;
 
@@ -23,6 +24,8 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.protocol.packets.interface_.CustomPageLifetime;
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
+import com.hypixel.hytale.server.core.ui.Anchor;
+import com.hypixel.hytale.server.core.ui.Value;
 import com.hypixel.hytale.server.core.ui.builder.EventData;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
@@ -124,11 +127,10 @@ public final class ItemDetailsPage extends MysticPage {
 
     private void applyShellSize(UICommandBuilder cmd) {
         try {
-            com.hypixel.hytale.server.core.ui.Anchor anchor =
-                    new com.hypixel.hytale.server.core.ui.Anchor();
-            anchor.setWidth(com.hypixel.hytale.server.core.ui.Value.of(
+            Anchor anchor = new Anchor();
+            anchor.setWidth(Value.of(
                     compact ? WIDTH_COMPACT : WIDTH_FULL));
-            anchor.setHeight(com.hypixel.hytale.server.core.ui.Value.of(
+            anchor.setHeight(Value.of(
                     compact ? HEIGHT_COMPACT : HEIGHT_FULL));
             cmd.setObject("#MysticItemShell.Anchor", anchor);
         } catch (Throwable ignored) {
@@ -207,7 +209,7 @@ public final class ItemDetailsPage extends MysticPage {
                 + ", VerticalAlignment: Center);\n"
                 + "}");
         cmd.set(titleId + ".TextSpans", uiText(titleId + ".TextSpans",
-                section.title().toUpperCase(java.util.Locale.ROOT)));
+                section.title().toUpperCase(Locale.ROOT)));
 
         if (section.collapsible()) {
             String toggleId = nextId("sg");

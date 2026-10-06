@@ -269,9 +269,10 @@ CREATE TABLE mystic_documents (
 
 Reads/writes run on a dedicated pool-sized executor (`INSERT ... ON DUPLICATE KEY
 UPDATE` for upserts). HikariCP, the MariaDB driver, the MySQL Connector/J driver,
-and slf4j-api are **shaded into the mod jar** (no relocation — Hytale gives each
-plugin an isolated `PluginClassLoader`); protobuf is excluded from the MySQL
-driver. The driver class is set explicitly per flavour, so JDBC auto-discovery is
+and slf4j-api (like Jedis and jsoup) are **shaded into the mod jar and relocated**
+under `org.hyzionstudios.mysticessentials.libs`, so another plugin's copy of the
+same library can never mix with ours (`verifyShadedJar` checks the shipped jar);
+protobuf is excluded from the MySQL driver. The driver class is set explicitly per flavour, so JDBC auto-discovery is
 not relied on. If the DB is unreachable at start, the Core logs and **falls back
 to JSON** so the server still boots. Configure host/port/db/credentials/poolSize
 under `storage.mysql` in `config.json`.
@@ -490,7 +491,7 @@ api.getNotificationService().send(
   do-not-disturb can still find them in `/notifications`. Low and normal sends
   must explicitly opt in with `storeInHistory(true)`.
 - **Critical notifications bypass player preferences** unless the server sets
-  `notifications.critical.allow-player-disable`. That rule is enforced in one
+  `critical.allowPlayerDisable` in `notifications.json`. That rule is enforced in one
   place, not at each call site.
 
 - **Notification Center tabs are registerable.** Mystic Essentials ships only
@@ -522,7 +523,7 @@ api.getNotificationService().send(
   recipient's muted categories, disabled surfaces, and do-not-disturb. It is a
   per-send decision rather than a permission the sender simply holds, so a
   moderator's contact gets through while their ordinary chatter does not. It
-  still honours `notifications.critical.allow-player-disable`, so a server that
+  still honours `critical.allowPlayerDisable`, so a server that
   has explicitly handed control to players keeps that promise.
 
 ### Mention scopes
@@ -563,10 +564,69 @@ chat.registerMentionScope(new MentionScopeProvider() {
   in-memory lookup; a throw is treated as "no" and logged, never breaking the
   message.
 
-Config lives in `data/modules/core/notifications.json` (profiles + category
-catalogue), `data/modules/chat/item-view.json` (inspection + panel display), and
-`data/modules/chat/mentions.json` (matching, limits, and
-`rules.staff-bypass-player-settings`).
+Config lives in `modules/core/notifications.json` (profiles + category
+catalogue), `modules/chat/item-view.json` (inspection + panel display), and
+`modules/chat/mentions.json` (matching, limits, and rules such as
+`rules.staffBypassPlayerSettings`, `rules.ignoredPlayersCanNotNotify` and
+`rules.mutedPlayersCanNotNotify`).
+
+### Chat from other mods (`ChatService.deliver`)
+
+Guild, officer, party or settlement chat that another mod owns never passes
+through `PlayerChatEvent`, so nothing that enforces chat rules on that event sees
+it. `ChatService.deliver(sender, recipients, channelLabel, message[, format])`
+applies them instead and returns a `ChatDeliveryResult` (status, delivered,
+skipped, reason):
+
+```java
+ChatDeliveryResult result = chat.deliver(senderId, memberIds, guild.name(), text);
+```
+
+- **Mutes.** Mystic Essentials keeps no server mutes; `ModerationBridge.lookupMute`
+  asks MysticModeration (`ModerationServiceRegistry#find(PunishmentService)` then
+  `PunishmentService#activeMute(UUID)`) — the lookup its own chat gate makes. A mute
+  refuses the line (`MUTED`, the sender gets `chat-you-muted`); a `SHADOW_MUTE` shows
+  it to the sender alone (`SHADOW_MUTED`, `isDelivered()` still true, so the caller
+  must not relay it). The public `activeMute(player)` is the same lookup, empty on
+  failure; `activeMute(player, channelId)` adds a temporary channel's moderation mute.
+- **Chat guard and tutorial.** `ModerationBridge.checkChat` runs
+  `ChatGuardService#evaluate(uuid, name, message)` (filter, chat lock, slow mode;
+  `BLOCK` refuses with its detail as feedback, `REWRITE` replaces the text), and
+  `TutorialService.isChatBlocked` refuses lines while a tutorial blocks chat; both
+  give `BLOCKED`. MysticModeration absent, disabled in the config, or with the module
+  unpublished means "allow"; installed but failing (`ModerationUnavailableException`)
+  refuses the line with `chat-moderation-unavailable`.
+- **Ignores.** `isIgnoring(recipient, sender)` is the recipient's ignore list
+  (`/ignore`, `NotificationPreferences.ignoredPlayers`, UUIDs edited under the
+  preferences' lock); such a recipient is skipped. Names stored before the list was
+  kept by UUID (`blockedMentioners`) are resolved with `PlayerProfileService.resolveUuid`
+  when the preferences load; an unresolved one is logged and keeps applying by name.
+  Public chat (`ChatDelivery.withoutIgnoring` on the event targets) and lines from
+  other servers (`deliverInbound`) apply the same list, mentions honour it while
+  `rules.ignoredPlayersCanNotNotify` is on, and private messages are refused on every
+  path: locally, on the target's server for a relayed one (a `pm-notice` Redis
+  message tells the sender's server, which replies `pm-blocked`), and from the stored
+  profile for an offline target's mail fallback. Player mail is refused the same
+  way (`MailModule.send` with a non-null sender and the composer, before attachments
+  are taken): `mail-blocked`, and `send` completes with `MailBlockedException`;
+  server mail and `deliver` are never refused. `mysticessentials.chat.ignore.exempt`
+  senders always get through (the relay carries the flag as `ignoreExempt`). An
+  offline player's list comes from `NotificationServiceImpl.storedPreferences`,
+  which with `json` storage is this server's copy of their profile.
+- **Managed accounts.** Each recipient is judged on the pair with
+  `TEXT_PUBLIC`, as for a cross-server channel line.
+- **Text safety.** The message goes through `preparePlayerMessage` (token
+  delimiters, colour permissions, length) and is filled into the format with
+  `MessageServiceImpl.fillParams`, so neither it, the nickname nor the caller's
+  label is ever parsed for placeholders; the label keeps colour codes only.
+- **Audience.** Recipients not online on this server are skipped, the sender
+  always gets their own line and it counts as their AFK activity
+  (`AfkService.markActivity`). The line is echoed to the server log and published as
+  `ChatDeliveredEvent` for moderation tooling; nothing is relayed over Redis and
+  `ChatMessagePublishedEvent` is not fired, so bridges never repeat it.
+
+The recipient rules live in `ChatDelivery.plan`, free of engine types and checked
+by `verifyChatDelivery`.
 
 Mystic Essentials' built-in sounds use vanilla AssetMap ids: routine notices use
 `SFX_Attn_Quiet`, announcements use `SFX_Attn_Moderate`, alerts use
@@ -582,7 +642,9 @@ explicitly supplied.
 ./gradlew shadowJar        # -> build/libs/MysticEssentials-1.0.4.jar (deploy this one)
                            #    the plain `jar` task now writes *-thin.jar so it can no longer
                            #    overwrite the shaded jar during `gradle build`
-./gradlew deployMod        # builds + copies to .hytale-server/mods
+./gradlew runServer        # local dev server in run/ (hytale-tools)
 ```
 
-Requires JDK 25 (configured via the Gradle toolchain).
+Requires JDK 25 (configured via the Gradle toolchain). The build uses AzureDoom's
+`com.azuredoom.hytale-tools` plugin; the Hytale version and manifest fields live in
+`gradle.properties`, and `manifest.json` is rewritten from them on every build.

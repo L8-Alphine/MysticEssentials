@@ -5,6 +5,7 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -155,7 +156,7 @@ public final class MachinimaSceneAssets {
      */
     public ImportResult importDropFolder() {
         List<String> imported = new ArrayList<>();
-        Map<String, String> failed = new java.util.LinkedHashMap<>();
+        Map<String, String> failed = new LinkedHashMap<>();
         try (Stream<Path> files = Files.list(importDir)) {
             files.filter(Files::isRegularFile)
                     .filter(file -> hasSceneExtension(file.getFileName().toString()))

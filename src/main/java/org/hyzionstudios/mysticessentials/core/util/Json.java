@@ -71,13 +71,13 @@ public final class Json {
      * Writes a value as pretty JSON, creating parent directories as needed. The
      * write is atomic: the JSON is fully written to a sibling temp file which is
      * then moved into place, so a crash mid-write can never leave a truncated
-     * (unparseable) target file behind.
+     * (unparseable) target file behind. Every write gets its own temp file, so two
+     * concurrent writes of the same target can never interleave in one file.
      */
     public static void writeFile(Path file, Object value) throws IOException {
-        if (file.getParent() != null) {
-            Files.createDirectories(file.getParent());
-        }
-        Path tmp = file.resolveSibling(file.getFileName() + ".tmp");
+        Path parent = file.toAbsolutePath().getParent();
+        Files.createDirectories(parent);
+        Path tmp = Files.createTempFile(parent, file.getFileName() + ".", ".tmp");
         try (Writer writer = Files.newBufferedWriter(tmp, StandardCharsets.UTF_8)) {
             GSON.toJson(value, writer);
         }

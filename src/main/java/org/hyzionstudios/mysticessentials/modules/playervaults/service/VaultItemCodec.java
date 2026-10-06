@@ -3,8 +3,10 @@ package org.hyzionstudios.mysticessentials.modules.playervaults.service;
 import java.util.List;
 import java.util.Locale;
 
+import org.bson.BsonDocument;
 import org.hyzionstudios.mysticessentials.modules.playervaults.config.PlayerVaultConfig;
 import org.hyzionstudios.mysticessentials.modules.playervaults.model.VaultItemStack;
+import org.hyzionstudios.mysticessentials.platform.ItemStackMetadata;
 
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 
@@ -20,24 +22,28 @@ public final class VaultItemCodec {
     }
 
     /** Serializes an occupied slot's item; returns {@code null} for empty slots. */
-    @SuppressWarnings("deprecation") // Full BSON is required for lossless vault round-trips.
     public static VaultItemStack toStored(int slot, ItemStack stack) {
         if (stack == null || stack.isEmpty()) {
             return null;
         }
-        var metadata = stack.getMetadata();
-        String json = metadata == null || metadata.isEmpty() ? null : metadata.toJson();
-        return new VaultItemStack(slot, stack.getItemId(), stack.getQuantity(),
+        String json = ItemStackMetadata.toJson(stack);
+        VaultItemStack stored = new VaultItemStack(slot, stack.getItemId(), stack.getQuantity(),
                 stack.getDurability(), stack.getMaxDurability(), json);
+        stored.quality = ItemStackMetadata.customQuality(stack);
+        return stored;
     }
 
-    /** Rebuilds a live item from stored data, restoring full metadata. */
+    /**
+     * Rebuilds a live item from stored data, restoring full metadata. An item stored
+     * without metadata gets none ({@code null}, like a fresh stack) so it still
+     * stacks with fresh items of the same id.
+     */
     public static ItemStack toLive(VaultItemStack stored) {
-        org.bson.BsonDocument metadata = stored.metadata == null || stored.metadata.isBlank()
-                ? new org.bson.BsonDocument()
-                : org.bson.BsonDocument.parse(stored.metadata);
-        return new ItemStack(stored.itemId, Math.max(1, stored.quantity),
-                stored.durability, stored.maxDurability, metadata);
+        BsonDocument metadata = stored.metadata == null || stored.metadata.isBlank()
+                ? null
+                : BsonDocument.parse(stored.metadata);
+        return ItemStackMetadata.rebuild(stored.itemId, Math.max(1, stored.quantity),
+                stored.durability, stored.maxDurability, metadata, stored.quality);
     }
 
     /** @return {@code true} if this item id may not be stored in a vault. */

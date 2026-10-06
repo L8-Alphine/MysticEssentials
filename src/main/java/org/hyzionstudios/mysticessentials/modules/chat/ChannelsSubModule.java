@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -18,12 +19,20 @@ import java.util.logging.Level;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.hyzionstudios.mysticessentials.api.chat.ChatMute;
+import org.hyzionstudios.mysticessentials.api.event.ChannelModeratorChangedEvent;
+import org.hyzionstudios.mysticessentials.api.event.ChannelOwnershipTransferredEvent;
+import org.hyzionstudios.mysticessentials.api.event.TemporaryChannelClosedEvent;
+import org.hyzionstudios.mysticessentials.api.event.TemporaryChannelCreatedEvent;
+import org.hyzionstudios.mysticessentials.api.event.TemporaryChannelMembershipChangedEvent;
 import org.hyzionstudios.mysticessentials.api.voice.ChannelVoicePresenceProvider;
 import org.hyzionstudios.mysticessentials.api.notification.Notification;
 import org.hyzionstudios.mysticessentials.api.notification.NotificationAudience;
 import org.hyzionstudios.mysticessentials.api.notification.NotificationCategory;
 import org.hyzionstudios.mysticessentials.api.notification.NotificationPriority;
 import org.hyzionstudios.mysticessentials.core.MysticCore;
+import org.hyzionstudios.mysticessentials.core.integration.ManagedAccountsBridge;
+import org.hyzionstudios.mysticessentials.core.message.MessageServiceImpl;
 import org.hyzionstudios.mysticessentials.core.util.Json;
 import org.hyzionstudios.mysticessentials.modules.chat.roster.ChannelActivity;
 import org.hyzionstudios.mysticessentials.modules.chat.roster.ChannelMemberRole;
@@ -33,10 +42,15 @@ import org.hyzionstudios.mysticessentials.modules.chat.roster.RosterTags;
 import org.hyzionstudios.mysticessentials.platform.command.MysticArgTypes;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommand;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommandSender;
+import org.joml.Vector3d;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.hypixel.hytale.registry.Registration;
+import com.hypixel.hytale.server.core.command.system.AbstractCommand;
+import com.hypixel.hytale.server.core.command.system.CommandManager;
+import com.hypixel.hytale.server.core.command.system.CommandRegistration;
 import com.hypixel.hytale.server.core.command.system.CommandSender;
 import com.hypixel.hytale.server.core.command.system.arguments.system.RequiredArg;
 import com.hypixel.hytale.server.core.command.system.arguments.types.ArgTypes;
@@ -54,6 +68,8 @@ public final class ChannelsSubModule {
     private static final String TEMP_INDEX_KEY = "chat:temp:index";
     private static final String TEMP_KEY_PREFIX = "chat:temp:";
     private static final Pattern HEX_COLOR = Pattern.compile("(?:&|<|color:|c:)#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})");
+    /** Player-chosen temporary-channel ids and aliases. */
+    private static final Pattern TEMP_NAME = Pattern.compile("[a-z0-9_-]{1,16}");
     private static final Map<Character, String> LEGACY_COLORS = Map.ofEntries(
             Map.entry('0', "#000000"),
             Map.entry('1', "#0000AA"),
@@ -83,7 +99,8 @@ public final class ChannelsSubModule {
     private final Map<String, TemporaryChannel> temporaryChannels = new ConcurrentHashMap<>();
     private final Map<UUID, TransferRequest> pendingTransfers = new ConcurrentHashMap<>();
     private final Set<String> seenRemoteMessages = ConcurrentHashMap.newKeySet();
-    private final Set<String> registeredAliases = ConcurrentHashMap.newKeySet();
+    /** Alias commands this submodule registered, by name, with their engine handles. */
+    private final Map<String, AliasCommand> aliasCommands = new ConcurrentHashMap<>();
     private final Set<String> subscribedRedisTopics = ConcurrentHashMap.newKeySet();
     private final Consumer<String> redisMessageHandler = this::handleRemoteChannelMessage;
     private final Consumer<String> redisStateHandler = this::handleRemoteState;
@@ -95,9 +112,8 @@ public final class ChannelsSubModule {
     private ChatConfig.Channels config = new ChatConfig.Channels();
     private Map<String, ChatConfig.Channel> configuredChannels = Map.of();
     private Map<String, String> aliasToChannel = Map.of();
-    private Consumer<MysticCommand> commandRegistrar;
-    private com.hypixel.hytale.registry.Registration disconnectListener;
-    private com.hypixel.hytale.registry.Registration connectListener;
+    private Registration disconnectListener;
+    private Registration connectListener;
     private boolean stateSubscribed;
 
     public ChannelsSubModule(MysticCore core, ChatModule chat) {
@@ -107,10 +123,9 @@ public final class ChannelsSubModule {
     }
 
     public void enable(ChatConfig.Channels config, Consumer<MysticCommand> commandRegistrar) {
-        this.commandRegistrar = commandRegistrar;
         reload(config);
         commandRegistrar.accept(new ChannelCommand());
-        registerConfiguredAliasCommands(commandRegistrar);
+        registerConfiguredAliasCommands();
         disconnectListener = core.platform().onEvent(PlayerDisconnectEvent.class, (PlayerDisconnectEvent event) ->
                 handleDisconnect(event.getPlayerRef()));
         connectListener = core.platform().onEvent(PlayerConnectEvent.class, (PlayerConnectEvent event) ->
@@ -121,7 +136,7 @@ public final class ChannelsSubModule {
         this.config = config == null ? new ChatConfig.Channels() : config;
         Map<String, ChatConfig.Channel> next = new HashMap<>();
         Map<String, String> aliases = new HashMap<>();
-        Set<String> desiredRedisTopics = new java.util.HashSet<>();
+        Set<String> desiredRedisTopics = new HashSet<>();
         if (this.config.channels != null) {
             for (ChatConfig.Channel channel : this.config.channels) {
                 if (channel.id == null || channel.id.isBlank()) {
@@ -129,7 +144,7 @@ public final class ChannelsSubModule {
                 }
                 String id = normalize(channel.id);
                 next.put(id, channel);
-                indexAliases(aliases, channel);
+                indexAliases(aliases, channel, false);
                 if (channel.crossServer && !core.redis().isEnabled()) {
                     core.log(Level.WARNING, "Chat channel '" + channel.id
                             + "' is crossServer=true but Redis is disabled; messages will stay local until Redis works.");
@@ -139,7 +154,7 @@ public final class ChannelsSubModule {
                 }
             }
         }
-        for (String oldTopic : new java.util.HashSet<>(subscribedRedisTopics)) {
+        for (String oldTopic : new HashSet<>(subscribedRedisTopics)) {
             if (!desiredRedisTopics.contains(oldTopic)) {
                 core.redis().unsubscribe(oldTopic, redisMessageHandler);
                 subscribedRedisTopics.remove(oldTopic);
@@ -156,7 +171,7 @@ public final class ChannelsSubModule {
         }
         loadRedisTemporaryChannels();
         for (TemporaryChannel temp : temporaryChannels.values()) {
-            indexAliases(aliases, temp.channel);
+            indexAliases(aliases, temp.channel, true);
         }
         aliasToChannel = aliases;
     }
@@ -181,6 +196,19 @@ public final class ChannelsSubModule {
         for (TemporaryChannel temp : temporaryChannels.values()) {
             cancelGrace(temp);
         }
+        // Unregistering removes whatever command holds the name by then, so only
+        // drop the alias commands that are still ours.
+        Map<String, AbstractCommand> registered = CommandManager.get().getCommandRegistration();
+        aliasCommands.forEach((name, alias) -> {
+            if (registered.get(name) == alias.command()) {
+                try {
+                    alias.registration().unregister();
+                } catch (Throwable ignored) {
+                    // One-shot handle; already gone or engine shutting down.
+                }
+            }
+        });
+        aliasCommands.clear();
         pendingTransfers.clear();
         speakChannels.clear();
         listeningChannels.clear();
@@ -215,9 +243,8 @@ public final class ChannelsSubModule {
         TemporaryChannel temp = temporaryChannels.get(normalize(channel.id));
         ChannelParticipation participation = effectiveParticipation(sender, channel, temp);
         if (participation == ChannelParticipation.MUTED) {
-            Mute mute = temp == null ? null : temp.mutes.get(sender.getUuid());
             core.getMessageService().sendKey(sender, "chat-channel-you-muted",
-                    Map.of("reason", mute == null || mute.reason() == null ? "" : mute.reason()));
+                    Map.of("reason", muteReason(channel.id, sender.getUuid()).orElse("")));
             event.setCancelled(true);
             return event;
         }
@@ -257,8 +284,7 @@ public final class ChannelsSubModule {
     // ----- Temporary-channel lifecycle events (external bridges) -------------
 
     private void publishTempCreated(String channelId, UUID owner) {
-        core.getEventBus().publish(
-                new org.hyzionstudios.mysticessentials.api.event.TemporaryChannelCreatedEvent(channelId, owner));
+        core.getEventBus().publish(new TemporaryChannelCreatedEvent(channelId, owner));
     }
 
     /** No-op for configured channels: only temporary channels report membership. */
@@ -267,13 +293,12 @@ public final class ChannelsSubModule {
             return;
         }
         core.getEventBus().publish(
-                new org.hyzionstudios.mysticessentials.api.event.TemporaryChannelMembershipChangedEvent(
+                new TemporaryChannelMembershipChangedEvent(
                         channelId, player, joined));
     }
 
     private void publishTempClosed(String channelId) {
-        core.getEventBus().publish(
-                new org.hyzionstudios.mysticessentials.api.event.TemporaryChannelClosedEvent(channelId));
+        core.getEventBus().publish(new TemporaryChannelClosedEvent(channelId));
     }
 
     /**
@@ -361,9 +386,32 @@ public final class ChannelsSubModule {
         core.platform().openPage(player, new ChannelPages.TempChannelPage(core, this, player));
     }
 
-    /** Opens the manager UI for the player's own temporary channel. */
-    public void openTempManageUi(PlayerRef player) {
-        core.platform().openPage(player, new ChannelPages.TempChannelManagePage(core, this, player));
+    /** Opens the manager UI for {@code channelId}, one of the player's own temporary channels. */
+    public void openTempManageUi(PlayerRef player, String channelId) {
+        core.platform().openPage(player, new ChannelPages.TempChannelManagePage(core, this, player,
+                resolveChannelId(channelId)));
+    }
+
+    /**
+     * The channel browser's Manage button: opens the manager for {@code selected} when the
+     * player owns it, else for the only temporary channel they own. When they own several
+     * and selected none of them, they are told to select one first.
+     */
+    void manageSelectedTemporaryChannel(PlayerRef player, String selected) {
+        UUID owner = player.getUuid();
+        Optional<ChatConfig.Channel> target = ownedTemporaryChannel(owner, selected)
+                .or(() -> ownedTemporaryChannel(owner));
+        if (target.isPresent()) {
+            openTempManageUi(player, target.get().id);
+            return;
+        }
+        List<String> owned = ownedTemporaryChannelIds(owner);
+        if (owned.isEmpty()) {
+            core.getMessageService().sendKey(player, "chat-channel-no-temp-owned");
+        } else {
+            core.getMessageService().sendKey(player, "chat-channel-temp-which-select",
+                    Map.of("channels", String.join(", ", owned)));
+        }
     }
 
     // ----- Channel roster (Phase 1: member state, role resolution, tags) -----
@@ -417,18 +465,19 @@ public final class ChannelsSubModule {
     /**
      * The current members of a channel as roster rows, grouped authority-first then
      * speakers before listeners then alphabetically (§5.3). Membership is defined as
-     * the online players currently listening to the channel.
+     * the online players currently listening to the channel. Empty when {@code viewer}
+     * cannot listen to the channel; members {@code viewer} cannot see (vanish) are left out.
      */
-    public List<ChannelMemberView> rosterFor(String channelId) {
+    public List<ChannelMemberView> rosterFor(String channelId, PlayerRef viewer) {
         ChatConfig.Channel channel = findChannel(channelId).orElse(null);
-        if (channel == null) {
+        if (channel == null || !canListen(viewer, channel)) {
             return List.of();
         }
         TemporaryChannel temp = temporaryChannels.get(resolveChannelId(channelId));
         UUID ownerId = temp == null ? null : temp.owner;
         List<ChannelMemberView> members = new ArrayList<>();
         for (PlayerRef online : core.platform().onlinePlayers()) {
-            if (isListening(online, channel)) {
+            if (isListening(online, channel) && core.vanish().canSee(viewer.getUuid(), online.getUuid())) {
                 members.add(buildMemberView(online, channel, ownerId, temp));
             }
         }
@@ -439,9 +488,9 @@ public final class ChannelsSubModule {
         return members;
     }
 
-    /** A single member's roster view within a channel, if they are currently a member. */
-    public Optional<ChannelMemberView> rosterMember(String channelId, UUID playerId) {
-        return rosterFor(channelId).stream()
+    /** A single member's roster view within a channel, if they are currently a member {@code viewer} can see. */
+    public Optional<ChannelMemberView> rosterMember(String channelId, UUID playerId, PlayerRef viewer) {
+        return rosterFor(channelId, viewer).stream()
                 .filter(view -> view.playerId().equals(playerId))
                 .findFirst();
     }
@@ -622,13 +671,22 @@ public final class ChannelsSubModule {
         return temp == null ? Optional.empty() : Optional.ofNullable(temp.joinedAt.get(uuid));
     }
 
+    /**
+     * The reason for the active channel moderation mute {@code uuid} holds in a temporary
+     * channel, or the {@code chat-mute-no-reason} text when the moderator gave none.
+     */
     public Optional<String> muteReason(String channelId, UUID uuid) {
+        return channelMute(channelId, uuid).map(mute -> ChatDelivery.reasonOrDefault(mute.reason(),
+                core.getMessageService().plainFromKey("chat-mute-no-reason")));
+    }
+
+    /** The active channel moderation mute {@code uuid} holds in a temporary channel. */
+    public Optional<ChatMute> channelMute(String channelId, UUID uuid) {
         TemporaryChannel temp = temporaryChannels.get(resolveChannelId(channelId));
-        if (temp == null) {
-            return Optional.empty();
-        }
-        Mute mute = temp.mutes.get(uuid);
-        return mute != null && mute.isActive() ? Optional.ofNullable(mute.reason()) : Optional.empty();
+        Mute mute = temp == null || uuid == null ? null : temp.mutes.get(uuid);
+        return mute != null && mute.isActive()
+                ? Optional.of(new ChatMute(ChatMute.Scope.CHANNEL, mute.reason(), mute.expiresAt(), false))
+                : Optional.empty();
     }
 
     /** {@code true} when {@code actor} may perform owner-level management on the channel. */
@@ -669,7 +727,7 @@ public final class ChannelsSubModule {
         persist(channelId, temp);
         audit.record("MODERATOR_ASSIGNED", channelId, actor.getUuid(), target, null);
         core.getEventBus().publish(
-                new org.hyzionstudios.mysticessentials.api.event.ChannelModeratorChangedEvent(
+                new ChannelModeratorChangedEvent(
                         resolveChannelId(channelId), target, actor.getUuid(), true));
         notify(target, "chat-channel-mod-assigned", Map.of("channel", displayNameOfId(channelId)));
         return ManageResult.OK;
@@ -689,7 +747,7 @@ public final class ChannelsSubModule {
         persist(channelId, temp);
         audit.record("MODERATOR_REMOVED", channelId, actor.getUuid(), target, null);
         core.getEventBus().publish(
-                new org.hyzionstudios.mysticessentials.api.event.ChannelModeratorChangedEvent(
+                new ChannelModeratorChangedEvent(
                         resolveChannelId(channelId), target, actor.getUuid(), false));
         notify(target, "chat-channel-mod-removed", Map.of("channel", displayNameOfId(channelId)));
         return ManageResult.OK;
@@ -742,7 +800,8 @@ public final class ChannelsSubModule {
                         + " reason=" + (reason == null ? "" : reason));
         notify(target, "chat-channel-you-muted-notice", Map.of(
                 "channel", displayNameOfId(channelId),
-                "reason", reason == null ? "" : reason));
+                "reason", ChatDelivery.reasonOrDefault(reason,
+                        core.getMessageService().plainFromKey("chat-mute-no-reason"))));
         return ManageResult.OK;
     }
 
@@ -886,6 +945,11 @@ public final class ChannelsSubModule {
             pendingTransfers.remove(requestId);
             return ManageResult.NOT_TEMPORARY;
         }
+        if (!request.from().equals(temp.owner)) {
+            // Ownership changed since the offer (succession, forced transfer).
+            pendingTransfers.remove(requestId);
+            return ManageResult.EXPIRED;
+        }
         ManageResult eligibility = transferEligible(temp, target.getUuid());
         if (eligibility != ManageResult.OK) {
             pendingTransfers.remove(requestId);
@@ -973,6 +1037,8 @@ public final class ChannelsSubModule {
         temp.owner = newOwner;
         temp.ownerDisconnectedAt = null;
         cancelGrace(temp);
+        // Offers made by the previous owner no longer speak for the channel.
+        pendingTransfers.values().removeIf(req -> req.channelId().equals(id));
         // The new owner can no longer be a moderator/muted/restricted of their own channel.
         temp.moderators.remove(newOwner);
         temp.mutes.remove(newOwner);
@@ -994,7 +1060,7 @@ public final class ChannelsSubModule {
         persist(id, temp);
         audit.record("OWNERSHIP_TRANSFERRED", id, previous, newOwner, "source=" + source);
         core.getEventBus().publish(
-                new org.hyzionstudios.mysticessentials.api.event.ChannelOwnershipTransferredEvent(
+                new ChannelOwnershipTransferredEvent(
                         id, previous, newOwner, source));
         notify(newOwner, "chat-channel-transfer-received", Map.of("channel", displayNameOfId(id)));
         if (previous != null) {
@@ -1037,10 +1103,13 @@ public final class ChannelsSubModule {
             temp.ownerDisconnectedAt = Instant.now();
             String id = entry.getKey();
             if (grace == 0) {
-                runSuccession(id, leaving);
+                // Still inside PlayerDisconnectEvent: the leaving owner is not removed
+                // from the universe yet, so the "back online" check must be skipped.
+                runSuccession(id, leaving, true);
             } else {
                 cancelGrace(temp);
-                temp.graceFuture = core.scheduler().runLater(() -> runSuccession(id, leaving), grace, TimeUnit.SECONDS);
+                temp.graceFuture = core.scheduler().runLater(() -> runSuccession(id, leaving, false),
+                        grace, TimeUnit.SECONDS);
             }
         }
     }
@@ -1057,12 +1126,12 @@ public final class ChannelsSubModule {
         }
     }
 
-    private void runSuccession(String channelId, UUID expectedOwner) {
+    private void runSuccession(String channelId, UUID expectedOwner, boolean ownerLeaving) {
         TemporaryChannel temp = temporaryChannels.get(channelId);
         if (temp == null || !expectedOwner.equals(temp.owner) || temp.ownerDisconnectedAt == null) {
             return; // Ownership changed, channel gone, or the owner already returned.
         }
-        if (core.platform().findPlayer(expectedOwner).isPresent()) {
+        if (!ownerLeaving && core.platform().findPlayer(expectedOwner).isPresent()) {
             temp.ownerDisconnectedAt = null; // Owner is back online.
             return;
         }
@@ -1385,52 +1454,91 @@ public final class ChannelsSubModule {
         }
     }
 
-    /** The temporary channel owned by {@code owner}, if any. */
-    public Optional<ChatConfig.Channel> ownedTemporaryChannel(UUID owner) {
+    /** Ids of the temporary channels {@code owner} owns, sorted. */
+    public List<String> ownedTemporaryChannelIds(UUID owner) {
         pruneExpired();
-        for (TemporaryChannel temp : temporaryChannels.values()) {
-            if (owner.equals(temp.owner)) {
-                return Optional.of(temp.channel);
-            }
-        }
-        return Optional.empty();
-    }
-
-    /** When the owner's temporary channel expires ({@code Instant.MAX} = with the last player). */
-    public Optional<Instant> ownedTemporaryChannelExpiry(UUID owner) {
-        for (TemporaryChannel temp : temporaryChannels.values()) {
-            if (owner.equals(temp.owner)) {
-                return Optional.of(temp.expiresAt);
-            }
-        }
-        return Optional.empty();
-    }
-
-    /** Updates the password/prefix of the owner's temporary channel. Blank password removes it. */
-    public boolean updateTemporaryChannel(UUID owner, String password, String prefix) {
-        for (Map.Entry<String, TemporaryChannel> entry : temporaryChannels.entrySet()) {
-            TemporaryChannel temp = entry.getValue();
-            if (owner.equals(temp.owner)) {
-                temp.channel.password = blankToNull(password);
-                temp.channel.prefix = temporaryPrefix(entry.getKey(), prefix);
-                temp.channel.format = temporaryFormat(entry.getKey(), temp.channel.prefix);
-                saveRedisTemporaryChannel(entry.getKey(), temp);
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /** Closes (deletes) the owner's temporary channel and moves everyone off it. */
-    public boolean closeTemporaryChannel(UUID owner) {
-        String id = null;
+        List<String> owned = new ArrayList<>();
         for (Map.Entry<String, TemporaryChannel> entry : temporaryChannels.entrySet()) {
             if (owner.equals(entry.getValue().owner)) {
-                id = entry.getKey();
-                break;
+                owned.add(entry.getKey());
             }
         }
-        return id != null && closeTemporaryChannelById(id);
+        owned.sort(null);
+        return owned;
+    }
+
+    /**
+     * The temporary channel {@code owner} owns when they own exactly one, which is what
+     * owner actions that name no channel act on. Empty when they own none or several:
+     * name one with {@link #ownedTemporaryChannel(UUID, String)}.
+     */
+    public Optional<ChatConfig.Channel> ownedTemporaryChannel(UUID owner) {
+        List<String> owned = ownedTemporaryChannelIds(owner);
+        return owned.size() == 1 ? ownedTemporaryChannel(owner, owned.get(0)) : Optional.empty();
+    }
+
+    /** {@code channelId} (an id or alias) when it is a temporary channel {@code owner} owns. */
+    public Optional<ChatConfig.Channel> ownedTemporaryChannel(UUID owner, String channelId) {
+        if (channelId == null || channelId.isBlank()) {
+            return Optional.empty();
+        }
+        pruneExpired();
+        TemporaryChannel temp = temporaryChannels.get(resolveChannelId(channelId));
+        return temp != null && owner.equals(temp.owner) ? Optional.of(temp.channel) : Optional.empty();
+    }
+
+    /** When a temporary channel expires ({@code Instant.MAX} = with the last player). */
+    public Optional<Instant> temporaryChannelExpiry(String channelId) {
+        TemporaryChannel temp = temporaryChannels.get(resolveChannelId(channelId));
+        return temp == null ? Optional.empty() : Optional.of(temp.expiresAt);
+    }
+
+    /**
+     * Updates the password/prefix of the owner's temporary channel when they own exactly
+     * one; {@code false} when they own none or several. Blank password removes it.
+     */
+    public boolean updateTemporaryChannel(UUID owner, String password, String prefix) {
+        return ownedTemporaryChannel(owner)
+                .map(channel -> updateTemporaryChannel(owner, channel.id, password, prefix))
+                .orElse(false);
+    }
+
+    /**
+     * Updates the password/prefix of {@code channelId}; {@code false} unless it is a
+     * temporary channel {@code owner} owns. Blank password removes it.
+     */
+    public boolean updateTemporaryChannel(UUID owner, String channelId, String password, String prefix) {
+        if (ownedTemporaryChannel(owner, channelId).isEmpty()) {
+            return false;
+        }
+        String id = resolveChannelId(channelId);
+        TemporaryChannel temp = temporaryChannels.get(id);
+        if (temp == null) {
+            return false;
+        }
+        temp.channel.password = blankToNull(password);
+        temp.channel.prefix = temporaryPrefix(id, sanitizePrefix(owner, prefix));
+        temp.channel.format = temporaryFormat(id, temp.channel.prefix);
+        saveRedisTemporaryChannel(id, temp);
+        return true;
+    }
+
+    /**
+     * Closes (deletes) the owner's temporary channel when they own exactly one, moving
+     * everyone off it; {@code false} when they own none or several.
+     */
+    public boolean closeTemporaryChannel(UUID owner) {
+        return ownedTemporaryChannel(owner)
+                .map(channel -> closeTemporaryChannel(owner, channel.id))
+                .orElse(false);
+    }
+
+    /**
+     * Closes (deletes) {@code channelId} and moves everyone off it; {@code false} unless
+     * it is a temporary channel {@code owner} owns.
+     */
+    public boolean closeTemporaryChannel(UUID owner, String channelId) {
+        return ownedTemporaryChannel(owner, channelId).isPresent() && closeTemporaryChannelById(channelId);
     }
 
     /** Closes a temporary channel by id, moving everyone off it. Used by succession + staff close. */
@@ -1467,19 +1575,30 @@ public final class ChannelsSubModule {
 
     public boolean createTemporaryChannel(UUID owner, String channelId, String permissionGate, String password,
             String prefix, List<String> aliases) {
-        if (!config.enabled || !config.allowTemporaryChannels) {
+        if (!config.enabled || !config.allowTemporaryChannels || temporaryChannelLimitReached(owner)) {
             return false;
         }
         String id = normalize(channelId);
-        if (id.isBlank() || configuredChannels.containsKey(id) || temporaryChannels.containsKey(id)) {
+        // The id is shown in every line and menu, so it is a plain name; it must not
+        // collide with an existing channel id or alias either.
+        if (!TEMP_NAME.matcher(id).matches() || configuredChannels.containsKey(id)
+                || temporaryChannels.containsKey(id) || aliasToChannel.containsKey(id)) {
             return false;
         }
-        String resolvedPrefix = temporaryPrefix(id, prefix);
+        String resolvedPrefix = temporaryPrefix(id, sanitizePrefix(owner, prefix));
         ChatConfig.Channel channel = new ChatConfig.Channel(id, id, "permission",
                 temporaryFormat(id, resolvedPrefix));
         channel.prefix = resolvedPrefix;
         channel.password = blankToNull(password);
-        channel.aliases = aliases == null ? new ArrayList<>() : new ArrayList<>(aliases);
+        channel.aliases = new ArrayList<>();
+        if (aliases != null) {
+            for (String alias : aliases) {
+                String normalized = normalizeAlias(alias);
+                if (TEMP_NAME.matcher(normalized).matches()) {
+                    channel.aliases.add(normalized);
+                }
+            }
+        }
         channel.joinPermission = blankToNull(permissionGate);
         channel.speakPermission = blankToNull(permissionGate);
         channel.listenPermission = blankToNull(permissionGate);
@@ -1493,12 +1612,11 @@ public final class ChannelsSubModule {
         speakChannels.put(owner, id);
         listeningChannels(owner).add(id);
         publishTempCreated(id, owner);
+        // Player-chosen aliases resolve only inside /channel; they are never
+        // registered as top-level commands.
         Map<String, String> aliasesNext = new HashMap<>(aliasToChannel);
-        indexAliases(aliasesNext, channel);
+        indexAliases(aliasesNext, channel, true);
         aliasToChannel = aliasesNext;
-        if (commandRegistrar != null) {
-            registerAliasCommands(channel.aliases, commandRegistrar);
-        }
         saveRedisTemporaryChannel(id, temp);
         publishChannelState("update", id, temp.version);
         return true;
@@ -1508,6 +1626,21 @@ public final class ChannelsSubModule {
         return blankToNull(prefix) == null ? "&8[&d" + id + "&8]" : prefix;
     }
 
+    /**
+     * A player-written prefix becomes part of every line's format, so it keeps only
+     * the markup its author may use in chat, and no placeholder syntax.
+     */
+    private String sanitizePrefix(UUID owner, String prefix) {
+        if (prefix == null) {
+            return null;
+        }
+        String cleaned = prefix.replaceAll("[{}%]", "");
+        PlayerRef author = core.platform().findPlayer(owner).orElse(null);
+        return author == null
+                ? ChatColors.sanitize(cleaned, false, false, false, false, false, false)
+                : chat.sanitizeColors(author, cleaned);
+    }
+
     private static String temporaryFormat(String id, String prefix) {
         return temporaryPrefix(id, prefix) + " &f{display_name}: &f{message}";
     }
@@ -1515,6 +1648,36 @@ public final class ChannelsSubModule {
     boolean canCreateTemporaryChannel(PlayerRef player) {
         return config.createTemporaryPermission == null || config.createTemporaryPermission.isBlank()
                 || player.hasPermission(config.createTemporaryPermission);
+    }
+
+    /**
+     * {@code true} when {@code owner} already owns {@code maxTemporaryChannelsPerOwner}
+     * temporary channels. Channels owned on other servers count too: they are mirrored
+     * here over Redis. {@code 0} or less is unlimited; staff-override holders are exempt.
+     */
+    boolean temporaryChannelLimitReached(UUID owner) {
+        int limit = config.maxTemporaryChannelsPerOwner;
+        if (limit <= 0 || core.platform().findPlayer(owner).map(this::hasStaffOverride).orElse(false)) {
+            return false;
+        }
+        return ownedTemporaryChannelCount(owner) >= limit;
+    }
+
+    /** Placeholders for the {@code chat-channel-temp-limit} message. */
+    Map<String, String> temporaryChannelLimitPlaceholders(UUID owner) {
+        return Map.of("count", String.valueOf(ownedTemporaryChannelCount(owner)),
+                "limit", String.valueOf(config.maxTemporaryChannelsPerOwner));
+    }
+
+    private int ownedTemporaryChannelCount(UUID owner) {
+        pruneExpired();
+        int count = 0;
+        for (TemporaryChannel temp : temporaryChannels.values()) {
+            if (owner.equals(temp.owner)) {
+                count++;
+            }
+        }
+        return count;
     }
 
     private Optional<ChatConfig.Channel> channelForSender(PlayerRef sender) {
@@ -1548,11 +1711,33 @@ public final class ChannelsSubModule {
     }
 
     private boolean sameScope(PlayerRef sender, PlayerRef target, ChatConfig.Channel channel) {
+        if (channel.radiusBlocks > 0 && !sender.getUuid().equals(target.getUuid())
+                && !withinRadius(sender, target, channel.radiusBlocks)) {
+            return false;
+        }
         String scope = channel.scope == null ? "server" : channel.scope.toLowerCase(Locale.ROOT);
         if ("world".equals(scope)) {
             return sender.getWorldUuid().equals(target.getWorldUuid());
         }
         return true;
+    }
+
+    /**
+     * Same world and within {@code radius} blocks. Reads each player's last-tick
+     * transform snapshot ({@link PlayerRef#getTransform}), which is safe off the
+     * world thread.
+     */
+    private static boolean withinRadius(PlayerRef sender, PlayerRef target, int radius) {
+        UUID world = sender.getWorldUuid();
+        if (world == null || !world.equals(target.getWorldUuid())) {
+            return false;
+        }
+        Vector3d from = sender.getTransform().getPosition();
+        Vector3d to = target.getTransform().getPosition();
+        double dx = from.x - to.x;
+        double dy = from.y - to.y;
+        double dz = from.z - to.z;
+        return dx * dx + dy * dy + dz * dz <= (double) radius * radius;
     }
 
     private boolean canSpeak(PlayerRef player, ChatConfig.Channel channel) {
@@ -1656,12 +1841,18 @@ public final class ChannelsSubModule {
         // already have done this, but a peer running an older build (or an external
         // injector) must not be able to put raw tokens or markup on local screens.
         String safeContent = ChatTokens.toPlainText(content);
-        String line = template
-                .replace("{player_name}", senderName)
-                .replace("{display_name}", senderName)
-                .replace("{channel}", displayName(channel))
-                .replace("{server_id}", originServerId == null ? "" : originServerId)
-                .replace("{message}", safeContent);
+        // The sender name (a remote nickname, or a bridge's user name), the channel
+        // name and the message are all filled in after placeholder resolution, so
+        // relayed or bridged player text is never parsed for placeholders, nor for
+        // each other's tokens.
+        String name = senderName == null ? "" : senderName;
+        String rendered = MessageServiceImpl.fillParams(template, Map.of(
+                        "player_name", name,
+                        "display_name", name,
+                        "channel", displayName(channel),
+                        "server_id", originServerId == null ? "" : originServerId,
+                        "message", safeContent),
+                text -> core.getMessageService().resolvePlaceholders(placeholderContext, text));
         // A managed child's policy (MysticIdentity) is asked per listener: a remote player's
         // line on the pair, a bridged line on the listener's own cross-platform setting.
         // The origin server filtered its own listeners on the native chat event; this is
@@ -1673,8 +1864,12 @@ public final class ChannelsSubModule {
             }
         }
         for (PlayerRef recipient : core.managedAccounts().reachable(placeholderContext, listening,
-                org.hyzionstudios.mysticessentials.core.integration.ManagedAccountsBridge.TEXT_PUBLIC)) {
-            recipient.sendMessage(core.getMessageService().formatFor(placeholderContext, line));
+                ManagedAccountsBridge.TEXT_PUBLIC)) {
+            // A player's line skips those who ignore them, as on the server it came from.
+            if (placeholderContext != null && chat.ignores(recipient.getUuid(), placeholderContext, name)) {
+                continue;
+            }
+            recipient.sendMessage(core.getMessageService().colorize(rendered));
         }
     }
 
@@ -1887,10 +2082,10 @@ public final class ChannelsSubModule {
     private void rebuildAliasIndex() {
         Map<String, String> aliases = new HashMap<>();
         for (ChatConfig.Channel channel : configuredChannels.values()) {
-            indexAliases(aliases, channel);
+            indexAliases(aliases, channel, false);
         }
         for (TemporaryChannel temp : temporaryChannels.values()) {
-            indexAliases(aliases, temp.channel);
+            indexAliases(aliases, temp.channel, true);
         }
         aliasToChannel = aliases;
     }
@@ -1923,9 +2118,6 @@ public final class ChannelsSubModule {
                     continue;
                 }
                 temporaryChannels.put(normalize(temp.channel.id), temp);
-                if (commandRegistrar != null) {
-                    registerAliasCommands(temp.channel.aliases, commandRegistrar);
-                }
                 // Restored channels re-announce so external bridges reconcile after restart.
                 publishTempCreated(normalize(temp.channel.id), temp.owner);
             }
@@ -2078,43 +2270,69 @@ public final class ChannelsSubModule {
         return Math.max(1, config.temporaryChannelDefaultMinutes) * 60L;
     }
 
-    private void indexAliases(Map<String, String> aliases, ChatConfig.Channel channel) {
+    /**
+     * Indexes a channel's id and aliases. A temporary channel's names never replace
+     * an entry that is already indexed, so a player-chosen alias such as "global"
+     * cannot redirect another channel (configured channels are indexed first).
+     */
+    private void indexAliases(Map<String, String> aliases, ChatConfig.Channel channel, boolean temporary) {
         if (channel == null || channel.id == null || channel.id.isBlank()) {
             return;
         }
         String channelId = normalize(channel.id);
-        aliases.put(channelId, channelId);
+        indexAlias(aliases, channelId, channelId, temporary);
         if (channel.aliases == null) {
             return;
         }
         for (String alias : channel.aliases) {
             String normalized = normalizeAlias(alias);
             if (!normalized.isBlank()) {
-                aliases.put(normalized, channelId);
+                indexAlias(aliases, normalized, channelId, temporary);
             }
         }
     }
 
-    private void registerConfiguredAliasCommands(Consumer<MysticCommand> registrar) {
-        if (registrar == null || config.channels == null) {
-            return;
-        }
-        for (ChatConfig.Channel channel : config.channels) {
-            registerAliasCommands(channel.aliases, registrar);
+    private static void indexAlias(Map<String, String> aliases, String alias, String channelId, boolean temporary) {
+        if (temporary) {
+            aliases.putIfAbsent(alias, channelId);
+        } else {
+            aliases.put(alias, channelId);
         }
     }
 
-    private void registerAliasCommands(List<String> aliases, Consumer<MysticCommand> registrar) {
-        if (aliases == null || registrar == null) {
+    private void registerConfiguredAliasCommands() {
+        if (config.channels == null) {
+            return;
+        }
+        for (ChatConfig.Channel channel : config.channels) {
+            registerAliasCommands(channel.aliases);
+        }
+    }
+
+    /**
+     * Registers configured channel aliases as top-level commands. The engine replaces
+     * a command of the same name without a check, so a name it already resolves is
+     * skipped (still usable as {@code /channel <alias>}) instead of being taken over.
+     */
+    private void registerAliasCommands(List<String> aliases) {
+        if (aliases == null) {
             return;
         }
         for (String alias : aliases) {
             String normalized = normalizeAlias(alias);
-            if (normalized.isBlank() || "channel".equals(normalized) || "ch".equals(normalized)) {
+            if (normalized.isBlank() || "channel".equals(normalized) || "ch".equals(normalized)
+                    || aliasCommands.containsKey(normalized)) {
                 continue;
             }
-            if (registeredAliases.add(normalized)) {
-                registrar.accept(new ChannelAliasCommand(normalized));
+            if (CommandManager.get().resolveCommand(normalized) != null) {
+                core.log(Level.WARNING, "Chat channel alias '/" + normalized
+                        + "' is already a command; it was not registered (use /channel " + normalized + ").");
+                continue;
+            }
+            ChannelAliasCommand command = new ChannelAliasCommand(normalized);
+            CommandRegistration registration = core.platform().registerCommand(command);
+            if (registration != null) {
+                aliasCommands.put(normalized, new AliasCommand(command, registration));
             }
         }
     }
@@ -2173,7 +2391,9 @@ public final class ChannelsSubModule {
         for (String alias : channel.aliases) {
             String normalized = normalizeAlias(alias);
             if (!normalized.isBlank()) {
-                aliases.add("/" + normalized);
+                // Only registered alias commands are typed with a slash; the rest
+                // (temporary-channel aliases) work as /channel <alias>.
+                aliases.add(aliasCommands.containsKey(normalized) ? "/" + normalized : normalized);
             }
         }
         return aliases;
@@ -2285,6 +2505,10 @@ public final class ChannelsSubModule {
     private record TransferRequest(UUID requestId, String channelId, UUID from, UUID to, Instant expiresAt) {
     }
 
+    /** A configured-alias command this submodule registered, with its engine handle. */
+    private record AliasCommand(ChannelAliasCommand command, CommandRegistration registration) {
+    }
+
     /** Channel ids the sender can see. */
     private List<String> visibleChannelIds(CommandSender commandSender) {
         return core.platform().findPlayer(commandSender.getUuid())
@@ -2380,6 +2604,15 @@ public final class ChannelsSubModule {
                     return;
                 }
                 String targetChannel = args.length >= 2 ? args[1] : currentChannelId(player);
+                ChatConfig.Channel rosterChannel = findChannel(targetChannel).orElse(null);
+                if (rosterChannel == null) {
+                    sender.replyKey("chat-channel-unknown");
+                    return;
+                }
+                if (!canListen(player, rosterChannel)) {
+                    sender.replyKey("chat-channel-no-listen");
+                    return;
+                }
                 if ("roster".equals(action)) {
                     core.platform().openPage(player,
                             new ChannelPages.ChannelRosterPage(core, ChannelsSubModule.this, player,
@@ -2394,16 +2627,20 @@ public final class ChannelsSubModule {
                 return;
             }
             if ("manage".equals(action)) {
-                if (ownedTemporaryChannel(sender.uuid()).isEmpty()) {
-                    sender.replyKey("chat-channel-no-temp-owned");
-                    return;
+                String channelId = ownedChannelOrReply(sender, args.length >= 2 ? args[1] : null,
+                        "/channel manage <channel>");
+                if (channelId != null) {
+                    openTempManageUi(player, channelId);
                 }
-                openTempManageUi(player);
                 return;
             }
             if ("temp".equals(action) || "create".equals(action)) {
                 if (!sender.hasPermission(config.createTemporaryPermission)) {
                     sender.replyKey("chat-channel-temp-no-permission");
+                    return;
+                }
+                if (temporaryChannelLimitReached(sender.uuid())) {
+                    sender.replyKey("chat-channel-temp-limit", temporaryChannelLimitPlaceholders(sender.uuid()));
                     return;
                 }
                 if (args.length < 2) {
@@ -2624,43 +2861,111 @@ public final class ChannelsSubModule {
     private static final Set<String> MANAGEMENT_ACTIONS = Set.of(
             "owner", "moderator", "mod", "member", "mute", "unmute", "lock", "unlock", "close");
 
-    /** The temporary channel these management commands act on: the one the player is in or owns. */
-    private String manageableChannelId(PlayerRef player) {
+    /** Management actions whose optional argument is the channel itself: {@code /channel close [channel]}. */
+    private static final Set<String> CHANNEL_ARGUMENT_ACTIONS = Set.of("lock", "unlock", "close");
+
+    /**
+     * The owned temporary channel an owner command acts on: {@code named} when given,
+     * which must be one the player owns, else the only one they own. Replies and
+     * returns {@code null} when they own none, the named one is not theirs, or they
+     * own several and named none.
+     */
+    private String ownedChannelOrReply(MysticCommandSender sender, String named, String usage) {
+        UUID owner = sender.uuid();
+        if (named != null && !named.isBlank()) {
+            if (ownedTemporaryChannel(owner, named).isEmpty()) {
+                sender.replyKey("chat-channel-temp-not-yours", Map.of("channel", normalize(named)));
+                return null;
+            }
+            return resolveChannelId(named);
+        }
+        List<String> owned = ownedTemporaryChannelIds(owner);
+        if (owned.size() == 1) {
+            return owned.get(0);
+        }
+        if (owned.isEmpty()) {
+            sender.replyKey("chat-channel-no-temp-owned");
+        } else {
+            sender.replyKey("chat-channel-temp-which",
+                    Map.of("channels", String.join(", ", owned), "usage", usage));
+        }
+        return null;
+    }
+
+    /**
+     * The temporary channel a management command acts on: {@code named} when given,
+     * else the temporary channel the player is in, else the only one they own. Replies
+     * and returns {@code null} when they own several, are in none of them and named
+     * none. Otherwise the action itself reports a channel it may not manage.
+     */
+    private String manageableChannelId(MysticCommandSender sender, PlayerRef player, String action,
+            String named) {
+        if (named != null && !named.isBlank()) {
+            return resolveChannelId(named);
+        }
         String current = currentChannelId(player);
         if (isTemporaryChannel(current)) {
             return current;
         }
-        return ownedTemporaryChannel(player.getUuid())
-                .map(channel -> normalize(channel.id))
-                .orElse(current);
+        List<String> owned = ownedTemporaryChannelIds(player.getUuid());
+        if (owned.size() == 1) {
+            return owned.get(0);
+        }
+        if (owned.size() > 1) {
+            String channels = String.join(", ", owned);
+            if (CHANNEL_ARGUMENT_ACTIONS.contains(action)) {
+                sender.replyKey("chat-channel-temp-which",
+                        Map.of("channels", channels, "usage", "/channel " + action + " <channel>"));
+            } else {
+                sender.replyKey("chat-channel-temp-which-switch", Map.of("channels", channels));
+            }
+            return null;
+        }
+        return current;
     }
 
     private void runManagement(MysticCommandSender sender, PlayerRef player, String action, String[] args) {
+        String sub = args.length >= 2 ? normalize(args[1]) : "";
+        if ("owner".equals(action) && (args.length < 2 || "accept".equals(sub) || "decline".equals(sub))) {
+            // Usage, or answering a transfer request: the request names its channel.
+            runOwnerAction(sender, player, args, null);
+            return;
+        }
+        String named = CHANNEL_ARGUMENT_ACTIONS.contains(action) && args.length >= 2 ? args[1] : null;
+        String channelId = manageableChannelId(sender, player, action, named);
+        if (channelId == null) {
+            return;
+        }
         switch (action) {
-            case "owner" -> runOwnerAction(sender, player, args);
-            case "moderator", "mod" -> runModeratorAction(sender, player, args);
-            case "member" -> runMemberAction(sender, player, args);
-            case "mute" -> runMute(sender, player, args);
+            case "owner" -> runOwnerAction(sender, player, args, channelId);
+            case "moderator", "mod" -> runModeratorAction(sender, player, args, channelId);
+            case "member" -> runMemberAction(sender, player, args, channelId);
+            case "mute" -> runMute(sender, player, args, channelId);
             case "unmute" -> withTarget(sender, args, 1, target ->
-                    replyManage(sender, unmuteMember(player, manageableChannelId(player), target),
+                    replyManage(sender, unmuteMember(player, channelId, target),
                             "chat-channel-manage-unmuted", target));
-            case "lock" -> replyManage(sender, setLocked(player, manageableChannelId(player), true),
+            case "lock" -> replyManage(sender, setLocked(player, channelId, true),
                     "chat-channel-manage-locked", null);
-            case "unlock" -> replyManage(sender, setLocked(player, manageableChannelId(player), false),
+            case "unlock" -> replyManage(sender, setLocked(player, channelId, false),
                     "chat-channel-manage-unlocked", null);
             case "close" -> {
-                if (!canOwnerManageChannel(player, manageableChannelId(player))) {
+                if (!isTemporaryChannel(channelId)) {
+                    sender.replyKey("chat-channel-not-temp");
+                    return;
+                }
+                if (!canOwnerManageChannel(player, channelId)) {
                     sender.replyKey("chat-channel-manage-no-permission");
                     return;
                 }
-                sender.replyKey(closeTemporaryChannelById(manageableChannelId(player))
+                sender.replyKey(closeTemporaryChannelById(channelId)
                         ? "chat-channel-temp-closed" : "chat-channel-temp-not-owned");
             }
             default -> sender.replyKey("chat-channel-unknown");
         }
     }
 
-    private void runOwnerAction(MysticCommandSender sender, PlayerRef player, String[] args) {
+    /** {@code channelId} is null only for the forms that need no channel: usage, accept, decline. */
+    private void runOwnerAction(MysticCommandSender sender, PlayerRef player, String[] args, String channelId) {
         if (args.length < 2) {
             sender.replyKey("chat-channel-owner-usage");
             return;
@@ -2668,7 +2973,7 @@ public final class ChannelsSubModule {
         String sub = normalize(args[1]);
         switch (sub) {
             case "transfer" -> withTarget(sender, args, 2, target ->
-                    replyManage(sender, requestTransfer(player, manageableChannelId(player), target),
+                    replyManage(sender, requestTransfer(player, channelId, target),
                             "chat-channel-transfer-sent", target));
             case "accept" -> {
                 UUID requestId = args.length >= 3 ? parseUuid(args[2]) : pendingTransferFor(player.getUuid()).orElse(null);
@@ -2687,13 +2992,14 @@ public final class ChannelsSubModule {
                 replyManage(sender, declineTransfer(player, requestId), "chat-channel-transfer-declined-self", null);
             }
             case "force-transfer" -> withTarget(sender, args, 2, target ->
-                    replyManage(sender, forceTransfer(player, manageableChannelId(player), target),
+                    replyManage(sender, forceTransfer(player, channelId, target),
                             "chat-channel-transfer-forced", target));
             default -> sender.replyKey("chat-channel-owner-usage");
         }
     }
 
-    private void runModeratorAction(MysticCommandSender sender, PlayerRef player, String[] args) {
+    private void runModeratorAction(MysticCommandSender sender, PlayerRef player, String[] args,
+            String channelId) {
         if (args.length < 3) {
             sender.replyKey("chat-channel-moderator-usage");
             return;
@@ -2701,23 +3007,23 @@ public final class ChannelsSubModule {
         String sub = normalize(args[1]);
         withTarget(sender, args, 2, target -> {
             switch (sub) {
-                case "add" -> replyManage(sender, assignModerator(player, manageableChannelId(player), target),
+                case "add" -> replyManage(sender, assignModerator(player, channelId, target),
                         "chat-channel-manage-mod-added", target);
-                case "remove" -> replyManage(sender, removeModerator(player, manageableChannelId(player), target),
+                case "remove" -> replyManage(sender, removeModerator(player, channelId, target),
                         "chat-channel-manage-mod-removed", target);
                 default -> sender.replyKey("chat-channel-moderator-usage");
             }
         });
     }
 
-    private void runMemberAction(MysticCommandSender sender, PlayerRef player, String[] args) {
+    private void runMemberAction(MysticCommandSender sender, PlayerRef player, String[] args,
+            String channelId) {
         if (args.length < 3) {
             sender.replyKey("chat-channel-member-usage");
             return;
         }
         String sub = normalize(args[1]);
         withTarget(sender, args, 2, target -> {
-            String channelId = manageableChannelId(player);
             switch (sub) {
                 case "remove", "kick" -> replyManage(sender, removeMember(player, channelId, target),
                         "chat-channel-manage-removed", target);
@@ -2734,7 +3040,7 @@ public final class ChannelsSubModule {
         });
     }
 
-    private void runMute(MysticCommandSender sender, PlayerRef player, String[] args) {
+    private void runMute(MysticCommandSender sender, PlayerRef player, String[] args, String channelId) {
         if (args.length < 2) {
             sender.replyKey("chat-channel-mute-usage");
             return;
@@ -2750,7 +3056,7 @@ public final class ChannelsSubModule {
                 }
             }
             String reason = args.length > reasonStart ? joinArgs(args, reasonStart, args.length) : null;
-            replyManage(sender, muteMember(player, manageableChannelId(player), target, duration, reason),
+            replyManage(sender, muteMember(player, channelId, target, duration, reason),
                     "chat-channel-manage-muted", target);
         });
     }

@@ -3,10 +3,10 @@ package org.hyzionstudios.mysticessentials.modules.teleportation.rtp;
 import static org.hyzionstudios.mysticessentials.platform.ui.MysticPage.uiText;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.hyzionstudios.mysticessentials.api.Permissions;
 import org.hyzionstudios.mysticessentials.api.rtp.RtpDestinationRequest;
@@ -149,7 +149,8 @@ final class RtpPages {
         private final Map<String, String> results;
 
         AdminPage(MysticCore core, RtpSubsystem rtp, PlayerRef player) {
-            this(core, rtp, player, new HashMap<>());
+            // Test results arrive on search threads while the page reads them on the world thread.
+            this(core, rtp, player, new ConcurrentHashMap<>());
         }
 
         AdminPage(MysticCore core, RtpSubsystem rtp, PlayerRef player, Map<String, String> results) {
@@ -216,7 +217,9 @@ final class RtpPages {
                                             + " (" + result.attempts() + " tries)"
                                     : "No destination (" + result.attempts() + " tries, "
                                             + result.failureReason() + ")");
-                            reopen(ref, store, new AdminPage(core, rtp, player, results));
+                            // The search completes off this player's world thread; hop back before touching the store.
+                            core.platform().runOnEntityThread(player, (liveStore, liveRef, world) ->
+                                    reopen(liveRef, liveStore, new AdminPage(core, rtp, player, results)));
                         });
                 default -> {
                 }

@@ -1,6 +1,7 @@
 package org.hyzionstudios.mysticessentials.core.economy;
 
 import java.math.BigDecimal;
+import java.util.Locale;
 import java.util.UUID;
 import java.util.logging.Level;
 
@@ -150,14 +151,14 @@ public final class EconomyServiceImpl implements EconomyService {
     public String format(double amount) {
         Economy economy = resolve();
         if (economy == null || !Double.isFinite(amount)) {
-            return String.format(java.util.Locale.ROOT, "%.2f", Double.isFinite(amount) ? amount : 0.0);
+            return String.format(Locale.ROOT, "%.2f", Double.isFinite(amount) ? amount : 0.0);
         }
         try {
             String formatted = economy.format(PLUGIN, BigDecimal.valueOf(amount));
-            return formatted == null ? String.format(java.util.Locale.ROOT, "%.2f", amount) : formatted;
+            return formatted == null ? String.format(Locale.ROOT, "%.2f", amount) : formatted;
         } catch (Throwable t) {
             core.log(Level.WARNING, "Economy formatting failed: " + t);
-            return String.format(java.util.Locale.ROOT, "%.2f", amount);
+            return String.format(Locale.ROOT, "%.2f", amount);
         }
     }
 

@@ -1,6 +1,8 @@
 package org.hyzionstudios.mysticessentials.api.service;
 
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.UnaryOperator;
 
 import com.google.gson.JsonElement;
 
@@ -30,5 +32,24 @@ public interface StorageService {
     CompletableFuture<Boolean> exists(String namespace, String key);
 
     /** Lists every key stored under {@code namespace} (empty if none). */
-    CompletableFuture<java.util.List<String>> listKeys(String namespace);
+    CompletableFuture<List<String>> listKeys(String namespace);
+
+    /**
+     * Read-modify-write of one document: loads it ({@code null} if absent), passes
+     * it to {@code updater} and stores the result. The built-in service runs the
+     * whole cycle after every earlier operation on the same key and before any
+     * later one, so concurrent updates on this server never overwrite each other.
+     * An updater returning {@code null} leaves the document untouched.
+     *
+     * @return the stored document (or the unchanged one when the updater returned {@code null})
+     */
+    default CompletableFuture<JsonElement> update(String namespace, String key,
+            UnaryOperator<JsonElement> updater) {
+        return load(namespace, key).thenCompose(current -> {
+            JsonElement next = updater.apply(current);
+            return next == null
+                    ? CompletableFuture.completedFuture(current)
+                    : save(namespace, key, next).thenApply(ignored -> next);
+        });
+    }
 }

@@ -7,12 +7,17 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.logging.Level;
 
 import org.hyzionstudios.mysticessentials.api.Permissions;
+import org.hyzionstudios.mysticessentials.api.event.MailReceivedEvent;
 import org.hyzionstudios.mysticessentials.api.model.MailAttachment;
 import org.hyzionstudios.mysticessentials.api.model.MailMessage;
 import org.hyzionstudios.mysticessentials.api.notification.Notification;
@@ -20,22 +25,34 @@ import org.hyzionstudios.mysticessentials.api.notification.NotificationAction;
 import org.hyzionstudios.mysticessentials.api.notification.NotificationAudience;
 import org.hyzionstudios.mysticessentials.api.notification.NotificationCategory;
 import org.hyzionstudios.mysticessentials.api.notification.NotificationPriority;
+import org.hyzionstudios.mysticessentials.api.service.MailBlockedException;
 import org.hyzionstudios.mysticessentials.api.service.MailService;
 import org.hyzionstudios.mysticessentials.api.service.StorageService;
 import org.hyzionstudios.mysticessentials.core.module.AbstractMysticModule;
+import org.hyzionstudios.mysticessentials.core.notification.NotificationPreferences;
+import org.hyzionstudios.mysticessentials.core.notification.NotificationServiceImpl;
 import org.hyzionstudios.mysticessentials.core.util.Json;
+import org.hyzionstudios.mysticessentials.modules.playervaults.service.VaultItemCatalog;
 import org.hyzionstudios.mysticessentials.platform.command.MysticArgTypes;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommand;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommandSender;
 
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
+import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.command.system.arguments.system.RequiredArg;
 import com.hypixel.hytale.server.core.command.system.arguments.types.ArgTypes;
+import com.hypixel.hytale.server.core.entity.ItemUtils;
 import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent;
+import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
 import com.hypixel.hytale.server.core.inventory.InventoryComponent;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
 /**
  * Virtual mail: send to online or offline players, inbox read/unread tracking,
@@ -54,6 +71,8 @@ public final class MailModule extends AbstractMysticModule implements MailServic
 
     private MailConfig config = new MailConfig();
     private final Consumer<String> redisNotifyHandler = this::handleRemoteMailNotification;
+    /** Players with a reward claim in progress, so a double click cannot claim twice. */
+    private final Set<UUID> claimsInProgress = ConcurrentHashMap.newKeySet();
 
     public MailModule() {
         super("mail", "Mail", "1.0.0");
@@ -66,9 +85,15 @@ public final class MailModule extends AbstractMysticModule implements MailServic
         registerCommand(new MailCommand());
         registerCommand(new MailAdminTopCommand());
         registerEvent(
-                com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent.class,
-                (com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent event) ->
+                PlayerConnectEvent.class,
+                (PlayerConnectEvent event) ->
                         notifyUnread(event.getPlayerRef()));
+        // A claim whose world-thread work was dropped because the player left never
+        // finishes; release its guard so the player can claim again next session.
+        registerEvent(
+                PlayerDisconnectEvent.class,
+                (PlayerDisconnectEvent event) ->
+                        claimsInProgress.remove(event.getPlayerRef().getUuid()));
     }
 
     @Override
@@ -102,31 +127,105 @@ public final class MailModule extends AbstractMysticModule implements MailServic
 
     // ----- MailService -------------------------------------------------------
 
+    private static List<MailMessage> parseInbox(JsonElement element) {
+        List<MailMessage> inbox = element == null ? null : Json.gson().fromJson(element, INBOX_TYPE);
+        return inbox != null ? inbox : new ArrayList<>();
+    }
+
     private CompletableFuture<List<MailMessage>> loadInbox(UUID player) {
         StorageService storage = core.getStorageService();
-        return storage.load(NAMESPACE, player.toString()).thenApply(element -> {
-            List<MailMessage> inbox = element == null ? null : Json.gson().fromJson(element, INBOX_TYPE);
-            return inbox != null ? inbox : new ArrayList<>();
-        });
+        return storage.load(NAMESPACE, player.toString()).thenApply(MailModule::parseInbox);
     }
 
     private CompletableFuture<Void> saveInbox(UUID player, List<MailMessage> inbox) {
         return core.getStorageService().save(NAMESPACE, player.toString(), Json.toTree(inbox));
     }
 
+    /**
+     * Read-modify-write of one inbox as a single {@link StorageService#update}, so
+     * concurrent deliveries, read flags and claims never overwrite each other.
+     * {@code change} edits the list in place and returns its result; returning
+     * {@code null} means nothing changed and leaves the stored inbox untouched.
+     */
+    private <T> CompletableFuture<T> updateInbox(UUID player, Function<List<MailMessage>, T> change) {
+        AtomicReference<T> result = new AtomicReference<>();
+        return core.getStorageService().update(NAMESPACE, player.toString(), element -> {
+            List<MailMessage> inbox = parseInbox(element);
+            T outcome = change.apply(inbox);
+            result.set(outcome);
+            return outcome == null ? null : Json.toTree(inbox);
+        }).thenApply(stored -> result.get());
+    }
+
     @Override
     public CompletableFuture<Void> send(UUID sender, String senderName, UUID recipient, String body) {
-        return deliver(recipient, MailMessage.create(sender, senderName, truncateBody(body)));
+        MailMessage mail = MailMessage.create(sender, senderName, truncateBody(body));
+        if (sender == null) {
+            // Server mail is never refused.
+            return deliver(recipient, mail);
+        }
+        return ignoredBy(sender, senderName, recipient).thenCompose(refused -> refused
+                ? refuse(sender, recipient).thenCompose(told ->
+                        CompletableFuture.<Void>failedFuture(new MailBlockedException(recipient)))
+                : deliver(recipient, mail));
+    }
+
+    // ----- Ignore lists -------------------------------------------------------
+
+    /**
+     * Whether a recipient's ignore list ({@code /ignore}) refuses mail from this sender:
+     * by UUID, or by name for an entry not yet resolved to one. Holders of
+     * {@link Permissions#CHAT_IGNORE_EXEMPT} always get through, as for private messages.
+     */
+    public static boolean refusesMail(NotificationPreferences recipientPreferences, UUID sender,
+            String senderName, boolean senderExempt) {
+        return sender != null && !senderExempt && recipientPreferences.ignores(sender, senderName);
+    }
+
+    /**
+     * Whether the recipient ignores this player sender. An offline recipient's list is
+     * read from their stored profile.
+     */
+    private CompletableFuture<Boolean> ignoredBy(UUID sender, String senderName, UUID recipient) {
+        NotificationServiceImpl notifications = core.notifications();
+        if (notifications == null || sender == null || recipient == null) {
+            return CompletableFuture.completedFuture(false);
+        }
+        boolean exempt = core.platform().findPlayer(sender)
+                .map(ref -> ref.hasPermission(Permissions.CHAT_IGNORE_EXEMPT))
+                .orElseGet(() -> core.getPermissionService().has(sender, Permissions.CHAT_IGNORE_EXEMPT));
+        if (exempt) {
+            return CompletableFuture.completedFuture(false);
+        }
+        return notifications.storedPreferences(recipient)
+                .thenApply(stored -> refusesMail(stored, sender, senderName, false));
+    }
+
+    /**
+     * Tells an online sender their mail was refused, in the neutral words a refused
+     * private message uses, so it says no more about the recipient than mail already does.
+     */
+    private CompletableFuture<Void> refuse(UUID sender, UUID recipient) {
+        Optional<PlayerRef> online = core.platform().findPlayer(sender);
+        if (online.isEmpty()) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return core.getPlayerProfileService().lastKnownName(recipient).thenAccept(name ->
+                core.getMessageService().sendKey(online.get(), "mail-blocked",
+                        Map.of("player", name.orElse("that player"))));
     }
 
     @Override
     public CompletableFuture<Void> deliver(UUID recipient, MailMessage prototype) {
         MailMessage mail = prototype.copyForDelivery();
         mail.setSubject(prototype.getSubject());
-        return loadInbox(recipient).thenCompose(inbox -> {
+        CompletableFuture<MailMessage> saved = updateInbox(recipient, inbox -> {
             enforceInboxCap(inbox);
             inbox.add(mail);
-            CompletableFuture<Void> saved = saveInbox(recipient, inbox);
+            return mail;
+        });
+        // Notify only once the mail is stored; the returned future reports the save alone.
+        saved.thenAccept(stored -> {
             String senderName = mail.getSenderName() == null || mail.getSenderName().isBlank()
                     ? "Server" : mail.getSenderName();
             var online = core.platform().findPlayer(recipient);
@@ -142,7 +241,7 @@ public final class MailModule extends AbstractMysticModule implements MailServic
             if (online.isEmpty() && core.redis().isEnabled()) {
                 core.networkPlayers().find(recipient).ifPresent(remote -> {
                     if (!remote.local(core.networkPlayers().localServerId())) {
-                        com.google.gson.JsonObject notice = new com.google.gson.JsonObject();
+                        JsonObject notice = new JsonObject();
                         notice.addProperty("targetServerId", remote.serverId());
                         notice.addProperty("recipient", recipient.toString());
                         notice.addProperty("sender", senderName);
@@ -151,20 +250,20 @@ public final class MailModule extends AbstractMysticModule implements MailServic
                 });
             }
             String body = mail.getBody() == null ? "" : mail.getBody();
-            core.getEventBus().publish(new org.hyzionstudios.mysticessentials.api.event.MailReceivedEvent(
+            core.getEventBus().publish(new MailReceivedEvent(
                     recipient,
                     senderName,
                     body.length() > 140 ? body.substring(0, 140) + "…" : body,
                     mail.hasRewards(),
                     online.isPresent()
             ));
-            return saved;
         });
+        return saved.thenApply(stored -> null);
     }
 
     private void handleRemoteMailNotification(String raw) {
         try {
-            com.google.gson.JsonObject notice = Json.asObject(Json.parse(raw));
+            JsonObject notice = Json.asObject(Json.parse(raw));
             if (!core.networkPlayers().localServerId().equals(notice.get("targetServerId").getAsString())) {
                 return;
             }
@@ -265,23 +364,20 @@ public final class MailModule extends AbstractMysticModule implements MailServic
 
     @Override
     public CompletableFuture<Boolean> markRead(UUID player, String mailId) {
-        return loadInbox(player).thenCompose(inbox -> {
+        return updateInbox(player, inbox -> {
             Optional<MailMessage> mail = inbox.stream().filter(m -> m.getId().equals(mailId)).findFirst();
             if (mail.isEmpty()) {
-                return CompletableFuture.completedFuture(false);
+                return null;
             }
             mail.get().setRead(true);
-            return saveInbox(player, inbox).thenApply(v -> true);
-        });
+            return Boolean.TRUE;
+        }).thenApply(found -> found != null);
     }
 
     @Override
     public CompletableFuture<Boolean> delete(UUID player, String mailId) {
-        return loadInbox(player).thenCompose(inbox -> {
-            boolean removed = inbox.removeIf(m -> m.getId().equals(mailId));
-            return removed ? saveInbox(player, inbox).thenApply(v -> true)
-                    : CompletableFuture.completedFuture(false);
-        });
+        return updateInbox(player, inbox -> inbox.removeIf(m -> m.getId().equals(mailId)) ? Boolean.TRUE : null)
+                .thenApply(removed -> removed != null);
     }
 
     @Override
@@ -297,7 +393,7 @@ public final class MailModule extends AbstractMysticModule implements MailServic
 
     @Override
     public CompletableFuture<Integer> markAllRead(UUID player) {
-        return loadInbox(player).thenCompose(inbox -> {
+        return updateInbox(player, inbox -> {
             int flipped = 0;
             for (MailMessage mail : inbox) {
                 if (!mail.isRead()) {
@@ -305,12 +401,8 @@ public final class MailModule extends AbstractMysticModule implements MailServic
                     flipped++;
                 }
             }
-            if (flipped == 0) {
-                return CompletableFuture.completedFuture(0);
-            }
-            int total = flipped;
-            return saveInbox(player, inbox).thenApply(v -> total);
-        });
+            return flipped == 0 ? null : Integer.valueOf(flipped);
+        }).thenApply(flipped -> flipped == null ? 0 : flipped);
     }
 
     @Override
@@ -338,16 +430,16 @@ public final class MailModule extends AbstractMysticModule implements MailServic
         return mutate(player, mailId, mail -> mail.setClaimed(true));
     }
 
-    /** Loads the inbox, applies {@code mutation} to the matching mail, and saves; false if not found. */
+    /** Atomically applies {@code mutation} to the matching mail and saves; false if not found. */
     private CompletableFuture<Boolean> mutate(UUID player, String mailId, Consumer<MailMessage> mutation) {
-        return loadInbox(player).thenCompose(inbox -> {
+        return updateInbox(player, inbox -> {
             Optional<MailMessage> match = inbox.stream().filter(m -> m.getId().equals(mailId)).findFirst();
             if (match.isEmpty()) {
-                return CompletableFuture.completedFuture(false);
+                return null;
             }
             mutation.accept(match.get());
-            return saveInbox(player, inbox).thenApply(v -> true);
-        });
+            return Boolean.TRUE;
+        }).thenApply(found -> found != null);
     }
 
     // ----- Item attachments & rewards (server-authoritative, world thread) -----
@@ -371,8 +463,8 @@ public final class MailModule extends AbstractMysticModule implements MailServic
     }
 
     private static List<ItemContainer> sources(
-            com.hypixel.hytale.component.Store<com.hypixel.hytale.server.core.universe.world.storage.EntityStore> store,
-            com.hypixel.hytale.component.Ref<com.hypixel.hytale.server.core.universe.world.storage.EntityStore> entity) {
+            Store<EntityStore> store,
+            Ref<EntityStore> entity) {
         List<ItemContainer> sources = new ArrayList<>();
         addSource(sources, store.getComponent(entity, InventoryComponent.Hotbar.getComponentType()));
         addSource(sources, store.getComponent(entity, InventoryComponent.Storage.getComponentType()));
@@ -510,33 +602,54 @@ public final class MailModule extends AbstractMysticModule implements MailServic
     }
 
     /**
-     * Claims a mail's rewards once: gives the escrowed items to the recipient's
-     * inventory (refusing if there is not enough room) and runs any reward
-     * commands as console, then flips the mail to claimed. Runs on the recipient's
-     * world thread.
+     * Claims a mail's rewards once. The mail is first flipped to claimed in a single
+     * atomic storage update, so no other claim can still see it claimable; then, on
+     * the recipient's world thread, the escrowed items are given (refusing if there
+     * is not enough room) and any reward commands run as console. A claim that
+     * hands nothing out is rolled back.
      */
     void claimRewards(PlayerRef player, String mailId, Runnable refresh) {
-        getMessage(player.getUuid(), mailId).thenAccept(opt -> {
-            if (opt.isEmpty() || !opt.get().isClaimable()) {
-                core.getMessageService().sendKey(player, "mail-nothing-to-claim");
-                refresh.run();
+        UUID uuid = player.getUuid();
+        if (!claimsInProgress.add(uuid)) {
+            return; // A claim is already running (e.g. a double click); it refreshes the UI itself.
+        }
+        Runnable done = () -> {
+            claimsInProgress.remove(uuid);
+            refresh.run();
+        };
+        updateInbox(uuid, inbox -> {
+            MailMessage mail = inbox.stream().filter(m -> m.getId().equals(mailId)).findFirst().orElse(null);
+            if (mail == null || !mail.isClaimable()) {
+                return null;
+            }
+            mail.setClaimed(true);
+            return mail;
+        }).whenComplete((claimed, failure) -> {
+            if (failure != null) {
+                core.log(Level.WARNING, "[mail] claim failed: " + failure);
+                done.run();
                 return;
             }
-            List<MailAttachment> items = new ArrayList<>(opt.get().items());
-            List<String> commands = new ArrayList<>(opt.get().commands());
+            if (claimed == null) {
+                core.getMessageService().sendKey(player, "mail-nothing-to-claim");
+                done.run();
+                return;
+            }
+            List<MailAttachment> items = new ArrayList<>(claimed.items());
+            List<String> commands = new ArrayList<>(claimed.commands());
             boolean dispatched = core.platform().runOnEntityThread(player, (store, entity, world) -> {
+                boolean handingOut = false;
                 try {
                     if (!items.isEmpty()) {
                         List<ItemContainer> containers = sources(store, entity);
                         if (containers.isEmpty() || freeSlots(containers) < items.size()) {
                             core.getMessageService().sendKey(player, "mail-claim-no-space");
-                            refresh.run();
+                            unclaim(uuid, mailId, done);
                             return;
                         }
-                        for (MailAttachment attachment : items) {
-                            Player.giveItem(MailItemCodec.toLive(attachment), entity, store);
-                        }
                     }
+                    handingOut = true;
+                    giveAttachments(store, entity, items);
                     for (String command : commands) {
                         String resolved = command
                                 .replace("{player}", player.getUsername())
@@ -546,18 +659,46 @@ public final class MailModule extends AbstractMysticModule implements MailServic
                         }
                         core.platform().dispatchConsoleCommand(resolved);
                     }
-                    markClaimed(player.getUuid(), mailId).thenRun(() -> {
-                        core.getMessageService().sendKey(player, "mail-claimed");
-                        refresh.run();
-                    });
+                    core.getMessageService().sendKey(player, "mail-claimed");
+                    done.run();
                 } catch (Throwable t) {
                     core.log(Level.WARNING, "[mail] claim failed: " + t);
-                    refresh.run();
+                    if (handingOut) {
+                        done.run(); // Some rewards may already be out: never re-open the claim.
+                    } else {
+                        unclaim(uuid, mailId, done);
+                    }
                 }
             });
             if (!dispatched) {
-                refresh.run();
+                unclaim(uuid, mailId, done);
             }
+        });
+    }
+
+    /**
+     * Gives each attachment to the player; whatever does not fit (a stack larger
+     * than the free room) is dropped at their feet instead of being discarded.
+     * MUST run on the player's world thread.
+     */
+    private static void giveAttachments(Store<EntityStore> store, Ref<EntityStore> entity,
+            List<MailAttachment> items) {
+        for (MailAttachment attachment : items) {
+            ItemStack remainder = Player.giveItem(MailItemCodec.toLive(attachment), entity, store).getRemainder();
+            if (!ItemStack.isEmpty(remainder)) {
+                ItemUtils.dropItem(entity, remainder, store);
+            }
+        }
+    }
+
+    /** Rolls back a claim whose rewards could not be handed out, then runs {@code then}. */
+    private void unclaim(UUID player, String mailId, Runnable then) {
+        mutate(player, mailId, mail -> mail.setClaimed(false)).whenComplete((found, failure) -> {
+            if (failure != null) {
+                core.log(Level.WARNING, "[mail] could not re-open claim " + mailId + " for " + player
+                        + ": " + failure);
+            }
+            then.run();
         });
     }
 
@@ -634,7 +775,7 @@ public final class MailModule extends AbstractMysticModule implements MailServic
     /** The announcement picker source: any registered item (quantity chosen on add). */
     private List<ItemPick> catalogPicks(String query) {
         List<ItemPick> picks = new ArrayList<>();
-        for (String itemId : org.hyzionstudios.mysticessentials.modules.playervaults.service.VaultItemCatalog
+        for (String itemId : VaultItemCatalog
                 .search(query, 60)) {
             if (!isBlocked(itemId)) {
                 picks.add(new ItemPick(itemId, 1));
@@ -662,14 +803,12 @@ public final class MailModule extends AbstractMysticModule implements MailServic
     // ----- Sent folder --------------------------------------------------------
 
     CompletableFuture<List<MailMessage>> sentInbox(UUID player) {
-        return core.getStorageService().load(SENT_NAMESPACE, player.toString()).thenApply(element -> {
-            List<MailMessage> list = element == null ? null : Json.gson().fromJson(element, INBOX_TYPE);
-            return list != null ? list : new ArrayList<>();
-        });
+        return core.getStorageService().load(SENT_NAMESPACE, player.toString()).thenApply(MailModule::parseInbox);
     }
 
     private void recordSent(UUID sender, MailMessage prototype, String recipientLabel) {
-        sentInbox(sender).thenCompose(list -> {
+        core.getStorageService().update(SENT_NAMESPACE, sender.toString(), element -> {
+            List<MailMessage> list = parseInbox(element);
             MailMessage copy = prototype.copyForDelivery();
             copy.setRead(true);
             copy.setRecipientName(recipientLabel);
@@ -677,7 +816,7 @@ public final class MailModule extends AbstractMysticModule implements MailServic
             while (config.maxInboxSize > 0 && list.size() > config.maxInboxSize) {
                 list.remove(0);
             }
-            return core.getStorageService().save(SENT_NAMESPACE, sender.toString(), Json.toTree(list));
+            return Json.toTree(list);
         });
     }
 
@@ -723,7 +862,12 @@ public final class MailModule extends AbstractMysticModule implements MailServic
             refresh.run();
             return;
         }
-        resolveRecipient(sender, target).thenAccept(opt -> {
+        resolveRecipient(sender, target).thenCompose(opt -> opt.isEmpty()
+                ? CompletableFuture.completedFuture(opt)
+                // Checked before any attachment leaves the sender's inventory.
+                : ignoredBy(sender.getUuid(), sender.getUsername(), opt.get()).thenCompose(refused -> refused
+                        ? refuse(sender.getUuid(), opt.get()).thenApply(told -> Optional.<UUID>empty())
+                        : CompletableFuture.completedFuture(opt))).thenAccept(opt -> {
             if (opt.isEmpty()) {
                 refresh.run();
                 return;
@@ -751,11 +895,34 @@ public final class MailModule extends AbstractMysticModule implements MailServic
 
     private void finishSend(PlayerRef sender, UUID recipient, String targetLabel, MailMessage proto,
             Runnable refresh) {
-        deliver(recipient, proto).thenRun(() -> {
+        deliver(recipient, proto).whenComplete((ignored, failure) -> {
+            if (failure != null) {
+                // The attachments already left the sender's inventory: give them back.
+                core.log(Level.WARNING, "[mail] delivery to " + targetLabel + " failed: " + failure);
+                returnAttachments(sender, proto.items());
+                core.getMessageService().send(sender, proto.items().isEmpty()
+                        ? "&cYour mail could not be delivered. Please try again."
+                        : "&cYour mail could not be delivered; the attached items were returned to you.");
+                refresh.run();
+                return;
+            }
             recordSent(sender.getUuid(), proto, targetLabel);
             core.getMessageService().sendKey(sender, "mail-sent", Map.of("player", targetLabel));
             refresh.run();
         });
+    }
+
+    /** Gives undelivered attachments back to their sender on the sender's world thread. */
+    private void returnAttachments(PlayerRef sender, List<MailAttachment> items) {
+        if (items.isEmpty()) {
+            return;
+        }
+        boolean dispatched = core.platform().runOnEntityThread(sender, (store, entity, world) ->
+                giveAttachments(store, entity, items));
+        if (!dispatched) {
+            core.log(Level.SEVERE, "[mail] " + sender.getUsername() + " (" + sender.getUuid()
+                    + ") left before undelivered attachments could be returned: " + Json.toString(items));
+        }
     }
 
     // ----- Admin center: audiences, broadcast & history -----------------------
@@ -818,7 +985,9 @@ public final class MailModule extends AbstractMysticModule implements MailServic
         List<MailAttachment> attachments = new ArrayList<>();
         for (ItemPick pick : picks) {
             if (!isBlocked(pick.itemId())) {
-                attachments.add(new MailAttachment(pick.itemId(), Math.max(1, pick.quantity()), 0, 0, null));
+                // A fresh stack carries the item's own durability (0/0 would make tools unbreakable).
+                int quantity = Math.max(1, pick.quantity());
+                attachments.add(MailItemCodec.toStored(new ItemStack(pick.itemId(), quantity), quantity));
             }
         }
         proto.setItems(attachments);
@@ -896,20 +1065,24 @@ public final class MailModule extends AbstractMysticModule implements MailServic
     // ----- Announcement history -----------------------------------------------
 
     CompletableFuture<List<SentAnnouncement>> announcementLog() {
-        return core.getStorageService().load(ANNOUNCEMENT_NAMESPACE, ANNOUNCEMENT_LOG_KEY).thenApply(element -> {
-            List<SentAnnouncement> log = element == null ? null
-                    : Json.gson().fromJson(element, ANNOUNCEMENT_LOG_TYPE);
-            return log != null ? log : new ArrayList<>();
-        });
+        return core.getStorageService().load(ANNOUNCEMENT_NAMESPACE, ANNOUNCEMENT_LOG_KEY)
+                .thenApply(MailModule::parseAnnouncementLog);
+    }
+
+    private static List<SentAnnouncement> parseAnnouncementLog(JsonElement element) {
+        List<SentAnnouncement> log = element == null ? null
+                : Json.gson().fromJson(element, ANNOUNCEMENT_LOG_TYPE);
+        return log != null ? log : new ArrayList<>();
     }
 
     private void recordAnnouncement(SentAnnouncement entry) {
-        announcementLog().thenCompose(log -> {
+        core.getStorageService().update(ANNOUNCEMENT_NAMESPACE, ANNOUNCEMENT_LOG_KEY, element -> {
+            List<SentAnnouncement> log = parseAnnouncementLog(element);
             log.add(entry);
             while (log.size() > ANNOUNCEMENT_LOG_CAP) {
                 log.remove(0);
             }
-            return core.getStorageService().save(ANNOUNCEMENT_NAMESPACE, ANNOUNCEMENT_LOG_KEY, Json.toTree(log));
+            return Json.toTree(log);
         });
     }
 
@@ -959,7 +1132,7 @@ public final class MailModule extends AbstractMysticModule implements MailServic
     private final class MailCommand extends MysticCommand {
         MailCommand() {
             super(MailModule.this.core, "mail", "Send and read mail.");
-            requirePermission(org.hyzionstudios.mysticessentials.api.Permissions.MAIL_USE);
+            requirePermission(Permissions.MAIL_USE);
             addSubCommand(new MailInboxCommand());
             addSubCommand(new MailUiCommand());
             addSubCommand(new MailReadCommand());
@@ -996,7 +1169,7 @@ public final class MailModule extends AbstractMysticModule implements MailServic
         }
 
         private void sendMail(MysticCommandSender sender, String targetName, String body) {
-            if (!sender.hasPermission(org.hyzionstudios.mysticessentials.api.Permissions.MAIL_SEND)) {
+            if (!sender.hasPermission(Permissions.MAIL_SEND)) {
                 sender.replyKey("no-permission");
                 return;
             }
@@ -1010,7 +1183,7 @@ public final class MailModule extends AbstractMysticModule implements MailServic
             if (networkOnline.isPresent()) {
                 send(sender.uuid(), sender.name(), networkOnline.get(), body)
                         .thenRun(() -> sender.replyKey("mail-sent", Map.of("player", targetName)));
-            } else if (sender.hasPermission(org.hyzionstudios.mysticessentials.api.Permissions.MAIL_SEND_OFFLINE)) {
+            } else if (sender.hasPermission(Permissions.MAIL_SEND_OFFLINE)) {
                 // Offline delivery: resolve the name via our username index, then write to
                 // the recipient's stored inbox (keyed by UUID) so it works while they are offline.
                 core.getPlayerProfileService().resolveUuid(targetName).thenAccept(resolved -> {
@@ -1027,7 +1200,7 @@ public final class MailModule extends AbstractMysticModule implements MailServic
         }
 
         private void sendAllMail(MysticCommandSender sender, String body) {
-            if (!sender.hasPermission(org.hyzionstudios.mysticessentials.api.Permissions.MAIL_SEND_ALL)) {
+            if (!sender.hasPermission(Permissions.MAIL_SEND_ALL)) {
                 sender.replyKey("no-permission");
                 return;
             }
@@ -1102,7 +1275,7 @@ public final class MailModule extends AbstractMysticModule implements MailServic
 
             MailSendCommand() {
                 super(MailModule.this.core, "send", "Send mail to a player.");
-                requirePermission(org.hyzionstudios.mysticessentials.api.Permissions.MAIL_SEND);
+                requirePermission(Permissions.MAIL_SEND);
             }
 
             @Override
@@ -1117,7 +1290,7 @@ public final class MailModule extends AbstractMysticModule implements MailServic
 
             MailSendAllCommand() {
                 super(MailModule.this.core, "sendall", "Send mail to all online players.");
-                requirePermission(org.hyzionstudios.mysticessentials.api.Permissions.MAIL_SEND_ALL);
+                requirePermission(Permissions.MAIL_SEND_ALL);
             }
 
             @Override

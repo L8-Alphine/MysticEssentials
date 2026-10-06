@@ -3,8 +3,10 @@ package org.hyzionstudios.mysticessentials.modules.customcontent.layout;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 import org.jsoup.Jsoup;
+import org.jsoup.nodes.Attribute;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 
@@ -422,7 +424,7 @@ public final class LayoutParser {
             case "message.send" -> "message:" + attributes.get("action.text");
             default -> {
                 StringBuilder encoded = new StringBuilder("typed:").append(id);
-                for (org.jsoup.nodes.Attribute attribute : attributes.element.attributes()) {
+                for (Attribute attribute : attributes.element.attributes()) {
                     if (attribute.getKey().startsWith("action.")) {
                         encoded.append(';').append(attribute.getKey().substring(7))
                                 .append('=').append(attribute.getValue());
@@ -634,7 +636,7 @@ public final class LayoutParser {
     }
 
     /** Attributes readable without a prefix because HTML already defines them. */
-    private static final java.util.Set<String> PLAIN_ATTRIBUTES = java.util.Set.of(
+    private static final Set<String> PLAIN_ATTRIBUTES = Set.of(
             "id", "version", "surface", "title", "name", "value", "placeholder", "src", "alt",
             "command", "controller", "theme", "frame", "lifetime", "width", "height", "min-width",
             "max-width", "refresh-interval", "refresh", "close", "anchor", "offset-x", "offset-y",

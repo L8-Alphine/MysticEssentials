@@ -2,6 +2,7 @@ package org.hyzionstudios.mysticessentials.modules.playervaults.service;
 
 import org.hyzionstudios.mysticessentials.api.Permissions;
 import org.hyzionstudios.mysticessentials.core.MysticCore;
+import org.hyzionstudios.mysticessentials.modules.playervaults.api.VaultOpenMode;
 import org.hyzionstudios.mysticessentials.modules.playervaults.config.PlayerVaultConfig;
 
 import com.hypixel.hytale.server.core.universe.PlayerRef;
@@ -117,6 +118,22 @@ public final class PlayerVaultPermissionService {
     /** View/recover items beyond the owner's current row/vault limits (overflow recovery). */
     public boolean canBypassLimit(PlayerRef player) {
         return hasAdmin(player, Permissions.VAULTS_ADMIN_BYPASSLIMIT);
+    }
+
+    /**
+     * The mode a staff open of another player's vault gets: edit only with the edit
+     * node (and unless the config prefers read-only), read-only otherwise.
+     */
+    public VaultOpenMode adminOpenMode(PlayerRef player) {
+        boolean canEdit = canAdminEdit(player);
+        boolean preferReadOnly = "READ_ONLY".equalsIgnoreCase(config.admin.defaultAdminMode);
+        if (canEdit && !preferReadOnly) {
+            return VaultOpenMode.ADMIN_EDIT;
+        }
+        if (canAdminReadOnly(player)) {
+            return VaultOpenMode.ADMIN_READONLY;
+        }
+        return canEdit ? VaultOpenMode.ADMIN_EDIT : VaultOpenMode.ADMIN_READONLY;
     }
 
     // ----- Internals ------------------------------------------------------------

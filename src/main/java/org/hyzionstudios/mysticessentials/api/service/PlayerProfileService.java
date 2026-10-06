@@ -36,6 +36,15 @@ public interface PlayerProfileService {
     CompletableFuture<Optional<UUID>> resolveUuid(String username);
 
     /**
+     * The current username of a player who has joined before, online or not: the name
+     * their latest session stored. Empty if the player was never seen.
+     */
+    default CompletableFuture<Optional<String>> lastKnownName(UUID uuid) {
+        return CompletableFuture.completedFuture(
+                uuid == null ? Optional.empty() : getCached(uuid).map(PlayerProfile::getUsername));
+    }
+
+    /**
      * Lists the UUIDs of every player who has a stored profile (i.e. has joined
      * before), unioned with those currently cached. Enables broadcasts to all
      * known players, including offline ones.

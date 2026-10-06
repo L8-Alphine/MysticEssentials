@@ -1,5 +1,7 @@
 package org.hyzionstudios.mysticessentials.api.item;
 
+import java.util.Locale;
+
 /**
  * Shared helpers for turning engine identifiers and translation keys into
  * readable labels.
@@ -75,7 +77,7 @@ public final class ItemNames {
         if (Math.abs(value - Math.rint(value)) < 0.001) {
             return Long.toString(Math.round(value));
         }
-        return String.format(java.util.Locale.ROOT, "%.2f", value);
+        return String.format(Locale.ROOT, "%.2f", value);
     }
 
     /** Formats a modifier amount with an explicit sign, e.g. {@code +8.1} / {@code -4.8}. */

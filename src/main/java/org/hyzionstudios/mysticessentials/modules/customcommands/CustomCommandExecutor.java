@@ -15,6 +15,8 @@ import org.hyzionstudios.mysticessentials.modules.customcommands.argument.Argume
 import org.hyzionstudios.mysticessentials.modules.customcommands.condition.CommandCondition;
 import org.hyzionstudios.mysticessentials.core.MysticCore;
 
+import com.hypixel.hytale.server.core.command.system.AbstractCommand;
+import com.hypixel.hytale.server.core.command.system.CommandManager;
 import com.hypixel.hytale.server.core.command.system.CommandSender;
 import com.hypixel.hytale.server.core.console.ConsoleSender;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
@@ -198,7 +200,21 @@ public final class CustomCommandExecutor {
 
     /** Called by {@link CommandAction}; owns blocked-command, executor, and recursion logic. */
     public void dispatchCommandAction(CustomCommandContext context, CommandAction action) {
-        String resolved = context.resolvePlaceholders(action.commandTemplate()).trim();
+        CustomCommandContext.CommandLine line = context.resolveCommandLine(action.commandTemplate());
+        if (line.refusedArg() != null) {
+            // A typed value that would re-split into extra arguments or --flags
+            // on the target command never reaches the command line.
+            module.audit().logSafetyStop(context.command(),
+                    "refused argument '" + line.refusedArg() + "' for '" + action.commandTemplate() + "'");
+            // The refused text is not echoed: bundle messages expand placeholders.
+            context.replyKey("customcommands-arg-invalid", Map.of(
+                    "arg", line.refusedArg(),
+                    "value", "",
+                    "expected", "no quotes, backslashes or --flags"
+                            + " (and no spaces, brackets or commas in a single word)"));
+            return;
+        }
+        String resolved = line.line().trim();
         if (resolved.startsWith("/")) {
             resolved = resolved.substring(1);
         }
@@ -312,9 +328,25 @@ public final class CustomCommandExecutor {
         return null;
     }
 
+    /**
+     * Checks the typed label and, through the engine's own lookup, the command
+     * it actually runs: an alias of a blocked command (e.g. {@code shutdown} for
+     * {@code stop}) is blocked too.
+     */
     private boolean isBlocked(String commandName) {
         List<String> blocked = module.config().safety.blockedCommands;
-        return blocked != null && blocked.stream()
-                .anyMatch(entry -> entry != null && entry.equalsIgnoreCase(commandName));
+        if (blocked == null || blocked.isEmpty()) {
+            return false;
+        }
+        String canonical = null;
+        try {
+            AbstractCommand command = CommandManager.get().resolveCommand(commandName);
+            canonical = command == null ? null : command.getName();
+        } catch (Throwable t) {
+            // No engine lookup available: the label check below still applies.
+        }
+        String resolved = canonical;
+        return blocked.stream().anyMatch(entry -> entry != null
+                && (entry.equalsIgnoreCase(commandName) || entry.equalsIgnoreCase(resolved)));
     }
 }

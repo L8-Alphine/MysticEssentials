@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 
 import org.hyzionstudios.mysticessentials.api.event.EventBus;
@@ -24,6 +25,7 @@ import org.hyzionstudios.mysticessentials.modules.playervaults.model.VaultConfli
 import org.hyzionstudios.mysticessentials.modules.playervaults.model.VaultMetadata;
 import org.hyzionstudios.mysticessentials.modules.playervaults.storage.PlayerVaultRedisBridge;
 import org.hyzionstudios.mysticessentials.modules.playervaults.storage.PlayerVaultStorage;
+import org.hyzionstudios.mysticessentials.modules.playervaults.ui.PlayerVaultUiController;
 
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 
@@ -51,7 +53,11 @@ public final class PlayerVaultServiceImpl implements PlayerVaultService {
     private PlayerVaultConfig config;
 
     /** Set after construction to break the service&harr;UI cycle. */
-    private org.hyzionstudios.mysticessentials.modules.playervaults.ui.PlayerVaultUiController uiController;
+    private PlayerVaultUiController uiController;
+
+    /** owner:vault -> the last versioned save queued for that vault on this server. */
+    private final ConcurrentHashMap<String, CompletableFuture<VaultSaveResult>> saveQueues =
+            new ConcurrentHashMap<>();
 
     public PlayerVaultServiceImpl(MysticCore core, PlayerVaultStorage storage,
             PlayerVaultRedisBridge redisBridge, PlayerVaultLockService lockService,
@@ -66,7 +72,7 @@ public final class PlayerVaultServiceImpl implements PlayerVaultService {
         this.config = config;
     }
 
-    public void setUiController(org.hyzionstudios.mysticessentials.modules.playervaults.ui.PlayerVaultUiController ui) {
+    public void setUiController(PlayerVaultUiController ui) {
         this.uiController = ui;
     }
 
@@ -197,6 +203,35 @@ public final class PlayerVaultServiceImpl implements PlayerVaultService {
             return CompletableFuture.completedFuture(VaultSaveResult.storageError());
         }
 
+        // Every save of this vault on this server (sessions, restore, metadata edits,
+        // the API) runs after the previous one finished, so each compares against the
+        // version the last one wrote and a race becomes a conflict, never a lost write.
+        String key = owner + ":" + working.vaultNumber;
+        CompletableFuture<VaultSaveResult> result = new CompletableFuture<>();
+        CompletableFuture<VaultSaveResult> previous = saveQueues.put(key, result);
+        (previous == null ? CompletableFuture.completedFuture(null) : previous)
+                .handle((ignored, failure) -> null)
+                .thenCompose(ignored -> saveInOrder(working, owner, expectedVersion, actorUuid,
+                        backupBeforeSave, reason))
+                .whenComplete((saved, failure) -> {
+                    saveQueues.remove(key, result);
+                    if (failure != null) {
+                        result.completeExceptionally(failure);
+                    } else {
+                        result.complete(saved);
+                    }
+                });
+        return result;
+    }
+
+    /** Completes once every versioned save queued so far has finished (module shutdown). */
+    public CompletableFuture<Void> pendingSaves() {
+        return CompletableFuture.allOf(saveQueues.values().toArray(CompletableFuture[]::new));
+    }
+
+    /** One versioned save; runs only after every earlier save of the same vault finished. */
+    private CompletableFuture<VaultSaveResult> saveInOrder(PlayerVault working, UUID owner, long expectedVersion,
+            UUID actorUuid, boolean backupBeforeSave, String reason) {
         // Pre-save veto: cancelling must leave stored data untouched.
         EventBus bus = core.getEventBus();
         if (bus != null) {
@@ -226,15 +261,26 @@ public final class PlayerVaultServiceImpl implements PlayerVaultService {
                 working.version = latestVersion + 1;
                 working.updatedAt = System.currentTimeMillis();
                 working.lastOpenedServer = redisBridge.serverId();
+                // The vault write is the commit point: once it landed, the save succeeded
+                // (version bumped), so the follow-up steps below can no longer fail it.
                 return storage.saveVault(working)
-                        .thenCompose(v -> trackProfile(owner, working))
+                        .thenCompose(v -> trackProfile(owner, working).exceptionally(error -> {
+                            core.log(Level.WARNING, "[playervaults] saved " + owner + " vault "
+                                    + working.vaultNumber + " but could not index it in the profile: " + error);
+                            return null;
+                        }))
                         .thenApply(v -> {
-                            redisBridge.cacheVault(working);
-                            redisBridge.publishUpdate(owner, working.vaultNumber, working.version);
-                            EventBus post = core.getEventBus();
-                            if (post != null) {
-                                post.publish(new PlayerVaultSaveEvent(working,
-                                        PlayerVaultSaveEvent.Phase.POST, expectedVersion));
+                            try {
+                                redisBridge.cacheVault(working);
+                                redisBridge.publishUpdate(owner, working.vaultNumber, working.version);
+                                EventBus post = core.getEventBus();
+                                if (post != null) {
+                                    post.publish(new PlayerVaultSaveEvent(working,
+                                            PlayerVaultSaveEvent.Phase.POST, expectedVersion));
+                                }
+                            } catch (Throwable t) {
+                                core.log(Level.WARNING, "[playervaults] saved " + owner + " vault "
+                                        + working.vaultNumber + " but post-save notification failed: " + t);
                             }
                             return VaultSaveResult.saved(working);
                         });
@@ -266,15 +312,14 @@ public final class PlayerVaultServiceImpl implements PlayerVaultService {
     }
 
     private CompletableFuture<Void> trackProfile(UUID owner, PlayerVault vault) {
-        return storage.loadProfile(owner).thenCompose(profileOpt -> {
-            PlayerVaultProfile profile = profileOpt.orElseGet(() ->
-                    new PlayerVaultProfile(owner, resolveName(owner)));
+        String name = resolveName(owner);
+        return storage.updateProfile(owner, stored -> {
+            PlayerVaultProfile profile = stored != null ? stored : new PlayerVaultProfile(owner, name);
             profile.trackVault(vault.vaultNumber);
-            String name = resolveName(owner);
             if (name != null) {
                 profile.lastKnownName = name;
             }
-            return storage.saveProfile(profile);
+            return profile;
         });
     }
 

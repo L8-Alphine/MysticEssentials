@@ -10,9 +10,11 @@ import org.hyzionstudios.mysticessentials.api.Permissions;
 import org.hyzionstudios.mysticessentials.api.rtp.RtpCancelReason;
 import org.hyzionstudios.mysticessentials.api.rtp.RtpProfile;
 import org.hyzionstudios.mysticessentials.api.rtp.RtpRequest;
+import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommand;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommandSender;
 
+import com.hypixel.hytale.server.core.command.system.arguments.system.FlagArg;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 
 /**
@@ -22,21 +24,32 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
  *
  * <pre>
  * /rtp                         self, default profile
- * /rtp &lt;player&gt;                admin: another online player
+ * /rtp &lt;player&gt;                another online player (rtp.others)
  * /rtp world &lt;world&gt; [player]
  * /rtp profile &lt;profile&gt; [player]
- * /rtp biome &lt;biome&gt;
  * /rtp cancel | status | info [world/profile]
  * </pre>
  *
- * Trailing {@code --force}, {@code --silent}, {@code --bypass-cost} flags are
- * honoured on the admin forms.
+ * Trailing {@code --force} and {@code --silent} flags need {@code rtp.admin.force}.
+ * They are declared flag arguments: the engine parses every {@code --name} token
+ * itself and rejects undeclared ones, and ones the sender lacks the permission
+ * for, before the command runs.
+ *
+ * <p>Sending another player needs {@code rtp.others}; that alone puts the target
+ * through the normal checks (their profile permission, cooldown, limits, cost and
+ * warmup). Skipping them - forcing - needs {@code rtp.admin.force}, which a
+ * sender holding it gets on every {@code /rtp <player>}, as before.</p>
  */
 final class RtpCommand extends MysticCommand {
 
     private final RtpSubsystem rtp;
+    private final FlagArg forceFlag = withFlagArg("force",
+            "Skip the permission, cooldown, limit, cost and warmup checks.")
+            .setPermission(Permissions.RTP_ADMIN_FORCE);
+    private final FlagArg silentFlag = withFlagArg("silent", "Send the player no RTP messages.")
+            .setPermission(Permissions.RTP_ADMIN_FORCE);
 
-    RtpCommand(org.hyzionstudios.mysticessentials.core.MysticCore core, RtpSubsystem rtp) {
+    RtpCommand(MysticCore core, RtpSubsystem rtp) {
         super(core, "rtp", "Randomly teleport to a safe location.");
         this.rtp = rtp;
         requirePermission(Permissions.RTP_USE);
@@ -50,15 +63,15 @@ final class RtpCommand extends MysticCommand {
             return;
         }
         List<String> args = new ArrayList<>();
-        Flags flags = new Flags();
         for (String token : sender.args()) {
-            switch (token.toLowerCase(Locale.ROOT)) {
-                case "--force" -> flags.force = true;
-                case "--silent" -> flags.silent = true;
-                case "--bypass-cost", "--bypasscost" -> flags.bypassCost = true;
-                default -> args.add(token);
+            // Flags arrive through the declared flag arguments; keep them out of the positional words.
+            if (!token.startsWith("--")) {
+                args.add(token);
             }
         }
+        Flags flags = new Flags();
+        flags.force = sender.get(forceFlag);
+        flags.silent = sender.get(silentFlag);
 
         String keyword = args.isEmpty() ? "" : args.get(0).toLowerCase(Locale.ROOT);
         boolean uiDefault = rtp.config().randomTeleport.openUiOnRtp;
@@ -67,7 +80,7 @@ final class RtpCommand extends MysticCommand {
                 if (uiDefault && sender.isPlayer()) {
                     openMenu(sender);
                 } else {
-                    runRtp(sender, null, null, null, null, flags);
+                    runRtp(sender, null, null, null, flags);
                 }
             }
             case "menu", "ui" -> openMenu(sender);
@@ -78,32 +91,23 @@ final class RtpCommand extends MysticCommand {
                 if (args.size() < 2) {
                     sender.replyKey("rtp-usage-world");
                 } else {
-                    runRtp(sender, args.size() > 2 ? args.get(2) : null, null, args.get(1), null, flags);
+                    runRtp(sender, args.size() > 2 ? args.get(2) : null, null, args.get(1), flags);
                 }
             }
             case "profile" -> {
                 if (args.size() < 2) {
                     sender.replyKey("rtp-usage-profile");
                 } else {
-                    runRtp(sender, args.size() > 2 ? args.get(2) : null, args.get(1), null, null, flags);
+                    runRtp(sender, args.size() > 2 ? args.get(2) : null, args.get(1), null, flags);
                 }
             }
-            case "biome" -> {
-                if (!sender.hasPermission(Permissions.RTP_BIOME)) {
-                    sender.replyKey("no-permission");
-                } else if (args.size() < 2) {
-                    sender.replyKey("rtp-usage-biome");
-                } else {
-                    runRtp(sender, null, null, null, args.get(1), flags);
-                }
-            }
-            // Anything else is treated as a target player name (admin form).
-            default -> runRtp(sender, args.get(0), null, null, null, flags);
+            // Anything else is treated as a target player name (rtp.others).
+            default -> runRtp(sender, args.get(0), null, null, flags);
         }
     }
 
     private void runRtp(MysticCommandSender sender, String targetName, String profileId, String world,
-            String biome, Flags flags) {
+            Flags flags) {
         UUID actor = sender.isPlayer() ? sender.uuid() : null;
         UUID targetUuid;
         boolean adminInitiated;
@@ -131,15 +135,8 @@ final class RtpCommand extends MysticCommand {
             adminInitiated = false;
         }
 
-        RtpRequest request = RtpRequest.builder(targetUuid)
-                .profileId(profileId)
-                .world(world)
-                .biome(biome)
-                .actor(actor)
-                .force(flags.force || adminInitiated)
-                .silent(flags.silent)
-                .bypassCost(flags.bypassCost)
-                .build();
+        RtpRequest request = request(targetUuid, profileId, world, actor, adminInitiated, flags.force,
+                flags.silent, sender.hasPermission(Permissions.RTP_ADMIN_FORCE));
 
         rtp.service().teleport(request).thenAccept(result -> {
             if (!adminInitiated) {
@@ -155,6 +152,22 @@ final class RtpCommand extends MysticCommand {
                         "reason", result.status().name().toLowerCase(Locale.ROOT).replace('_', ' ')));
             }
         });
+    }
+
+    /**
+     * The request {@code /rtp} sends. It skips the target's checks only on {@code --force}
+     * or when someone holding {@code rtp.admin.force} sends another player; a sender with
+     * just {@code rtp.others} sends them through the normal checks.
+     */
+    static RtpRequest request(UUID target, String profileId, String world, UUID actor,
+            boolean adminInitiated, boolean forceFlag, boolean silentFlag, boolean senderMayForce) {
+        return RtpRequest.builder(target)
+                .profileId(profileId)
+                .world(world)
+                .actor(actor)
+                .force(forceFlag || (adminInitiated && senderMayForce))
+                .silent(silentFlag)
+                .build();
     }
 
     private void openMenu(MysticCommandSender sender) {
@@ -237,6 +250,5 @@ final class RtpCommand extends MysticCommand {
     private static final class Flags {
         boolean force;
         boolean silent;
-        boolean bypassCost;
     }
 }

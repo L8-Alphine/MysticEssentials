@@ -5,11 +5,11 @@ import static org.hyzionstudios.mysticessentials.platform.ui.MysticPage.uiText;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
 import org.hyzionstudios.mysticessentials.core.MysticCore;
-import org.hyzionstudios.mysticessentials.modules.playervaults.api.VaultOpenMode;
 import org.hyzionstudios.mysticessentials.modules.playervaults.config.PlayerVaultConfig;
 import org.hyzionstudios.mysticessentials.modules.playervaults.model.PlayerVault;
 import org.hyzionstudios.mysticessentials.platform.ui.MysticPage;
@@ -224,7 +224,7 @@ final class VaultListUi extends MysticPage {
                 close(ref, store);
                 if (adminView) {
                     controller.openAdminVault(player, ownerUuid, ownerName, vault,
-                            VaultOpenMode.ADMIN_EDIT, isOnline(ownerUuid));
+                            controller.permissions().adminOpenMode(player), isOnline(ownerUuid));
                 } else {
                     controller.openOwnVault(player, vault);
                 }
@@ -254,7 +254,7 @@ final class VaultListUi extends MysticPage {
         Optional<PlayerRef> target = core.platform().findPlayerByName(targetName.trim());
         if (target.isEmpty()) {
             core.getMessageService().sendKey(player, "player-not-found",
-                    java.util.Map.of("player", targetName.trim()));
+                    Map.of("player", targetName.trim()));
             return;
         }
         close(ref, store);

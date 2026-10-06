@@ -1,13 +1,18 @@
 package org.hyzionstudios.mysticessentials.core;
 
+import java.nio.file.Path;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 
 import org.hyzionstudios.mysticessentials.MysticessentialsPlugin;
 import org.hyzionstudios.mysticessentials.api.MysticEssentialsAPI;
 import org.hyzionstudios.mysticessentials.api.MysticEssentialsProvider;
+import org.hyzionstudios.mysticessentials.api.Permissions;
 import org.hyzionstudios.mysticessentials.api.event.EventBus;
+import org.hyzionstudios.mysticessentials.api.item.ItemInspectionService;
 import org.hyzionstudios.mysticessentials.api.module.ModuleManager;
+import org.hyzionstudios.mysticessentials.api.notification.NotificationService;
 import org.hyzionstudios.mysticessentials.api.service.AfkService;
 import org.hyzionstudios.mysticessentials.api.service.AnnouncementService;
 import org.hyzionstudios.mysticessentials.api.service.ChatService;
@@ -22,12 +27,22 @@ import org.hyzionstudios.mysticessentials.api.service.SpawnService;
 import org.hyzionstudios.mysticessentials.api.service.StorageService;
 import org.hyzionstudios.mysticessentials.api.service.TeleportService;
 import org.hyzionstudios.mysticessentials.api.service.WarpService;
+import org.hyzionstudios.mysticessentials.api.ui.CustomUiService;
 import org.hyzionstudios.mysticessentials.core.config.ConfigManager;
 import org.hyzionstudios.mysticessentials.core.config.MainConfig;
 import org.hyzionstudios.mysticessentials.core.economy.EconomyServiceImpl;
 import org.hyzionstudios.mysticessentials.core.event.SimpleEventBus;
+import org.hyzionstudios.mysticessentials.core.integration.ManagedAccountsBridge;
+import org.hyzionstudios.mysticessentials.core.integration.ModerationBridge;
+import org.hyzionstudios.mysticessentials.core.integration.PortalBridge;
+import org.hyzionstudios.mysticessentials.core.integration.VanishBridge;
 import org.hyzionstudios.mysticessentials.core.item.ItemInspectionServiceImpl;
+import org.hyzionstudios.mysticessentials.core.item.ItemViewConfig;
+import org.hyzionstudios.mysticessentials.core.license.LicenseCommand;
+import org.hyzionstudios.mysticessentials.core.license.LicenseSupport;
 import org.hyzionstudios.mysticessentials.core.message.MessageServiceImpl;
+import org.hyzionstudios.mysticessentials.core.notification.NotificationCenterPage;
+import org.hyzionstudios.mysticessentials.core.notification.NotificationConfig;
 import org.hyzionstudios.mysticessentials.core.notification.NotificationServiceImpl;
 import org.hyzionstudios.mysticessentials.core.migration.MigrationCommand;
 import org.hyzionstudios.mysticessentials.core.module.ModuleManagerImpl;
@@ -43,12 +58,22 @@ import org.hyzionstudios.mysticessentials.core.scheduler.SchedulerService;
 import org.hyzionstudios.mysticessentials.core.storage.RedisBridge;
 import org.hyzionstudios.mysticessentials.core.storage.StorageServiceImpl;
 import org.hyzionstudios.mysticessentials.core.teleport.TeleportServiceImpl;
+import org.hyzionstudios.mysticessentials.core.ui.CustomUiServiceImpl;
 import org.hyzionstudios.mysticessentials.core.update.UpdateNotifier;
+import org.hyzionstudios.mysticessentials.core.util.Json;
 import org.hyzionstudios.mysticessentials.modules.ModuleBootstrap;
 import org.hyzionstudios.mysticessentials.platform.HytalePlatform;
 import org.hyzionstudios.mysticessentials.platform.command.MysticArgTypes;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommand;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommandSender;
+
+import com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent;
+import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
+import com.hypixel.hytale.server.core.plugin.PluginManager;
+import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.mysticlicensing.license.LicenseGate;
+import com.mysticlicensing.license.MysticLicenseService;
+import com.mysticlicensing.license.NoopMysticLicenseService;
 
 /**
  * The non-disableable Core. Owns every shared service and drives the boot order:
@@ -70,10 +95,10 @@ public final class MysticCore implements MysticEssentialsAPI {
     private StorageServiceImpl storageService;
     private RedisBridge redisBridge;
     private NetworkPlayerService networkPlayerService;
-    private org.hyzionstudios.mysticessentials.core.integration.VanishBridge vanishBridge;
-    private org.hyzionstudios.mysticessentials.core.integration.ModerationBridge moderationBridge;
-    private org.hyzionstudios.mysticessentials.core.integration.ManagedAccountsBridge managedAccountsBridge;
-    private org.hyzionstudios.mysticessentials.core.integration.PortalBridge portalBridge;
+    private VanishBridge vanishBridge;
+    private ModerationBridge moderationBridge;
+    private ManagedAccountsBridge managedAccountsBridge;
+    private PortalBridge portalBridge;
     private PlayerProfileServiceImpl playerProfileService;
     private PlaytimeTracker playtimeTracker;
     private MessageServiceImpl messageService;
@@ -94,7 +119,7 @@ public final class MysticCore implements MysticEssentialsAPI {
      */
     private ItemInspectionServiceImpl itemInspectionService;
     private NotificationServiceImpl notificationService;
-    private org.hyzionstudios.mysticessentials.core.ui.CustomUiServiceImpl customUiService;
+    private CustomUiServiceImpl customUiService;
 
     /**
      * Offline license gate. Never null after {@link #enable()} has run, and
@@ -102,14 +127,13 @@ public final class MysticCore implements MysticEssentialsAPI {
      * null-check it. A licensing failure disables only the modules that declare
      * a licensed feature.
      */
-    private com.mysticlicensing.license.LicenseGate license;
+    private LicenseGate license;
 
     public MysticCore(MysticessentialsPlugin plugin) {
         this.plugin = plugin;
         // Anchor all files at mods/MysticEssentials (per design) instead of the
         // identifier-named plugin data dir (e.g. "org.hyzionstudios_mysticessentials").
-        this.paths = new PathManager(
-                com.hypixel.hytale.server.core.plugin.PluginManager.MODS_PATH.resolve("MysticEssentials"));
+        this.paths = new PathManager(PluginManager.MODS_PATH.resolve("MysticEssentials"));
     }
 
     // ----- Lifecycle ---------------------------------------------------------
@@ -146,11 +170,11 @@ public final class MysticCore implements MysticEssentialsAPI {
         placeholderService.init(config.integrations.placeholderAPI);
         economyService = new EconomyServiceImpl(this);
         economyService.init(config.integrations.vaultUnlocked);
-        vanishBridge = new org.hyzionstudios.mysticessentials.core.integration.VanishBridge(this);
+        vanishBridge = new VanishBridge(this);
         vanishBridge.init(config.integrations.mysticVanish);
-        moderationBridge = new org.hyzionstudios.mysticessentials.core.integration.ModerationBridge(this);
+        moderationBridge = new ModerationBridge(this);
         moderationBridge.init(config.integrations.mysticModeration);
-        managedAccountsBridge = new org.hyzionstudios.mysticessentials.core.integration.ManagedAccountsBridge(this);
+        managedAccountsBridge = new ManagedAccountsBridge(this);
         managedAccountsBridge.init(config.integrations.mysticIdentity);
         networkPlayerService = new NetworkPlayerService(this);
         networkPlayerService.start();
@@ -159,6 +183,12 @@ public final class MysticCore implements MysticEssentialsAPI {
         messageService = new MessageServiceImpl(this);
         messageService.load();
         playerProfileService = new PlayerProfileServiceImpl(this);
+        // Players already online (a runtime plugin reload) never fire a join event
+        // for this instance: load their profiles now, or nothing would be cached,
+        // credited or saved for them until they relog.
+        for (PlayerRef online : platform.onlinePlayers()) {
+            playerProfileService.load(online.getUuid(), online.getUsername());
+        }
         playtimeTracker = new PlaytimeTracker(this);
         playtimeTracker.start();
         teleportService = new TeleportServiceImpl(this);
@@ -170,12 +200,12 @@ public final class MysticCore implements MysticEssentialsAPI {
         itemInspectionService = new ItemInspectionServiceImpl(this,
                 loadItemViewConfig());
         notificationService = new NotificationServiceImpl(this, loadNotificationConfig());
-        customUiService = new org.hyzionstudios.mysticessentials.core.ui.CustomUiServiceImpl(1000);
+        customUiService = new CustomUiServiceImpl(1000);
 
         // Licensing. Verified once, here, before any module asks about it. This
         // cannot fail the startup: the worst outcome is that licensed modules
         // stay off and one warning is logged.
-        license = org.hyzionstudios.mysticessentials.core.license.LicenseSupport.create(this);
+        license = LicenseSupport.create(this);
         license.start();
 
         // Core commands + player lifecycle listeners (always available).
@@ -186,13 +216,16 @@ public final class MysticCore implements MysticEssentialsAPI {
         moduleManager = new ModuleManagerImpl(this);
         ModuleBootstrap.registerBuiltins(moduleManager);
         moduleManager.enableAll();
+        // A license that expires while the server runs must switch its modules off
+        // without waiting for a reload or restart.
+        scheduler.runRepeating(this::enforceLicenses, 1, 1, TimeUnit.HOURS);
 
         // After the modules, so the first refresh already sees the AFK service.
         playerListService = new PlayerListService(this);
         playerListService.start();
 
         // After the modules too, so the portal's first manifest already sees mail, vaults and notes.
-        portalBridge = new org.hyzionstudios.mysticessentials.core.integration.PortalBridge(this);
+        portalBridge = new PortalBridge(this);
         portalBridge.init(config.integrations.mysticIdentity);
 
         MysticEssentialsProvider.register(this);
@@ -213,6 +246,9 @@ public final class MysticCore implements MysticEssentialsAPI {
         }
         if (moduleManager != null) {
             moduleManager.disableAll();
+        }
+        if (platform != null) {
+            platform.endAllArrivalProtection();
         }
         // Credit the final slice of every open session before profiles are saved.
         if (playtimeTracker != null) {
@@ -271,7 +307,7 @@ public final class MysticCore implements MysticEssentialsAPI {
                 return;
             }
             if (!platform.openPage(player,
-                    new org.hyzionstudios.mysticessentials.core.notification.NotificationCenterPage(
+                    new NotificationCenterPage(
                             MysticCore.this, player, notificationService))) {
                 sender.reply("&cCould not open the notification UI — see the server log.");
             }
@@ -284,18 +320,21 @@ public final class MysticCore implements MysticEssentialsAPI {
      * universe {@code PlayerRef}.
      */
     private void registerCoreListeners() {
-        platform.onEvent(com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent.class,
-                (com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent event) -> {
+        platform.onEvent(PlayerConnectEvent.class,
+                (PlayerConnectEvent event) -> {
                     var ref = event.getPlayerRef();
                     networkPlayerService.onJoin(ref);
-                    playerProfileService.load(ref.getUuid(), ref.getUsername());
                     playtimeTracker.onJoin(ref.getUuid());
-                    updateNotifier.notifyOnJoin(ref);
+                    // The notice is kept in notification history, which lives in the
+                    // profile: send it once the profile is loaded.
+                    playerProfileService.load(ref.getUuid(), ref.getUsername())
+                            .whenComplete((profile, failure) -> updateNotifier.notifyOnJoin(ref));
                 });
-        platform.onEvent(com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent.class,
-                (com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent event) -> {
+        platform.onEvent(PlayerDisconnectEvent.class,
+                (PlayerDisconnectEvent event) -> {
                     var ref = event.getPlayerRef();
                     networkPlayerService.onQuit(ref);
+                    platform.endArrivalProtection(ref);
                     // Credit the session before the profile is persisted and evicted.
                     playtimeTracker.onQuit(ref.getUuid());
                     // Notification history and preferences live in the profile, so
@@ -319,7 +358,7 @@ public final class MysticCore implements MysticEssentialsAPI {
             addSubCommand(new ReloadCommand());
             addSubCommand(new NetworkCommand());
             addSubCommand(new MigrationCommand(MysticCore.this));
-            addSubCommand(new org.hyzionstudios.mysticessentials.core.license.LicenseCommand(
+            addSubCommand(new LicenseCommand(
                     MysticCore.this, license));
         }
 
@@ -336,12 +375,16 @@ public final class MysticCore implements MysticEssentialsAPI {
     private final class ReloadCommand extends MysticCommand {
         ReloadCommand() {
             super(MysticCore.this, "reload", "Reload Mystic Essentials configuration.");
-            requirePermission(org.hyzionstudios.mysticessentials.api.Permissions.RELOAD);
+            requirePermission(Permissions.RELOAD);
         }
 
         @Override
         protected void run(MysticCommandSender sender) {
-            configManager.load();
+            if (!configManager.reload()) {
+                sender.reply("&cconfig.json could not be read, so nothing was reloaded."
+                        + " Fix the file (see the server log) and reload again.");
+                return;
+            }
             messageService.load();
             updateNotifier.reload();
             reloadIntegrations();
@@ -362,7 +405,7 @@ public final class MysticCore implements MysticEssentialsAPI {
     private final class NetworkCommand extends MysticCommand {
         NetworkCommand() {
             super(MysticCore.this, "network", "Show the Redis network roster and this server's advertised address.");
-            requirePermission(org.hyzionstudios.mysticessentials.api.Permissions.NETWORK);
+            requirePermission(Permissions.NETWORK);
         }
 
         @Override
@@ -447,10 +490,10 @@ public final class MysticCore implements MysticEssentialsAPI {
      * been set up yet. Callers can rely on this never being null and never
      * throwing; see {@code mystic-license-core/README.md} for the failure policy.
      */
-    public com.mysticlicensing.license.MysticLicenseService license() {
-        com.mysticlicensing.license.LicenseGate current = license;
+    public MysticLicenseService license() {
+        LicenseGate current = license;
         return current == null
-                ? com.mysticlicensing.license.NoopMysticLicenseService.INSTANCE
+                ? NoopMysticLicenseService.INSTANCE
                 : current;
     }
 
@@ -484,17 +527,17 @@ public final class MysticCore implements MysticEssentialsAPI {
     }
 
     /** Vanish integration (MysticVanish); fails open when absent. */
-    public org.hyzionstudios.mysticessentials.core.integration.VanishBridge vanish() {
+    public VanishBridge vanish() {
         return vanishBridge;
     }
 
     /** Moderation integration (MysticModeration); fails open when absent. */
-    public org.hyzionstudios.mysticessentials.core.integration.ModerationBridge moderation() {
+    public ModerationBridge moderation() {
         return moderationBridge;
     }
 
     /** Managed-account policy (MysticIdentity); fails open when absent. */
-    public org.hyzionstudios.mysticessentials.core.integration.ManagedAccountsBridge managedAccounts() {
+    public ManagedAccountsBridge managedAccounts() {
         return managedAccountsBridge;
     }
 
@@ -514,11 +557,20 @@ public final class MysticCore implements MysticEssentialsAPI {
      * drift from everything else on the server.
      */
     public void reloadSharedServices() {
+        // An unreadable file keeps the running settings instead of resetting them.
         if (itemInspectionService != null) {
-            itemInspectionService.updateConfig(loadItemViewConfig());
+            ItemViewConfig itemView = loadSharedConfig("chat", "item-view.json",
+                    ItemViewConfig.class, new ItemViewConfig(), null);
+            if (itemView != null) {
+                itemInspectionService.updateConfig(itemView.normalized());
+            }
         }
         if (notificationService != null) {
-            notificationService.updateConfig(loadNotificationConfig());
+            NotificationConfig notifications = loadSharedConfig("core", "notifications.json",
+                    NotificationConfig.class, new NotificationConfig(), null);
+            if (notifications != null) {
+                notificationService.updateConfig(notifications.normalized());
+            }
         }
     }
 
@@ -538,46 +590,58 @@ public final class MysticCore implements MysticEssentialsAPI {
         networkPlayerService.reload();
     }
 
-    private org.hyzionstudios.mysticessentials.core.item.ItemViewConfig loadItemViewConfig() {
-        return loadSharedConfig("chat", "item-view.json",
-                org.hyzionstudios.mysticessentials.core.item.ItemViewConfig.class,
-                new org.hyzionstudios.mysticessentials.core.item.ItemViewConfig())
+    private ItemViewConfig loadItemViewConfig() {
+        ItemViewConfig defaults = new ItemViewConfig();
+        return loadSharedConfig("chat", "item-view.json", ItemViewConfig.class, defaults, defaults)
                 .normalized();
     }
 
-    private org.hyzionstudios.mysticessentials.core.notification.NotificationConfig
-            loadNotificationConfig() {
-        return loadSharedConfig("core", "notifications.json",
-                org.hyzionstudios.mysticessentials.core.notification.NotificationConfig.class,
-                new org.hyzionstudios.mysticessentials.core.notification.NotificationConfig())
+    private NotificationConfig loadNotificationConfig() {
+        NotificationConfig defaults = new NotificationConfig();
+        return loadSharedConfig("core", "notifications.json", NotificationConfig.class, defaults, defaults)
                 .normalized();
     }
 
     /**
      * Loads a shared config file, writing the defaults on first run. A corrupt
-     * file logs and yields the defaults rather than aborting startup — losing a
-     * customised notification profile is recoverable; failing to boot is not.
+     * file logs and yields {@code onFailure} (the defaults at startup) rather than
+     * aborting startup — losing a customised notification profile is
+     * recoverable; failing to boot is not.
      */
-    private <T> T loadSharedConfig(String module, String fileName, Class<T> type, T defaults) {
-        java.nio.file.Path file = paths.moduleExtraConfigFile(module, fileName);
+    private <T> T loadSharedConfig(String module, String fileName, Class<T> type, T defaults,
+            T onFailure) {
+        Path file = paths.moduleExtraConfigFile(module, fileName);
         try {
-            T loaded = org.hyzionstudios.mysticessentials.core.util.Json.readFile(file, type);
+            T loaded = Json.readFile(file, type);
             if (loaded != null) {
                 return loaded;
             }
-            org.hyzionstudios.mysticessentials.core.util.Json.writeFile(file,
-                    org.hyzionstudios.mysticessentials.core.util.Json.toTree(defaults));
+            Json.writeFile(file, Json.toTree(defaults));
             log(Level.INFO, "Generated default modules/" + module + "/" + fileName);
         } catch (Exception e) {
-            log(Level.WARNING, "Failed to load " + fileName + " (using defaults): "
+            log(Level.WARNING, "Failed to load " + fileName
+                    + (onFailure == defaults ? " (using defaults): " : " (keeping current settings): ")
                     + e.getMessage());
+            return onFailure;
         }
         return defaults;
+    }
+
+    /** Stops running modules whose license feature is no longer granted. */
+    public void enforceLicenses() {
+        if (moduleManager != null) {
+            moduleManager.enforceLicenses();
+        }
     }
 
     /** Logs through the plugin's Hytale logger. */
     public void log(Level level, String message) {
         plugin.getLogger().at(level).log(message);
+    }
+
+    /** Logs {@code message} with {@code cause}'s stack trace. */
+    public void log(Level level, String message, Throwable cause) {
+        plugin.getLogger().at(level).withCause(cause).log(message);
     }
 
     // ----- MysticEssentialsAPI ----------------------------------------------
@@ -642,19 +706,17 @@ public final class MysticCore implements MysticEssentialsAPI {
     }
 
     @Override
-    public org.hyzionstudios.mysticessentials.api.item.ItemInspectionService
-            getItemInspectionService() {
+    public ItemInspectionService getItemInspectionService() {
         return itemInspectionService;
     }
 
     @Override
-    public org.hyzionstudios.mysticessentials.api.notification.NotificationService
-            getNotificationService() {
+    public NotificationService getNotificationService() {
         return notificationService;
     }
 
     @Override
-    public org.hyzionstudios.mysticessentials.api.ui.CustomUiService getCustomUiService() {
+    public CustomUiService getCustomUiService() {
         return customUiService;
     }
 

@@ -337,10 +337,13 @@ public final class ItemLinkSubModule {
             Optional<ItemSnapshot> target;
             if (argument.isBlank() || "latest".equals(argument) || "last".equals(argument)) {
                 target = snapshots.latest(player.getUuid());
-            } else if (argument.chars().allMatch(Character::isDigit)) {
-                target = snapshots.recentAt(player.getUuid(), Integer.parseInt(argument));
             } else {
                 target = snapshots.get(sender.arg(0).orElse(""));
+                // View codes can be all digits (their alphabet includes 2-9), so a code
+                // wins; only an unknown short number is read as a recent-list position.
+                if (target.isEmpty() && argument.length() <= 9 && argument.chars().allMatch(Character::isDigit)) {
+                    target = snapshots.recentAt(player.getUuid(), Integer.parseInt(argument));
+                }
             }
             target.ifPresentOrElse(
                     snapshot -> openDetails(player, snapshot),

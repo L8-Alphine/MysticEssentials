@@ -1,5 +1,7 @@
 package org.hyzionstudios.mysticessentials.api;
 
+import java.util.Locale;
+
 /**
  * Central registry of every permission node Mystic Essentials uses. All
  * command gates, feature checks, and dynamic node prefixes live here so the
@@ -49,7 +51,6 @@ public final class Permissions {
     public static final String RTP_USE = "mysticessentials.teleport.rtp.use";
     public static final String RTP_CANCEL = "mysticessentials.teleport.rtp.cancel";
     public static final String RTP_STATUS = "mysticessentials.teleport.rtp.status";
-    public static final String RTP_BIOME = "mysticessentials.teleport.rtp.biome";
     public static final String RTP_OTHERS = "mysticessentials.teleport.rtp.others";
     public static final String RTP_BYPASS_WARMUP = "mysticessentials.teleport.rtp.bypass.warmup";
     public static final String RTP_BYPASS_COOLDOWN = "mysticessentials.teleport.rtp.bypass.cooldown";
@@ -151,6 +152,10 @@ public final class Permissions {
     public static final String CHAT_PRIVATE_REPLY = "mysticessentials.chat.private.reply";
     public static final String CHAT_SOCIALSPY = "mysticessentials.chat.socialspy";
     public static final String CHAT_SOCIALSPY_EXEMPT = "mysticessentials.chat.socialspy.exempt";
+    /** {@code /ignore} and {@code /unignore}: hide a player's chat lines, mentions and private messages. */
+    public static final String CHAT_IGNORE = "mysticessentials.chat.ignore";
+    /** Cannot be added to anyone's ignore list, and private messages always get through (staff). */
+    public static final String CHAT_IGNORE_EXEMPT = "mysticessentials.chat.ignore.exempt";
     public static final String CHAT_CHANNEL_CREATE_TEMP = "mysticessentials.chat.channel.create.temp";
     /** Dynamic: {@code mysticessentials.chat.channel.<id>[.speak|.listen|.moderator]}. */
     public static final String CHAT_CHANNEL_BASE = "mysticessentials.chat.channel";
@@ -335,17 +340,17 @@ public final class Permissions {
 
     /** {@code mysticessentials.kit.<name>} — access to a specific kit. */
     public static String kit(String kitName) {
-        return KIT_BASE + "." + kitName.toLowerCase(java.util.Locale.ROOT);
+        return KIT_BASE + "." + kitName.toLowerCase(Locale.ROOT);
     }
 
     /** {@code mysticessentials.craftblock.bypass.<item id>} — craft one blocked item. */
     public static String craftBlockBypass(String itemId) {
-        return CRAFTBLOCK_BYPASS + "." + itemId.toLowerCase(java.util.Locale.ROOT);
+        return CRAFTBLOCK_BYPASS + "." + itemId.toLowerCase(Locale.ROOT);
     }
 
     /** {@code mysticessentials.chat.channel.<id>} — join a specific channel. */
     public static String chatChannel(String channelId) {
-        return CHAT_CHANNEL_BASE + "." + channelId.toLowerCase(java.util.Locale.ROOT);
+        return CHAT_CHANNEL_BASE + "." + channelId.toLowerCase(Locale.ROOT);
     }
 
     /**
@@ -353,12 +358,12 @@ public final class Permissions {
      * for a custom command with permission mode {@code single} and no explicit node.
      */
     public static String customCommand(String commandName) {
-        return CUSTOMCOMMANDS_COMMAND_BASE + "." + commandName.toLowerCase(java.util.Locale.ROOT);
+        return CUSTOMCOMMANDS_COMMAND_BASE + "." + commandName.toLowerCase(Locale.ROOT);
     }
 
     /** {@code mysticessentials.customcommands.bypass.cooldown.<name>} — per-command cooldown bypass. */
     public static String customCommandCooldownBypass(String commandName) {
-        return CUSTOMCOMMANDS_BYPASS_COOLDOWN + "." + commandName.toLowerCase(java.util.Locale.ROOT);
+        return CUSTOMCOMMANDS_BYPASS_COOLDOWN + "." + commandName.toLowerCase(Locale.ROOT);
     }
 
     /** {@code mysticessentials.vaults.vault.<n>} — highest accessible vault number. */
@@ -373,11 +378,11 @@ public final class Permissions {
 
     /** {@code mysticessentials.teleport.rtp.world.<world>} — permission to RTP in a world. */
     public static String rtpWorld(String world) {
-        return RTP_WORLD_BASE + "." + world.toLowerCase(java.util.Locale.ROOT);
+        return RTP_WORLD_BASE + "." + world.toLowerCase(Locale.ROOT);
     }
 
     /** {@code mysticessentials.teleport.rtp.profile.<profile>} — permission to use a profile. */
     public static String rtpProfile(String profile) {
-        return RTP_PROFILE_BASE + "." + profile.toLowerCase(java.util.Locale.ROOT);
+        return RTP_PROFILE_BASE + "." + profile.toLowerCase(Locale.ROOT);
     }
 }

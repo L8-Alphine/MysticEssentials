@@ -27,7 +27,7 @@ import org.hyzionstudios.mysticessentials.api.item.ItemViewData;
 import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.core.item.ItemViewConfig;
 
-import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.inventory.InventoryComponent;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 
@@ -89,20 +89,13 @@ public final class ItemSnapshotService {
      *
      * @return the stored snapshot, or empty when the hand is empty or capture failed
      */
-    // getItemInHand() honours the tools section over the hotbar, which is what
-    // "held item" means to the player. Update 6 deprecated it for removal along
-    // with every other convenience accessor on Inventory (getActiveHotbarItem,
-    // getToolsItem, usingToolsItem, getActiveToolItem — the whole family), so
-    // there is no non-deprecated way to ask this question yet; the replacement
-    // direction is the Ref-based ItemContainer API. It works at runtime, so the
-    // call stands until that API can express "item in hand".
-    @SuppressWarnings("removal")
+    // InventoryComponent.getItemInHand honours the tools section over the hotbar,
+    // which is what "held item" means to the player.
     public Optional<ItemSnapshot> captureHeld(PlayerRef sender, String channelName) {
         CompletableFuture<ItemSnapshot> future = new CompletableFuture<>();
         boolean dispatched = core.platform().runOnEntityThread(sender, (store, ref, world) -> {
             try {
-                Player entity = store.getComponent(ref, Player.getComponentType());
-                ItemStack held = entity == null ? null : entity.getInventory().getItemInHand();
+                ItemStack held = InventoryComponent.getItemInHand(store, ref);
                 if (held == null || held.isEmpty()) {
                     future.complete(null);
                     return;

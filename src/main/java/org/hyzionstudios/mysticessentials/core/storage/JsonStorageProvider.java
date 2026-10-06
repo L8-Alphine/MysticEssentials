@@ -2,6 +2,7 @@ package org.hyzionstudios.mysticessentials.core.storage;
 
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -12,15 +13,16 @@ import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.core.util.Json;
 
 import com.google.gson.JsonElement;
+import com.google.gson.JsonParseException;
 
 /**
  * Default local storage provider. Each namespace is a folder under
  * {@code data/} and each key is a {@code <key>.json} file inside it. Suitable
  * for testing and small communities; the primary target for the first release.
  *
- * <p>Operations are executed asynchronously on the common pool but file writes
- * for the same key are serialized by the filesystem; callers that need
- * read-modify-write atomicity should coordinate at a higher level.</p>
+ * <p>Operations are executed asynchronously on the common pool. Ordering per key
+ * and read-modify-write atomicity are provided one level up, by
+ * {@code StorageServiceImpl}; each write is atomic (temp file + move).</p>
  */
 public final class JsonStorageProvider implements StorageProvider {
 
@@ -42,8 +44,22 @@ public final class JsonStorageProvider implements StorageProvider {
         Files.createDirectories(dataRoot);
     }
 
+    /**
+     * Maps a document to its file, refusing keys that would leave the namespace
+     * folder (keys can come from player input, e.g. a looked-up username).
+     */
     private Path fileFor(String namespace, String key) {
-        return dataRoot.resolve(namespace).resolve(key + ".json");
+        try {
+            Path root = dataRoot.toAbsolutePath().normalize();
+            Path dir = root.resolve(namespace).normalize();
+            Path file = dir.resolve(key + ".json").normalize();
+            if (dir.startsWith(root) && !dir.equals(root) && dir.equals(file.getParent())) {
+                return file;
+            }
+        } catch (InvalidPathException ignored) {
+            // Reported below like any other unusable key.
+        }
+        throw new StorageException("invalid document key " + namespace + "/" + key, null);
     }
 
     @Override
@@ -51,7 +67,8 @@ public final class JsonStorageProvider implements StorageProvider {
         return CompletableFuture.supplyAsync(() -> {
             try {
                 return Json.readFile(fileFor(namespace, key));
-            } catch (IOException e) {
+            } catch (IOException | JsonParseException e) {
+                // A corrupt file must fail loudly, not look like a missing document.
                 throw new StorageException("load " + namespace + "/" + key, e);
             }
         });

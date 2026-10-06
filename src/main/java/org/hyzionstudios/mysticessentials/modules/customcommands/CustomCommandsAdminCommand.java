@@ -1,7 +1,9 @@
 package org.hyzionstudios.mysticessentials.modules.customcommands;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -33,6 +35,9 @@ public final class CustomCommandsAdminCommand extends MysticCommand {
         this.module = module;
         addAliases("ccmd", "customcmd", "mecustomcommands");
         allowExtraArguments();
+        // Each subcommand checks its own customcommands.* node (or .admin); without
+        // this the engine would also demand a generated node nobody is granted.
+        requireNoPermission();
     }
 
     @Override
@@ -112,7 +117,7 @@ public final class CustomCommandsAdminCommand extends MysticCommand {
         Optional<CustomCommand> found = module.findDefinition(name);
         if (name == null || found.isEmpty()) {
             sender.replyKey("customcommands-unknown",
-                    java.util.Map.of("command", name == null ? "?" : name));
+                    Map.of("command", name == null ? "?" : name));
             return;
         }
         CustomCommand definition = found.get();
@@ -159,7 +164,7 @@ public final class CustomCommandsAdminCommand extends MysticCommand {
         long errors = module.lastValidation().stream()
                 .filter(issue -> issue.severity() == CustomCommandValidator.Severity.ERROR).count()
                 + module.fileLoader().fileErrors().size();
-        sender.replyKey("customcommands-reloaded", java.util.Map.of(
+        sender.replyKey("customcommands-reloaded", Map.of(
                 "count", Integer.toString(module.registry().size()),
                 "errors", Long.toString(errors)));
         if (errors > 0) {
@@ -178,7 +183,7 @@ public final class CustomCommandsAdminCommand extends MysticCommand {
         Optional<CustomCommand> found = module.findDefinition(name);
         if (name == null || found.isEmpty()) {
             sender.replyKey("customcommands-unknown",
-                    java.util.Map.of("command", name == null ? "?" : name));
+                    Map.of("command", name == null ? "?" : name));
             return;
         }
         CustomCommand definition = found.get();
@@ -201,11 +206,11 @@ public final class CustomCommandsAdminCommand extends MysticCommand {
                         .or(() -> module.registry().byName(name));
         if (found.isEmpty()) {
             sender.replyKey("customcommands-unknown",
-                    java.util.Map.of("command", name == null ? "?" : name));
+                    Map.of("command", name == null ? "?" : name));
             return;
         }
         String rawArgs = args.length <= 2 ? ""
-                : String.join(" ", java.util.Arrays.asList(args).subList(2, args.length));
+                : String.join(" ", Arrays.asList(args).subList(2, args.length));
         sender.reply("&7Testing &f/" + found.get().nameLower()
                 + (rawArgs.isBlank() ? "" : " " + rawArgs) + "&7 (cooldowns ignored)...");
         module.executor().invoke(found.get(), sender.raw().sender(),

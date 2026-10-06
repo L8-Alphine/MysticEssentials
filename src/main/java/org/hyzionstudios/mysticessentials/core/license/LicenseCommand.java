@@ -36,6 +36,8 @@ public final class LicenseCommand extends MysticCommand {
         if (isReload(sender.args())) {
             license.reload();
             sender.reply("&aLicense re-read from disk.");
+            // A license that no longer grants a running module's feature stops it now.
+            core.enforceLicenses();
             report(sender);
             if (!license.hasFeature(Products.Essentials.MODULE_CUSTOM_CONTENT)) {
                 return;

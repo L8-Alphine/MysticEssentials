@@ -2,6 +2,7 @@ package org.hyzionstudios.mysticessentials.core.storage;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.logging.Level;
@@ -147,24 +148,47 @@ public final class RedisBridge {
     }
 
     private void startSubscriber() {
-        subscription = new JedisPubSub() {
+        long generation = lifecycleGeneration;
+        // A subscriber still connecting when Redis is reconfigured cannot be
+        // unsubscribed by shutdown() (it is not subscribed yet), so each one
+        // drops itself as soon as it notices it belongs to an older generation.
+        JedisPubSub pubSub = new JedisPubSub() {
+            @Override
+            public void onPSubscribe(String pattern, int subscribedChannels) {
+                if (generation != lifecycleGeneration) {
+                    punsubscribe();
+                }
+            }
+
             @Override
             public void onPMessage(String pattern, String channel, String message) {
+                if (generation != lifecycleGeneration) {
+                    punsubscribe();
+                    return;
+                }
                 dispatch(message);
             }
         };
-        long generation = lifecycleGeneration;
-        subscriberThread = new Thread(() -> subscriberLoop(generation),
+        subscription = pubSub;
+        // Everything the loop needs is captured now: reconfigure() replaces the fields.
+        String host = config.host;
+        int port = config.port;
+        JedisClientConfig connection = clientConfig;
+        String pattern = channelKey("*");
+        subscriberThread = new Thread(() -> subscriberLoop(generation, pubSub, host, port, connection, pattern),
                 "MysticEssentials-Redis-Sub");
         subscriberThread.setDaemon(true);
         subscriberThread.start();
     }
 
-    private void subscriberLoop(long generation) {
-        String pattern = channelKey("*");
+    private void subscriberLoop(long generation, JedisPubSub pubSub, String host, int port,
+            JedisClientConfig connection, String pattern) {
         while (enabled && !shuttingDown && generation == lifecycleGeneration) {
-            try (Jedis jedis = new Jedis(config.host, config.port, clientConfig)) {
-                jedis.psubscribe(subscription, pattern); // blocks until punsubscribe
+            try (Jedis jedis = new Jedis(host, port, connection)) {
+                if (shuttingDown || generation != lifecycleGeneration) {
+                    return; // superseded while connecting
+                }
+                jedis.psubscribe(pubSub, pattern); // blocks until punsubscribe
             } catch (Throwable t) {
                 if (shuttingDown || generation != lifecycleGeneration) {
                     return;
@@ -258,15 +282,15 @@ public final class RedisBridge {
     }
 
     /** Returns a snapshot of a namespaced Redis set, or an empty set when unavailable. */
-    public java.util.Set<String> cacheSetMembers(String key) {
+    public Set<String> cacheSetMembers(String key) {
         if (!enabled) {
-            return java.util.Set.of();
+            return Set.of();
         }
         try {
-            return java.util.Set.copyOf(commands.smembers(cacheKey(key)));
+            return Set.copyOf(commands.smembers(cacheKey(key)));
         } catch (Throwable t) {
             core.log(Level.WARNING, "Redis cacheSetMembers '" + key + "' failed: " + t);
-            return java.util.Set.of();
+            return Set.of();
         }
     }
 

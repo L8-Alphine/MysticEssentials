@@ -1,5 +1,8 @@
 package org.hyzionstudios.mysticessentials.modules.mail;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /** Persisted mail settings for {@code modules/mail/config.json}. */
 public final class MailConfig {
 
@@ -25,7 +28,7 @@ public final class MailConfig {
     public boolean allowAnnouncementCommands = true;
 
     /** Item ids that may never be mailed (case-insensitive; empty = allow all). */
-    public java.util.List<String> blockedItemIds = new java.util.ArrayList<>();
+    public List<String> blockedItemIds = new ArrayList<>();
 
     /** How many mail rows to show per folder page in the UI. */
     public int pageSize = 6;

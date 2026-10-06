@@ -110,11 +110,15 @@ final class ChannelPages {
             }
             event.addEventBinding(CustomUIEventBindingType.Activating, "#OpenTempButton",
                     new EventData().put("action", "opentemp"));
-            boolean ownsTemp = channels.ownedTemporaryChannel(player.getUuid()).isPresent();
+            boolean ownsTemp = !channels.ownedTemporaryChannelIds(player.getUuid()).isEmpty();
             cmd.set("#ManageTempButton.Visible", ownsTemp);
             if (ownsTemp) {
-                event.addEventBinding(CustomUIEventBindingType.Activating, "#ManageTempButton",
-                        new EventData().put("action", "managetemp"));
+                // Manage acts on the selected channel when it is one of the player's own.
+                EventData manage = new EventData().put("action", "managetemp");
+                if (selected != null) {
+                    manage.put("channel", selected.id());
+                }
+                event.addEventBinding(CustomUIEventBindingType.Activating, "#ManageTempButton", manage);
             }
         }
 
@@ -130,7 +134,7 @@ final class ChannelPages {
                 case "join" -> joinAndRefresh(ref, store, channel, password);
                 case "leave" -> leaveAndRefresh(ref, store, channel);
                 case "opentemp" -> channels.openTempChannelUi(player);
-                case "managetemp" -> channels.openTempManageUi(player);
+                case "managetemp" -> channels.manageSelectedTemporaryChannel(player, channel);
                 case "members" -> reopen(ref, store,
                         new ChannelMembersPage(core, channels, player, channels.currentChannelId(player), ""));
                 default -> {
@@ -229,6 +233,12 @@ final class ChannelPages {
                     reopen(ref, store, new ChannelsPage(core, channels, player));
                     return;
                 }
+                if (channels.temporaryChannelLimitReached(player.getUuid())) {
+                    core.getMessageService().sendKey(player, "chat-channel-temp-limit",
+                            channels.temporaryChannelLimitPlaceholders(player.getUuid()));
+                    reopen(ref, store, new ChannelsPage(core, channels, player));
+                    return;
+                }
                 boolean created = channels.createTemporaryChannel(player.getUuid(), id, null,
                         blankToNull(field(payload, "password")),
                         blankToNull(field(payload, "prefix")),
@@ -237,7 +247,7 @@ final class ChannelPages {
                         ? "chat-channel-temp-created"
                         : "chat-channel-temp-failed", Map.of("channel", id.toLowerCase()));
                 if (created) {
-                    reopen(ref, store, new TempChannelManagePage(core, channels, player));
+                    reopen(ref, store, new TempChannelManagePage(core, channels, player, id));
                 } else {
                     reopen(ref, store, new ChannelsPage(core, channels, player));
                 }
@@ -265,24 +275,27 @@ final class ChannelPages {
 
     static final class TempChannelManagePage extends MysticPage {
         private final ChannelsSubModule channels;
+        /** The temporary channel this page manages: the player may own several. */
+        private final String channelId;
 
-        TempChannelManagePage(MysticCore core, ChannelsSubModule channels, PlayerRef player) {
+        TempChannelManagePage(MysticCore core, ChannelsSubModule channels, PlayerRef player, String channelId) {
             super(core, player, CustomPageLifetime.CanDismiss);
             this.channels = channels;
+            this.channelId = channelId;
         }
 
         @Override
         public void build(Ref<EntityStore> ref, UICommandBuilder cmd, UIEventBuilder event,
                 Store<EntityStore> store) {
             cmd.append(TEMP_MANAGE_UI);
-            ChatConfig.Channel channel = channels.ownedTemporaryChannel(player.getUuid()).orElse(null);
+            ChatConfig.Channel channel = channels.ownedTemporaryChannel(player.getUuid(), channelId).orElse(null);
             if (channel == null) {
                 cmd.set("#ManageChannelName.TextSpans", uiText("#ManageChannelName.TextSpans", "No temporary channel"));
                 cmd.set("#ManageExpiry.TextSpans", uiText("#ManageExpiry.TextSpans", "Create one with /channel temp <id>."));
             } else {
                 cmd.set("#ManageChannelName.TextSpans", uiText("#ManageChannelName.TextSpans", channel.id));
                 cmd.set("#ManageExpiry.TextSpans", uiText("#ManageExpiry.TextSpans", expiryText(
-                        channels.ownedTemporaryChannelExpiry(player.getUuid()).orElse(null))));
+                        channels.temporaryChannelExpiry(channelId).orElse(null))));
                 cmd.set("#ManagePasswordInput.Value", channel.password == null ? "" : channel.password);
                 cmd.set("#ManagePrefixInput.Value", channel.prefix == null ? "" : channel.prefix);
                 event.addEventBinding(CustomUIEventBindingType.Activating, "#SaveChannelButton",
@@ -302,15 +315,15 @@ final class ChannelPages {
             String action = string(payload, "action");
             switch (action) {
                 case "save" -> {
-                    boolean saved = channels.updateTemporaryChannel(player.getUuid(),
+                    boolean saved = channels.updateTemporaryChannel(player.getUuid(), channelId,
                             field(payload, "password"), field(payload, "prefix"));
                     core.getMessageService().sendKey(player, saved
                             ? "chat-channel-temp-updated"
                             : "chat-channel-temp-not-owned");
-                    reopen(ref, store, new TempChannelManagePage(core, channels, player));
+                    reopen(ref, store, new TempChannelManagePage(core, channels, player, channelId));
                 }
                 case "close" -> {
-                    boolean closed = channels.closeTemporaryChannel(player.getUuid());
+                    boolean closed = channels.closeTemporaryChannel(player.getUuid(), channelId);
                     core.getMessageService().sendKey(player, closed
                             ? "chat-channel-temp-closed"
                             : "chat-channel-temp-not-owned");
@@ -347,7 +360,7 @@ final class ChannelPages {
             cmd.append(ROSTER_UI);
             cmd.set("#RosterChannel.TextSpans", uiText("#RosterChannel.TextSpans", channels.displayNameOfId(channelId)));
 
-            List<ChannelMemberView> members = channels.rosterFor(channelId);
+            List<ChannelMemberView> members = channels.rosterFor(channelId, player);
             cmd.set("#RosterCounts.TextSpans", uiText("#RosterCounts.TextSpans", countsSummary(members)));
             cmd.set("#RosterEmpty.Visible", members.isEmpty());
 
@@ -396,7 +409,7 @@ final class ChannelPages {
                 Store<EntityStore> store) {
             cmd.append(MEMBERS_UI);
 
-            List<ChannelMemberView> all = channels.rosterFor(channelId);
+            List<ChannelMemberView> all = channels.rosterFor(channelId, player);
             cmd.set("#InfoName.TextSpans", uiText("#InfoName.TextSpans", channels.displayNameOfId(channelId)));
             cmd.set("#InfoType.TextSpans", uiText("#InfoType.TextSpans", channels.isTemporaryChannel(channelId)
                     ? "Temporary Channel" : "Server Channel"));
@@ -485,7 +498,7 @@ final class ChannelPages {
             event.addEventBinding(CustomUIEventBindingType.Activating, "#BackBtn",
                     new EventData().put("action", "back"));
 
-            ChannelMemberView view = channels.rosterMember(channelId, target).orElse(null);
+            ChannelMemberView view = channels.rosterMember(channelId, target, player).orElse(null);
             if (view == null) {
                 cmd.set("#MName.TextSpans", uiText("#MName.TextSpans", "Member left the channel"));
                 cmd.set("#MTags.TextSpans", uiText("#MTags.TextSpans", ""));

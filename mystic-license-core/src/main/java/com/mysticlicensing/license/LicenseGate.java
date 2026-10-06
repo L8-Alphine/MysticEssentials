@@ -68,6 +68,7 @@ public final class LicenseGate implements MysticLicenseService {
 
     private final String productId;
     private final Path dataDir;
+    private final Path modsDir;
     private final Supplier<Path> licenseFile;
     private final Supplier<String> serverUuidSupplier;
     private final String modVersion;
@@ -88,6 +89,7 @@ public final class LicenseGate implements MysticLicenseService {
     private LicenseGate(Builder builder, McLicenseVerifier verifier, String keyFailure) {
         this.productId = builder.productId;
         this.dataDir = builder.dataDir;
+        this.modsDir = builder.modsDir != null ? builder.modsDir : defaultModsDir(builder.dataDir);
         this.licenseFile = builder.licenseFile;
         this.serverUuidSupplier = builder.serverUuid;
         this.modVersion = builder.modVersion;
@@ -154,13 +156,17 @@ public final class LicenseGate implements MysticLicenseService {
                         + "the server binding cannot be checked."));
             }
         } else {
-            ServerIdentity.Result identity = ServerIdentity.resolve(dataDir);
+            ServerIdentity.Result identity = ServerIdentity.resolveShared(modsDir, dataDir);
             if (identity.detail() != null) {
                 log.warn(prefixed(identity.detail()));
             }
             if (identity.outcome() == ServerIdentity.Outcome.CREATED) {
                 log.info(prefixed("Generated this server's licensing id: " + identity.uuid()
-                        + " (stored in " + dataDir.resolve(ServerIdentity.IDENTITY_FILE) + ")"));
+                        + " (stored in " + sharedIdentityFile() + ", shared by every Mystic mod)"));
+            } else if (identity.outcome() == ServerIdentity.Outcome.MIGRATED) {
+                log.info(prefixed("This server's licensing id " + identity.uuid() + " is now kept in "
+                        + sharedIdentityFile() + ", shared by every Mystic mod. The per-mod "
+                        + ServerIdentity.IDENTITY_FILE + " files are left in place."));
             }
             serverUuid = identity.uuid();
         }
@@ -184,6 +190,26 @@ public final class LicenseGate implements MysticLicenseService {
                             + result.payload().serverUuids() + " cannot be checked");
         }
 
+        // A license bound to the id this mod kept in its own data folder, before
+        // Mystic mods shared one, keeps working - still checked offline, against
+        // that file - so updating a mod never strands a license on another id.
+        if (result.status() == LicenseStatus.WRONG_SERVER && serverUuidSupplier == null) {
+            Optional<UUID> own = ServerIdentity.load(dataDir);
+            if (own.isPresent() && !own.get().equals(serverUuid)) {
+                LicenseCheckResult legacy = verifier.verifyFile(file,
+                        own.get().toString().toLowerCase(Locale.ROOT), clock.instant());
+                if (legacy.grantsAccess()) {
+                    log.warn(prefixed("This license is bound to " + own.get() + ", the id in "
+                            + dataDir.resolve(ServerIdentity.IDENTITY_FILE) + " from before Mystic mods "
+                            + "shared " + sharedIdentityFile() + " (" + serverUuid + "). It is still "
+                            + "accepted; move it to the shared id with the portal's "
+                            + "server-replacement flow."));
+                    result = legacy;
+                    serverUuid = own.get();
+                }
+            }
+        }
+
         // --- 3. help the operator get a license --------------------------------
         if (writeRequestFile && result.status() == LicenseStatus.MISSING && serverUuid != null) {
             try {
@@ -203,18 +229,18 @@ public final class LicenseGate implements MysticLicenseService {
 
     @Override
     public LicenseStatus status() {
-        return state.status();
+        return effectiveStatus(state);
     }
 
     @Override
     public boolean isValid() {
-        return state.status().grantsAccess();
+        return effectiveStatus(state).grantsAccess();
     }
 
     @Override
     public boolean isProductLicensed(String product) {
         State current = state;
-        return current.status().grantsAccess()
+        return effectiveStatus(current).grantsAccess()
                 && current.payload() != null
                 && current.payload().coversProduct(product);
     }
@@ -222,9 +248,33 @@ public final class LicenseGate implements MysticLicenseService {
     @Override
     public boolean hasFeature(String product, String featureId) {
         State current = state;
-        return current.status().grantsAccess()
+        return effectiveStatus(current).grantsAccess()
                 && current.payload() != null
                 && current.payload().coversFeature(product, featureId);
+    }
+
+    /**
+     * The verified status, aged to now: a license verified while valid (or in
+     * grace) stops granting once its grace period ends, even if the server has
+     * been running since before that and nobody reloaded it.
+     */
+    private LicenseStatus effectiveStatus(State current) {
+        LicenseStatus status = current.status();
+        LicensePayload payload = current.payload();
+        if (!status.grantsAccess() || payload == null) {
+            return status;
+        }
+        Instant expiresAt = payload.expiresAtOrNull();
+        if (expiresAt == null) {
+            return status;
+        }
+        Instant now = clock.instant();
+        if (!now.isAfter(expiresAt)) {
+            return status;
+        }
+        return now.isAfter(McLicenseVerifier.graceEnd(expiresAt, payload.gracePeriodSeconds()))
+                ? LicenseStatus.EXPIRED
+                : LicenseStatus.GRACE_PERIOD;
     }
 
     @Override
@@ -341,8 +391,8 @@ public final class LicenseGate implements MysticLicenseService {
                     + " and restart. Everything else keeps working.";
             case WRONG_SERVER -> state.serverUuid() == null
                     ? "This license is bound to a specific server, and this server's licensing id "
-                            + "could not be read. Fix or delete " + dataDir.resolve(ServerIdentity.IDENTITY_FILE)
-                            + ", then re-register the server in the portal."
+                            + "could not be read. Fix or delete the " + ServerIdentity.IDENTITY_FILE
+                            + " named above, then re-register the server in the portal."
                     : "This license is bound to a different server UUID. This server's id is "
                             + state.serverUuid() + ". Use the portal's server-replacement flow to move it.";
             case EXPIRED -> "The license and its grace period have both ended. Renew it in the portal.";
@@ -376,6 +426,20 @@ public final class LicenseGate implements MysticLicenseService {
         }
     }
 
+    /** The identity file every Mystic mod on this server shares. */
+    private Path sharedIdentityFile() {
+        return ServerIdentity.sharedDir(modsDir).resolve(ServerIdentity.IDENTITY_FILE);
+    }
+
+    /** The data folder's parent: every Mystic mod keeps its data folder in the mods folder. */
+    private static Path defaultModsDir(Path dataDir) {
+        Path parent = dataDir.normalize().getParent();
+        if (parent == null) {
+            parent = dataDir.toAbsolutePath().normalize().getParent();
+        }
+        return parent != null ? parent : dataDir;
+    }
+
     private static UUID parseUuid(String value) {
         try {
             return UUID.fromString(value.trim());
@@ -397,6 +461,7 @@ public final class LicenseGate implements MysticLicenseService {
     public static final class Builder {
         private final String productId;
         private Path dataDir = Path.of(".");
+        private Path modsDir;
         private Supplier<Path> licenseFile;
         private Supplier<String> serverUuid;
         private String modVersion = "unknown";
@@ -413,10 +478,22 @@ public final class LicenseGate implements MysticLicenseService {
 
         /**
          * The mod's data directory. Unless overridden, {@code license.mclicense}
-         * and {@code server-id.txt} live here.
+         * and {@code license-request.json} live here. The server id does not: see
+         * {@link #modsDir}.
          */
         public Builder dataDir(Path value) {
             this.dataDir = Objects.requireNonNull(value, "dataDir");
+            return this;
+        }
+
+        /**
+         * The server's mods folder. Every Mystic mod shares one server id in
+         * {@code <modsDir>/.mystic/server-id.txt} ({@link ServerIdentity#resolveShared}).
+         * Defaults to the data directory's parent, which is the mods folder when the
+         * data directory is {@code mods/<ModName>}.
+         */
+        public Builder modsDir(Path value) {
+            this.modsDir = Objects.requireNonNull(value, "modsDir");
             return this;
         }
 
@@ -428,8 +505,9 @@ public final class LicenseGate implements MysticLicenseService {
 
         /**
          * Override how this server's UUID is determined. Defaults to
-         * {@link ServerIdentity}, which persists one in the data directory.
-         * The value is normalised to lowercase before the binding check.
+         * {@link ServerIdentity}, which persists one shared by every Mystic mod
+         * (see {@link #modsDir}). The value is normalised to lowercase before the
+         * binding check.
          */
         public Builder serverUuid(Supplier<String> value) {
             this.serverUuid = value;

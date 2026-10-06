@@ -7,7 +7,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -46,7 +48,7 @@ final class RtpSearchEngine {
     private final List<RtpExclusionProvider> exclusions = new CopyOnWriteArrayList<>();
 
     private final Deque<Search> queue = new ConcurrentLinkedDeque<>();
-    private final java.util.Set<Search> active = ConcurrentHashMap.newKeySet();
+    private final Set<Search> active = ConcurrentHashMap.newKeySet();
     private final Map<UUID, Search> byPlayer = new ConcurrentHashMap<>();
     private final Map<String, Deque<CachedLocation>> cache = new ConcurrentHashMap<>();
 
@@ -97,11 +99,11 @@ final class RtpSearchEngine {
 
     // ----- Submission --------------------------------------------------------
 
-    java.util.concurrent.CompletableFuture<RtpDestinationResult> submit(RtpProfile profile, UUID player,
+    CompletableFuture<RtpDestinationResult> submit(RtpProfile profile, UUID player,
             int priority) {
         RandomTeleportConfig cfg = config;
         if (queue.size() + active.size() >= cfg.searchEngine.maximumQueueSize) {
-            return java.util.concurrent.CompletableFuture.completedFuture(
+            return CompletableFuture.completedFuture(
                     RtpDestinationResult.notFound(0, "queue_full", Map.of()));
         }
         Search s = new Search(profile, player, priority,
@@ -415,8 +417,7 @@ final class RtpSearchEngine {
         final long deadline;
         final int maxAttempts;
         final long submittedAt = System.nanoTime();
-        final java.util.concurrent.CompletableFuture<RtpDestinationResult> future =
-                new java.util.concurrent.CompletableFuture<>();
+        final CompletableFuture<RtpDestinationResult> future = new CompletableFuture<>();
         final Random rng = new Random();
         final Map<String, Integer> tally = new ConcurrentHashMap<>();
         final AtomicInteger attempts = new AtomicInteger();

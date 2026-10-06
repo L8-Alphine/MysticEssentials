@@ -3,6 +3,7 @@ package org.hyzionstudios.mysticessentials.modules.tutorial;
 import java.util.Collection;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
@@ -130,8 +131,7 @@ public final class TutorialModule extends AbstractMysticModule implements Tutori
         // Chat block while a session says so (async cancellable chat event).
         registerAsyncEvent(PlayerChatEvent.class,
                 (CompletableFuture<PlayerChatEvent> future) -> future.thenApply(event -> {
-                    if (active && config.enabled && event.getSender() != null
-                            && sessions.isChatBlocked(event.getSender().getUuid())) {
+                    if (event.getSender() != null && isChatBlocked(event.getSender().getUuid())) {
                         event.setCancelled(true);
                         core.getMessageService().sendKey(event.getSender(), "tutorial-chat-blocked");
                     }
@@ -146,9 +146,10 @@ public final class TutorialModule extends AbstractMysticModule implements Tutori
             return;
         }
         storage.load(player.getUuid(), player.getUsername()).thenAccept(data -> {
-            // Repair an unclean exit first (lingering invulnerability/HUD/camera).
-            sessions.recoverOnJoin(player, data);
-            scheduleFirstJoin(player, data.hasCompleted(config.firstJoin.tutorialId));
+            // Repair an unclean exit first (lingering invulnerability/HUD/camera);
+            // the first-join tutorial waits for it so it never captures that state.
+            sessions.recoverOnJoin(player, data).thenRun(() ->
+                    scheduleFirstJoin(player, data.hasCompleted(config.firstJoin.tutorialId)));
         });
     }
 
@@ -166,7 +167,10 @@ public final class TutorialModule extends AbstractMysticModule implements Tutori
             return;
         }
         long delayMillis = Math.max(0, firstJoin.delayTicksAfterJoin) * 50L;
-        core.scheduler().runLater(() -> {
+        // The delay counts from the moment the player is in a world: joining can
+        // take far longer than the delay, and the tutorial needs the entity and
+        // its world (requirements, snapshot, scene).
+        core.platform().runOnEntityThread(player, (store, ref, world) -> core.scheduler().runLater(() -> {
             if (!active || !config.enabled) {
                 return;
             }
@@ -182,13 +186,14 @@ public final class TutorialModule extends AbstractMysticModule implements Tutori
                                     + " not started: " + result);
                         }
                     });
-        }, delayMillis, TimeUnit.MILLISECONDS);
+        }, delayMillis, TimeUnit.MILLISECONDS));
     }
 
     private void onQuit(PlayerRef player) {
         if (sessions != null) {
-            // Ends the session and keeps the recovery marker (restore cannot run
-            // on a gone entity); the data is flushed by the unload below.
+            // Ends the session: the restore is queued on the world thread before
+            // the engine removes the entity, and the recovery marker is kept in
+            // case it never runs. The data is flushed by the unload below.
             sessions.stop(player.getUuid(), TutorialStopReason.DISCONNECT);
         }
         if (storage != null) {
@@ -294,6 +299,11 @@ public final class TutorialModule extends AbstractMysticModule implements Tutori
     @Override
     public boolean isInTutorial(PlayerRef player) {
         return service.isInTutorial(player);
+    }
+
+    @Override
+    public boolean isChatBlocked(UUID player) {
+        return active && config.enabled && player != null && sessions.isChatBlocked(player);
     }
 
     @Override

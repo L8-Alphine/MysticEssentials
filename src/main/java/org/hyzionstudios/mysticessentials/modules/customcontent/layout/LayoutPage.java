@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.platform.ui.MysticPage;
@@ -122,13 +123,22 @@ public final class LayoutPage extends MysticPage {
     public void handleDataEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
         JsonObject payload = parse(data);
         String action = string(payload, "action");
-        UiNode node = layout == null ? null : layout.node(string(payload, "node"));
+        String selector = string(payload, "node");
+        UiNode node = layout == null ? null : layout.node(selector);
         if (node == null) {
             return;
         }
 
-        Map<String, String> inputs = readInputs(payload);
         LayoutBridge bridge = runtime.bridge();
+        // The client keeps the bindings of hidden elements, so a node inside a
+        // section the player does not meet is refused here, not just hidden.
+        for (UiNode ancestor : layout.ancestors(selector)) {
+            if (!bridge.meetsRequirements(player, ancestor.requirements)) {
+                return;
+            }
+        }
+
+        Map<String, String> inputs = readInputs(payload, layout.inputs().keySet());
         boolean close = value(node.close, document.defaultClose);
         boolean refresh = value(node.refresh, document.defaultRefresh);
         List<String> actions;
@@ -138,7 +148,8 @@ public final class LayoutPage extends MysticPage {
             UiNode.Option option = node.options.stream()
                     .filter(candidate -> candidate.value().equals(selected))
                     .findFirst().orElse(null);
-            if (option == null || !bridge.meetsRequirements(player, option.requirements())) {
+            if (option == null || !bridge.meetsRequirements(player, node.requirements)
+                    || !bridge.meetsRequirements(player, option.requirements())) {
                 return;
             }
             bridge.consumeRequirements(player, option.requirements());
@@ -162,7 +173,7 @@ public final class LayoutPage extends MysticPage {
         }
 
         LayoutActions.Outcome outcome =
-                runtime.actions().run(player, substitute(actions, inputs), ref, store);
+                runtime.actions().run(player, substitute(actions, inputs), inputs, ref, store);
         if (outcome != LayoutActions.Outcome.CONTINUE) {
             // An action already opened or closed a surface; reopening this one
             // on top of it would fight whatever the player just navigated to.
@@ -183,13 +194,17 @@ public final class LayoutPage extends MysticPage {
         }
     }
 
-    /** @return input name to current value, from the {@code @in_*} event keys. */
-    private static Map<String, String> readInputs(JsonObject payload) {
+    /**
+     * @return input name to current value, from the {@code @in_*} event keys;
+     *         only inputs this surface rendered are accepted, so a client cannot
+     *         fill any other {@code {token}} of an action
+     */
+    private static Map<String, String> readInputs(JsonObject payload, Set<String> declared) {
         Map<String, String> inputs = new LinkedHashMap<>();
         for (String key : payload.keySet()) {
             String name = key.startsWith("@in_") ? key.substring(4)
                     : key.startsWith("in_") ? key.substring(3) : null;
-            if (name != null && payload.get(key).isJsonPrimitive()) {
+            if (name != null && declared.contains(name) && payload.get(key).isJsonPrimitive()) {
                 inputs.put(name, sanitize(payload.get(key).getAsString()));
             }
         }
@@ -205,13 +220,22 @@ public final class LayoutPage extends MysticPage {
         return value.replaceAll("[\\p{Cntrl}]", "").trim();
     }
 
-    /** Replaces {@code {name}} in actions with the matching input's value. */
+    /**
+     * Replaces {@code {name}} in actions with the matching input's value. Typed
+     * and message/broadcast actions are left alone: {@link LayoutActions} fills
+     * them itself (payload values after splitting, so an input cannot add or
+     * override payload keys; message text after placeholders, as plain text).
+     */
     private static List<String> substitute(List<String> actions, Map<String, String> inputs) {
         if (actions.isEmpty() || inputs.isEmpty()) {
             return actions;
         }
         List<String> resolved = new ArrayList<>(actions.size());
         for (String action : actions) {
+            if (LayoutActions.fillsInputsItself(action)) {
+                resolved.add(action);
+                continue;
+            }
             String current = action;
             for (Map.Entry<String, String> input : inputs.entrySet()) {
                 current = current.replace("{" + input.getKey() + "}", input.getValue());

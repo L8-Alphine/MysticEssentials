@@ -1,5 +1,9 @@
 package org.hyzionstudios.mysticessentials.core.notification;
 
+import java.time.Duration;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 
@@ -15,6 +19,7 @@ import com.hypixel.hytale.server.core.asset.type.soundevent.config.SoundEvent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.SoundUtil;
 import com.hypixel.hytale.server.core.util.EventTitleUtil;
+import com.hypixel.hytale.server.core.util.NotificationUtil;
 
 /**
  * Pushes one notification onto one player's screen across every enabled surface.
@@ -39,6 +44,8 @@ import com.hypixel.hytale.server.core.util.EventTitleUtil;
 final class NotificationDelivery {
 
     private final MysticCore core;
+    /** Latest push per player and HUD key; an older push's timer must not remove a newer HUD. */
+    private final Map<String, Object> hudTokens = new ConcurrentHashMap<>();
     private volatile NotificationConfig config;
 
     NotificationDelivery(MysticCore core, NotificationConfig config) {
@@ -93,7 +100,7 @@ final class NotificationDelivery {
      * clause is the reason this decision lives in one method instead of being
      * repeated at six call sites.</p>
      */
-    private boolean enabled(boolean profileValue, java.util.Optional<Boolean> override,
+    private boolean enabled(boolean profileValue, Optional<Boolean> override,
             boolean preference, boolean overridePreferences) {
         boolean wanted = override.orElse(profileValue);
         if (!wanted) {
@@ -161,9 +168,7 @@ final class NotificationDelivery {
             // The action bar is transient by definition — schedule its own removal
             // rather than leaving the last notice pinned above the hotbar forever.
             long seconds = Math.max(1, profile.stayMillis / 1000);
-            core.scheduler().runLater(
-                    () -> core.platform().removeHud(player, NotificationHuds.ACTION_BAR_KEY),
-                    seconds, TimeUnit.SECONDS);
+            removeHudLater(player, NotificationHuds.ACTION_BAR_KEY, seconds);
         } catch (Throwable t) {
             logSurfaceFailure("action bar", t);
         }
@@ -180,10 +185,10 @@ final class NotificationDelivery {
                     : null;
             NotificationStyle style = toastStyle(notification.priority());
             if (secondary == null) {
-                com.hypixel.hytale.server.core.util.NotificationUtil
+                NotificationUtil
                         .sendNotification(player.getPacketHandler(), primary, style);
             } else {
-                com.hypixel.hytale.server.core.util.NotificationUtil
+                NotificationUtil
                         .sendNotification(player.getPacketHandler(), primary, secondary, style);
             }
         } catch (Throwable t) {
@@ -232,7 +237,7 @@ final class NotificationDelivery {
             return;
         }
         long seconds = notification.duration()
-                .map(java.time.Duration::toSeconds)
+                .map(Duration::toSeconds)
                 .orElse((long) profile.durationSeconds);
         seconds = Math.max(1, seconds);
         // A banner the player cannot dismiss says so, so nobody spends the
@@ -241,12 +246,26 @@ final class NotificationDelivery {
         try {
             core.platform().showHud(player,
                     new NotificationHuds.Banner(player, text, hint, safeColor(category.accent), 1.0));
-            core.scheduler().runLater(
-                    () -> core.platform().removeHud(player, NotificationHuds.BANNER_KEY),
-                    seconds, TimeUnit.SECONDS);
+            removeHudLater(player, NotificationHuds.BANNER_KEY, seconds);
         } catch (Throwable t) {
             logSurfaceFailure("banner", t);
         }
+    }
+
+    /**
+     * Removes the HUD under {@code key} after {@code seconds}, unless it was
+     * pushed again meanwhile: the key is shared, so the older timer would
+     * otherwise take down the newer action bar or banner early.
+     */
+    private void removeHudLater(PlayerRef player, String key, long seconds) {
+        String slot = player.getUuid() + "/" + key;
+        Object token = new Object();
+        hudTokens.put(slot, token);
+        core.scheduler().runLater(() -> {
+            if (hudTokens.remove(slot, token)) {
+                core.platform().removeHud(player, key);
+            }
+        }, seconds, TimeUnit.SECONDS);
     }
 
     /** Removes a pinned banner ahead of its scheduled expiry. */

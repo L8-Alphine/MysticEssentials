@@ -15,8 +15,8 @@ identifiers change.
 ## 1. The adapter
 
 `LicenseSupport` is the entire Hytale-facing layer. It supplies the data
-directory and a logger; the server UUID is left to the library, which persists
-one in `server-id.txt`.
+directory, the mods folder and a logger; the server UUID is left to the library,
+which persists one in `mods/.mystic/server-id.txt`, shared by every Mystic mod.
 
 `src/main/java/org/hyzionstudios/mysticessentials/core/license/LicenseSupport.java`
 
@@ -24,6 +24,7 @@ one in `server-id.txt`.
 public static LicenseGate create(MysticCore core) {
     return LicenseGate.builder(Products.ESSENTIALS)
             .dataDir(core.paths().root())        // mods/MysticEssentials
+            .modsDir(PluginManager.MODS_PATH)    // mods: the shared .mystic/server-id.txt
             .modVersion(core.getVersion())
             .logger(adapt(core))                 // info + warn onto the plugin logger
             .build();
@@ -117,7 +118,7 @@ anything else asks about a feature.
 ### No license file
 
 ```
-[INFO]    [mysticessentials] Generated this server's licensing id: 20bf6b33-b798-43bb-b248-e4162a26ce28 (stored in mods\MysticEssentials\server-id.txt)
+[INFO]    [mysticessentials] Generated this server's licensing id: 20bf6b33-b798-43bb-b248-e4162a26ce28 (stored in mods\.mystic\server-id.txt, shared by every Mystic mod)
 [INFO]    [mysticessentials] No license found. Upload mods\MysticEssentials\license-request.json to the licensing portal to register this server.
 [WARNING] [mysticessentials] License: MISSING | server=20bf6b33-b798-43bb-b248-e4162a26ce28 | no license file at mods\MysticEssentials\license.mclicense
 [WARNING] [mysticessentials] Place license.mclicense in mods\MysticEssentials and restart. Everything else keeps working.

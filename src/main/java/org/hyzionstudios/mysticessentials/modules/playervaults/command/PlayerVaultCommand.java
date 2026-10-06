@@ -1,5 +1,7 @@
 package org.hyzionstudios.mysticessentials.modules.playervaults.command;
 
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -248,21 +250,9 @@ public final class PlayerVaultCommand extends MysticCommand {
             sender.replyKey("no-permission");
             return;
         }
-        VaultOpenMode mode = resolveAdminMode(viewer);
+        VaultOpenMode mode = perms().adminOpenMode(viewer);
         resolveTarget(sender, viewer, targetName, (uuid, name, online) ->
                 module.ui().openAdminVault(viewer, uuid, name, number, mode, online));
-    }
-
-    private VaultOpenMode resolveAdminMode(PlayerRef viewer) {
-        boolean canEdit = perms().canAdminEdit(viewer);
-        boolean preferReadOnly = "READ_ONLY".equalsIgnoreCase(config().admin.defaultAdminMode);
-        if (canEdit && !preferReadOnly) {
-            return VaultOpenMode.ADMIN_EDIT;
-        }
-        if (perms().canAdminReadOnly(viewer)) {
-            return VaultOpenMode.ADMIN_READONLY;
-        }
-        return canEdit ? VaultOpenMode.ADMIN_EDIT : VaultOpenMode.ADMIN_READONLY;
     }
 
     // ----- Target resolution (online, then offline by UUID) ---------------------
@@ -303,8 +293,8 @@ public final class PlayerVaultCommand extends MysticCommand {
     }
 
     private static String shortTime(long epochMillis) {
-        return java.time.Instant.ofEpochMilli(epochMillis)
-                .atZone(java.time.ZoneId.systemDefault())
+        return Instant.ofEpochMilli(epochMillis)
+                .atZone(ZoneId.systemDefault())
                 .toLocalDate().toString();
     }
 }

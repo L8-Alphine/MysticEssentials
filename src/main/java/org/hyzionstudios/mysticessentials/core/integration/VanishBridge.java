@@ -26,47 +26,51 @@ public final class VanishBridge {
             "org.hyzionstudios.mysticvanish.api.MysticVanishProvider";
 
     private final MysticCore core;
-    private boolean enabled;
-    private boolean present;
-    private Method providerGet;
-    private Method providerRegistered;
-    private Method isVanished;
-    private Method canSee;
+    /**
+     * The resolved MysticVanish hooks, or {@code null} when unavailable. Published
+     * as one immutable value so a caller racing a reload never sees a
+     * half-cleared set.
+     */
+    private volatile Hooks hooks;
+
+    /** The reflective handles, resolved together. */
+    private record Hooks(Method providerGet, Method providerRegistered, Method isVanished,
+            Method canSee) {
+    }
 
     public VanishBridge(MysticCore core) {
         this.core = core;
     }
 
     public void init(boolean enabledInConfig) {
-        enabled = enabledInConfig;
-        clear();
-        if (!enabled) {
+        if (!enabledInConfig) {
+            hooks = null;
             core.log(Level.INFO, "Vanish integration: disabled in config");
             return;
         }
+        Hooks resolved;
         try {
             Class<?> provider = Class.forName(PROVIDER_CLASS, false,
                     VanishBridge.class.getClassLoader());
             Class<?> api = provider.getMethod("get").getReturnType();
-            providerGet = provider.getMethod("get");
-            providerRegistered = provider.getMethod("isRegistered");
-            isVanished = api.getMethod("isVanished", UUID.class);
-            canSee = api.getMethod("canSee", UUID.class, UUID.class);
-            present = true;
+            resolved = new Hooks(provider.getMethod("get"), provider.getMethod("isRegistered"),
+                    api.getMethod("isVanished", UUID.class),
+                    api.getMethod("canSee", UUID.class, UUID.class));
         } catch (Throwable t) {
-            clear();
+            resolved = null;
         }
+        hooks = resolved;
         core.log(Level.INFO, "Vanish integration: MysticVanish "
-                + (present ? "detected" : "not present"));
+                + (resolved != null ? "detected" : "not present"));
     }
 
     public boolean isAvailable() {
-        return enabled && present && providerRegistered();
+        return available(hooks);
     }
 
-    private boolean providerRegistered() {
+    private static boolean available(Hooks h) {
         try {
-            return Boolean.TRUE.equals(providerRegistered.invoke(null));
+            return h != null && Boolean.TRUE.equals(h.providerRegistered().invoke(null));
         } catch (Throwable t) {
             return false;
         }
@@ -74,12 +78,13 @@ public final class VanishBridge {
 
     /** @return {@code true} if the player is currently vanished. */
     public boolean isVanished(UUID player) {
-        if (!isAvailable() || player == null) {
+        Hooks h = hooks;
+        if (!available(h) || player == null) {
             return false;
         }
         try {
-            Object api = providerGet.invoke(null);
-            return Boolean.TRUE.equals(isVanished.invoke(api, player));
+            Object api = h.providerGet().invoke(null);
+            return Boolean.TRUE.equals(h.isVanished().invoke(api, player));
         } catch (Throwable t) {
             return false;
         }
@@ -91,13 +96,14 @@ public final class VanishBridge {
      *         absent). A {@code null} viewer means "the server" and sees everyone.
      */
     public boolean canSee(UUID viewer, UUID target) {
-        if (!isAvailable() || target == null || viewer == null || viewer.equals(target)) {
+        Hooks h = hooks;
+        if (!available(h) || target == null || viewer == null || viewer.equals(target)) {
             return true;
         }
         try {
-            Object api = providerGet.invoke(null);
-            return !Boolean.TRUE.equals(isVanished.invoke(api, target))
-                    || Boolean.TRUE.equals(canSee.invoke(api, viewer, target));
+            Object api = h.providerGet().invoke(null);
+            return !Boolean.TRUE.equals(h.isVanished().invoke(api, target))
+                    || Boolean.TRUE.equals(h.canSee().invoke(api, viewer, target));
         } catch (Throwable t) {
             return true;
         }
@@ -112,13 +118,5 @@ public final class VanishBridge {
             }
         }
         return visible;
-    }
-
-    private void clear() {
-        present = false;
-        providerGet = null;
-        providerRegistered = null;
-        isVanished = null;
-        canSee = null;
     }
 }

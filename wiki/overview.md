@@ -42,10 +42,11 @@ Developers should start with [Developer API](developer-api). Mystic Essentials e
 After the server starts once with Mystic Essentials installed, the mod creates:
 
 ```text
+mods/.mystic/
+  server-id.txt            # licensing identity, shared by every Mystic mod
 mods/MysticEssentials/
   config.json
   license.mclicense        # only when installing a licensed feature
-  server-id.txt            # generated licensing identity
   messages/en_us.json
   modules/<module>/config.json
   data/

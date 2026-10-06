@@ -110,7 +110,7 @@ Player, home, and warp names autocomplete.
 | `/tpall` | Teleport every online player to you | `mysticessentials.teleport.tpall` |
 | `/top` | Teleport to the highest block in your current column | `mysticessentials.teleport.top` |
 | `/back` | Return to your previous location | `mysticessentials.teleport.back` |
-| `/rtp [profile]` | Randomly teleport to a safe destination | `mysticessentials.teleport.rtp` |
+| `/rtp [profile]` | Randomly teleport to a safe destination | `mysticessentials.teleport.rtp.use` |
 | `/rtpadmin` | Inspect and administer random-teleport profiles/searches | `mysticessentials.teleport.rtp.admin` |
 
 The Teleport Requests UI (`/tpa` with no player) includes a **favorites list**:
@@ -208,12 +208,15 @@ Bypass: `mysticessentials.craftblock.bypass` (all items) or
 |---|---|---|
 | `/msg <player> <message>` | Private message (aliases `/tell`, `/w`, `/whisper`) | — |
 | `/reply <message>` | Reply to your last PM (alias `/r`) | — |
+| `/ignore [player]` | Ignore a player (their chat lines, mentions, private messages and mail are kept from you, across renames); without a name, list who you ignore | `mysticessentials.chat.ignore` |
+| `/unignore <player>` | Stop ignoring a player | `mysticessentials.chat.ignore` |
 | `/channel` | Open the channel browser/menu (alias `/ch`) | — |
 | `/channel <name>` or `/channel switch <name> [password]` | Switch the channel you speak in | — |
 | `/channel join <name> [password]` | Listen to a channel you can access | — |
 | `/channel leave <name>` | Stop listening to a channel | — |
 | `/channel temp <id> [password\|-] [prefix\|-] [alias1,alias2\|-] [permission]` | Create a temporary channel | `mysticessentials.chat.channel.create.temp` |
-| `/channel manage` | Open the manager UI for your temporary channel | — |
+| `/channel manage [channel]` | Open the manager UI for your temporary channel (name it when you own several) | — |
+| `/channel close\|lock\|unlock [channel]` | Close, lock or unlock a temporary channel you manage: the one named, else the one you are in, else the only one you own | Owner/moderator rules apply |
 | Configured aliases, e.g. `/g`, `/global`, `/sc`, `/schat`, `/staffchat` | Quickly switch speaking channel | — |
 | `/mentions` | Configure who may mention you and how you are notified (alias `/mentionsettings`) | — |
 | `/iteminspect [code\|n\|latest]` | Open the Item Details panel for a shared item (alias `/itemview`) | — |
@@ -238,6 +241,27 @@ Aether, and trailing punctuation (`@Aether,`) is handled. Mentions inside URLs,
 email addresses, and item data are ignored. Sender cooldowns, a per-minute
 budget, and per-recipient sound throttling keep mentions from becoming a
 nuisance, and every recipient can retune or switch them off with `/mentions`.
+
+#### Ignoring players
+
+`/ignore <player>` keeps that player's public and channel chat lines, the chat
+other mods hand over (guild, party...), their mentions, their private messages
+(`/msg`, `/reply`, across servers and as offline mail) and their mail (`/mail
+send`, the mail composer, and player mail other mods send) away from you. A
+refused sender is told they can't message or mail you right now, the same reply
+any refused private message gets. `/ignore` alone lists who you ignore, under
+their current names, and `/unignore <player>` undoes it. The list is kept by UUID
+with your notification preferences, so renames keep it. Players with
+`mysticessentials.chat.ignore.exempt` cannot be ignored and always reach you.
+
+**Stored lists and `json` storage:** a player online on this server is checked
+against their live list, and a private message to a player online on another
+server is checked on that server. Mail, and a private message to an offline
+player, are checked against the list stored in the recipient's profile — the copy
+last saved. With `storage.provider` set to `json` every server keeps its own
+profiles, so on a network that is the copy *this* server saved: ignores added
+while the recipient was on another server are not seen here until they join this
+server again. With `mysql` or `mariadb` every server reads the same stored copy.
 
 ### Announcements & AFK
 | Command | Description | Permission |
@@ -656,6 +680,7 @@ Notable per-module settings:
   colour/format markup through Custom UI `TextSpans`.
 - **spawn** — `defaultHomeLimit`, `teleportOnFirstJoin`, `teleportOnJoin`.
 - **chat** — `defaultFormat`, priority-ordered `formats` (permission-gated),
+  `deliveryFormat` (chat other mods hand over through `ChatService.deliver`),
   per-colour-style permissions, private messaging, channel definitions, temporary
   channels, and configurable channel prefixes/aliases/passwords.
   `/channel` opens the packaged channel browser UI
@@ -663,6 +688,12 @@ Notable per-module settings:
   Temporary channels are session channels: without Redis they stay open until
   the server is empty or restarts; with Redis enabled they can be restored after
   restart for `temporaryChannelDefaultMinutes` (default `120`) minutes.
+  `maxTemporaryChannelsPerOwner` (default `1`; `0` = unlimited) caps how many
+  temporary channels one player may own at once, across all servers when Redis
+  is enabled; holders of `mysticessentials.channel.staff.override` are exempt.
+  An owner of several names the one to act on (`/channel manage <channel>`,
+  `/channel close <channel>`, or the channel selected in the browser before
+  pressing Manage); with one, nothing changes.
 - **announcements** — `autoBroadcastEnabled`, `intervalSeconds`, `randomOrder`,
   and `messages`. Message entries may be legacy strings or JSON objects:
   `{"lines":["&7Line one","&fLine two"],"click":{"action":"command","value":"/spawn"}}`.
@@ -714,7 +745,9 @@ Notable per-module settings:
   `itemId`, overflow drops), and `command` (runs `command` as the console with
   `{player}`/`{uuid}` placeholders). `weight` sets relative odds, an optional
   `message` overrides the default reward message, and `maxRollsPerDay` caps
-  total rolls per player per day (`0` = unlimited). Example:
+  total rolls per player per day (`0` = unlimited). The daily counts behind
+  `maxDailyReward` and `maxRollsPerDay` are kept per player per UTC day in the
+  player profile, so a restart or relog does not reset them. Example:
 
   ```json
   "rewardPool": [
@@ -757,8 +790,8 @@ integration toggles plus the Redis connection without a restart.
 | **PlaceholderAPI-Hytale 1.0.8+** | Resolves external `%...%` values and registers `%mystic_<name>%` / `%mysticessentials_<name>%` | Internal `{...}` placeholders continue to work; late registration is retried |
 | **VaultUnlocked 2.20+** | Paid warps/teleports/flight/kits and AFK payouts through its current `BigDecimal` economy API | Costs become free and payouts safely no-op |
 | **MysticVanish 1.0+** | Hides vanished players from suggestions, TPA, messaging, and public lifecycle announcements | Everyone is treated as visible |
-| **MysticModeration 1.0+** | Dynamic diagnostics/API and reload bridge; discovered after startup through MysticModeration's plugin classloader | Moderation calls are unavailable; core moderation audit logs remain local |
-| **MysticIdentity 0.1+** | Managed (parentally supervised) accounts: private messages are refused between a pair the child's policy keeps apart (`TEXT_PRIVATE`), cross-server channel lines are delivered per listener (`TEXT_PUBLIC`), and bridged Discord lines skip a child whose cross-platform chat is off (`TEXT_CROSS_PLATFORM`); guardians and trusted staff are exempt inside MysticIdentity's answer | Nobody is restricted |
+| **MysticModeration 1.0+** | Dynamic diagnostics/API and reload bridge; discovered after startup through MysticModeration's plugin classloader. `ChatService.deliver`, the chat other mods hand over (guild, party...), honours its active mute (shadow mutes included) and its chat guard (filter, chat lock, slow mode), and refuses lines while it is installed but cannot answer; a muted player's line never pings anyone | Moderation calls are unavailable; core moderation audit logs remain local; delivered chat is not moderated |
+| **MysticIdentity 0.1+** | Managed (parentally supervised) accounts: private messages are refused between a pair the child's policy keeps apart (`TEXT_PRIVATE`), cross-server channel lines and lines other mods hand to `ChatService.deliver` are delivered per listener (`TEXT_PUBLIC`), and bridged Discord lines skip a child whose cross-platform chat is off (`TEXT_CROSS_PLATFORM`); guardians and trusted staff are exempt inside MysticIdentity's answer | Nobody is restricted |
 | **MysticIdentity player portal** | Mail (read-only; attachments are claimed in game), view-only vaults and patch notes on the web dashboard, plus a My identity card with unread mail, vault count and nickname. Loaded from its own source set (`src/mysticidentity/java`) so the main code never compiles against MysticIdentity; follows `integrations.mysticIdentity` | The pages do not appear |
 | **MysticRPG 1.0+** | RPG-level/safe-region checks for random teleport plus its stable item metadata contract | RTP uses terrain/config safety only; ordinary item details remain |
 | **QuestLines** | Reflection-only requirements/actions/placeholders bridge for Custom Content, plus compatible dialog/GUI imports and exports | Custom Content's native layouts and dialogs still work |
@@ -786,7 +819,21 @@ Hytale API surface, and how to build addons against
 ```bash
 ./gradlew shadowJar     # -> build/libs/MysticEssentials-1.0.4.jar (the one to deploy)
                         #    MysticEssentials-1.0.4-thin.jar has no bundled Jedis/JDBC — never deploy it
-./gradlew deployMod     # build + copy to the project-local server mods folder
 ```
 
 Requires JDK 25 (configured via the Gradle toolchain).
+
+The build uses AzureDoom's `com.azuredoom.hytale-tools` Gradle plugin: the
+Hytale version, mod identity and manifest fields live in `gradle.properties`,
+and `src/main/resources/manifest.json` is rewritten from them on every build.
+
+## Running a dev server
+
+```bash
+./gradlew runServer
+```
+
+Starts a local Hytale server in `run/` with the mod loaded from the compiled
+classes. Set `hytale_home` (ideally in `~/.gradle/gradle.properties`) to your
+Hytale install to use its `Assets.zip` instead of downloading one; the
+`validateUiDocuments` check also reads `Common.ui` from that `Assets.zip`.

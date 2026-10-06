@@ -58,7 +58,7 @@ loads.
 
 ```java
 LicenseGate license = LicenseGate.builder(Products.ESSENTIALS)
-        .dataDir(modDataDirectory)      // license.mclicense + server-id.txt live here
+        .dataDir(modDataDirectory)      // license.mclicense lives here (mods/<ModName>)
         .modVersion("1.0.4")
         .logger(myLoggerAdapter)        // two methods: info, warn
         .build();
@@ -82,11 +82,35 @@ tests with **zero** Hytale dependencies and takes these from the host instead:
 | What | How | Default |
 | --- | --- | --- |
 | Where the license file is | `.licenseFile(Supplier<Path>)` | `<dataDir>/license.mclicense` |
-| This server's UUID | `.serverUuid(Supplier<String>)` | `ServerIdentity`, persisted in `<dataDir>/server-id.txt` |
+| This server's UUID | `.serverUuid(Supplier<String>)` | `ServerIdentity`, persisted in `mods/.mystic/server-id.txt` |
 | Logging | `.logger(LicenseLog)` | `System.Logger` |
 
 The supplied UUID is normalised to lowercase before the binding check, and a
 supplier that throws is treated as "not available" rather than as a failure.
+
+### One server id for every Mystic mod
+
+Every Mystic mod on a server shares one licensing id, kept in
+`<modsDir>/.mystic/server-id.txt` — `mods/.mystic/server-id.txt` from the server
+root. `modsDir` is `.modsDir(Path)`, defaulting to the data directory's parent,
+which is the mods folder for a data directory of `mods/<ModName>`. Hytale mods
+pass `PluginManager.MODS_PATH` explicitly.
+
+Before this, each mod kept its own `<dataDir>/server-id.txt`. The first start
+that finds no shared file adopts those automatically:
+
+- none: a new id is generated;
+- one, or several that agree: that id is adopted;
+- several that differ: `MysticEssentials`' id is kept (else the starting mod's
+  own, else the first by folder name) and the others are named in a warning.
+
+Per-mod files are looked for in the starting mod's data directory and in every
+folder under `modsDir` whose name contains "mystic", and are left in place for
+mod versions that still read them. A license bound to the id a mod kept in its
+own `server-id.txt` keeps verifying for that mod (offline, as always), with a
+warning to move it to the shared id with the portal's server-replacement flow.
+A corrupt shared file, or per-mod files that are all corrupt, are never
+overwritten.
 
 `mystic-license-example-mod` is a working adapter with no Hytale types in it.
 For the real thing, see `INTEGRATION.md`.
@@ -116,7 +140,7 @@ What each status means for a server operator.
 | `INVALID_FORMAT` | The file is not a readable MCL1 envelope — truncated, empty, edited, or not a license at all. | Re-download it. Do not edit it by hand. |
 | `INVALID_SIGNATURE` | Ed25519 verification failed. The file was modified or forged. | Re-download it. |
 | `DECRYPTION_FAILED` | The signature was fine but the content key does not match. | Update the mod to a build carrying the right key. |
-| `WRONG_SERVER` | Bound to a different server UUID. | Check `server-id.txt`; use the portal's server-replacement flow. |
+| `WRONG_SERVER` | Bound to a different server UUID. | Check `mods/.mystic/server-id.txt`; use the portal's server-replacement flow. |
 | `WRONG_PRODUCT` | Valid, but does not cover this product or feature. | Check what the tier includes. |
 | `NOT_YET_VALID` | Current time is before `not_before`. | Check the machine's clock. |
 | `EXPIRED` | Past expiry *and* past grace. | Renew. |

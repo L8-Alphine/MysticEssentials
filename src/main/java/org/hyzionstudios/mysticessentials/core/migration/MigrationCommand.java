@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.logging.Level;
 
 import org.hyzionstudios.mysticessentials.api.Permissions;
 import org.hyzionstudios.mysticessentials.core.MysticCore;
@@ -59,7 +60,7 @@ public final class MigrationCommand extends MysticCommand {
                     source, sourcePath, dryRun, replace));
             sendReport(sender, report);
         } catch (Exception e) {
-            core.log(java.util.logging.Level.WARNING, "Migration failed: " + e.getMessage());
+            core.log(Level.WARNING, "Migration failed: " + e.getMessage());
             sender.reply("&cMigration failed: &f" + e.getMessage());
         }
     }

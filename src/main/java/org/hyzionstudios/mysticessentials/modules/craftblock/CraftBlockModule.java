@@ -14,7 +14,7 @@ import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.asset.type.item.config.CraftingRecipe;
 import com.hypixel.hytale.server.core.asset.type.item.config.Item;
 import com.hypixel.hytale.server.core.asset.type.item.config.ItemTranslationProperties;
-import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.inventory.InventoryComponent;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.MaterialQuantity;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
@@ -249,10 +249,8 @@ public final class CraftBlockModule extends AbstractMysticModule {
             }
         }
 
-        // getItemInHand() is the correct held-item accessor, as elsewhere in
-        // this mod. Deprecated for removal on 0.6.2 with no replacement that
-        // expresses "item in hand" — see ItemSnapshotService.captureHeld.
-        @SuppressWarnings("removal")
+        // InventoryComponent.getItemInHand is the held-item accessor, as elsewhere in
+        // this mod: the active tool item while using tools, else the hotbar item.
         private void checkHeld(MysticCommandSender sender) {
             PlayerRef player = sender.player().orElse(null);
             if (player == null) {
@@ -260,8 +258,7 @@ public final class CraftBlockModule extends AbstractMysticModule {
                 return;
             }
             boolean dispatched = core.platform().runOnEntityThread(player, (store, ref, world) -> {
-                Player entity = store.getComponent(ref, Player.getComponentType());
-                ItemStack held = entity == null ? null : entity.getInventory().getItemInHand();
+                ItemStack held = InventoryComponent.getItemInHand(store, ref);
                 if (held == null || held.isEmpty()) {
                     core.getMessageService().sendKey(player, "craftblock-check-empty");
                     return;

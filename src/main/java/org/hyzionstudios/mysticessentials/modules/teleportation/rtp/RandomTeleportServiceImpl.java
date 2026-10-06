@@ -1,8 +1,10 @@
 package org.hyzionstudios.mysticessentials.modules.teleportation.rtp;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -13,6 +15,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 
 import org.hyzionstudios.mysticessentials.api.Permissions;
@@ -98,7 +101,7 @@ public final class RandomTeleportServiceImpl implements RandomTeleportService {
         if (session == null) {
             return Optional.empty();
         }
-        return Optional.of(session.phase.name().toLowerCase(java.util.Locale.ROOT) + ":" + session.profile.id);
+        return Optional.of(session.phase.name().toLowerCase(Locale.ROOT) + ":" + session.profile.id);
     }
 
     /** Remaining cooldown seconds for a profile (0 if ready or unknown). */
@@ -225,8 +228,15 @@ public final class RandomTeleportServiceImpl implements RandomTeleportService {
     @Override
     public boolean cancel(UUID playerId, RtpCancelReason reason) {
         Session session = sessions.get(playerId);
-        if (session == null || !session.cancelled.compareAndSet(false, true)) {
+        if (session == null) {
             return false;
+        }
+        // Once the move is dispatched it cannot be called back: the session is
+        // settled by the move's outcome (commit on success, refund on failure).
+        synchronized (session) {
+            if (session.phase == Session.Phase.TELEPORT || !session.cancelled.compareAndSet(false, true)) {
+                return false;
+            }
         }
         session.cancelReason = reason;
         ScheduledFuture<?> warmupTask = session.warmupTask;
@@ -268,11 +278,10 @@ public final class RandomTeleportServiceImpl implements RandomTeleportService {
         showHud(player, session, "rtp-hud-warmup",
                 Map.of("seconds", Integer.toString(warmupSeconds)));
 
-        java.util.concurrent.atomic.AtomicReference<java.time.Instant> damageBaseline =
-                new java.util.concurrent.atomic.AtomicReference<>();
+        AtomicReference<Instant> damageBaseline = new AtomicReference<>();
         if (cfg.warmup.cancelOnDamage) {
             core.platform().lastDamageTime(player)
-                    .thenAccept(instant -> damageBaseline.set(instant == null ? java.time.Instant.MIN : instant));
+                    .thenAccept(instant -> damageBaseline.set(instant == null ? Instant.MIN : instant));
         }
 
         session.warmupTask = core.scheduler().runRepeating(() -> {
@@ -306,7 +315,7 @@ public final class RandomTeleportServiceImpl implements RandomTeleportService {
                 }
             }
             if (cfg.warmup.cancelOnDamage && damageBaseline.get() != null) {
-                java.time.Instant baseline = damageBaseline.get();
+                Instant baseline = damageBaseline.get();
                 core.platform().lastDamageTime(ref).thenAccept(current -> {
                     if (!session.cancelled.get() && current != null && current.isAfter(baseline)) {
                         cancel(uuid, RtpCancelReason.DAMAGE_TAKEN);
@@ -422,9 +431,17 @@ public final class RandomTeleportServiceImpl implements RandomTeleportService {
             return;
         }
         PlayerRef player = playerOpt.get();
-        session.phase = Session.Phase.TELEPORT;
+        synchronized (session) {
+            if (session.cancelled.get()) {
+                return;
+            }
+            session.phase = Session.Phase.TELEPORT;
+        }
         showHud(player, session, "rtp-hud-teleporting", Map.of());
-        recordBackLocation(uuid, player);
+        // Captured before the move (afterwards the player is somewhere else), but
+        // stored as the /back location only once the move succeeded: a failed RTP
+        // must not overwrite where /back currently leads.
+        MysticLocation origin = Conversions.capture(player);
 
         core.platform().teleportEntity(player, destination).whenComplete((moveResult, moveError) -> {
             if (moveError != null || moveResult != TeleportService.Result.SUCCESS) {
@@ -432,6 +449,7 @@ public final class RandomTeleportServiceImpl implements RandomTeleportService {
                         moveError != null ? moveError.toString() : String.valueOf(moveResult));
                 return;
             }
+            recordBackLocation(uuid, origin);
             onTeleportSuccess(uuid, session, destination);
         });
     }
@@ -507,9 +525,9 @@ public final class RandomTeleportServiceImpl implements RandomTeleportService {
         }
     }
 
-    private void recordBackLocation(UUID uuid, PlayerRef player) {
+    private void recordBackLocation(UUID uuid, MysticLocation origin) {
         core.getPlayerProfileService().getCached(uuid).ifPresent(profile ->
-                profile.setLastTeleportedLocation(Conversions.capture(player)));
+                profile.setLastTeleportedLocation(origin));
     }
 
     private static String searchFailureDetail(String reason, RtpDestinationResult result, Throwable error) {

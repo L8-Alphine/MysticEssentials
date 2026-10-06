@@ -2,11 +2,14 @@ package org.hyzionstudios.mysticessentials.modules.customcontent;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.logging.Level;
 
 import org.hyzionstudios.mysticessentials.api.Permissions;
+import org.hyzionstudios.mysticessentials.api.ui.UiDiagnostic;
 import org.hyzionstudios.mysticessentials.core.module.AbstractMysticModule;
 import org.hyzionstudios.mysticessentials.modules.customcontent.layout.LayoutRuntime;
 import org.hyzionstudios.mysticessentials.modules.customcontent.layout.PlayerPortraitService;
@@ -18,6 +21,7 @@ import com.hypixel.hytale.server.core.command.system.CommandRegistration;
 import com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.mysticlicensing.license.Products;
 
 /**
  * Optional CustomGUIs and CustomDialogs feature set behind one Essentials
@@ -45,7 +49,7 @@ public final class CustomContentModule extends AbstractMysticModule {
      */
     @Override
     public String licensedFeature() {
-        return com.mysticlicensing.license.Products.Essentials.MODULE_CUSTOM_CONTENT;
+        return Products.Essentials.MODULE_CUSTOM_CONTENT;
     }
 
     @Override
@@ -63,6 +67,9 @@ public final class CustomContentModule extends AbstractMysticModule {
         registerEvent(PlayerDisconnectEvent.class, (PlayerDisconnectEvent event) -> {
             if (portraits != null) {
                 portraits.handlerClosed(event.getPlayerRef().getPacketHandler());
+            }
+            if (layouts != null) {
+                layouts.forgetViewer(event.getPlayerRef());
             }
         });
         log("Loaded " + dialogs.ids().size() + " dialog(s) and " + guis.all().size()
@@ -356,9 +363,9 @@ public final class CustomContentModule extends AbstractMysticModule {
             showGuiList(sender);
             return;
         }
-        switch (args[0].toLowerCase(java.util.Locale.ROOT)) {
+        switch (args[0].toLowerCase(Locale.ROOT)) {
             case "open" -> openGuiFromCommand(sender, value(args, 1), value(args, 2));
-            case "hud" -> handleHudCommand(sender, java.util.Arrays.copyOfRange(args, 1, args.length));
+            case "hud" -> handleHudCommand(sender, Arrays.copyOfRange(args, 1, args.length));
             case "validate" -> showValidation(sender, value(args, 1));
             case "inspect" -> inspectUi(sender, value(args, 1));
             case "debug" -> debugSession(sender, value(args, 1));
@@ -375,19 +382,19 @@ public final class CustomContentModule extends AbstractMysticModule {
         boolean strict = "--strict".equalsIgnoreCase(filter);
         String document = strict ? null : filter;
         var findings = guis.diagnostics().stream()
-                .filter(finding -> document == null || finding.source().toLowerCase(java.util.Locale.ROOT)
-                        .contains(document.toLowerCase(java.util.Locale.ROOT)))
+                .filter(finding -> document == null || finding.source().toLowerCase(Locale.ROOT)
+                        .contains(document.toLowerCase(Locale.ROOT)))
                 .toList();
         long errors = findings.stream().filter(finding -> finding.severity()
-                == org.hyzionstudios.mysticessentials.api.ui.UiDiagnostic.Severity.ERROR).count();
+                == UiDiagnostic.Severity.ERROR).count();
         long warnings = findings.stream().filter(finding -> finding.severity()
-                == org.hyzionstudios.mysticessentials.api.ui.UiDiagnostic.Severity.WARNING).count();
+                == UiDiagnostic.Severity.WARNING).count();
         sender.reply("&6Custom UI validation: &f" + errors + " error(s)&7, &f"
                 + warnings + " warning(s).");
         findings.stream().filter(finding -> strict || finding.severity()
-                != org.hyzionstudios.mysticessentials.api.ui.UiDiagnostic.Severity.INFO)
+                != UiDiagnostic.Severity.INFO)
                 .limit(20).forEach(finding -> sender.reply(
-                        (finding.severity() == org.hyzionstudios.mysticessentials.api.ui.UiDiagnostic.Severity.ERROR
+                        (finding.severity() == UiDiagnostic.Severity.ERROR
                                 ? "&c" : "&e") + finding.source() + "&7: " + finding.message()));
         if (findings.size() > 20) sender.reply("&7...and " + (findings.size() - 20) + " more finding(s).");
     }
@@ -404,8 +411,8 @@ public final class CustomContentModule extends AbstractMysticModule {
             return;
         }
         var value = blueprint.orElseThrow();
-        sender.reply("&6" + value.id() + " &7[" + value.kind().name().toLowerCase(java.util.Locale.ROOT)
-                + ", " + value.surface().name().toLowerCase(java.util.Locale.ROOT) + "]");
+        sender.reply("&6" + value.id() + " &7[" + value.kind().name().toLowerCase(Locale.ROOT)
+                + ", " + value.surface().name().toLowerCase(Locale.ROOT) + "]");
         sender.reply("&7Version: &f" + value.version() + "&7, components: &f" + value.nodeCount()
                 + "&7, source: &f" + value.source());
         sender.reply("&7Theme: &f" + (value.theme() == null ? "default" : value.theme())
@@ -458,7 +465,7 @@ public final class CustomContentModule extends AbstractMysticModule {
                         + " dialog | gui <list|open|hud|reload> | import | reload");
                 return;
             }
-            switch (args[0].toLowerCase(java.util.Locale.ROOT)) {
+            switch (args[0].toLowerCase(Locale.ROOT)) {
                 case "dialog", "builder" -> {
                     if (!sender.isPlayer()) {
                         sender.replyKey("player-only");
@@ -467,7 +474,7 @@ public final class CustomContentModule extends AbstractMysticModule {
                     }
                 }
                 case "gui" -> handleGuiAdmin(sender,
-                        java.util.Arrays.copyOfRange(args, 1, args.length));
+                        Arrays.copyOfRange(args, 1, args.length));
                 case "import" -> {
                     importExportedDialogs();
                     sender.reply("&aImport complete. &f" + dialogs.ids().size() + " &adialog(s) loaded.");
@@ -519,6 +526,9 @@ public final class CustomContentModule extends AbstractMysticModule {
         GuiAliasCommand(String name, String guiId) {
             super(CustomContentModule.this.core, name, "Open the " + guiId + " CustomGUI.");
             this.guiId = guiId;
+            // A player-facing shortcut: what the GUI may do is gated by its own
+            // requirements and actions (server actions need the admin node).
+            requireNoPermission();
         }
 
         @Override

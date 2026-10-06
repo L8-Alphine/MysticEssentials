@@ -14,13 +14,12 @@ The `/rtp` command is free-form parsed, so its many forms never collide.
 | `/rtp menu`, `/rtp ui` | Open the RTP selection UI | `mysticessentials.teleport.rtp.use` |
 | `/rtp world <world> [player]` | RTP into a specific world | `mysticessentials.teleport.rtp.use` |
 | `/rtp profile <profile> [player]` | RTP using a named profile | `mysticessentials.teleport.rtp.use` |
-| `/rtp biome <biome>` | Search for a destination in a biome | `mysticessentials.teleport.rtp.biome` |
-| `/rtp <player>` | Send another online player (admin form) | `mysticessentials.teleport.rtp.others` |
+| `/rtp <player>` | Send another online player; they go through the normal checks unless you hold `mysticessentials.teleport.rtp.admin.force` | `mysticessentials.teleport.rtp.others` |
 | `/rtp cancel` | Cancel your active warmup, queued search, or pending teleport | `mysticessentials.teleport.rtp.use` |
 | `/rtp status` | Show your active search phase, queue position, and per-profile cooldowns | `mysticessentials.teleport.rtp.use` |
 | `/rtp info [profile]` | Show a profile's world, radius, shape, cost, warmup, and cooldown | `mysticessentials.teleport.rtp.use` |
 
-Admin forms accept trailing flags: `--force` (skip warmup/cooldown/cost checks), `--silent` (no chat feedback to the target), and `--bypass-cost`.
+Sending another player with only `mysticessentials.teleport.rtp.others` puts them through the normal checks: their profile permission, cooldown, limits and warmup, and the cost is charged to them (unless they hold `mysticessentials.teleport.rtp.bypass.cost`). A sender holding `mysticessentials.teleport.rtp.admin.force` skips those checks, as does the trailing `--force` flag; `--silent` (no chat feedback to the target) needs the same node.
 
 ## Admin commands
 
@@ -96,7 +95,7 @@ Profiles are defined in the `profiles` map of `rtp.json`, keyed by id. Each prof
 | `cost` | disabled | `{ enabled, amount, currency }` economy cost |
 | `safety` | see below | Ground/headroom/hazard rules |
 | `arrivalProtection` | see below | Post-arrival invulnerability and fall-damage grace |
-| `filters` | see below | Biome, region, distance, and cross-module gates |
+| `filters` | see below | Region, distance, and cross-module gates |
 | `platformFallback` | disabled | Optionally build a small platform when no natural ground is found |
 
 ### Shapes
@@ -116,7 +115,7 @@ Profiles are defined in the `profiles` map of `rtp.json`, keyed by id. Each prof
 
 ### Filters and cross-module gates
 
-The `filters` block adds optional constraints: included/excluded biomes and regions, minimum distance from spawn/other players/claims, allowed dimensions, block-tag requirements, a `permission` gate, and per-hour/per-day use caps. Fields that depend on APIs not verified on the running server — or on other Mystic mods (claims via MysticGuilds, level via MysticRPG) — are honored only when a matching capability or exclusion provider is registered; otherwise they are ignored so a search never silently fails.
+The `filters` block adds optional constraints: included/excluded regions, minimum distance from spawn/other players/claims, allowed dimensions, block-tag requirements, a `permission` gate, and per-hour/per-day use caps. Fields that depend on APIs not verified on the running server — or on other Mystic mods (claims via MysticGuilds, level via MysticRPG) — are honored only when a matching capability or exclusion provider is registered; otherwise they are ignored so a search never silently fails.
 
 ## Search engine
 

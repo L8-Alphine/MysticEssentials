@@ -24,6 +24,24 @@ When `formatChat` is on, every message is rewritten through a permission-selecte
 | `/tell`, `/w`, `/whisper` | Aliases for `/msg` | `mysticessentials.chat.private.message` |
 | `/reply <message>`, `/r <message>` | Reply to your last private message | `mysticessentials.chat.private.reply` |
 
+### Ignoring players
+
+`/ignore <player>` (`mysticessentials.chat.ignore`) hides that player's public and
+channel chat lines, the chat other mods hand to Mystic (guild, party...), and their
+mentions, and refuses their private messages (`/msg`, `/reply`, across servers and
+as offline mail) and their [mail](mail-module); `/ignore` alone lists who you ignore
+and `/unignore <player>` undoes it. The sender of a refused message or mail is told
+they can't message or mail you right now, the same reply any refused private message
+gets. An offline player's list is read from their stored profile, which with `json`
+storage is the copy this server last saved (see the README's *Ignoring players*). The list is kept by UUID with your
+notification preferences, so a renamed player stays ignored and is listed under
+their current name; it is the "blocked players" count shown in `/mentions`. Names
+stored by older versions are resolved to players when you join; one that matches
+no known player yet keeps applying by name (and is logged) until it does. You
+always see your own lines, you cannot ignore yourself, and players with
+`mysticessentials.chat.ignore.exempt` cannot be ignored and always reach you by
+private message.
+
 Private messaging can deliver across servers over Redis (`allowCrossServer`): `/msg` tab-completes and resolves players on every server in the network, and a player online nowhere falls back to [mail](mail-module) (`offlineToMail`). **Social spy** (`mysticessentials.chat.socialspy`) lets staff monitor private messages; players with `mysticessentials.chat.socialspy.exempt` are hidden from it.
 
 ## Channels
@@ -37,7 +55,8 @@ Channels split chat into separate streams such as global and staff.
 | `/channel join <name> [password]` | Listen to a channel |
 | `/channel leave <name>` | Stop listening to a channel |
 | `/channel temp <id> ...` | Create a temporary channel (`mysticessentials.chat.channel.create.temp`) |
-| `/channel manage` | Manage your temporary channel |
+| `/channel manage [channel]` | Manage your temporary channel; name it when you own several |
+| `/channel close\|lock\|unlock [channel]` | Close, lock or unlock a temporary channel you manage (the one named, else the one you are in, else the only one you own) |
 | `/mentions` | Open mention settings |
 
 Servers can define quick aliases such as `/g`, `/global`, `/sc`, `/schat`, and `/staffchat`. Channels are gated by dynamic permissions: `mysticessentials.chat.channel.<id>` and its `.speak`, `.listen`, and `.moderator` variants. The bundled defaults are a server-wide `global` channel and a permission-gated cross-server `staff` channel.
@@ -64,6 +83,7 @@ Channels are configured under `channels` in `modules/chat/config.json`. Top-leve
 | `allowTemporaryChannels` | `true` | Allow player-created session channels |
 | `temporaryChannelDefaultMinutes` | `120` | Redis restore window for temporary channels |
 | `createTemporaryPermission` | `mysticessentials.chat.channel.create.temp` | Permission to create temporary channels |
+| `maxTemporaryChannelsPerOwner` | `1` | Temporary channels one player may own at once (network-wide with Redis); `0` = unlimited; `mysticessentials.channel.staff.override` is exempt |
 | `channels` | global + staff | The channel definitions (see below) |
 | `roster` | enabled | Member-list permission, tags, ranks, activity and visible-row cap |
 | `tempManagement.ownershipTransfer` | enabled, acceptance required | Transfer request expiry and the previous owner's new role |
@@ -146,6 +166,19 @@ permissions. Addons can register relationship scopes such as friends, guild or
 party through `ChatService.registerMentionScope(...)`; unavailable scopes stay
 hidden from player settings instead of silently accepting a rule that cannot be
 enforced. Server defaults live in `modules/chat/mentions.json`.
+
+## Chat from other mods
+
+Mods with their own chat contexts (guild, officer, party or settlement chat) can
+hand each line to Mystic through `ChatService.deliver` (see
+[Developer API](developer-api)). Such lines follow the same rules as public chat:
+a player muted by MysticModeration is refused (a shadow-muted one sees only their
+own line), MysticModeration's chat guard (filter, chat lock, slow mode) and a
+tutorial that blocks chat refuse the line, players who ignore the sender do not
+receive it, the sender's colour permissions and `maxMessageLength` apply, the line
+counts as AFK activity, and it is rendered with the mod's own format or
+`deliveryFormat`. While MysticModeration is installed but cannot answer, such lines
+are refused rather than sent unchecked.
 
 ## Configuration
 

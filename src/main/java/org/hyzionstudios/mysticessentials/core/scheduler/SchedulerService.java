@@ -61,7 +61,7 @@ public final class SchedulerService {
             try {
                 task.run();
             } catch (Throwable t) {
-                core.log(Level.SEVERE, "Scheduled task threw: " + t);
+                core.log(Level.SEVERE, "Scheduled task threw", t);
             }
         };
     }

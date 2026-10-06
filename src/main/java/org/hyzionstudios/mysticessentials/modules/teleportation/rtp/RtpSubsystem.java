@@ -3,11 +3,13 @@ package org.hyzionstudios.mysticessentials.modules.teleportation.rtp;
 import java.nio.file.Path;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 
 import org.hyzionstudios.mysticessentials.api.rtp.RtpRequest;
 import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.core.util.Json;
+import org.hyzionstudios.mysticessentials.platform.command.MysticCommand;
 
 import com.google.gson.JsonObject;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
@@ -43,8 +45,7 @@ public final class RtpSubsystem {
      * through the supplied registrar (the module's tracked
      * {@code registerCommand}, so the commands are dropped on module disable).
      */
-    public void enable(java.util.function.Consumer<
-            org.hyzionstudios.mysticessentials.platform.command.MysticCommand> commandRegistrar) {
+    public void enable(Consumer<MysticCommand> commandRegistrar) {
         loadConfig();
         audit = new RtpAudit(core);
         engine = new RtpSearchEngine(core, config);
@@ -128,7 +129,7 @@ public final class RtpSubsystem {
         core.getStorageService().save(PENDING_NS, target.toString(), payload);
     }
 
-    /** Runs (and clears) any pending login teleport for a player who just joined. */
+    /** Runs any pending login teleport for a player who just joined, clearing it once it succeeded. */
     public void onPlayerConnect(PlayerRef player) {
         if (config == null || !config.enabled || service == null) {
             return;
@@ -141,15 +142,21 @@ public final class RtpSubsystem {
             JsonObject payload = element.getAsJsonObject();
             String profileId = payload.has("profile") ? payload.get("profile").getAsString() : null;
             UUID actor = payload.has("actor") ? tryUuid(payload.get("actor").getAsString()) : null;
-            core.getStorageService().delete(PENDING_NS, uuid.toString());
             if (profileId == null || service.getProfile(profileId).isEmpty()) {
+                core.getStorageService().delete(PENDING_NS, uuid.toString());
                 return;
             }
-            // Delay so the player and their world are fully loaded; the search then
-            // revalidates the destination as normal.
+            // Delay so the player and their world are fully loaded (the /back entry
+            // is taken from their position); the search then revalidates the
+            // destination as normal. The entry is only cleared once the teleport
+            // succeeded, so a failed run is retried at the next login.
             core.scheduler().runLater(() -> core.platform().findPlayer(uuid).ifPresent(live ->
                             service.teleport(RtpRequest.builder(uuid).profileId(profileId).actor(actor)
-                                    .force(true).build())),
+                                    .force(true).build()).thenAccept(result -> {
+                                        if (result.isSuccess()) {
+                                            core.getStorageService().delete(PENDING_NS, uuid.toString());
+                                        }
+                                    })),
                     LOGIN_TELEPORT_DELAY_SECONDS, TimeUnit.SECONDS);
         });
     }

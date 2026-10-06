@@ -3,6 +3,7 @@ package org.hyzionstudios.mysticessentials.modules.chat.itemlink;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 import org.hyzionstudios.mysticessentials.api.item.ItemClassification;
@@ -401,11 +402,11 @@ final class ItemViewSections {
         ItemClassification quality = view.classification().quality().orElse(null);
         if (quality != null) {
             String name = quality.displayName();
-            return name == null || name.isBlank() ? null : name.toUpperCase(java.util.Locale.ROOT);
+            return name == null || name.isBlank() ? null : name.toUpperCase(Locale.ROOT);
         }
         if (config.fallback.hideMissingQuality) {
             return null;
         }
-        return config.fallback.missingQualityDisplayName.toUpperCase(java.util.Locale.ROOT);
+        return config.fallback.missingQualityDisplayName.toUpperCase(Locale.ROOT);
     }
 }

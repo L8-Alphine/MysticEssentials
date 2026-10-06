@@ -26,6 +26,9 @@ final class DynamicCommandStub extends MysticCommand {
         this.module = module;
         this.label = label;
         allowExtraArguments();
+        // The definition's own permission mode gates every call at dispatch
+        // time; the engine's generated node would make "none" commands op-only.
+        requireNoPermission();
     }
 
     @Override

@@ -131,7 +131,6 @@ public final class DefaultMessages {
         o.addProperty("rtp-info-unknown", "&cUnknown random-teleport profile: &f{name}");
         o.addProperty("rtp-usage-world", "&7Usage: &f/rtp world <world> [player]");
         o.addProperty("rtp-usage-profile", "&7Usage: &f/rtp profile <profile> [player]");
-        o.addProperty("rtp-usage-biome", "&7Usage: &f/rtp biome <biome>");
         o.addProperty("rtp-admin-reloaded", "&aReloaded random teleport ({count} profiles).");
         o.addProperty("rtp-admin-test-start", "&7Testing profile &f{profile}&7...");
         o.addProperty("rtp-admin-test-found", "&aFound: &f{x}, {y}, {z} &7in {attempts} attempts.");
@@ -222,6 +221,7 @@ public final class DefaultMessages {
         o.addProperty("mail-inbox-entry", "{read_color}[{id}] &7from &f{sender}&7: &f{body}");
         o.addProperty("mail-read-line", "&7from &f{sender}&7: &f{body}");
         o.addProperty("mail-sent", "&aMail sent to &f{player}");
+        o.addProperty("mail-blocked", "&cYou can't send mail to &f{player}&c right now.");
         o.addProperty("mail-sent-offline", "&aMail sent to &f{player} &7(offline)");
         o.addProperty("mail-sent-all", "&aMail sent to &f{count} &aplayers.");
         o.addProperty("mail-deleted", "&aMail deleted.");
@@ -252,6 +252,7 @@ public final class DefaultMessages {
         o.addProperty("kit-claimed", "&aYou received the &f{kit} &akit!");
         o.addProperty("kit-given", "&aGave kit &f{kit} &ato &f{player}&a.");
         o.addProperty("kit-cannot-afford", "&cYou cannot afford this kit (&f{cost}&c).");
+        o.addProperty("kit-profile-not-loaded", "&cYour player data is not loaded yet - try again in a moment.");
         o.addProperty("nick-error-length", "&cNicknames must be {min}-{max} characters.");
         o.addProperty("nick-error-characters", "&cNicknames may only contain letters, digits, and underscores.");
         o.addProperty("nick-error-blocked", "&cThat nickname is not allowed.");
@@ -327,6 +328,11 @@ public final class DefaultMessages {
         o.addProperty("chat-channel-temp-usage", "&cUsage: /channel temp <id> [password|-] [prefix|-] [alias1,alias2|-] [permission]");
         o.addProperty("chat-channel-temp-created", "&aCreated temporary channel &f{channel}&a.");
         o.addProperty("chat-channel-temp-failed", "&cCould not create that temporary channel.");
+        o.addProperty("chat-channel-temp-limit", "&cYou already own {count} temporary channel(s) (limit {limit}). Close one first.");
+        o.addProperty("chat-channel-temp-which", "&eYou own several temporary channels: &f{channels}&e. Which one? Use &f{usage}&e.");
+        o.addProperty("chat-channel-temp-which-switch", "&eYou own several temporary channels: &f{channels}&e. Which one? Switch into it with &f/channel switch <channel>&e, then repeat the command.");
+        o.addProperty("chat-channel-temp-which-select", "&eYou own several temporary channels: &f{channels}&e. Select the one to manage in the list, then press Manage.");
+        o.addProperty("chat-channel-temp-not-yours", "&cYou do not own a temporary channel called &f{channel}&c.");
         o.addProperty("chat-channel-joined", "&aNow listening to &f{channel}&a.");
         o.addProperty("chat-channel-already-listening", "&7Already listening to &f{channel}&7.");
         o.addProperty("chat-channel-password-required", "&cThat channel requires a password.");
@@ -348,6 +354,10 @@ public final class DefaultMessages {
         o.addProperty("chat-channel-roster-no-permission", "&cYou cannot view channel members.");
         // Participation / access enforcement
         o.addProperty("chat-channel-you-muted", "&cYou are muted in this channel. {reason}");
+        o.addProperty("chat-you-muted", "&cYou are muted. {reason}");
+        o.addProperty("chat-mute-no-reason", "No reason was given.");
+        o.addProperty("chat-moderation-unavailable",
+                "&cChat moderation is unavailable right now, so your message was not sent.");
         o.addProperty("chat-channel-you-listener", "&cYou are a listener in this channel and cannot speak.");
         o.addProperty("chat-channel-banned", "&cYou are banned from that channel.");
         o.addProperty("chat-channel-locked", "&cThat channel is locked.");
@@ -408,6 +418,15 @@ public final class DefaultMessages {
         o.addProperty("pm-blocked", "&cYou can't send private messages to &f{target}&c right now.");
         o.addProperty("pm-reply-no-permission", "&cYou do not have permission to reply to private messages.");
         o.addProperty("pm-reply-none", "&cYou have no one to reply to.");
+        o.addProperty("chat-ignore-added", "&aYou are now ignoring &f{player}&a: their chat and mentions are hidden.");
+        o.addProperty("chat-ignore-removed", "&aYou are no longer ignoring &f{player}&a.");
+        o.addProperty("chat-ignore-already", "&7You are already ignoring &f{player}&7.");
+        o.addProperty("chat-ignore-not-ignored", "&7You are not ignoring &f{player}&7.");
+        o.addProperty("chat-ignore-self", "&cYou cannot ignore yourself.");
+        o.addProperty("chat-ignore-exempt", "&f{player} &ccannot be ignored.");
+        o.addProperty("chat-ignore-list", "&7Ignored players (&f{count}&7): &f{players}");
+        o.addProperty("chat-ignore-list-empty", "&7You are not ignoring anyone. Use &f/ignore <player>&7.");
+        o.addProperty("chat-ignore-unavailable", "&cIgnoring players is unavailable on this server.");
         o.addProperty("announcement-broadcast", "{message}");
         o.addProperty("tutorial-started", "&aTutorial &f{tutorial} &astarted.");
         o.addProperty("tutorial-started-other", "&aStarted tutorial &f{tutorial} &afor &f{player}&a.");
@@ -465,7 +484,7 @@ public final class DefaultMessages {
         o.addProperty("vault-save-failed", "&cCould not save vault &f#{vault}&c. Your items are still in the vault session.");
         o.addProperty("vault-readonly", "&7This vault is open in read-only mode.");
         o.addProperty("vault-readonly-downgrade",
-                "&cThe vault lock could not be renewed; the vault is now read-only.");
+                "&cThe vault lock could not be renewed, so the vault was closed to protect its contents.");
         o.addProperty("vault-overflow-notice",
                 "&eYour current rank allows {rows} row(s). Items beyond that remain safe but unavailable.");
         o.addProperty("vault-item-blocked", "&cThat item cannot be stored in a vault.");

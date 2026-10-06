@@ -29,6 +29,9 @@ All nodes are prefixed `mysticessentials.`.
 | `mysticessentials.teleport.back` | `/back` |
 | `mysticessentials.teleport.bypass.warmup` | Skip teleport warmups |
 | `mysticessentials.teleport.bypass.cooldown` | Skip teleport cooldowns |
+| `mysticessentials.teleport.rtp.others` | `/rtp <player>`, `/rtp world <world> <player>`, `/rtp profile <profile> <player>` — the target goes through the normal checks (their profile permission, cooldown, limits, cost and warmup; the target pays the cost) |
+| `mysticessentials.teleport.rtp.bypass.cost` | Your own `/rtp` is never charged |
+| `mysticessentials.teleport.rtp.admin.force` | Skip the target's permission, cooldown, limit, cost and warmup checks: `/rtp ... --force`, and every `/rtp <player>` its holder sends; also `--silent` |
 
 ## Spawn & Homes
 
@@ -97,7 +100,10 @@ that portal. Leave the field empty to allow everyone.
 | `mysticessentials.chat.private.reply` | `/reply` |
 | `mysticessentials.chat.socialspy` | See other players' private messages |
 | `mysticessentials.chat.socialspy.exempt` | Hidden from social spy |
-| `mysticessentials.chat.channel.create.temp` | `/channel temp` — temporary channels |
+| `mysticessentials.chat.ignore` | `/ignore`, `/unignore` — hide a player's chat lines, mentions, private messages and mail |
+| `mysticessentials.chat.ignore.exempt` | Cannot be added to anyone's ignore list, and private messages and mail always get through (staff who must stay reachable) |
+| `mysticessentials.chat.channel.create.temp` | `/channel temp` — temporary channels (up to `channels.maxTemporaryChannelsPerOwner` owned at once, default 1) |
+| `mysticessentials.channel.staff.override` | Manage, force-transfer or force-close any temporary channel; not limited by `maxTemporaryChannelsPerOwner` |
 | `mysticessentials.chat.channel.<id>[.speak/.listen/.moderator]` | Dynamic per-channel gates (configured per channel) |
 | `mysticessentials.chat.color.legacy/hex/gradient/rainbow/minimessage/links` | Colour/markup styles in chat messages |
 | `mysticessentials.chat.itemlink.use` | Share the held item in chat with the `[item]` tag |
@@ -113,7 +119,7 @@ teammate is not the same as being trusted to ping the whole server.
 | `mysticessentials.chat.mention` | Use `@PlayerName` at all |
 | `mysticessentials.chat.mention.multiple` | More than one mention per message (otherwise capped at one) |
 | `mysticessentials.chat.mention.bypass-cooldown` | Skip the sender cooldowns and per-minute budget |
-| `mysticessentials.chat.mention.bypass-settings` | **Staff override** — reach a player through their own scope, block list, and do-not-disturb (also allows mentioning a vanished player, and delivers the title/sound their preferences would have muted). Kept separate from `bypass-cooldown` so "can contact anyone" and "can ping rapidly" are granted independently. Disable server-wide with `rules.staff-bypass-player-settings: false` in `mentions.json`. |
+| `mysticessentials.chat.mention.bypass-settings` | **Staff override** — reach a player through their own scope, block list, and do-not-disturb (also allows mentioning a vanished player, and delivers the title/sound their preferences would have muted). Kept separate from `bypass-cooldown` so "can contact anyone" and "can ping rapidly" are granted independently. Disable server-wide with `rules.staffBypassPlayerSettings: false` in `mentions.json`. |
 | `mysticessentials.chat.mention.offline` | Mention offline players (requires offline mentions to be enabled) |
 | `mysticessentials.chat.mention.staff` | Marks a player as staff for `@staff`, and allows using it |
 | `mysticessentials.chat.mention.everyone` | `@everyone` / `@online` |

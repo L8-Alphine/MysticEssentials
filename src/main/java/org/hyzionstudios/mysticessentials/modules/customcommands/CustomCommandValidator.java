@@ -51,7 +51,7 @@ public final class CustomCommandValidator {
      */
     public List<Issue> validate(List<CustomCommand> definitions, CustomCommandsConfig config) {
         List<Issue> issues = new ArrayList<>();
-        Map<String, String> claimedLabels = new HashMap<>(); // label -> command that claimed it
+        Map<String, CustomCommand> claimedLabels = new HashMap<>(); // label -> definition that claimed it
 
         for (CustomCommand definition : definitions) {
             String id = definition.name == null ? "(unnamed)" : definition.name;
@@ -90,7 +90,7 @@ public final class CustomCommandValidator {
     }
 
     private void validateAliases(CustomCommand definition, String id, List<Issue> issues,
-            Map<String, String> claimedLabels) {
+            Map<String, CustomCommand> claimedLabels) {
         Set<String> seen = new HashSet<>();
         for (String label : definition.labels()) {
             if (!NAME.matcher(label).matches()) {
@@ -101,21 +101,30 @@ public final class CustomCommandValidator {
                 issues.add(new Issue(Severity.WARNING, id, "duplicate alias '" + label + "'"));
                 continue;
             }
-            String claimedBy = claimedLabels.putIfAbsent(label, id);
-            if (claimedBy != null && !claimedBy.equalsIgnoreCase(id)) {
+            // Compared by identity: two definitions with the same name are still
+            // two claims (comparing names let both of them register).
+            CustomCommand claimer = claimedLabels.putIfAbsent(label, definition);
+            if (claimer != null && claimer != definition) {
+                String claimedBy = describe(claimer);
                 boolean isPrimary = label.equals(definition.nameLower());
                 if (isPrimary) {
                     // Two commands cannot share a primary name — block this one.
                     issues.add(new Issue(Severity.ERROR, id,
-                            "name '" + label + "' is already used by custom command '" + claimedBy + "'"));
+                            "name '" + label + "' is already used by custom command " + claimedBy));
                 } else {
                     // A clashing alias is skipped, not fatal — the command still
                     // registers under its name and its other aliases.
                     issues.add(new Issue(Severity.WARNING, id,
-                            "alias '" + label + "' already used by '" + claimedBy + "' — alias skipped"));
+                            "alias '" + label + "' already used by " + claimedBy + " — alias skipped"));
                 }
             }
         }
+    }
+
+    /** @return {@code 'name'}, plus the file it came from (two definitions may share a name). */
+    private static String describe(CustomCommand definition) {
+        String name = "'" + (definition.name == null ? "(unnamed)" : definition.name) + "'";
+        return definition.sourceFile == null ? name : name + " (" + definition.sourceFile.getFileName() + ")";
     }
 
     private void validatePermission(CustomCommand definition, String id, List<Issue> issues) {

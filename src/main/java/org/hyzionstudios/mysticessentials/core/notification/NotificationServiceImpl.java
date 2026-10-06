@@ -4,14 +4,17 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.logging.Level;
 
 import org.hyzionstudios.mysticessentials.api.notification.Notification;
@@ -85,7 +88,7 @@ public final class NotificationServiceImpl implements NotificationService {
 
     /** A filter with a fixed rule and no external system behind it. */
     private record BuiltInFilter(String id, String displayName, int sortOrder,
-            java.util.function.Predicate<NotificationRecord> rule) implements NotificationFilter {
+            Predicate<NotificationRecord> rule) implements NotificationFilter {
 
         @Override
         public String getId() {
@@ -126,6 +129,14 @@ public final class NotificationServiceImpl implements NotificationService {
     /** Persists a player's preferences after an edit through the settings UI. */
     public void savePreferences(UUID player) {
         store.savePreferences(player);
+    }
+
+    /**
+     * Preferences for a player who may be offline: the live ones while their profile is
+     * loaded, otherwise read from storage without caching. Defaults when unreadable.
+     */
+    public CompletableFuture<NotificationPreferences> storedPreferences(UUID player) {
+        return store.storedPreferences(player);
     }
 
     /** Flushes and drops a player's cached notification state on disconnect. */
@@ -267,7 +278,7 @@ public final class NotificationServiceImpl implements NotificationService {
     }
 
     private void forEachOnline(Map<UUID, PlayerRef> out,
-            java.util.function.Predicate<PlayerRef> test) {
+            Predicate<PlayerRef> test) {
         for (PlayerRef player : core.platform().onlinePlayers()) {
             if (player != null && safeTest(test, player)) {
                 put(out, player);
@@ -275,7 +286,7 @@ public final class NotificationServiceImpl implements NotificationService {
         }
     }
 
-    private static boolean safeTest(java.util.function.Predicate<PlayerRef> test, PlayerRef player) {
+    private static boolean safeTest(Predicate<PlayerRef> test, PlayerRef player) {
         try {
             return test.test(player);
         } catch (Throwable t) {
@@ -378,7 +389,7 @@ public final class NotificationServiceImpl implements NotificationService {
                 out.add(filter);
             }
         }
-        out.sort(java.util.Comparator
+        out.sort(Comparator
                 .comparingInt(NotificationServiceImpl::safeSortOrder)
                 .thenComparing(NotificationServiceImpl::safeFilterName));
         return out;

@@ -23,7 +23,7 @@ Rewards are an optional, permission-gated way to pay players for idle time — c
 | `rewards.intervalSeconds` | `60` | Reward interval |
 | `rewards.amountPerInterval` | `5.0` | Payout per interval |
 | `rewards.maxSessionReward` | `500.0` | Per-session cap; `0` disables |
-| `rewards.maxDailyReward` | `2000.0` | Daily cap; `0` disables |
+| `rewards.maxDailyReward` | `2000.0` | Daily cap (per player per UTC day, kept in the player profile so a restart does not reset it); `0` disables |
 | `rewards.requireInZone` | `false` | Require standing in the reward zone |
 | `rewards.zones` | `[]` | Named reward-zone X/Z footprints |
 | `rewards.teleportToZoneOnAfk` | `true` | Offer/choose a safe zone landing and restore the saved location on return |

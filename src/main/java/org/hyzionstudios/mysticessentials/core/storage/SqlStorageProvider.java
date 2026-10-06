@@ -4,10 +4,13 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 
@@ -167,13 +170,13 @@ public final class SqlStorageProvider implements StorageProvider {
     }
 
     @Override
-    public CompletableFuture<java.util.List<String>> listKeys(String namespace) {
+    public CompletableFuture<List<String>> listKeys(String namespace) {
         return CompletableFuture.supplyAsync(() -> {
             try (Connection connection = dataSource.getConnection();
                     PreparedStatement statement = connection.prepareStatement(LIST_KEYS)) {
                 statement.setString(1, namespace);
                 try (ResultSet rs = statement.executeQuery()) {
-                    java.util.List<String> keys = new java.util.ArrayList<>();
+                    List<String> keys = new ArrayList<>();
                     while (rs.next()) {
                         keys.add(rs.getString(1));
                     }
@@ -189,6 +192,14 @@ public final class SqlStorageProvider implements StorageProvider {
     public void shutdown() {
         if (executor != null) {
             executor.shutdown();
+            try {
+                // Queued writes need open connections: let them finish before the pool closes.
+                if (!executor.awaitTermination(10, TimeUnit.SECONDS)) {
+                    core.log(Level.WARNING, "SQL storage tasks still running after 10s; closing the pool.");
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
         }
         if (dataSource != null) {
             dataSource.close();

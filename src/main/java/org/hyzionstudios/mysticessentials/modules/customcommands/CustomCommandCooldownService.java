@@ -34,6 +34,8 @@ public final class CustomCommandCooldownService {
 
     /** player uuid -> (command name -> expiry epoch millis). */
     private final Map<UUID, Map<String, Long>> expiries = new ConcurrentHashMap<>();
+    /** player uuid -> token of the current join; a load finishing after quit or rejoin is ignored. */
+    private final Map<UUID, Object> joins = new ConcurrentHashMap<>();
 
     public CustomCommandCooldownService(MysticCore core, CustomCommandStorage storage,
             Supplier<CustomCommandsConfig> config) {
@@ -106,7 +108,7 @@ public final class CustomCommandCooldownService {
         Map<String, Long> byCommand = expiries.get(player);
         if (byCommand != null) {
             byCommand.remove(commandName);
-            persist(player);
+            persist(player, commandName);
         }
     }
 
@@ -125,6 +127,8 @@ public final class CustomCommandCooldownService {
         if (!config.get().cooldowns.persist) {
             return;
         }
+        Object join = new Object();
+        joins.put(player, join);
         storage.loadCooldowns(player).thenAccept(loaded -> {
             long now = System.currentTimeMillis();
             Map<String, Long> live = new ConcurrentHashMap<>();
@@ -133,18 +137,39 @@ public final class CustomCommandCooldownService {
                     live.put(command, expiry);
                 }
             });
-            if (!live.isEmpty()) {
-                expiries.merge(player, live, (existing, incoming) -> {
-                    incoming.forEach((cmd, exp) -> existing.merge(cmd, exp, Math::max));
-                    return existing;
-                });
+            if (live.isEmpty()) {
+                return;
             }
+            // Applied under this join's entry, so a load finishing after the
+            // player quit (or rejoined) cannot re-add state nobody evicts.
+            joins.computeIfPresent(player, (key, current) -> {
+                if (current == join) {
+                    expiries.merge(player, live, (existing, incoming) -> {
+                        incoming.forEach((cmd, exp) -> existing.merge(cmd, exp, Math::max));
+                        return existing;
+                    });
+                }
+                return current;
+            });
         });
     }
 
-    /** Evicts a player's in-memory state on disconnect (persisted copies remain). */
+    /**
+     * Drops a player's in-memory state on disconnect when it is persisted (the
+     * stored copy is reloaded on the next join). Without persistence memory is
+     * the only copy, so running cooldowns are kept and only expired ones go.
+     */
     public void onQuit(UUID player) {
-        expiries.remove(player);
+        joins.remove(player);
+        if (config.get().cooldowns.persist) {
+            expiries.remove(player);
+            return;
+        }
+        long now = System.currentTimeMillis();
+        expiries.computeIfPresent(player, (key, byCommand) -> {
+            byCommand.values().removeIf(expiry -> expiry <= now);
+            return byCommand.isEmpty() ? null : byCommand;
+        });
     }
 
     /** Flushes every online player's cooldowns; called on module disable. */
@@ -158,6 +183,17 @@ public final class CustomCommandCooldownService {
     // ----- Write-through -----------------------------------------------------------------
 
     private void persist(UUID player) {
+        persist(player, null);
+    }
+
+    /**
+     * Writes the player's running cooldowns, merged into the stored ones (see
+     * {@link CustomCommandStorage#saveCooldowns}), so a command used before the
+     * join load finished cannot wipe cooldowns this server has not loaded yet.
+     *
+     * @param cleared a command whose stored cooldown is removed, or {@code null}
+     */
+    private void persist(UUID player, String cleared) {
         if (!config.get().cooldowns.persist) {
             return;
         }
@@ -169,7 +205,7 @@ public final class CustomCommandCooldownService {
                 alive.put(command, expiry);
             }
         });
-        storage.saveCooldowns(player, alive);
+        storage.saveCooldowns(player, alive, cleared);
     }
 
     private void publish(UUID player, String commandName, long expiry) {

@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.logging.Level;
@@ -110,12 +111,12 @@ final class CustomGuiRepository {
     }
 
     private static boolean supported(Path path) {
-        String name = path.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
+        String name = path.getFileName().toString().toLowerCase(Locale.ROOT);
         return name.endsWith(EXTENSION) || name.endsWith(".xml");
     }
 
     private static String stem(String filename) {
-        String lower = filename.toLowerCase(java.util.Locale.ROOT);
+        String lower = filename.toLowerCase(Locale.ROOT);
         if (lower.endsWith(EXTENSION)) return filename.substring(0, filename.length() - EXTENSION.length());
         if (lower.endsWith(".xml")) return filename.substring(0, filename.length() - 4);
         return filename;

@@ -1,10 +1,14 @@
 package org.hyzionstudios.mysticessentials.modules.customcontent.layout;
 
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.logging.Level;
 
+import org.hyzionstudios.mysticessentials.api.ui.UiActionResult;
 import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.api.Permissions;
 import org.hyzionstudios.mysticessentials.api.ui.UiActionContext;
@@ -48,11 +52,15 @@ final class LayoutActions {
     }
 
     /**
-     * @param ref   entity ref of the event being handled, or {@code null} when
-     *              running outside a page event
-     * @param store entity store of that event, or {@code null}
+     * @param inputs input name to the value the player entered, filled into
+     *               typed action payload values (other actions arrive with
+     *               their inputs already substituted)
+     * @param ref    entity ref of the event being handled, or {@code null} when
+     *               running outside a page event
+     * @param store  entity store of that event, or {@code null}
      */
-    Outcome run(PlayerRef player, List<String> actions, Ref<EntityStore> ref, Store<EntityStore> store) {
+    Outcome run(PlayerRef player, List<String> actions, Map<String, String> inputs,
+            Ref<EntityStore> ref, Store<EntityStore> store) {
         if (actions == null || actions.isEmpty()) {
             return Outcome.CONTINUE;
         }
@@ -65,7 +73,7 @@ final class LayoutActions {
             }
             // Later actions still run — only a second navigation is skipped,
             // since it would fight the surface the first one just opened.
-            Outcome step = runOne(player, raw.trim(), ref, store, unhandled,
+            Outcome step = runOne(player, raw.trim(), inputs, ref, store, unhandled,
                     outcome != Outcome.CONTINUE);
             if (step != Outcome.CONTINUE) {
                 outcome = step;
@@ -78,7 +86,7 @@ final class LayoutActions {
         return outcome;
     }
 
-    private Outcome runOne(PlayerRef player, String raw, Ref<EntityStore> ref,
+    private Outcome runOne(PlayerRef player, String raw, Map<String, String> inputs, Ref<EntityStore> ref,
             Store<EntityStore> store, List<String> unhandled, boolean surfaceGone) {
         int split = separator(raw);
         String verb = (split < 0 ? raw : raw.substring(0, split)).trim().toLowerCase(Locale.ROOT);
@@ -95,7 +103,7 @@ final class LayoutActions {
                 yield Outcome.CLOSED;
             }
             case "hud" -> hud(player, argument);
-            case "typed" -> typed(player, argument);
+            case "typed" -> typed(player, argument, inputs);
             case "showhud" -> hud(player, "show " + argument);
             case "hidehud" -> hud(player, "hide " + argument);
             case "command", "player", "run" -> {
@@ -113,11 +121,11 @@ final class LayoutActions {
                 yield Outcome.CONTINUE;
             }
             case "message", "msg", "tell", "send" -> {
-                core.getMessageService().send(player, resolve(player, argument));
+                core.getMessageService().send(player, fillInputs(resolve(player, argument), plain(inputs)));
                 yield Outcome.CONTINUE;
             }
             case "broadcast", "announce" -> {
-                String text = resolve(player, argument);
+                String text = fillInputs(resolve(player, argument), plain(inputs));
                 core.platform().onlinePlayers()
                         .forEach(online -> core.getMessageService().send(online, text));
                 yield Outcome.CONTINUE;
@@ -129,23 +137,52 @@ final class LayoutActions {
         };
     }
 
-    private Outcome typed(PlayerRef player, String encoded) {
+    /**
+     * Whether this action fills {@code {input}} tokens itself, after its own
+     * placeholder pass: typed actions (per payload value) and message/broadcast
+     * text (player-typed text must not become markup or placeholders that the
+     * message formatter would then render for every recipient).
+     */
+    static boolean fillsInputsItself(String action) {
+        return switch (verbOf(action)) {
+            case "typed", "message", "msg", "tell", "send", "broadcast", "announce" -> true;
+            default -> false;
+        };
+    }
+
+    private static String verbOf(String action) {
+        String trimmed = action == null ? "" : action.trim();
+        int split = separator(trimmed);
+        return (split < 0 ? trimmed : trimmed.substring(0, split)).trim().toLowerCase(Locale.ROOT);
+    }
+
+    /** Inputs reduced to plain text: no markup, link tags or placeholder delimiters. */
+    private static Map<String, String> plain(Map<String, String> inputs) {
+        Map<String, String> plain = new LinkedHashMap<>();
+        inputs.forEach((name, value) -> plain.put(name, value.replaceAll("[<>&{}%]", "")));
+        return plain;
+    }
+
+    private Outcome typed(PlayerRef player, String encoded, Map<String, String> inputs) {
         String[] parts = encoded.split(";");
         String id = parts.length == 0 ? "" : parts[0].trim();
-        java.util.Map<String, Object> payload = new java.util.LinkedHashMap<>();
+        Map<String, Object> payload = new LinkedHashMap<>();
         for (int index = 1; index < parts.length; index++) {
             int equals = parts[index].indexOf('=');
             if (equals > 0) {
+                // Inputs go into the value only after splitting, so typed text
+                // cannot add or override keys; and after placeholders, so it is
+                // never expanded.
                 payload.put(parts[index].substring(0, equals),
-                        resolve(player, parts[index].substring(equals + 1)));
+                        fillInputs(resolve(player, parts[index].substring(equals + 1)), inputs));
             }
         }
         var session = core.getCustomUiService().sessions().find(player.getUuid()).orElse(null);
         var result = core.getCustomUiService().actions().dispatch(id,
                 new UiActionContext(player.getUuid(), session, null,
                         session == null ? null : session.currentRoute(), payload,
-                        player::hasPermission, java.time.Instant.now()));
-        if (result.status() != org.hyzionstudios.mysticessentials.api.ui.UiActionResult.Status.SUCCESS
+                        player::hasPermission, Instant.now()));
+        if (result.status() != UiActionResult.Status.SUCCESS
                 && result.message() != null) {
             core.getMessageService().send(player, "&c" + result.message());
         }
@@ -208,6 +245,15 @@ final class LayoutActions {
 
     private String resolve(PlayerRef player, String value) {
         return bridge.substitute(player, value);
+    }
+
+    /** Replaces {@code {name}} with the matching input's value. */
+    private static String fillInputs(String value, Map<String, String> inputs) {
+        String current = value;
+        for (Map.Entry<String, String> input : inputs.entrySet()) {
+            current = current.replace("{" + input.getKey() + "}", input.getValue());
+        }
+        return current;
     }
 
     /** @return {@code command} without a leading slash, as the dispatchers expect. */

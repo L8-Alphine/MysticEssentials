@@ -17,15 +17,20 @@ import org.hyzionstudios.mysticessentials.platform.command.MysticCommand;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommandSender;
 
 import com.google.gson.JsonObject;
+import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.asset.type.item.config.Item;
 import com.hypixel.hytale.server.core.command.system.CommandSender;
 import com.hypixel.hytale.server.core.command.system.arguments.system.RequiredArg;
 import com.hypixel.hytale.server.core.command.system.arguments.types.ArgTypes;
 import com.hypixel.hytale.server.core.command.system.arguments.types.SingleArgumentType;
+import com.hypixel.hytale.server.core.entity.ItemUtils;
 import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
 /**
  * Kits: named item bundles with per-kit cooldowns (including single-use),
@@ -34,9 +39,9 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
  * named by {@code firstJoinKit} is granted automatically on first join.
  *
  * <p>Items are given on the player's world thread via the verified
- * {@code Player.giveItem} (overflow drops at the player's feet, matching the
- * builtin {@code /give}). Last-claim timestamps live in the player profile
- * under {@code moduleData.kits}.</p>
+ * {@code Player.giveItem}; whatever does not fit is dropped at the player's feet
+ * (the builtin {@code /give} would discard it). Last-claim timestamps live in
+ * the player profile under {@code moduleData.kits}.</p>
  */
 public final class KitModule extends AbstractMysticModule {
 
@@ -56,8 +61,8 @@ public final class KitModule extends AbstractMysticModule {
         loadConfig();
         registerCommand(new KitCommand());
         registerEvent(
-                com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent.class,
-                (com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent event) ->
+                PlayerConnectEvent.class,
+                (PlayerConnectEvent event) ->
                         onJoin(event.getPlayerRef()));
     }
 
@@ -90,9 +95,20 @@ public final class KitModule extends AbstractMysticModule {
                 log("firstJoinKit '" + kitName + "' is not defined in modules/kits/config.json");
                 return;
             }
-            giveItems(player, kit, kitName);
-            recordClaim(player.getUuid(), normalize(kitName));
-            core.getMessageService().sendKey(player, "kit-claimed", Map.of("kit", kitName));
+            String id = normalize(kitName);
+            // Record the claim only once the items were actually given, on the world
+            // thread; checking it there first means a repeated join cannot grant it twice.
+            boolean dispatched = core.platform().runOnEntityThread(player, (store, entity, world) -> {
+                if (lastClaim(player.getUuid(), id) != null) {
+                    return;
+                }
+                giveItemsNow(store, entity, kit, kitName);
+                recordClaim(player.getUuid(), id);
+                core.getMessageService().sendKey(player, "kit-claimed", Map.of("kit", kitName));
+            });
+            if (!dispatched) {
+                log("Could not give first-join kit '" + kitName + "' to " + player.getUsername() + " (left).");
+            }
         });
     }
 
@@ -223,6 +239,11 @@ public final class KitModule extends AbstractMysticModule {
                     Map.of("duration", formatDuration(kit.requiredOnlineSeconds - onlineSeconds)));
             return;
         }
+        if (kitData(playerId) == null) {
+            // Without the loaded profile the cooldown can be neither checked nor recorded.
+            reply.reply("kit-profile-not-loaded", Map.of());
+            return;
+        }
         if (!player.hasPermission(Permissions.KIT_BYPASS_COOLDOWN)) {
             Long lastClaim = lastClaim(playerId, id);
             if (lastClaim != null) {
@@ -241,13 +262,18 @@ public final class KitModule extends AbstractMysticModule {
             }
         }
         if (kit.cost > 0) {
-            if (!core.getEconomyService().has(playerId, kit.cost)) {
+            if (!core.getEconomyService().has(playerId, kit.cost)
+                    || !core.getEconomyService().withdraw(playerId, kit.cost)) {
                 reply.reply("kit-cannot-afford", Map.of("cost", Double.toString(kit.cost)));
                 return;
             }
-            core.getEconomyService().withdraw(playerId, kit.cost);
         }
-        giveItems(player, kit, id);
+        if (!giveItems(player, kit, id)) {
+            if (kit.cost > 0) {
+                core.getEconomyService().deposit(playerId, kit.cost); // Refund: the player is gone.
+            }
+            return;
+        }
         recordClaim(playerId, id);
         reply.reply("kit-claimed", Map.of("kit", id));
     }
@@ -256,24 +282,36 @@ public final class KitModule extends AbstractMysticModule {
         void reply(String key, Map<String, String> params);
     }
 
-    /** Gives the kit's items on the player's world thread (overflow drops like /give). */
-    private void giveItems(PlayerRef player, KitConfig.Kit kit, String kitName) {
-        boolean dispatched = core.platform().runOnEntityThread(player, (store, entity, world) -> {
-            for (KitConfig.KitItem item : kit.items) {
-                if (item == null || item.itemId == null || item.itemId.isBlank()) {
-                    continue;
-                }
-                try {
-                    ItemStack stack = new ItemStack(item.itemId, Math.max(1, item.quantity));
-                    Player.giveItem(stack, entity, store);
-                } catch (Throwable t) {
-                    core.log(Level.WARNING, "[kits] Kit '" + kitName + "': cannot give item '"
-                            + item.itemId + "': " + t);
-                }
-            }
-        });
+    /**
+     * Gives the kit's items on the player's world thread, dropping what does not fit
+     * at their feet. @return {@code false} when the player is no longer connected.
+     */
+    private boolean giveItems(PlayerRef player, KitConfig.Kit kit, String kitName) {
+        boolean dispatched = core.platform().runOnEntityThread(player, (store, entity, world) ->
+                giveItemsNow(store, entity, kit, kitName));
         if (!dispatched) {
             log("Could not give kit '" + kitName + "' to " + player.getUsername() + " (invalid entity).");
+        }
+        return dispatched;
+    }
+
+    /** Gives the kit's items to {@code entity}. MUST run on the player's world thread. */
+    private void giveItemsNow(Store<EntityStore> store, Ref<EntityStore> entity, KitConfig.Kit kit,
+            String kitName) {
+        for (KitConfig.KitItem item : kit.items) {
+            if (item == null || item.itemId == null || item.itemId.isBlank()) {
+                continue;
+            }
+            try {
+                ItemStack stack = new ItemStack(item.itemId, Math.max(1, item.quantity));
+                ItemStack remainder = Player.giveItem(stack, entity, store).getRemainder();
+                if (!ItemStack.isEmpty(remainder)) {
+                    ItemUtils.dropItem(entity, remainder, store);
+                }
+            } catch (Throwable t) {
+                core.log(Level.WARNING, "[kits] Kit '" + kitName + "': cannot give item '"
+                        + item.itemId + "': " + t);
+            }
         }
     }
 

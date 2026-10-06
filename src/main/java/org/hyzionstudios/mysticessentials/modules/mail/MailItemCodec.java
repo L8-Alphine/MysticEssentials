@@ -1,6 +1,8 @@
 package org.hyzionstudios.mysticessentials.modules.mail;
 
+import org.bson.BsonDocument;
 import org.hyzionstudios.mysticessentials.api.model.MailAttachment;
+import org.hyzionstudios.mysticessentials.platform.ItemStackMetadata;
 
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 
@@ -16,23 +18,24 @@ final class MailItemCodec {
     }
 
     /** Serializes an occupied item stack; returns {@code null} for empty stacks. */
-    @SuppressWarnings("deprecation") // Full BSON is required for lossless attachment round-trips.
     static MailAttachment toStored(ItemStack stack, int quantity) {
         if (stack == null || stack.isEmpty()) {
             return null;
         }
-        var metadata = stack.getMetadata();
-        String json = metadata == null || metadata.isEmpty() ? null : metadata.toJson();
-        return new MailAttachment(stack.getItemId(), Math.max(1, quantity),
+        String json = ItemStackMetadata.toJson(stack);
+        MailAttachment stored = new MailAttachment(stack.getItemId(), Math.max(1, quantity),
                 stack.getDurability(), stack.getMaxDurability(), json);
+        stored.quality = ItemStackMetadata.customQuality(stack);
+        return stored;
     }
 
     /** Rebuilds a live item from a stored attachment, restoring full metadata. */
     static ItemStack toLive(MailAttachment stored) {
-        org.bson.BsonDocument metadata = stored.metadata == null || stored.metadata.isBlank()
-                ? new org.bson.BsonDocument()
-                : org.bson.BsonDocument.parse(stored.metadata);
-        return new ItemStack(stored.itemId, Math.max(1, stored.quantity),
-                stored.durability, stored.maxDurability, metadata);
+        // No stored metadata means none: an empty document would not stack with fresh items.
+        BsonDocument metadata = stored.metadata == null || stored.metadata.isBlank()
+                ? null
+                : BsonDocument.parse(stored.metadata);
+        return ItemStackMetadata.rebuild(stored.itemId, Math.max(1, stored.quantity),
+                stored.durability, stored.maxDurability, metadata, stored.quality);
     }
 }

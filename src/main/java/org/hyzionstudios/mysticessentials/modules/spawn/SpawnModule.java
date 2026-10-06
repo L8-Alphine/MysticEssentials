@@ -1,6 +1,7 @@
 package org.hyzionstudios.mysticessentials.modules.spawn;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -21,10 +22,12 @@ import org.hyzionstudios.mysticessentials.platform.command.MysticArgTypes;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommand;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommandSender;
 
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.hypixel.hytale.server.core.command.system.arguments.system.RequiredArg;
 import com.hypixel.hytale.server.core.command.system.arguments.types.ArgTypes;
 import com.hypixel.hytale.server.core.command.system.arguments.types.SingleArgumentType;
+import com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 
 /**
@@ -73,23 +76,30 @@ public final class SpawnModule extends AbstractMysticModule implements SpawnServ
         // GlobalSpawnProvider, which is what the engine respawns against.
         // Update 6 does add a cancellable ECS RespawnEvent, so overriding the
         // respawn destination directly is now possible if this ever needs to
-        // diverge from the published spawn.
-        if (config.teleportOnFirstJoin || config.teleportOnJoin) {
-            registerEvent(
-                    com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent.class,
-                    (com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent event) ->
-                            onJoin(event.getPlayerRef()));
-        }
+        // diverge from the published spawn. Always registered: the join flags
+        // are read per join, so a reload (or an import) can switch them on.
+        registerEvent(
+                PlayerConnectEvent.class,
+                (PlayerConnectEvent event) ->
+                        onJoin(event.getPlayerRef()));
     }
 
+    /**
+     * Runs at {@code PlayerConnectEvent}, before the player has an entity: the
+     * teleport is held by the platform until the player is placed in a world.
+     */
     private void onJoin(PlayerRef player) {
+        SpawnConfig current = config;
+        if (!current.teleportOnFirstJoin && !current.teleportOnJoin) {
+            return;
+        }
         Optional<MysticLocation> spawn = getGlobalSpawn();
         if (spawn.isEmpty()) {
             return;
         }
         core.getPlayerProfileService().load(player.getUuid(), player.getUsername()).thenAccept(profile -> {
-            boolean shouldTeleport = (profile.isFirstJoin() && config.teleportOnFirstJoin)
-                    || (!profile.isFirstJoin() && config.teleportOnJoin);
+            boolean shouldTeleport = (profile.isFirstJoin() && current.teleportOnFirstJoin)
+                    || (!profile.isFirstJoin() && current.teleportOnJoin);
             if (shouldTeleport) {
                 core.getTeleportService().teleportNow(player, spawn.get());
             }
@@ -220,7 +230,7 @@ public final class SpawnModule extends AbstractMysticModule implements SpawnServ
                 || newName == null || newName.isBlank() || homes.has(newName)) {
             return false;
         }
-        com.google.gson.JsonElement location = homes.get(oldName);
+        JsonElement location = homes.get(oldName);
         homes.remove(oldName);
         homes.add(newName.trim(), location);
         core.getPlayerProfileService().getCached(player).ifPresent(core.getPlayerProfileService()::save);
@@ -284,7 +294,7 @@ public final class SpawnModule extends AbstractMysticModule implements SpawnServ
 
     private void normalizeConfig() {
         if (config.worldSpawns == null) {
-            config.worldSpawns = new java.util.LinkedHashMap<>();
+            config.worldSpawns = new LinkedHashMap<>();
         }
     }
 

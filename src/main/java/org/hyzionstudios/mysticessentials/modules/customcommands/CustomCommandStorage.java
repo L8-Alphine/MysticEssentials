@@ -47,12 +47,25 @@ public final class CustomCommandStorage {
                 });
     }
 
-    /** Persists a player's cooldown expiries (call with expired entries pruned). */
-    public CompletableFuture<Void> saveCooldowns(UUID player, Map<String, Long> expiries) {
-        if (expiries.isEmpty()) {
-            return core.getStorageService().delete(NAMESPACE, "cooldown-" + player).thenApply(v -> null);
-        }
-        return core.getStorageService().save(NAMESPACE, "cooldown-" + player, toJson(expiries));
+    /**
+     * Merges a player's cooldown expiries into the stored document in one atomic
+     * read-modify-write: the later expiry of each command wins, expired entries
+     * are pruned and {@code cleared} (may be {@code null}) is removed. Merging
+     * instead of overwriting keeps cooldowns stored by an earlier session or
+     * another server that this server's memory does not hold (yet).
+     */
+    public CompletableFuture<Void> saveCooldowns(UUID player, Map<String, Long> expiries, String cleared) {
+        long now = System.currentTimeMillis();
+        return core.getStorageService().update(NAMESPACE, "cooldown-" + player, current -> {
+            Map<String, Long> merged = toLongMap(current);
+            merged.values().removeIf(expiry -> expiry <= now);
+            if (cleared != null) {
+                merged.remove(cleared);
+            }
+            expiries.forEach((command, expiry) -> merged.merge(command, expiry, Math::max));
+            // Nothing stored and nothing to store: do not create an empty document.
+            return current == null && merged.isEmpty() ? null : toJson(merged);
+        }).thenApply(stored -> null);
     }
 
     // ----- Usage stats -----------------------------------------------------------

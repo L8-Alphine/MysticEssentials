@@ -110,6 +110,11 @@ public final class CameraSceneProvider implements TutorialSceneProvider {
         CompletableFuture<TutorialSceneResult> completion = new CompletableFuture<>();
         long startNanos = System.nanoTime();
 
+        // A scene already playing for this player is ended first: replacing its
+        // entry would leave its tick loop running, and that loop would later
+        // complete this scene, while its own future never resolved.
+        finish(request.playerId, TutorialSceneResultType.STOPPED, "replaced by a new scene");
+
         // Freeze the player's world (time dilation) for the shot so nothing
         // moves during the cutscene — the cinematic look the Replay mod uses. The
         // unfreeze is unconditional in resetCamera(), so this always heals.
@@ -123,12 +128,14 @@ public final class CameraSceneProvider implements TutorialSceneProvider {
 
         ScheduledFuture<?> tickTask = core.scheduler().runRepeating(() -> {
             Running entry = running.get(request.playerId);
-            if (entry == null) {
-                return; // Stopped between ticks.
+            if (entry == null || entry.completion() != completion) {
+                return; // Stopped or replaced between ticks.
             }
             double elapsed = (System.nanoTime() - startNanos) / 1_000_000_000.0;
             if (elapsed >= totalSeconds) {
-                finish(request.playerId, TutorialSceneResultType.COMPLETED, "path complete");
+                if (running.remove(request.playerId, entry)) {
+                    end(entry, TutorialSceneResultType.COMPLETED, "path complete");
+                }
                 return;
             }
             try {
@@ -163,12 +170,16 @@ public final class CameraSceneProvider implements TutorialSceneProvider {
 
     // ----- Internals -------------------------------------------------------------
 
-    /** Ends playback exactly once: cancels the loop, resets the camera, completes the future. */
+    /** Ends the player's current playback, if any. */
     private void finish(UUID playerId, TutorialSceneResultType type, String detail) {
         Running entry = running.remove(playerId);
-        if (entry == null) {
-            return;
+        if (entry != null) {
+            end(entry, type, detail);
         }
+    }
+
+    /** Ends one removed playback exactly once: cancels the loop, resets the camera, completes the future. */
+    private void end(Running entry, TutorialSceneResultType type, String detail) {
         if (entry.tickTask() != null) {
             entry.tickTask().cancel(false);
         }

@@ -2,7 +2,10 @@ package org.hyzionstudios.mysticessentials.modules.nick;
 
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.hyzionstudios.mysticessentials.api.Permissions;
 import org.hyzionstudios.mysticessentials.core.module.AbstractMysticModule;
@@ -74,8 +77,8 @@ public final class NickModule extends AbstractMysticModule {
         return stripNickFormat(stripColors(nickname(player)));
     }
 
-    java.util.Optional<String> nicknameColor(UUID player) {
-        return java.util.Optional.ofNullable(extractColor(nickname(player)));
+    Optional<String> nicknameColor(UUID player) {
+        return Optional.ofNullable(extractColor(nickname(player)));
     }
 
     record NickError(String key, Map<String, String> params) {
@@ -107,10 +110,10 @@ public final class NickModule extends AbstractMysticModule {
         if (!allowColors) {
             toStore = stripped;
         } else {
-            // Preserve any colour markup the player typed; translate config preset
-            // names (<red>) to hex so MysticText renders them, and if they chose no
-            // colour at all, fall back to the configured default colour.
-            String raw = translateNamedColors(stripLeadingMarker(rawNick).trim());
+            // Preserve the colour markup the player typed (and only that); translate
+            // config preset names (<red>) to hex so MysticText renders them, and if they
+            // chose no colour at all, fall back to the configured default colour.
+            String raw = keepColorMarkup(translateNamedColors(stripLeadingMarker(rawNick).trim()));
             if (!hasColorMarkup(raw)) {
                 String fallback = resolveColor(config.defaultColor);
                 raw = fallback != null ? "<" + fallback + ">" + raw : raw;
@@ -138,6 +141,54 @@ public final class NickModule extends AbstractMysticModule {
         return value != null && value.matches("(?is).*(&[0-9a-fk-or]|&#[0-9a-f]{3,6}|<[^>]+>).*");
     }
 
+    /**
+     * Keeps only plain colour markup in a nickname: legacy {@code &} codes and hex
+     * colours ({@code <#hex>}, {@code <color:#hex>}, {@code &#hex}), the hex limited
+     * to the configured presets unless {@code allowCustomHex}. Every other tag
+     * (links, translations, gradients) is dropped, since the nickname is rendered
+     * into every chat line.
+     */
+    private String keepColorMarkup(String value) {
+        Matcher tag = Pattern.compile("<([^>]*)>").matcher(value);
+        StringBuilder tagged = new StringBuilder(value.length());
+        while (tag.find()) {
+            String inner = tag.group(1).trim();
+            int colon = inner.indexOf(':');
+            if (colon > 0) {
+                String prefix = inner.substring(0, colon).trim().toLowerCase(Locale.ROOT);
+                if (prefix.equals("color") || prefix.equals("c")) {
+                    inner = inner.substring(colon + 1).trim();
+                }
+            }
+            String hex = inner.startsWith("#") ? allowedHex(resolveHexOnly(inner)) : null;
+            tag.appendReplacement(tagged, hex == null ? "" : Matcher.quoteReplacement("<" + hex + ">"));
+        }
+        tag.appendTail(tagged);
+        Matcher ampHex = Pattern.compile("(?i)&#([0-9a-f]{6})").matcher(tagged.toString());
+        StringBuilder out = new StringBuilder(tagged.length());
+        while (ampHex.find()) {
+            String hex = allowedHex(resolveHexOnly(ampHex.group(1)));
+            ampHex.appendReplacement(out, hex == null ? "" : Matcher.quoteReplacement("&" + hex));
+        }
+        ampHex.appendTail(out);
+        return out.toString();
+    }
+
+    /** {@code hex} when custom hex is allowed or it is one of the configured presets, else null. */
+    private String allowedHex(String hex) {
+        if (hex == null || config.allowCustomHex) {
+            return hex;
+        }
+        if (config.colors != null) {
+            for (String preset : config.colors.values()) {
+                if (hex.equals(resolveHexOnly(preset))) {
+                    return hex;
+                }
+            }
+        }
+        return null;
+    }
+
     /** Replaces {@code <presetName>} tokens with their configured hex so they render. */
     String translateNamedColors(String value) {
         if (value == null || config.colors == null || config.colors.isEmpty()) {
@@ -147,7 +198,7 @@ public final class NickModule extends AbstractMysticModule {
         for (Map.Entry<String, String> entry : config.colors.entrySet()) {
             String hex = resolveHexOnly(entry.getValue());
             if (hex != null) {
-                out = out.replaceAll("(?i)<" + java.util.regex.Pattern.quote(entry.getKey()) + ">", "<" + hex + ">");
+                out = out.replaceAll("(?i)<" + Pattern.quote(entry.getKey()) + ">", "<" + hex + ">");
             }
         }
         return out;
@@ -208,7 +259,7 @@ public final class NickModule extends AbstractMysticModule {
             return null;
         }
         String t = value.trim();
-        java.util.regex.Matcher rgb = java.util.regex.Pattern
+        Matcher rgb = Pattern
                 .compile("^(\\d{1,3})\\s*,\\s*(\\d{1,3})\\s*,\\s*(\\d{1,3})$").matcher(t);
         if (rgb.matches()) {
             int r = clampByte(Integer.parseInt(rgb.group(1)));
@@ -324,17 +375,17 @@ public final class NickModule extends AbstractMysticModule {
         if (value == null) {
             return null;
         }
-        java.util.regex.Matcher hexTag = java.util.regex.Pattern
+        Matcher hexTag = Pattern
                 .compile("(?i)<#([0-9a-f]{6})>").matcher(value);
         if (hexTag.find()) {
             return "#" + hexTag.group(1).toUpperCase(Locale.ROOT);
         }
-        java.util.regex.Matcher ampHex = java.util.regex.Pattern
+        Matcher ampHex = Pattern
                 .compile("(?i)&#([0-9a-f]{6})").matcher(value);
         if (ampHex.find()) {
             return "#" + ampHex.group(1).toUpperCase(Locale.ROOT);
         }
-        java.util.regex.Matcher legacy = java.util.regex.Pattern
+        Matcher legacy = Pattern
                 .compile("(?i)&([0-9a-f])").matcher(value);
         return legacy.find() ? legacyColor(legacy.group(1).charAt(0)) : null;
     }

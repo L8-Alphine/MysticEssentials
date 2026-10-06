@@ -15,7 +15,6 @@ public final class RtpRequest {
     private final UUID playerId;
     private final String profileId;
     private final String world;
-    private final String biome;
     private final boolean force;
     private final boolean silent;
     private final boolean bypassCost;
@@ -25,7 +24,6 @@ public final class RtpRequest {
         this.playerId = b.playerId;
         this.profileId = b.profileId;
         this.world = b.world;
-        this.biome = b.biome;
         this.force = b.force;
         this.silent = b.silent;
         this.bypassCost = b.bypassCost;
@@ -46,10 +44,6 @@ public final class RtpRequest {
 
     public String getWorld() {
         return world;
-    }
-
-    public String getBiome() {
-        return biome;
     }
 
     public boolean isForce() {
@@ -77,7 +71,6 @@ public final class RtpRequest {
         private final UUID playerId;
         private String profileId;
         private String world;
-        private String biome;
         private boolean force;
         private boolean silent;
         private boolean bypassCost;
@@ -94,11 +87,6 @@ public final class RtpRequest {
 
         public Builder world(String world) {
             this.world = world;
-            return this;
-        }
-
-        public Builder biome(String biome) {
-            this.biome = biome;
             return this;
         }
 

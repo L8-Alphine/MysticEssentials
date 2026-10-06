@@ -17,6 +17,12 @@ public final class ChatConfig {
     public Boolean autoLinkPlainUrls = true;
     public String autoLinkPermission = null;
     public String defaultFormat = "{luckperms_prefix}{display_name} &8» &f{message}";
+    /**
+     * Line format for chat another mod hands over through {@code ChatService.deliver}
+     * (guild, officer, party or settlement chat) when it supplies none. {@code {channel}}
+     * is that mod's label, e.g. the guild name.
+     */
+    public String deliveryFormat = "&8[&d{channel}&8] &f{display_name} &8» &7{message}";
     public List<Format> formats = defaultFormats();
     public Map<String, String> messageColorPermissions = defaultColorPermissions();
     public PrivateMessaging privateMessaging = new PrivateMessaging();
@@ -63,6 +69,12 @@ public final class ChatConfig {
         public String crossServerPrefix = "&8[&b{server_id}&8] ";
         public boolean allowTemporaryChannels = true;
         public int temporaryChannelDefaultMinutes = 120;
+        /**
+         * Temporary channels one player may own at once, counted across the network
+         * when Redis is enabled. {@code 0} or less is unlimited; holders of
+         * {@code mysticessentials.channel.staff.override} are not limited.
+         */
+        public int maxTemporaryChannelsPerOwner = 1;
         public String createTemporaryPermission = "mysticessentials.chat.channel.create.temp";
         public List<Channel> channels = defaultChannels();
         public Roster roster = new Roster();

@@ -102,15 +102,13 @@ public final class RtpProfile {
 
     /**
      * Optional per-profile filters. Fields backed by server APIs that remain
-     * unverified through 0.6.2 (biomes, block tags, world types) or by other
+     * unverified through 0.6.2 (block tags, world types) or by other
      * Mystic modules (claims via
      * MysticGuilds, level via MysticRPG) are honoured only when a corresponding
      * capability/exclusion provider is registered; otherwise they are ignored so
      * a search never silently fails.
      */
     public static final class Filters {
-        public List<String> includedBiomes = new ArrayList<>();
-        public List<String> excludedBiomes = new ArrayList<>();
         public List<String> includedRegions = new ArrayList<>();
         public List<String> excludedRegions = new ArrayList<>();
         public int minimumDistanceFromSpawn = 0;

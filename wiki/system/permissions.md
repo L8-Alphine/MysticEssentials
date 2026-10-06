@@ -30,12 +30,12 @@ All permission nodes are prefixed with `mysticessentials.`. Dynamic nodes such a
 | Node | Grants |
 | --- | --- |
 | `mysticessentials.teleport.rtp.use` | `/rtp` and the selection UI |
-| `mysticessentials.teleport.rtp.biome` | `/rtp biome <biome>` |
-| `mysticessentials.teleport.rtp.others` | `/rtp <player>` (send another player) |
+| `mysticessentials.teleport.rtp.others` | `/rtp <player>` (send another player through the normal checks) |
 | `mysticessentials.teleport.rtp.cancel` / `.status` | Cancel / status forms |
 | `mysticessentials.teleport.rtp.bypass.warmup` | Skip RTP warmups |
 | `mysticessentials.teleport.rtp.bypass.cooldown` | Skip RTP cooldowns |
 | `mysticessentials.teleport.rtp.bypass.cost` | Skip RTP costs |
+| `mysticessentials.teleport.rtp.admin.force` | Skip the target's checks: the `--force` flag and every `/rtp <player>` its holder sends; also `--silent` |
 | `mysticessentials.teleport.rtp.bypass.combat` | RTP while in combat |
 | `mysticessentials.teleport.rtp.bypass.queue` | Skip the search queue |
 | `mysticessentials.teleport.rtp.bypass.limits` | Ignore per-hour/day use limits |
@@ -123,14 +123,16 @@ config page); players without it cannot use that portal.
 | `mysticessentials.chat.private.reply` | `/reply`, `/r` |
 | `mysticessentials.chat.socialspy` | See other players' private messages |
 | `mysticessentials.chat.socialspy.exempt` | Hide a player's private messages from social spy |
-| `mysticessentials.chat.channel.create.temp` | Create temporary channels |
+| `mysticessentials.chat.ignore` | `/ignore` and `/unignore` |
+| `mysticessentials.chat.ignore.exempt` | Cannot be added to anyone's ignore list; private messages and mail always get through |
+| `mysticessentials.chat.channel.create.temp` | Create temporary channels (up to `channels.maxTemporaryChannelsPerOwner` owned at once) |
 | `mysticessentials.chat.channel.<id>` | Dynamic per-channel gate |
 | `mysticessentials.chat.channel.<id>.speak` | Dynamic speak gate for a channel |
 | `mysticessentials.chat.channel.<id>.listen` | Dynamic listen gate for a channel |
 | `mysticessentials.chat.channel.<id>.moderator` | Dynamic moderation/management gate for a channel |
 | `mysticessentials.channel.members.view` | Open channel member rosters (configurable with `channels.roster.viewPermission`) |
 | `mysticessentials.chat.staff` | Adds the live `STAFF` roster tag (configurable with `channels.roster.staffPermission`) |
-| `mysticessentials.channel.staff.override` | Staff override for temporary-channel management restrictions |
+| `mysticessentials.channel.staff.override` | Staff override for temporary-channel management restrictions and the per-owner limit |
 | `mysticessentials.chat.color.legacy` | Use legacy `&a` style color codes in chat |
 | `mysticessentials.chat.color.hex` | Use hex colors such as `&#ff8800` |
 | `mysticessentials.chat.color.gradient` | Use gradients |

@@ -1,5 +1,6 @@
 package org.hyzionstudios.mysticessentials.core.network;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -13,6 +14,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 
 import org.hyzionstudios.mysticessentials.core.MysticCore;
@@ -46,7 +48,7 @@ public final class NetworkPlayerService {
 
     private final MysticCore core;
     private final Map<String, ServerSnapshot> remoteServers = new ConcurrentHashMap<>();
-    private final java.util.function.Consumer<String> redisHandler = this::handleSnapshot;
+    private final Consumer<String> redisHandler = this::handleSnapshot;
 
     private ScheduledFuture<?> heartbeat;
     private volatile boolean running;
@@ -119,7 +121,7 @@ public final class NetworkPlayerService {
             players.put(local.getUuid(), localPlayer(local));
         }
         long staleBefore = Instant.now().minusSeconds(ttlSeconds()).toEpochMilli();
-        remoteServers.entrySet().removeIf(entry -> entry.getValue().seenAtMillis < staleBefore);
+        remoteServers.entrySet().removeIf(entry -> entry.getValue().receivedAtMillis < staleBefore);
         for (ServerSnapshot snapshot : remoteServers.values()) {
             for (NetworkPlayer player : snapshot.players) {
                 players.putIfAbsent(player.uuid(), player);
@@ -231,7 +233,7 @@ public final class NetworkPlayerService {
         JsonObject route = new JsonObject();
         route.addProperty("kind", "mysticessentials:route");
         route.addProperty("destinationServerId", destinationServerId);
-        return Json.toString(route).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        return Json.toString(route).getBytes(StandardCharsets.UTF_8);
     }
 
     /** Every other server currently on the roster, for diagnostics. */
@@ -240,7 +242,7 @@ public final class NetworkPlayerService {
         for (Map.Entry<String, ServerSnapshot> entry : remoteServers.entrySet()) {
             ServerSnapshot snapshot = entry.getValue();
             result.add(new RemoteServer(entry.getKey(), snapshot.host, snapshot.port,
-                    snapshot.seenAtMillis, snapshot.players.size()));
+                    snapshot.receivedAtMillis, snapshot.players.size()));
         }
         result.sort(Comparator.comparing(RemoteServer::serverId, String.CASE_INSENSITIVE_ORDER));
         return result;
@@ -359,11 +361,21 @@ public final class NetworkPlayerService {
         snapshot.add("players", players);
 
         String raw = Json.toString(snapshot);
-        int ttl = ttlSeconds();
-        core.redis().cacheSet(SERVER_KEY_PREFIX + localServerId(), raw, ttl);
-        core.redis().cacheSetAdd(SERVER_INDEX, ttl * 4, localServerId());
-        core.redis().publish(CHANNEL, raw);
-        refreshFromRedis();
+        // The roster is captured here, on the caller's thread (it must reflect this
+        // exact join/quit), but the Redis round trips run on the scheduler: join and
+        // quit listeners can run on a world thread, which a slow or unreachable Redis
+        // must never stall.
+        try {
+            core.scheduler().runLater(() -> {
+                int ttl = ttlSeconds();
+                core.redis().cacheSet(SERVER_KEY_PREFIX + localServerId(), raw, ttl);
+                core.redis().cacheSetAdd(SERVER_INDEX, ttl * 4, localServerId());
+                core.redis().publish(CHANNEL, raw);
+                refreshFromRedis();
+            }, 0, TimeUnit.MILLISECONDS);
+        } catch (RuntimeException e) {
+            // Scheduler already stopped: the plugin is shutting down.
+        }
     }
 
     private void refreshFromRedis() {
@@ -410,7 +422,13 @@ public final class NetworkPlayerService {
                             bool(item, "vanished"), bool(item, "afk")));
                 }
             }
-            remoteServers.put(serverId, new ServerSnapshot(host, port, seenAt, List.copyOf(players)));
+            // seenAt orders snapshots of one server (its own clock); staleness is
+            // judged by when this server received it, so clock skew between
+            // servers cannot prune a live one or keep a dead one.
+            ServerSnapshot received = new ServerSnapshot(host, port, seenAt,
+                    System.currentTimeMillis(), List.copyOf(players));
+            remoteServers.merge(serverId, received,
+                    (current, fresh) -> fresh.seenAtMillis >= current.seenAtMillis ? fresh : current);
         } catch (RuntimeException e) {
             core.log(Level.WARNING, "Ignored malformed Redis presence payload: " + e.getMessage());
         }
@@ -471,7 +489,7 @@ public final class NetworkPlayerService {
         }
     }
 
-    private record ServerSnapshot(String host, int port, long seenAtMillis,
+    private record ServerSnapshot(String host, int port, long seenAtMillis, long receivedAtMillis,
             List<NetworkPlayer> players) {
     }
 

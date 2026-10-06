@@ -41,13 +41,12 @@ public final class VaultAdminLogService {
             return CompletableFuture.completedFuture(null);
         }
         UUID target = UUID.fromString(entry.targetUuid);
-        return storage.loadLogs(target).thenCompose(entries -> {
+        int max = Math.max(1, config.admin.maxLogEntriesPerPlayer);
+        return storage.updateLogs(target, entries -> {
             entries.add(0, entry);
-            int max = Math.max(1, config.admin.maxLogEntriesPerPlayer);
             while (entries.size() > max) {
                 entries.remove(entries.size() - 1);
             }
-            return storage.saveLogs(target, entries);
         });
     }
 

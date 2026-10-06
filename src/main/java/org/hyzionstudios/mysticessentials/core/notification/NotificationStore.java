@@ -8,8 +8,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.function.Consumer;
+import java.util.function.UnaryOperator;
 import java.util.logging.Level;
 
 import org.hyzionstudios.mysticessentials.api.model.PlayerProfile;
@@ -18,6 +21,7 @@ import org.hyzionstudios.mysticessentials.api.notification.NotificationCategory;
 import org.hyzionstudios.mysticessentials.api.notification.NotificationPriority;
 import org.hyzionstudios.mysticessentials.api.notification.NotificationRecord;
 import org.hyzionstudios.mysticessentials.core.MysticCore;
+import org.hyzionstudios.mysticessentials.core.profile.PlayerProfileServiceImpl;
 import org.hyzionstudios.mysticessentials.core.util.Json;
 
 import com.google.gson.JsonArray;
@@ -57,12 +61,78 @@ final class NotificationStore {
 
     // ----- Preferences ------------------------------------------------------------
 
-    /** This player's preferences, loading them from the profile on first access. */
+    /**
+     * This player's preferences, loading them from the profile on first access.
+     * Until the profile is loaded (a send during the join, or to an offline
+     * player) defaults are returned without being cached: cached defaults would
+     * be written over the stored preferences when the session ends.
+     */
     NotificationPreferences preferences(UUID player) {
         if (player == null) {
             return new NotificationPreferences();
         }
-        return preferences.computeIfAbsent(player, this::loadPreferences);
+        NotificationPreferences cached = preferences.get(player);
+        if (cached != null) {
+            return cached;
+        }
+        if (!profileLoaded(player)) {
+            return new NotificationPreferences();
+        }
+        boolean[] loaded = {false};
+        NotificationPreferences current = preferences.computeIfAbsent(player, id -> {
+            loaded[0] = true;
+            return loadPreferences(id);
+        });
+        if (loaded[0]) {
+            migrateIgnoredNames(player, current);
+        }
+        return current;
+    }
+
+    /**
+     * Resolves ignore-list names stored before the list was kept by UUID, once per load.
+     * A name no known player has yet is kept (and still applies by name) until a later
+     * load resolves it.
+     */
+    private void migrateIgnoredNames(UUID player, NotificationPreferences current) {
+        for (String name : current.pendingIgnoredNames()) {
+            core.getPlayerProfileService().resolveUuid(name).whenComplete((found, failure) -> {
+                if (found != null && found.isPresent()) {
+                    if (current.resolvePendingIgnore(name, found.get())) {
+                        savePreferences(player);
+                    }
+                } else {
+                    core.log(Level.INFO, "[notifications] Ignore list of " + player + ": '" + name
+                            + "' is not a known player yet; kept by name until it resolves.");
+                }
+            });
+        }
+    }
+
+    /**
+     * This player's preferences wherever they are: the live ones while their profile is
+     * loaded here, otherwise read from their stored profile without being cached (an
+     * offline player). Defaults when there are none or they cannot be read.
+     */
+    CompletableFuture<NotificationPreferences> storedPreferences(UUID player) {
+        if (player == null) {
+            return CompletableFuture.completedFuture(new NotificationPreferences());
+        }
+        if (profileLoaded(player)) {
+            return CompletableFuture.completedFuture(preferences(player));
+        }
+        return core.getStorageService().load(PlayerProfileServiceImpl.NAMESPACE, player.toString())
+                .thenApply(element -> {
+                    PlayerProfile profile = element == null ? null : Json.fromJson(element, PlayerProfile.class);
+                    JsonObject data = profile == null ? null : profile.getModuleData().get(MODULE_KEY);
+                    if (data == null || !data.has(PREFERENCES_FIELD)) {
+                        return new NotificationPreferences();
+                    }
+                    NotificationPreferences stored = Json.gson()
+                            .fromJson(data.get(PREFERENCES_FIELD), NotificationPreferences.class);
+                    return stored == null ? new NotificationPreferences() : stored.normalized();
+                })
+                .exceptionally(failure -> new NotificationPreferences());
     }
 
     private NotificationPreferences loadPreferences(UUID player) {
@@ -88,8 +158,12 @@ final class NotificationStore {
         if (current == null) {
             return;
         }
-        mutateModuleData(player, data ->
-                data.add(PREFERENCES_FIELD, Json.toTree(current)));
+        mutateModuleData(player, data -> {
+            // The ignore list is edited under this lock (NotificationPreferences.setIgnored).
+            synchronized (current) {
+                data.add(PREFERENCES_FIELD, Json.toTree(current));
+            }
+        });
     }
 
     // ----- History -------------------------------------------------------------------
@@ -181,7 +255,7 @@ final class NotificationStore {
     }
 
     private boolean replace(UUID player, String notificationId,
-            java.util.function.UnaryOperator<NotificationRecord> mapper) {
+            UnaryOperator<NotificationRecord> mapper) {
         Deque<NotificationRecord> entries = historyFor(player);
         List<NotificationRecord> updated = new ArrayList<>(entries.size());
         boolean changed = false;
@@ -202,7 +276,15 @@ final class NotificationStore {
         return changed;
     }
 
+    /** Same rule as {@link #preferences}: nothing is cached before the profile is loaded. */
     private Deque<NotificationRecord> historyFor(UUID player) {
+        Deque<NotificationRecord> cached = history.get(player);
+        if (cached != null) {
+            return cached;
+        }
+        if (!profileLoaded(player)) {
+            return new ConcurrentLinkedDeque<>();
+        }
         return history.computeIfAbsent(player, this::loadHistory);
     }
 
@@ -279,6 +361,10 @@ final class NotificationStore {
 
     // ----- Profile access --------------------------------------------------------------
 
+    private boolean profileLoaded(UUID player) {
+        return core.getPlayerProfileService().getCached(player).isPresent();
+    }
+
     private JsonObject moduleData(UUID player) {
         return core.getPlayerProfileService().getCached(player)
                 .map(profile -> profile.getModuleData().get(MODULE_KEY))
@@ -290,7 +376,7 @@ final class NotificationStore {
      * dirty. A no-op when the profile is not loaded — an offline player's history
      * is written when their own session ends, not by somebody else's send.
      */
-    private void mutateModuleData(UUID player, java.util.function.Consumer<JsonObject> mutation) {
+    private void mutateModuleData(UUID player, Consumer<JsonObject> mutation) {
         Optional<PlayerProfile> profile = core.getPlayerProfileService().getCached(player);
         if (profile.isEmpty()) {
             return;

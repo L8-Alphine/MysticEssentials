@@ -47,20 +47,19 @@ public final class VaultBackupService {
         }
         UUID owner = UUID.fromString(vault.ownerUuid);
         VaultBackup backup = VaultBackup.of(vault, reason, actorUuid, serverId());
-        return storage.loadBackups(owner, vault.vaultNumber).thenCompose(backups -> {
+        int max = Math.max(1, config.saving.maxBackupsPerVault);
+        return storage.updateBackups(owner, vault.vaultNumber, backups -> {
             backups.add(0, backup);
-            int max = Math.max(1, config.saving.maxBackupsPerVault);
             while (backups.size() > max) {
                 backups.remove(backups.size() - 1);
             }
-            return storage.saveBackups(owner, vault.vaultNumber, backups).thenApply(v -> {
-                EventBus bus = core.getEventBus();
-                if (bus != null) {
-                    bus.publish(new PlayerVaultBackupCreateEvent(owner, vault.vaultNumber,
-                            backup.backupId, reason));
-                }
-                return Optional.of(backup);
-            });
+        }).thenApply(v -> {
+            EventBus bus = core.getEventBus();
+            if (bus != null) {
+                bus.publish(new PlayerVaultBackupCreateEvent(owner, vault.vaultNumber,
+                        backup.backupId, reason));
+            }
+            return Optional.of(backup);
         });
     }
 
@@ -80,13 +79,12 @@ public final class VaultBackupService {
             return CompletableFuture.completedFuture(null);
         }
         UUID owner = UUID.fromString(snapshot.ownerUuid);
-        return storage.loadConflicts(owner, snapshot.vaultNumber).thenCompose(conflicts -> {
+        int max = Math.max(1, config.saving.maxBackupsPerVault);
+        return storage.updateConflicts(owner, snapshot.vaultNumber, conflicts -> {
             conflicts.add(0, snapshot);
-            int max = Math.max(1, config.saving.maxBackupsPerVault);
             while (conflicts.size() > max) {
                 conflicts.remove(conflicts.size() - 1);
             }
-            return storage.saveConflicts(owner, snapshot.vaultNumber, conflicts);
         });
     }
 

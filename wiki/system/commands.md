@@ -40,8 +40,7 @@ See the [Random Teleport](rtp-module) page for full details.
 | `/rtp` | Teleport to a random safe location (or open the RTP UI) | `mysticessentials.teleport.rtp.use` |
 | `/rtp world <world> [player]` | RTP into a specific world | `mysticessentials.teleport.rtp.use` |
 | `/rtp profile <profile> [player]` | RTP using a named profile | `mysticessentials.teleport.rtp.use` |
-| `/rtp biome <biome>` | RTP into a biome | `mysticessentials.teleport.rtp.biome` |
-| `/rtp <player>` | RTP another online player | `mysticessentials.teleport.rtp.others` |
+| `/rtp <player>` | RTP another online player (normal checks unless you hold `...rtp.admin.force`) | `mysticessentials.teleport.rtp.others` |
 | `/rtp cancel` / `status` / `info [profile]` | Cancel, check status, or inspect a profile | `mysticessentials.teleport.rtp.use` |
 | `/rtpadmin`, `/rtpa` | Administer profiles, queue, and search (reload/test/preview/debug/enable/disable/setcenter/clearcache/queue/ui/cancel/spread/queue-login) | `mysticessentials.teleport.rtp.admin` |
 
@@ -104,13 +103,17 @@ Alias: `/portals`. Portals are configured in-game by pressing Use (F) on a porta
 | `/msg <player> <message>` | Send a private message | `mysticessentials.chat.private.message` |
 | `/tell`, `/w`, `/whisper` | Aliases for `/msg` | `mysticessentials.chat.private.message` |
 | `/reply <message>`, `/r <message>` | Reply to the last private message | `mysticessentials.chat.private.reply` |
+| `/ignore` | List the players you ignore | `mysticessentials.chat.ignore` |
+| `/ignore <player>` | Hide a player's chat lines, mentions, private messages and mail from you | `mysticessentials.chat.ignore` |
+| `/unignore <player>` | Stop ignoring a player | `mysticessentials.chat.ignore` |
 | `/channel`, `/ch` | Open the channel browser or show channel state | None by default |
 | `/channel <name>` | Switch speaking channel | Channel permissions may apply |
 | `/channel switch <name> [password]` | Switch speaking channel | Channel permissions may apply |
 | `/channel join <name> [password]` | Listen to a channel | Channel permissions may apply |
 | `/channel leave <name>` | Stop listening to a channel | None by default |
 | `/channel temp <id> [password|-] [prefix|-] [alias1,alias2|-] [permission]` | Create a temporary channel | `mysticessentials.chat.channel.create.temp` |
-| `/channel manage` | Manage your temporary channel | Owner/moderator rules apply |
+| `/channel manage [channel]` | Manage your temporary channel; name it when you own several | Owner/moderator rules apply |
+| `/channel close\|lock\|unlock [channel]` | Close, lock or unlock a temporary channel you manage | Owner/moderator rules apply |
 | `/mentions`, `/mentionsettings` | Configure mention scope, delivery, block list, and do-not-disturb | None |
 | Configured aliases such as `/g`, `/global`, `/sc`, `/schat`, `/staffchat` | Switch channel quickly | Channel permissions may apply |
 | `[item]` (chat tag) | Share your held item in chat as an [item link](itemlinks-module) | `mysticessentials.chat.itemlink.use` |

@@ -3,6 +3,8 @@ package org.hyzionstudios.mysticessentials.modules.playervaults.ui;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -11,6 +13,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 
 import org.hyzionstudios.mysticessentials.core.MysticCore;
+import org.hyzionstudios.mysticessentials.core.util.Json;
 import org.hyzionstudios.mysticessentials.modules.playervaults.api.VaultOpenMode;
 import org.hyzionstudios.mysticessentials.modules.playervaults.api.results.VaultLockResult;
 import org.hyzionstudios.mysticessentials.modules.playervaults.api.results.VaultSaveResult;
@@ -32,6 +35,10 @@ import org.hyzionstudios.mysticessentials.modules.playervaults.service.VaultItem
 import org.hyzionstudios.mysticessentials.modules.playervaults.service.VaultItemCodec;
 import org.hyzionstudios.mysticessentials.modules.playervaults.model.VaultAdminLogEntry;
 
+import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.protocol.packets.interface_.Page;
+import com.hypixel.hytale.server.core.entity.ItemUtils;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.entities.player.windows.ContainerWindow;
 import com.hypixel.hytale.server.core.inventory.InventoryComponent;
@@ -42,6 +49,7 @@ import com.hypixel.hytale.server.core.inventory.container.filter.FilterActionTyp
 import com.hypixel.hytale.server.core.inventory.container.filter.FilterType;
 import com.hypixel.hytale.server.core.inventory.container.filter.SlotFilter;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
 /**
  * Owns the lifecycle of open vault sessions: it resolves permission + lock +
@@ -61,8 +69,13 @@ public final class PlayerVaultUiController {
     private final VaultAdminLogService logService;
     private PlayerVaultConfig config;
 
+    /** How long a close waits for the viewer's world thread to shut the vault window. */
+    private static final long WINDOW_CLOSE_TIMEOUT_SECONDS = 3L;
+
     /** viewer UUID -> their currently open vault session (one at a time). */
     private final ConcurrentHashMap<UUID, VaultSession> sessions = new ConcurrentHashMap<>();
+    /** Closes still in progress (final save, then unlock), so shutdown can wait for them. */
+    private final Set<CompletableFuture<Void>> closing = ConcurrentHashMap.newKeySet();
 
     public PlayerVaultUiController(MysticCore core, PlayerVaultServiceImpl service,
             PlayerVaultPermissionService permissions, VaultBackupService backupService,
@@ -108,13 +121,13 @@ public final class PlayerVaultUiController {
         int allowedRows = adminView ? config.maxRows : permissions.allowedRows(viewer);
         int limit = Math.min(Math.max(allowedVaults, 1), config.maxVaults);
 
-        List<CompletableFuture<java.util.Optional<PlayerVault>>> loads = new ArrayList<>();
+        List<CompletableFuture<Optional<PlayerVault>>> loads = new ArrayList<>();
         for (int number = 1; number <= limit; number++) {
             loads.add(service.getVault(ownerUuid, number));
         }
         CompletableFuture.allOf(loads.toArray(CompletableFuture[]::new)).whenComplete((v, error) -> {
             List<PlayerVault> vaults = new ArrayList<>(limit);
-            for (CompletableFuture<java.util.Optional<PlayerVault>> load : loads) {
+            for (CompletableFuture<Optional<PlayerVault>> load : loads) {
                 vaults.add(load.join().orElse(null));
             }
             core.platform().openPage(viewer, new VaultListUi(core, this, viewer, ownerUuid, ownerName,
@@ -169,8 +182,9 @@ public final class PlayerVaultUiController {
 
     /**
      * Opens another player's vault for staff. Permission, mode, and offline
-     * eligibility are decided by the caller; this fires the admin-open event,
-     * writes an audit entry, and starts the session.
+     * eligibility are decided by the caller (an edit mode is still downgraded to
+     * read-only without the admin edit permission); this fires the admin-open
+     * event, writes an audit entry, and starts the session.
      */
     public void openAdminVault(PlayerRef viewer, UUID ownerUuid, String ownerName, int vaultNumber,
             VaultOpenMode mode, boolean onlineTarget) {
@@ -178,6 +192,9 @@ public final class PlayerVaultUiController {
             core.getMessageService().sendKey(viewer, "vault-invalid-number",
                     Map.of("max", Integer.toString(config.maxVaults)));
             return;
+        }
+        if (mode.isMutable() && !permissions.canAdminEdit(viewer)) {
+            mode = VaultOpenMode.ADMIN_READONLY; // never grant item edits without the edit node
         }
         PlayerVaultAdminOpenEvent event = new PlayerVaultAdminOpenEvent(viewer.getUuid(), ownerUuid,
                 vaultNumber, mode, onlineTarget);
@@ -215,11 +232,9 @@ public final class PlayerVaultUiController {
      */
     private void beginSession(PlayerRef viewer, UUID ownerUuid, String ownerName, int vaultNumber,
             VaultOpenMode mode, int allowedRows, boolean warnOverflow) {
-        // One open session per viewer: close any previous first (saving it).
-        VaultSession previous = sessions.get(viewer.getUuid());
-        if (previous != null) {
-            closeSession(viewer.getUuid(), true);
-        }
+        // One open session per viewer: close any previous first (saving it), and only
+        // take the new lock once that close finished (it may hold this very vault).
+        CompletableFuture<Void> previousClosed = closeSession(viewer.getUuid(), true);
 
         PlayerVaultOpenEvent openEvent = new PlayerVaultOpenEvent(viewer.getUuid(), ownerUuid, vaultNumber, mode);
         if (core.getEventBus() != null) {
@@ -231,7 +246,9 @@ public final class PlayerVaultUiController {
             return;
         }
 
-        service.lockVault(ownerUuid, vaultNumber, viewer.getUuid(), mode).thenAccept(lock -> {
+        CompletableFuture<VaultLockResult> locked = previousClosed.thenCompose(ignored ->
+                service.lockVault(ownerUuid, vaultNumber, viewer.getUuid(), mode));
+        locked.thenAccept(lock -> {
             if (!lock.acquired()) {
                 messageLockFailure(viewer, vaultNumber, lock);
                 return;
@@ -244,9 +261,12 @@ public final class PlayerVaultUiController {
                     return;
                 }
                 vault.lastOpenedAt = System.currentTimeMillis();
-                VaultSession session = new VaultSession(viewer.getUuid(), ownerUuid, ownerName, vaultNumber,
-                        mode, allowedRows, lock.token(), vault, vault.version);
-                sessions.put(viewer.getUuid(), session);
+                VaultSession session = new VaultSession(viewer.getUuid(), viewer.getUsername(), ownerUuid,
+                        ownerName, vaultNumber, mode, allowedRows, lock.token(), vault, vault.version);
+                VaultSession replaced = sessions.put(viewer.getUuid(), session);
+                if (replaced != null) {
+                    closeSession(replaced, true); // a racing open: never orphan its lock
+                }
                 scheduleMaintenance(session);
                 if (warnOverflow && mode == VaultOpenMode.PLAYER
                         && vault.hasOverflow(allowedRows, config.slotsPerRow)) {
@@ -270,12 +290,15 @@ public final class PlayerVaultUiController {
      * versioned working copy for persistence. Runs on the viewer's world thread.
      */
     void openContainerWindow(PlayerRef viewer, VaultSession session) {
-        core.platform().runOnEntityThread(viewer, (store, entity, world) -> {
+        boolean dispatched = core.platform().runOnEntityThread(viewer, (store, entity, world) -> {
+            if (session.closed != null) {
+                return; // closed (replaced, viewer left) before its window could open
+            }
             Player playerEntity = store.getComponent(entity, Player.getComponentType());
             if (playerEntity == null) {
                 core.log(Level.WARNING, "[playervaults] openContainerWindow: no Player component for "
                         + viewer.getUsername());
-                closeSession(session.viewerUuid, false);
+                closeSession(session, false);
                 return;
             }
             PlayerVaultConfig cfg = this.config;
@@ -322,28 +345,41 @@ public final class PlayerVaultUiController {
             }
             window.registerCloseEvent(evt -> onWindowClosed(session, container, cap, !readOnly));
 
+            boolean opened;
             try {
                 // Native draggable chest: grid window + the player's own inventory panel,
                 // opened as Page.Bench (mirrors /invsee and real chests). A custom side
                 // panel CANNOT coexist with the grid (openCustomPageWithWindows hides it),
                 // so vault name / nav / edit live on the vault-list dashboard instead.
-                playerEntity.getPageManager().setPageWithWindows(entity, store,
-                        com.hypixel.hytale.protocol.packets.interface_.Page.Bench, true, window);
+                opened = playerEntity.getPageManager().setPageWithWindows(entity, store,
+                        Page.Bench, true, window);
             } catch (Throwable t) {
                 core.log(Level.SEVERE, "[playervaults] openWindow failed for "
                         + viewer.getUsername() + ": " + t);
-                closeSession(session.viewerUuid, false);
+                opened = false;
+            }
+            if (!opened) {
+                closeSession(session, false);
+                return;
+            }
+            session.container = container;
+            session.window = window;
+            // Closed or downgraded while this ran: that close/lockdown may have missed the
+            // window, so shut it now, before anything can be moved out of it.
+            if (session.closed != null || (!readOnly && session.readOnlyDowngrade)) {
+                closeWindowNow(session, store, entity);
             }
         });
+        if (!dispatched) {
+            closeSession(session, false); // the viewer left: release the lock now
+        }
     }
 
     /** A drag/move happened in the live container: mirror it into the working copy and persist. */
     private void onContainerChanged(VaultSession session, ItemContainer container, int capacity) {
-        if (session.mode.isReadOnly() || session.readOnlyDowngrade) {
+        if (session.mode.isReadOnly() || !recordEdit(session, container, capacity, false)) {
             return;
         }
-        syncContainerToSession(session, container, capacity);
-        session.dirty = true;
         if (config.saving.writeThrough) {
             persist(session, false, "WRITE_THROUGH", null);
         }
@@ -351,10 +387,34 @@ public final class PlayerVaultUiController {
 
     /** The window closed (Esc/close): capture the final state, then save + release the lock. */
     private void onWindowClosed(VaultSession session, ItemContainer container, int capacity, boolean mutable) {
-        if (mutable && !session.readOnlyDowngrade) {
-            syncContainerToSession(session, container, capacity);
+        session.window = null;
+        if (mutable) {
+            recordEdit(session, container, capacity, true);
         }
-        closeSession(session.viewerUuid, true);
+        closeSession(session, true);
+    }
+
+    /**
+     * Mirrors the grid into the working copy and counts it as an edit (with
+     * {@code onlyIfChanged}, only when the items actually differ), unless the
+     * session was downgraded to read-only.
+     *
+     * @return {@code true} if an edit was recorded
+     */
+    private boolean recordEdit(VaultSession session, ItemContainer container, int capacity, boolean onlyIfChanged) {
+        synchronized (session) {
+            if (session.readOnlyDowngrade) {
+                return false;
+            }
+            List<VaultItemStack> before = session.working.items;
+            syncContainerToSession(session, container, capacity);
+            if (onlyIfChanged && Json.toTree(before).equals(Json.toTree(session.working.items))) {
+                return false;
+            }
+            session.edits++;
+            session.dirty = true;
+            return true;
+        }
     }
 
     /**
@@ -404,13 +464,18 @@ public final class PlayerVaultUiController {
         if (session.mode.isReadOnly()) {
             return; // read-only sessions neither renew a lock nor auto-save
         }
-        long renewSeconds = Math.max(1, config.crossServer.lockRenewSeconds);
-        session.renewalTask = core.scheduler().runRepeating(() -> renew(session),
-                renewSeconds, renewSeconds, TimeUnit.SECONDS);
-        long saveInterval = config.saving.saveIntervalSeconds;
-        if (saveInterval > 0) {
-            session.saveTask = core.scheduler().runRepeating(() -> intervalSave(session),
-                    saveInterval, saveInterval, TimeUnit.SECONDS);
+        synchronized (session) {
+            if (session.closed != null) {
+                return; // already closed (a racing open replaced it): nothing to maintain
+            }
+            long renewSeconds = Math.max(1, config.crossServer.lockRenewSeconds);
+            session.renewalTask = core.scheduler().runRepeating(() -> renew(session),
+                    renewSeconds, renewSeconds, TimeUnit.SECONDS);
+            long saveInterval = config.saving.saveIntervalSeconds;
+            if (saveInterval > 0) {
+                session.saveTask = core.scheduler().runRepeating(() -> intervalSave(session),
+                        saveInterval, saveInterval, TimeUnit.SECONDS);
+            }
         }
     }
 
@@ -420,6 +485,7 @@ public final class PlayerVaultUiController {
             // Lost the lock (TTL lapse / force unlock elsewhere): fail safe to read-only.
             session.readOnlyDowngrade = true;
             cancelTasks(session);
+            closeWindow(session); // nothing may be taken out of a grid we no longer save
             core.platform().findPlayer(session.viewerUuid).ifPresent(viewer ->
                     core.getMessageService().sendKey(viewer, "vault-readonly-downgrade"));
         }
@@ -447,8 +513,8 @@ public final class PlayerVaultUiController {
     }
 
     private static List<ItemContainer> depositSources(
-            com.hypixel.hytale.component.Store<com.hypixel.hytale.server.core.universe.world.storage.EntityStore> store,
-            com.hypixel.hytale.component.Ref<com.hypixel.hytale.server.core.universe.world.storage.EntityStore> entity) {
+            Store<EntityStore> store,
+            Ref<EntityStore> entity) {
         List<ItemContainer> sources = new ArrayList<>();
         addDepositSource(sources, store.getComponent(entity, InventoryComponent.Storage.getComponentType()));
         addDepositSource(sources, store.getComponent(entity, InventoryComponent.Backpack.getComponentType()));
@@ -467,39 +533,93 @@ public final class PlayerVaultUiController {
         // Serialize saves per session: only this server writes (it holds the lock),
         // so overlapping an interval save with a write-through save would otherwise
         // read the same expectedVersion twice and the second would false-conflict.
-        if (!session.saving.compareAndSet(false, true)) {
+        // A save asked for while one is in flight runs once that one settled.
+        CompletableFuture<Void> saved = startSave(session, backupFirst, reason, false);
+        if (saved == null) {
             if (onDone != null) {
                 onDone.run(); // still refresh the UI; the data persists on the next save
             }
             return;
         }
-        service.versionedSave(session.working, session.expectedVersion, session.viewerUuid, backupFirst, reason)
-                .whenComplete((result, error) -> {
-                    session.saving.set(false);
-                    if (error == null && result != null) {
-                        handleSaveResult(session, result);
-                    }
-                    if (onDone != null) {
-                        onDone.run();
-                    }
-                });
+        if (onDone != null) {
+            saved.whenComplete((ignored, error) -> onDone.run());
+        }
     }
 
-    private void handleSaveResult(VaultSession session, VaultSaveResult result) {
+    /**
+     * Saves a snapshot of the working copy, one save per session at a time. Edits
+     * made after the snapshot keep the session dirty, and a save asked for while this
+     * one runs starts once it settled. A closing or downgraded session is only saved
+     * by its close ({@code finalSave}).
+     *
+     * @return completes once the result was applied, or {@code null} if no save started
+     */
+    private CompletableFuture<Void> startSave(VaultSession session, boolean backupFirst, String reason,
+            boolean finalSave) {
+        CompletableFuture<Void> done = new CompletableFuture<>();
+        PlayerVault snapshot;
+        long expectedVersion;
+        long edits;
+        synchronized (session) {
+            if (session.inFlight != null) {
+                session.saveQueued = true;
+                return null;
+            }
+            if (!finalSave && (session.closed != null || session.readOnlyDowngrade)) {
+                return null;
+            }
+            session.inFlight = done;
+            edits = session.edits;
+            snapshot = session.working.copy();
+            expectedVersion = session.expectedVersion;
+        }
+        service.versionedSave(snapshot, expectedVersion, session.viewerUuid, backupFirst, reason)
+                .whenComplete((result, error) -> {
+                    boolean again;
+                    try {
+                        if (error == null && result != null) {
+                            handleSaveResult(session, result, edits);
+                        }
+                    } finally {
+                        synchronized (session) {
+                            session.inFlight = null;
+                            again = session.saveQueued && session.dirty && session.closed == null
+                                    && !session.readOnlyDowngrade;
+                            session.saveQueued = false;
+                        }
+                        done.complete(null);
+                    }
+                    if (again) {
+                        persist(session, false, reason, null);
+                    }
+                });
+        return done;
+    }
+
+    private void handleSaveResult(VaultSession session, VaultSaveResult result, long savedEdits) {
         switch (result.status()) {
             case SAVED -> {
-                session.dirty = false;
-                // Adopt the new version so the next save compares correctly.
-                session.expectedVersion = result.vault().version;
-                session.working = result.vault();
+                synchronized (session) {
+                    // Adopt the new version so the next save compares correctly. The save
+                    // only holds the edits made before its snapshot: a later edit keeps
+                    // the session dirty so the next save writes it.
+                    session.expectedVersion = result.vault().version;
+                    session.working.version = result.vault().version;
+                    if (session.edits == savedEdits) {
+                        session.dirty = false;
+                    }
+                }
             }
             case CONFLICT -> {
                 // Another writer won: adopt stored truth, drop our stale edits from the session.
-                session.dirty = false;
-                session.working = result.vault();
-                session.expectedVersion = result.vault().version;
-                session.readOnlyDowngrade = true;
+                synchronized (session) {
+                    session.dirty = false;
+                    session.working = result.vault();
+                    session.expectedVersion = result.vault().version;
+                    session.readOnlyDowngrade = true;
+                }
                 cancelTasks(session);
+                closeWindow(session); // nothing may be taken out of a grid we no longer save
                 core.platform().findPlayer(session.viewerUuid).ifPresent(viewer ->
                         core.getMessageService().sendKey(viewer, "vault-conflict"));
             }
@@ -512,57 +632,140 @@ public final class PlayerVaultUiController {
     }
 
     /** Closes and tears down the viewer's session, optionally doing a final save. */
-    public void closeSession(UUID viewerUuid, boolean save) {
-        VaultSession session = sessions.remove(viewerUuid);
-        if (session == null) {
-            return;
+    public CompletableFuture<Void> closeSession(UUID viewerUuid, boolean save) {
+        VaultSession session = sessions.get(viewerUuid);
+        return session == null ? CompletableFuture.completedFuture(null) : closeSession(session, save);
+    }
+
+    /**
+     * Closes this one session (never another session of the same viewer): shuts its
+     * window, which captures the final grid, waits for a save already in flight, does
+     * the final save, and only then releases the lock.
+     *
+     * @return completes once the session is closed and its lock released
+     */
+    private CompletableFuture<Void> closeSession(VaultSession session, boolean save) {
+        CompletableFuture<Void> closed;
+        synchronized (session) {
+            if (session.closed != null) {
+                return session.closed;
+            }
+            closed = new CompletableFuture<>();
+            session.closed = closed;
         }
+        closing.add(closed);
+        sessions.remove(session.viewerUuid, session);
         cancelTasks(session);
-        boolean willSave = save && session.dirty && session.mode.isMutable() && !session.readOnlyDowngrade;
-        Runnable finish = () -> {
+        closeWindow(session).thenCompose(ignored -> {
+            CompletableFuture<Void> inFlight;
+            synchronized (session) {
+                inFlight = session.inFlight;
+            }
+            return inFlight == null ? CompletableFuture.completedFuture(null) : inFlight;
+        }).thenCompose(ignored -> {
+            boolean willSave = save && session.dirty && session.mode.isMutable() && !session.readOnlyDowngrade;
+            CompletableFuture<Void> saved = willSave && config.saving.saveOnClose
+                    ? startSave(session, config.saving.saveBackups, "SAVE_ON_CLOSE", true) : null;
+            return saved == null ? CompletableFuture.completedFuture(willSave) : saved.thenApply(v -> willSave);
+        }).handle((willSave, error) -> {
+            if (error != null) {
+                core.log(Level.WARNING, "[playervaults] closing vault " + session.vaultNumber + " of "
+                        + session.ownerUuid + " failed: " + error);
+            }
+            return Boolean.TRUE.equals(willSave);
+        }).thenCompose(willSave -> {
+            // Only now, with every save of this session settled, may the lock go.
             service.lockService().release(session.ownerUuid, session.vaultNumber, session.token);
             if (core.getEventBus() != null) {
-                core.getEventBus().publish(new PlayerVaultCloseEvent(viewerUuid, session.ownerUuid,
+                core.getEventBus().publish(new PlayerVaultCloseEvent(session.viewerUuid, session.ownerUuid,
                         session.vaultNumber, willSave));
             }
             if (session.mode.isAdmin() && config.admin.logAdminEdits && willSave) {
-                logService.record(VaultAdminLogEntry.create(viewerUuid, session.ownerName,
+                return logService.record(VaultAdminLogEntry.create(session.viewerUuid, session.viewerName,
                         session.ownerUuid, session.vaultNumber, "ADMIN_EDIT", logService.serverId())
                         .with("items", Integer.toString(session.working.totalItemCount())));
             }
-        };
-        // Skip the close-save if a write-through/interval save is already in flight —
-        // that save persists the same working state; double-saving would false-conflict.
-        if (willSave && config.saving.saveOnClose && session.saving.compareAndSet(false, true)) {
-            service.versionedSave(session.working, session.expectedVersion, viewerUuid,
-                    config.saving.saveBackups, "SAVE_ON_CLOSE").whenComplete((result, error) -> {
-                        session.saving.set(false);
-                        if (result != null) {
-                            handleSaveResult(session, result);
-                        }
-                        finish.run();
-                    });
-        } else {
-            finish.run();
+            return CompletableFuture.completedFuture(null);
+        }).whenComplete((ignored, error) -> {
+            closing.remove(closed);
+            closed.complete(null);
+        });
+        return closed;
+    }
+
+    /**
+     * Shuts the session's vault window on the viewer's world thread, if it is still
+     * open, so nothing more can be moved; closing it runs {@link #onWindowClosed},
+     * which captures the final grid. Bounded, so a stalled world thread cannot hold
+     * a close (and its lock) forever.
+     */
+    private CompletableFuture<Void> closeWindow(VaultSession session) {
+        if (session.window == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+        Optional<PlayerRef> viewer = core.platform().findPlayer(session.viewerUuid);
+        if (viewer.isEmpty()) {
+            return CompletableFuture.completedFuture(null); // the engine closes a leaving player's windows
+        }
+        CompletableFuture<Void> done = new CompletableFuture<>();
+        try {
+            boolean dispatched = core.platform().runOnEntityThread(viewer.get(), (store, entity, world) -> {
+                try {
+                    closeWindowNow(session, store, entity);
+                } finally {
+                    done.complete(null);
+                }
+            });
+            if (!dispatched) {
+                done.complete(null);
+            }
+        } catch (Throwable t) {
+            core.log(Level.WARNING, "[playervaults] could not close the vault window of "
+                    + session.viewerUuid + ": " + t);
+            done.complete(null);
+        }
+        return done.completeOnTimeout(null, WINDOW_CLOSE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+    }
+
+    /** World thread: freezes the session's grid and closes its window if that is still open. */
+    private void closeWindowNow(VaultSession session, Store<EntityStore> store, Ref<EntityStore> entity) {
+        ContainerWindow window = session.window;
+        if (window == null) {
+            return;
+        }
+        SimpleItemContainer container = session.container;
+        if (container != null) {
+            container.setGlobalFilter(FilterType.DENY_ALL);
+        }
+        Player playerEntity = store.getComponent(entity, Player.getComponentType());
+        if (playerEntity != null && playerEntity.getWindowManager().getWindow(window.getId()) == window) {
+            window.close(entity, store);
         }
     }
 
     private void cancelTasks(VaultSession session) {
-        if (session.renewalTask != null) {
-            session.renewalTask.cancel(false);
-            session.renewalTask = null;
-        }
-        if (session.saveTask != null) {
-            session.saveTask.cancel(false);
-            session.saveTask = null;
+        synchronized (session) {
+            if (session.renewalTask != null) {
+                session.renewalTask.cancel(false);
+                session.renewalTask = null;
+            }
+            if (session.saveTask != null) {
+                session.saveTask.cancel(false);
+                session.saveTask = null;
+            }
         }
     }
 
-    /** Closes every open session (module disable / shutdown). */
-    public void closeAll() {
-        for (UUID viewer : new ArrayList<>(sessions.keySet())) {
-            closeSession(viewer, true);
+    /**
+     * Closes every open session (module disable / shutdown).
+     *
+     * @return completes once every close in progress did its final save and released its lock
+     */
+    public CompletableFuture<Void> closeAll() {
+        for (VaultSession session : new ArrayList<>(sessions.values())) {
+            closeSession(session, true);
         }
+        return CompletableFuture.allOf(closing.toArray(CompletableFuture[]::new));
     }
 
     VaultSession session(UUID viewerUuid) {
@@ -660,6 +863,7 @@ public final class PlayerVaultUiController {
             VaultMetadata metadata = vault.metadata == null ? new VaultMetadata() : vault.metadata;
             vault.metadata = metadata;
             boolean changed = false;
+            String iconCost = null;
 
             if (edit.name() != null && permissions.canEditName(viewer)) {
                 String sanitized = sanitizeName(edit.name());
@@ -695,11 +899,12 @@ public final class PlayerVaultUiController {
                         PlayerVaultEditMetadataEvent.Field.ICON,
                         metadata.icon == null ? null : metadata.icon.itemId, iconId);
                 if (applied != null) {
+                    String previousIcon = metadata.icon == null ? null : metadata.icon.itemId;
                     metadata.icon = applied.isBlank() ? null
                             : new VaultMetadata.Icon(applied, applied, null);
                     changed = true;
-                    if (!applied.isBlank() && config.consumeIconItem) {
-                        consumeIconItem(viewer, applied);
+                    if (!applied.isBlank() && config.consumeIconItem && !applied.equals(previousIcon)) {
+                        iconCost = applied; // a new icon is paid for before it is saved
                     }
                 }
             }
@@ -718,14 +923,27 @@ public final class PlayerVaultUiController {
                 runQuietly(onDone);
                 return;
             }
-            saveMetadata(viewer, vault, vaultNumber, admin, onDone);
+            if (iconCost == null) {
+                saveMetadata(viewer, vault, vaultNumber, admin, onDone, null);
+                return;
+            }
+            String cost = iconCost;
+            takeIconItem(viewer, cost).thenAccept(taken -> {
+                if (taken == null) {
+                    core.getMessageService().sendKey(viewer, "vault-icon-invalid");
+                    runQuietly(onDone);
+                    return;
+                }
+                core.getMessageService().sendKey(viewer, "vault-icon-consumed", Map.of("item", cost));
+                saveMetadata(viewer, vault, vaultNumber, admin, onDone, taken);
+            });
         });
     }
 
     /** Resets a vault's metadata to defaults (contents untouched). {@code onDone} runs when settled. */
     void resetMetadata(PlayerRef viewer, UUID ownerUuid, String ownerName, int vaultNumber, boolean admin,
             Runnable onDone) {
-        if (!permissions.canResetMetadata(viewer)) {
+        if (!permissions.canResetMetadata(viewer) || (admin && !permissions.canAdminEdit(viewer))) {
             core.getMessageService().sendKey(viewer, "no-permission");
             runQuietly(onDone);
             return;
@@ -739,14 +957,20 @@ public final class PlayerVaultUiController {
             }
             fireEdit(viewer, ownerUuid, vaultNumber, PlayerVaultEditMetadataEvent.Field.RESET, "custom", "default");
             vault.metadata = new VaultMetadata();
-            saveMetadata(viewer, vault, vaultNumber, admin, onDone);
+            saveMetadata(viewer, vault, vaultNumber, admin, onDone, null);
         });
     }
 
-    private void saveMetadata(PlayerRef viewer, PlayerVault vault, int vaultNumber, boolean admin, Runnable onDone) {
+    /** {@code paidIcon}: the icon item taken as payment, given back if the save does not happen. */
+    private void saveMetadata(PlayerRef viewer, PlayerVault vault, int vaultNumber, boolean admin, Runnable onDone,
+            ItemStack paidIcon) {
         service.versionedSave(vault, vault.version, viewer.getUuid(), false, "METADATA_EDIT")
                 .whenComplete((result, error) -> {
                     try {
+                        if (paidIcon != null && (result == null || error != null
+                                || result.status() != VaultSaveResult.Status.SAVED)) {
+                            refundIconItem(viewer, paidIcon);
+                        }
                         if (result == null || error != null) {
                             core.getMessageService().sendKey(viewer, "vault-storage-unavailable");
                             return;
@@ -820,9 +1044,14 @@ public final class PlayerVaultUiController {
         return value; // preset name; the card renderer falls back if unknown
     }
 
-    /** Best-effort consume of one icon item from the viewer's inventory (world thread). */
-    private void consumeIconItem(PlayerRef viewer, String itemId) {
-        core.platform().runOnEntityThread(viewer, (store, entity, world) -> {
+    /**
+     * Takes one icon item from the viewer's inventory (world thread), leaving the
+     * rest of that stack (metadata, durability) intact. Completes {@code true} once
+     * an item was taken, {@code false} when the viewer has none.
+     */
+    private CompletableFuture<ItemStack> takeIconItem(PlayerRef viewer, String itemId) {
+        CompletableFuture<ItemStack> taken = new CompletableFuture<>();
+        boolean dispatched = core.platform().runOnEntityThread(viewer, (store, entity, world) -> {
             try {
                 for (ItemContainer container : depositSources(store, entity)) {
                     for (short i = 0; i < container.getCapacity(); i++) {
@@ -830,21 +1059,37 @@ public final class PlayerVaultUiController {
                         if (stack == null || stack.isEmpty() || !itemId.equals(stack.getItemId())) {
                             continue;
                         }
-                        int remaining = stack.getQuantity() - 1;
-                        if (remaining <= 0) {
-                            container.setItemStackForSlot(i, ItemStack.EMPTY);
-                        } else {
-                            container.setItemStackForSlot(i, new ItemStack(itemId, remaining));
+                        ItemStack one = stack.withQuantity(1);
+                        if (container.removeItemStackFromSlot(i, 1).succeeded()) {
+                            taken.complete(one);
+                            return;
                         }
-                        core.getMessageService().sendKey(viewer, "vault-icon-consumed",
-                                Map.of("item", itemId));
-                        return;
                     }
                 }
             } catch (Throwable t) {
                 core.log(Level.WARNING, "[playervaults] icon consume failed: " + t);
+            } finally {
+                taken.complete(null); // no-op once an item was taken
             }
         });
+        if (!dispatched) {
+            taken.complete(null);
+        }
+        return taken;
+    }
+
+    /** Gives a taken icon item back (world thread), dropping it at the player's feet if full. */
+    private void refundIconItem(PlayerRef viewer, ItemStack item) {
+        boolean dispatched = core.platform().runOnEntityThread(viewer, (store, entity, world) -> {
+            ItemStack remainder = Player.giveItem(item, entity, store).getRemainder();
+            if (!ItemStack.isEmpty(remainder)) {
+                ItemUtils.dropItem(entity, remainder, store);
+            }
+        });
+        if (!dispatched) {
+            core.log(Level.WARNING, "[playervaults] Could not return icon item " + item.getItemId()
+                    + " to " + viewer.getUsername() + " (offline).");
+        }
     }
 
     VaultBackupService backupService() {
@@ -857,9 +1102,10 @@ public final class PlayerVaultUiController {
 
     // ----- Session state --------------------------------------------------------
 
-    /** Mutable per-viewer state for one open vault. Confined to controller threads. */
+    /** Mutable per-viewer state for one open vault; save and close state is guarded by its monitor. */
     static final class VaultSession {
         final UUID viewerUuid;
+        final String viewerName;
         final UUID ownerUuid;
         final String ownerName;
         final int vaultNumber;
@@ -871,14 +1117,24 @@ public final class PlayerVaultUiController {
         volatile long expectedVersion;
         volatile boolean dirty;
         volatile boolean readOnlyDowngrade;
-        /** Guards against overlapping saves for this session (interval vs write-through vs close). */
-        final java.util.concurrent.atomic.AtomicBoolean saving = new java.util.concurrent.atomic.AtomicBoolean();
+        /** Edits recorded so far; a save clears {@link #dirty} only if none came after its snapshot. */
+        long edits;
+        /** The one save in flight for this session (interval, write-through or close), or {@code null}. */
+        CompletableFuture<Void> inFlight;
+        /** A save was asked for while {@link #inFlight} ran: run it once that one settled. */
+        boolean saveQueued;
+        /** Set once closing starts; completes when the session is closed and unlocked. */
+        volatile CompletableFuture<Void> closed;
+        /** The open grid and its window (set on the world thread); the window is {@code null} once closed. */
+        volatile SimpleItemContainer container;
+        volatile ContainerWindow window;
         ScheduledFuture<?> renewalTask;
         ScheduledFuture<?> saveTask;
 
-        VaultSession(UUID viewerUuid, UUID ownerUuid, String ownerName, int vaultNumber, VaultOpenMode mode,
-                int allowedRows, String token, PlayerVault working, long expectedVersion) {
+        VaultSession(UUID viewerUuid, String viewerName, UUID ownerUuid, String ownerName, int vaultNumber,
+                VaultOpenMode mode, int allowedRows, String token, PlayerVault working, long expectedVersion) {
             this.viewerUuid = viewerUuid;
+            this.viewerName = viewerName;
             this.ownerUuid = ownerUuid;
             this.ownerName = ownerName;
             this.vaultNumber = vaultNumber;

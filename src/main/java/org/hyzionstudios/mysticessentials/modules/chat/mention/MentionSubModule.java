@@ -3,21 +3,25 @@ package org.hyzionstudios.mysticessentials.modules.chat.mention;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiPredicate;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 
 import org.hyzionstudios.mysticessentials.api.Permissions;
 import org.hyzionstudios.mysticessentials.api.mention.MentionScopeProvider;
 import org.hyzionstudios.mysticessentials.api.notification.Notification;
+import org.hyzionstudios.mysticessentials.api.notification.NotificationAction;
 import org.hyzionstudios.mysticessentials.api.notification.NotificationAudience;
 import org.hyzionstudios.mysticessentials.api.notification.NotificationCategory;
 import org.hyzionstudios.mysticessentials.api.notification.NotificationPriority;
@@ -138,22 +142,22 @@ public final class MentionSubModule {
                 out.add(provider);
             }
         }
-        out.sort(java.util.Comparator
+        out.sort(Comparator
                 .comparingInt(MentionSubModule::safeSortOrder)
                 .thenComparing(MentionSubModule::safeDisplayName));
         return out;
     }
 
     /** A registered scope by id, or empty when nothing currently implements it. */
-    public java.util.Optional<MentionScopeProvider> scope(String scopeId) {
+    public Optional<MentionScopeProvider> scope(String scopeId) {
         return scopeId == null
-                ? java.util.Optional.empty()
-                : java.util.Optional.ofNullable(scopes.get(scopeId.trim().toLowerCase(Locale.ROOT)));
+                ? Optional.empty()
+                : Optional.ofNullable(scopes.get(scopeId.trim().toLowerCase(Locale.ROOT)));
     }
 
     /** A built-in scope with a fixed answer; no external system behind it. */
     private record BuiltInScope(String id, String displayName, int sortOrder,
-            java.util.function.BiPredicate<UUID, UUID> rule) implements MentionScopeProvider {
+            BiPredicate<UUID, UUID> rule) implements MentionScopeProvider {
 
         @Override
         public String getId() {
@@ -231,6 +235,10 @@ public final class MentionSubModule {
                 massKeywords, limit);
 
         if (matches.isEmpty()) {
+            return Result.unchanged(message);
+        }
+        if (!senderMayNotify(config.rules, core.moderation().activeMute(sender.getUuid()).isPresent())) {
+            // Left as typed: a muted sender's line pings nobody, even where it still shows.
             return Result.unchanged(message);
         }
         if (!withinSenderBudget(sender)) {
@@ -347,7 +355,7 @@ public final class MentionSubModule {
                             && (staffOverride || preferences.mentionActionBar))
                     .bypassPlayerPreferences(staffOverride)
                     .storeInHistory(true)
-                    .action(org.hyzionstudios.mysticessentials.api.notification.NotificationAction
+                    .action(NotificationAction
                             .channel(channel))
                     .source("mysticessentials:chat")
                     .build(),
@@ -428,7 +436,7 @@ public final class MentionSubModule {
         NotificationServiceImpl notifications = core.notifications();
         if (notifications != null) {
             NotificationPreferences preferences = notifications.preferences(target.getUuid());
-            if (preferences.blocks(sender.getUsername()) || preferences.doNotDisturb) {
+            if (recipientRefuses(config.rules, preferences, sender.getUuid(), sender.getUsername())) {
                 return false;
             }
             if (!scopeAllows(preferences, sender.getUuid(), target.getUuid())) {
@@ -439,6 +447,21 @@ public final class MentionSubModule {
         Long lastPair = lastMentionByPair.get(pairKey(sender.getUuid(), target.getUuid()));
         return lastPair == null
                 || now - lastPair >= config.limits.sameTargetCooldownSeconds * 1000L;
+    }
+
+    /**
+     * Whether the recipient's own settings refuse this sender's mention: their ignore
+     * list (unless {@code rules.ignoredPlayersCanNotNotify} is off) or do-not-disturb.
+     */
+    public static boolean recipientRefuses(MentionConfig.Rules rules, NotificationPreferences preferences,
+            UUID sender, String senderName) {
+        return (rules.ignoredPlayersCanNotNotify && preferences.ignores(sender, senderName))
+                || preferences.doNotDisturb;
+    }
+
+    /** Whether a sender may ping anyone, given whether they are muted. */
+    public static boolean senderMayNotify(MentionConfig.Rules rules, boolean muted) {
+        return !(rules.mutedPlayersCanNotNotify && muted);
     }
 
     /**
@@ -589,11 +612,19 @@ public final class MentionSubModule {
                 || System.currentTimeMillis() - last >= config.massMentions.cooldownSeconds * 1000L;
     }
 
+    /**
+     * The players a mass keyword reaches, always drawn from the line's recipients:
+     * the ping carries the line as its preview, so it must never reach someone the
+     * line itself does not (a staff-channel {@code @everyone} pings the staff channel).
+     */
     private List<PlayerRef> massTargets(String keyword, List<PlayerRef> recipients) {
         MentionConfig.MassMentions mass = config.massMentions;
+        if (recipients == null) {
+            return List.of();
+        }
         if (keyword.equals(mass.staffKeyword.toLowerCase(Locale.ROOT))) {
             List<PlayerRef> staff = new ArrayList<>();
-            for (PlayerRef player : core.platform().onlinePlayers()) {
+            for (PlayerRef player : recipients) {
                 if (player != null && player.hasPermission(Permissions.CHAT_MENTION_STAFF)) {
                     staff.add(player);
                 }
@@ -601,9 +632,15 @@ public final class MentionSubModule {
             return staff;
         }
         if (keyword.equals(mass.channelKeyword.toLowerCase(Locale.ROOT))) {
-            return recipients == null ? List.of() : recipients;
+            return recipients;
         }
-        return new ArrayList<>(core.platform().onlinePlayers());
+        List<PlayerRef> everyone = new ArrayList<>();
+        for (PlayerRef player : recipients) {
+            if (player != null) {
+                everyone.add(player);
+            }
+        }
+        return everyone;
     }
 
     private String usernameOf(UUID player) {

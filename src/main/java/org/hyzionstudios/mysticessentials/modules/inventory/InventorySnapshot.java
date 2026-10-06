@@ -32,6 +32,8 @@ public final class InventorySnapshot {
         public double maxDurability;
         /** JSON form of the item's BSON metadata; null when absent. */
         public String metadata;
+        /** Quality id overriding the item's own quality; null when not overridden. */
+        public String quality;
     }
 
     public static InventorySnapshot create(String cause) {

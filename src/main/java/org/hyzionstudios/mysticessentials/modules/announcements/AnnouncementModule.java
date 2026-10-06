@@ -2,15 +2,18 @@ package org.hyzionstudios.mysticessentials.modules.announcements;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import org.hyzionstudios.mysticessentials.api.Permissions;
 import org.hyzionstudios.mysticessentials.api.notification.Notification;
 import org.hyzionstudios.mysticessentials.api.notification.NotificationAction;
 import org.hyzionstudios.mysticessentials.api.notification.NotificationAudience;
@@ -85,8 +88,8 @@ public final class AnnouncementModule extends AbstractMysticModule implements An
         core.redis().publish(CHANNEL, message);
     }
 
-    /** Shows a broadcast to this server's players only. */
-    private void broadcastLocal(String message) {
+    /** Shows a broadcast to this server's players only (no network relay). */
+    public void broadcastLocal(String message) {
         sendAnnouncement(message, NotificationAudience.all());
     }
 
@@ -137,11 +140,11 @@ public final class AnnouncementModule extends AbstractMysticModule implements An
     private void broadcastLocal(AutoAnnouncement announcement) {
         String message = announcement.lines.stream()
                 .map(AutoLine::render)
-                .collect(java.util.stream.Collectors.joining("\n"));
+                .collect(Collectors.joining("\n"));
         Notification.Builder builder = announcement(config.broadcastTitle, message,
                 config.broadcastSound).chatPrefix(orEmpty(config.broadcastPrefix));
         announcement.lines.stream().map(line -> line.clickTarget)
-                .filter(java.util.Objects::nonNull).findFirst()
+                .filter(Objects::nonNull).findFirst()
                 .map(AnnouncementModule::actionFor)
                 .ifPresent(builder::action);
         send(builder.build(), NotificationAudience.all());
@@ -362,7 +365,7 @@ public final class AnnouncementModule extends AbstractMysticModule implements An
         BroadcastCommand() {
             super(AnnouncementModule.this.core, "broadcast", "Broadcast a message to the server.");
             addAliases("bc");
-            requirePermission(org.hyzionstudios.mysticessentials.api.Permissions.ANNOUNCEMENT_BROADCAST);
+            requirePermission(Permissions.ANNOUNCEMENT_BROADCAST);
         }
 
         @Override
@@ -383,7 +386,7 @@ public final class AnnouncementModule extends AbstractMysticModule implements An
 
         AlertCommand() {
             super(AnnouncementModule.this.core, "alert", "Send an alert to the server.");
-            requirePermission(org.hyzionstudios.mysticessentials.api.Permissions.ANNOUNCEMENT_ALERT);
+            requirePermission(Permissions.ANNOUNCEMENT_ALERT);
         }
 
         @Override
@@ -428,10 +431,9 @@ public final class AnnouncementModule extends AbstractMysticModule implements An
                         .minimumPriority, NotificationPriority.LOW);
         boolean critical = parsed.notification().priority().atLeast(NotificationPriority.CRITICAL)
                 || effective.atLeast(NotificationPriority.CRITICAL);
-        if (critical && !sender.hasPermission(
-                org.hyzionstudios.mysticessentials.api.Permissions.NOTIFICATIONS_CRITICAL)) {
+        if (critical && !sender.hasPermission(Permissions.NOTIFICATIONS_CRITICAL)) {
             sender.reply("&cSending critical alerts requires "
-                    + org.hyzionstudios.mysticessentials.api.Permissions.NOTIFICATIONS_CRITICAL
+                    + Permissions.NOTIFICATIONS_CRITICAL
                     + ".");
             return;
         }

@@ -25,6 +25,7 @@ import org.hyzionstudios.mysticessentials.modules.tutorial.player.TutorialPlayer
 import org.hyzionstudios.mysticessentials.modules.tutorial.scene.TutorialSceneProvider;
 import org.hyzionstudios.mysticessentials.modules.tutorial.scene.TutorialSceneRequest;
 import org.hyzionstudios.mysticessentials.modules.tutorial.scene.TutorialSceneResult;
+import org.hyzionstudios.mysticessentials.modules.tutorial.scene.TutorialSceneResultType;
 import org.hyzionstudios.mysticessentials.modules.tutorial.util.TutorialPlaceholders;
 import org.hyzionstudios.mysticessentials.platform.Conversions;
 
@@ -260,7 +261,7 @@ public final class TutorialSessionManager {
         provider.playScene(request).whenComplete((result, error) -> {
             if (error != null) {
                 handleSceneResult(session, TutorialSceneResult.of(
-                        org.hyzionstudios.mysticessentials.modules.tutorial.scene.TutorialSceneResultType.FAILED,
+                        TutorialSceneResultType.FAILED,
                         String.valueOf(error)));
             } else {
                 handleSceneResult(session, result);
@@ -367,9 +368,12 @@ public final class TutorialSessionManager {
             }
         }
 
-        // On disconnect the entity is already gone, so no restore can run; the
-        // recovery marker must survive so the next join repairs the player.
-        boolean restoreDispatched = reason != TutorialStopReason.DISCONNECT && restore(session);
+        // On disconnect the entity is still in its world (the engine fires the
+        // disconnect event before removing it), so the restore is queued on the
+        // world thread ahead of the removal and the saved player loses the
+        // tutorial's Invulnerable. The recovery marker survives anyway, in case
+        // the removal ran first and the restore never did.
+        boolean restoreDispatched = restore(session) && reason != TutorialStopReason.DISCONNECT;
 
         updateDataOnFinish(session, reason, restoreDispatched);
         publishFinishEvent(session, reason, detail);
@@ -623,22 +627,25 @@ public final class TutorialSessionManager {
     /**
      * Next-join repair for unclean exits (crash or disconnect mid-tutorial):
      * removes a lingering Invulnerable component, resets HUD and camera, and
-     * clears the recovery marker. Movement settings are rebuilt from defaults
-     * by the server on join, so they need no repair.
+     * clears the recovery marker once that repair has actually run. Movement
+     * settings are rebuilt from defaults by the server on join, so they need no
+     * repair.
+     *
+     * @return a future completing once the repair ran (or at once when there
+     *         was nothing to repair or the player already left)
      */
-    public void recoverOnJoin(PlayerRef player, TutorialPlayerData data) {
+    public CompletableFuture<Void> recoverOnJoin(PlayerRef player, TutorialPlayerData data) {
         String tutorialId;
         synchronized (data) {
             tutorialId = data.activeTutorialId;
-            if (tutorialId == null) {
-                return;
-            }
-            data.activeTutorialId = null;
         }
-        module.storage().markDirty(player.getUuid());
+        if (tutorialId == null) {
+            return CompletableFuture.completedFuture(null);
+        }
         module.logger().error("Repairing unclean tutorial exit ('" + tutorialId + "') for "
                 + player.getUsername());
-        core.platform().runOnEntityThread(player, (store, ref, world) -> {
+        CompletableFuture<Void> repaired = new CompletableFuture<>();
+        boolean dispatched = core.platform().runOnEntityThread(player, (store, ref, world) -> {
             try {
                 store.tryRemoveComponent(ref, Invulnerable.getComponentType());
             } catch (Throwable ignored) {
@@ -658,6 +665,20 @@ public final class TutorialSessionManager {
                 }
             } catch (Throwable ignored) {
             }
+            // Only now is the player repaired: clearing the marker any earlier
+            // would lose it for good if the player left before this ran.
+            synchronized (data) {
+                if (tutorialId.equals(data.activeTutorialId)) {
+                    data.activeTutorialId = null;
+                }
+            }
+            module.storage().markDirty(player.getUuid());
+            repaired.complete(null);
         });
+        if (!dispatched) {
+            // The player already left; the marker stays for their next join.
+            repaired.complete(null);
+        }
+        return repaired;
     }
 }

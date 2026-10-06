@@ -13,7 +13,7 @@ dependencies {
     // No runtime dependencies, on purpose. See README.md ("Why there is no JSON
     // library"): this jar lands on a mod classpath we do not control, so it
     // carries nothing that could collide with the server's own libraries.
-    testImplementation(platform("org.junit:junit-bom:5.11.4"))
+    testImplementation(platform("org.junit:junit-bom:6.1.3"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
@@ -31,6 +31,7 @@ java {
 tasks.withType<JavaCompile>().configureEach {
     options.release.set(17)
     options.encoding = "UTF-8"
+    options.compilerArgs.add("-Xlint:deprecation")
 }
 
 tasks.test {

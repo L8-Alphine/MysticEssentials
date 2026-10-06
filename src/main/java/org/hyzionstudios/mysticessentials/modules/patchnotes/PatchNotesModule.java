@@ -4,10 +4,13 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.ToIntFunction;
 
 import org.hyzionstudios.mysticessentials.api.Permissions;
 import org.hyzionstudios.mysticessentials.api.notification.Notification;
@@ -22,6 +25,7 @@ import org.hyzionstudios.mysticessentials.platform.command.MysticArgTypes;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommand;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommandSender;
 
+import com.google.gson.JsonElement;
 import com.hypixel.hytale.server.core.command.system.arguments.system.OptionalArg;
 import com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
@@ -120,7 +124,7 @@ public final class PatchNotesModule extends AbstractMysticModule {
         if (search == null || search.isBlank()) {
             return true;
         }
-        String needle = search.toLowerCase(java.util.Locale.ROOT).trim();
+        String needle = search.toLowerCase(Locale.ROOT).trim();
         if (contains(note.title, needle) || contains(note.version, needle)
                 || contains(note.summary, needle) || contains(note.author, needle)) {
             return true;
@@ -136,7 +140,7 @@ public final class PatchNotesModule extends AbstractMysticModule {
     }
 
     private static boolean contains(String haystack, String lowerNeedle) {
-        return haystack != null && haystack.toLowerCase(java.util.Locale.ROOT).contains(lowerNeedle);
+        return haystack != null && haystack.toLowerCase(Locale.ROOT).contains(lowerNeedle);
     }
 
     PatchNote noteById(String id) {
@@ -155,47 +159,60 @@ public final class PatchNotesModule extends AbstractMysticModule {
 
     CompletableFuture<PatchReadState> readState(UUID player) {
         StorageService storage = core.getStorageService();
-        return storage.load(READ_NAMESPACE, player.toString()).thenApply(element -> {
-            PatchReadState state = element == null ? null : Json.gson().fromJson(element, PatchReadState.class);
-            if (state == null) {
-                state = new PatchReadState(player.toString());
-            }
-            if (state.readPatchIds == null) {
-                state.readPatchIds = new ArrayList<>();
-            }
-            return state;
-        });
+        return storage.load(READ_NAMESPACE, player.toString()).thenApply(element -> toReadState(player, element));
     }
 
-    private CompletableFuture<Void> saveReadState(UUID player, PatchReadState state) {
-        state.lastOpened = Instant.now().toString();
-        return core.getStorageService().save(READ_NAMESPACE, player.toString(), Json.toTree(state));
+    private static PatchReadState toReadState(UUID player, JsonElement element) {
+        PatchReadState state = element == null ? null : Json.gson().fromJson(element, PatchReadState.class);
+        if (state == null) {
+            state = new PatchReadState(player.toString());
+        }
+        if (state.readPatchIds == null) {
+            state.readPatchIds = new ArrayList<>();
+        }
+        return state;
+    }
+
+    /**
+     * Applies {@code change} to the stored read state as one atomic
+     * read-modify-write, so quick successive marks never overwrite each other.
+     *
+     * @return future of the count {@code change} reported (nothing is written for 0)
+     */
+    private CompletableFuture<Integer> updateReadState(UUID player, ToIntFunction<PatchReadState> change) {
+        AtomicInteger changed = new AtomicInteger();
+        return core.getStorageService().update(READ_NAMESPACE, player.toString(), element -> {
+            PatchReadState state = toReadState(player, element);
+            changed.set(change.applyAsInt(state));
+            if (changed.get() == 0) {
+                return null;
+            }
+            state.lastOpened = Instant.now().toString();
+            return Json.toTree(state);
+        }).thenApply(stored -> changed.get());
     }
 
     /** Marks one patch read for a player. @return future of whether anything changed. */
     CompletableFuture<Boolean> markRead(UUID player, String patchId) {
-        return readState(player).thenCompose(state -> {
-            if (!state.markRead(patchId)) {
-                return CompletableFuture.completedFuture(false);
-            }
-            return saveReadState(player, state).thenApply(v -> true);
-        });
+        if (noteById(patchId) == null) {
+            // Ids come from the client: only loaded patches are ever recorded.
+            return CompletableFuture.completedFuture(false);
+        }
+        return updateReadState(player, state -> state.markRead(patchId) ? 1 : 0)
+                .thenApply(count -> count > 0);
     }
 
     /** Marks every currently-loaded patch read. @return future of how many were newly marked. */
     CompletableFuture<Integer> markAllRead(UUID player) {
-        return readState(player).thenCompose(state -> {
+        List<PatchNote> loaded = notes;
+        return updateReadState(player, state -> {
             int flipped = 0;
-            for (PatchNote note : notes) {
+            for (PatchNote note : loaded) {
                 if (state.markRead(note.safeId())) {
                     flipped++;
                 }
             }
-            if (flipped == 0) {
-                return CompletableFuture.completedFuture(0);
-            }
-            int total = flipped;
-            return saveReadState(player, state).thenApply(v -> total);
+            return flipped;
         });
     }
 
@@ -252,17 +269,18 @@ public final class PatchNotesModule extends AbstractMysticModule {
     }
 
     /**
-     * Opens the Patch Notes UI shortly after join. A delay is required because
-     * the player entity is not ready to receive a Custom UI page the instant
-     * {@code PlayerConnectEvent} fires; the player is re-resolved after the delay
-     * so a fast disconnect is a no-op.
+     * Opens the Patch Notes UI shortly after join. The player entity does not
+     * exist yet when {@code PlayerConnectEvent} fires and joining a world can
+     * take far longer than the delay, so the delay counts from the moment the
+     * entity is in its world; the player is re-resolved after the delay so a
+     * fast disconnect is a no-op.
      */
     private void scheduleOpenOnJoin(PlayerRef player) {
         long delayMillis = Math.max(0, config.openOnJoinDelayTicks) * 50L;
         UUID uuid = player.getUuid();
-        core.scheduler().runLater(() ->
+        core.platform().runOnEntityThread(player, (store, ref, world) -> core.scheduler().runLater(() ->
                 core.platform().findPlayer(uuid).ifPresent(this::openUi),
-                delayMillis, TimeUnit.MILLISECONDS);
+                delayMillis, TimeUnit.MILLISECONDS));
     }
 
     // ----- UI opening --------------------------------------------------------
@@ -344,6 +362,9 @@ public final class PatchNotesModule extends AbstractMysticModule {
 
             OpenCommand() {
                 super(PatchNotesModule.this.core, "open", "Open patch notes (optionally for another player).");
+                // Declared, not left to the engine: its generated node (the
+                // parent's node + ".open") is one players are never granted.
+                requirePermission(Permissions.PATCHNOTES_VIEW);
             }
 
             @Override
@@ -393,6 +414,7 @@ public final class PatchNotesModule extends AbstractMysticModule {
 
             MarkReadCommand() {
                 super(PatchNotesModule.this.core, "markread", "Mark all patch notes as read.");
+                requirePermission(Permissions.PATCHNOTES_VIEW);
             }
 
             @Override
@@ -422,6 +444,7 @@ public final class PatchNotesModule extends AbstractMysticModule {
         private final class ListCommand extends MysticCommand {
             ListCommand() {
                 super(PatchNotesModule.this.core, "list", "List patch notes in chat.");
+                requirePermission(Permissions.PATCHNOTES_VIEW);
             }
 
             @Override

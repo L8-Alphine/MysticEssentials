@@ -3,6 +3,7 @@ package org.hyzionstudios.mysticessentials.api.ui;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -83,6 +84,6 @@ public final class CustomUiRegistry {
     }
 
     private static final class ListView {
-        static <T> Collection<T> copy(Collection<T> values) { return java.util.List.copyOf(values); }
+        static <T> Collection<T> copy(Collection<T> values) { return List.copyOf(values); }
     }
 }

@@ -1,6 +1,7 @@
 package org.hyzionstudios.mysticessentials.api.service;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
@@ -9,7 +10,16 @@ import org.hyzionstudios.mysticessentials.api.model.MailMessage;
 /** Virtual mail: send to online/offline players, inbox read/unread, and bulk send. */
 public interface MailService {
 
-    /** Sends mail to a recipient (online or offline). {@code sender} may be {@code null} for server mail. */
+    /**
+     * Sends mail to a recipient (online or offline). {@code sender} may be {@code null} for
+     * server mail.
+     *
+     * <p>Mail from a player is refused when the recipient ignores them ({@code /ignore}),
+     * as private messages are; senders holding {@code mysticessentials.chat.ignore.exempt}
+     * always get through. The future then completes exceptionally with a
+     * {@link MailBlockedException}, and the sender, when online, has been told. Server
+     * mail ({@code sender == null}) and {@link #deliver} are never refused.</p>
+     */
     CompletableFuture<Void> send(UUID sender, String senderName, UUID recipient, String body);
 
     /**
@@ -25,7 +35,7 @@ public interface MailService {
     CompletableFuture<List<MailMessage>> inbox(UUID player);
 
     /** Loads a single mail from a player's inbox by id, or empty if absent. */
-    CompletableFuture<java.util.Optional<MailMessage>> getMessage(UUID player, String mailId);
+    CompletableFuture<Optional<MailMessage>> getMessage(UUID player, String mailId);
 
     CompletableFuture<Integer> unreadCount(UUID player);
 

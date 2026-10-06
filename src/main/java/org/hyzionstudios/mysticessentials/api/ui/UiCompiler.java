@@ -12,6 +12,7 @@ import java.util.regex.Pattern;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
+import org.jsoup.parser.Parser;
 
 /** Strict, bounded compiler for v2 XML and compatible legacy HTML layouts. */
 public final class UiCompiler {
@@ -50,7 +51,7 @@ public final class UiCompiler {
             throw new IllegalArgumentException("UI source is empty");
         }
         String source = sourceName == null ? "<memory>" : sourceName;
-        Document parsed = Jsoup.parse(sourceText, "", org.jsoup.parser.Parser.xmlParser());
+        Document parsed = Jsoup.parse(sourceText, "", Parser.xmlParser());
         Element element = parsed.children().stream().filter(e -> !e.tagName().equals("#root")).findFirst()
                 .orElseGet(() -> parsed.body() == null ? null : parsed.body().children().first());
         if (element == null) {
