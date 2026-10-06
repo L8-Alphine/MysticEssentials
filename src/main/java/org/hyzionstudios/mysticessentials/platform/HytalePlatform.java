@@ -572,8 +572,8 @@ public final class HytalePlatform {
      *
      * <p>This is the low-level block-safety probe behind the Random Teleport
      * destination search. All chunk/block API access stays here in the platform
-     * layer; higher-level rules (distance from spawn, region/claim exclusion,
-     * biome filters) live in the RTP service on top of this result.</p>
+     * layer; higher-level rules (distance from spawn, region/claim exclusion)
+     * live in the RTP service on top of this result.</p>
      *
      * <p>Runs the block reads on the target world's thread via the verified
      * {@code ChunkStore.getChunkReferenceAsync} + world-executor continuation, mirroring

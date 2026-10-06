@@ -25,7 +25,12 @@ public interface ChatService {
     /** Moves the player into a channel. @return {@code true} on success. */
     boolean setChannel(UUID player, String channelId);
 
-    /** Creates an in-memory temporary channel owned by a player. */
+    /**
+     * Creates an in-memory temporary channel owned by a player.
+     *
+     * @return {@code false} when the channel cannot be created, including when the
+     *         owner already owns {@code channels.maxTemporaryChannelsPerOwner} of them
+     */
     boolean createTemporaryChannel(UUID owner, String channelId, String permissionGate);
 
     /** The ids of temporary channels currently active on this server. */

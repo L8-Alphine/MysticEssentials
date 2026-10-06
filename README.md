@@ -110,7 +110,7 @@ Player, home, and warp names autocomplete.
 | `/tpall` | Teleport every online player to you | `mysticessentials.teleport.tpall` |
 | `/top` | Teleport to the highest block in your current column | `mysticessentials.teleport.top` |
 | `/back` | Return to your previous location | `mysticessentials.teleport.back` |
-| `/rtp [profile]` | Randomly teleport to a safe destination | `mysticessentials.teleport.rtp` |
+| `/rtp [profile]` | Randomly teleport to a safe destination | `mysticessentials.teleport.rtp.use` |
 | `/rtpadmin` | Inspect and administer random-teleport profiles/searches | `mysticessentials.teleport.rtp.admin` |
 
 The Teleport Requests UI (`/tpa` with no player) includes a **favorites list**:

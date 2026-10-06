@@ -64,6 +64,7 @@ Channels are configured under `channels` in `modules/chat/config.json`. Top-leve
 | `allowTemporaryChannels` | `true` | Allow player-created session channels |
 | `temporaryChannelDefaultMinutes` | `120` | Redis restore window for temporary channels |
 | `createTemporaryPermission` | `mysticessentials.chat.channel.create.temp` | Permission to create temporary channels |
+| `maxTemporaryChannelsPerOwner` | `1` | Temporary channels one player may own at once (network-wide with Redis); `0` = unlimited; `mysticessentials.channel.staff.override` is exempt |
 | `channels` | global + staff | The channel definitions (see below) |
 | `roster` | enabled | Member-list permission, tags, ranks, activity and visible-row cap |
 | `tempManagement.ownershipTransfer` | enabled, acceptance required | Transfer request expiry and the previous owner's new role |

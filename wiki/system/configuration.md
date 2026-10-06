@@ -223,6 +223,7 @@ Channel settings:
 | `channels.allowTemporaryChannels` | `true` | Allows session channels |
 | `channels.temporaryChannelDefaultMinutes` | `120` | Redis TTL restore window for temporary channels |
 | `channels.createTemporaryPermission` | `mysticessentials.chat.channel.create.temp` | Temporary channel permission |
+| `channels.maxTemporaryChannelsPerOwner` | `1` | Temporary channels one player may own at once; `0` = unlimited |
 | `channels.roster.enabled` | `true` | Enables compact/full member rosters |
 | `channels.roster.viewPermission` | `mysticessentials.channel.members.view` | Permission required to open rosters; blank allows everyone |
 | `channels.roster.showServerRanks` | `true` | Show LuckPerms/server rank below the channel role |
@@ -342,7 +343,7 @@ Rewards:
 | `rewards.intervalSeconds` | `60` | Reward interval |
 | `rewards.amountPerInterval` | `5.0` | Economy payout per interval |
 | `rewards.maxSessionReward` | `500.0` | Per-session cap; `0` disables |
-| `rewards.maxDailyReward` | `2000.0` | Daily cap; `0` disables |
+| `rewards.maxDailyReward` | `2000.0` | Daily cap (per player per UTC day, survives restarts); `0` disables |
 | `rewards.requireInZone` | `false` | Require reward zone |
 | `rewards.zones` | `[]` | Named X/Z footprints; height is not bounded |
 | `rewards.teleportToZoneOnAfk` | `true` | Safely move to a permitted zone and restore on return |
