@@ -593,11 +593,19 @@ public final class MentionSubModule {
                 || System.currentTimeMillis() - last >= config.massMentions.cooldownSeconds * 1000L;
     }
 
+    /**
+     * The players a mass keyword reaches, always drawn from the line's recipients:
+     * the ping carries the line as its preview, so it must never reach someone the
+     * line itself does not (a staff-channel {@code @everyone} pings the staff channel).
+     */
     private List<PlayerRef> massTargets(String keyword, List<PlayerRef> recipients) {
         MentionConfig.MassMentions mass = config.massMentions;
+        if (recipients == null) {
+            return List.of();
+        }
         if (keyword.equals(mass.staffKeyword.toLowerCase(Locale.ROOT))) {
             List<PlayerRef> staff = new ArrayList<>();
-            for (PlayerRef player : core.platform().onlinePlayers()) {
+            for (PlayerRef player : recipients) {
                 if (player != null && player.hasPermission(Permissions.CHAT_MENTION_STAFF)) {
                     staff.add(player);
                 }
@@ -605,9 +613,15 @@ public final class MentionSubModule {
             return staff;
         }
         if (keyword.equals(mass.channelKeyword.toLowerCase(Locale.ROOT))) {
-            return recipients == null ? List.of() : recipients;
+            return recipients;
         }
-        return new ArrayList<>(core.platform().onlinePlayers());
+        List<PlayerRef> everyone = new ArrayList<>();
+        for (PlayerRef player : recipients) {
+            if (player != null) {
+                everyone.add(player);
+            }
+        }
+        return everyone;
     }
 
     private String usernameOf(UUID player) {
