@@ -35,6 +35,9 @@ public final class CustomCommandsAdminCommand extends MysticCommand {
         this.module = module;
         addAliases("ccmd", "customcmd", "mecustomcommands");
         allowExtraArguments();
+        // Each subcommand checks its own customcommands.* node (or .admin); without
+        // this the engine would also demand a generated node nobody is granted.
+        requireNoPermission();
     }
 
     @Override
