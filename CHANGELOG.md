@@ -41,8 +41,6 @@
 
 ## 1.0.4 — Integration Upgrade and Lifecycle Reliability
 
-Released August 30, 2026.
-
 Mystic Essentials 1.0.4 upgrades every bundled integration dependency, corrects
 optional-plugin metadata and load ordering, and makes integration reload and
 shutdown behavior safe for long-running Update 6 servers.
