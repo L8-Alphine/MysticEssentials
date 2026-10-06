@@ -31,6 +31,7 @@ import org.hyzionstudios.mysticessentials.api.notification.NotificationCategory;
 import org.hyzionstudios.mysticessentials.api.notification.NotificationPriority;
 import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.core.integration.ManagedAccountsBridge;
+import org.hyzionstudios.mysticessentials.core.message.MessageServiceImpl;
 import org.hyzionstudios.mysticessentials.core.util.Json;
 import org.hyzionstudios.mysticessentials.modules.chat.roster.ChannelActivity;
 import org.hyzionstudios.mysticessentials.modules.chat.roster.ChannelMemberRole;
@@ -1768,15 +1769,18 @@ public final class ChannelsSubModule {
         // already have done this, but a peer running an older build (or an external
         // injector) must not be able to put raw tokens or markup on local screens.
         String safeContent = ChatTokens.toPlainText(content);
-        String line = template
-                .replace("{player_name}", senderName)
-                .replace("{display_name}", senderName)
-                .replace("{channel}", displayName(channel))
-                .replace("{server_id}", originServerId == null ? "" : originServerId);
-        // The message is substituted after placeholder resolution, as in local chat,
-        // so relayed or bridged player text is never parsed for placeholders.
-        String rendered = core.getMessageService().resolvePlaceholders(placeholderContext, line)
-                .replace("{message}", safeContent);
+        // The sender name (a remote nickname, or a bridge's user name), the channel
+        // name and the message are all filled in after placeholder resolution, so
+        // relayed or bridged player text is never parsed for placeholders, nor for
+        // each other's tokens.
+        String name = senderName == null ? "" : senderName;
+        String rendered = MessageServiceImpl.fillParams(template, Map.of(
+                        "player_name", name,
+                        "display_name", name,
+                        "channel", displayName(channel),
+                        "server_id", originServerId == null ? "" : originServerId,
+                        "message", safeContent),
+                text -> core.getMessageService().resolvePlaceholders(placeholderContext, text));
         // A managed child's policy (MysticIdentity) is asked per listener: a remote player's
         // line on the pair, a bridged line on the listener's own cross-platform setting.
         // The origin server filtered its own listeners on the native chat event; this is

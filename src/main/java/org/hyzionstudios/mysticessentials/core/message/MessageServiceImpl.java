@@ -152,7 +152,7 @@ public final class MessageServiceImpl implements MessageService {
      * over a placeholder of the same name. Values are not escaped: their colour markup
      * still renders when the result is colourized.
      */
-    static String fillParams(String raw, Map<String, String> params, UnaryOperator<String> placeholders) {
+    public static String fillParams(String raw, Map<String, String> params, UnaryOperator<String> placeholders) {
         if (params.isEmpty()) {
             return placeholders.apply(raw);
         }

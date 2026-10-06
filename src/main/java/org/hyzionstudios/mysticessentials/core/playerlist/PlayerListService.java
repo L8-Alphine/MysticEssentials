@@ -15,6 +15,7 @@ import java.util.logging.Level;
 import org.hyzionstudios.mysticessentials.api.service.AfkService;
 import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.core.config.MainConfig;
+import org.hyzionstudios.mysticessentials.core.message.MessageServiceImpl;
 import org.hyzionstudios.mysticessentials.core.message.MysticText;
 
 import com.hypixel.hytale.component.Ref;
@@ -321,9 +322,11 @@ public final class PlayerListService {
         String format = config.format == null || config.format.isBlank()
                 ? "{display_name}"
                 : config.format;
-        String resolved = core.getMessageService().resolvePlaceholders(uuid, format
-                .replace("{player_name}", username)
-                .replace("{display_name}", displayNameOf(uuid, username)));
+        // The nickname is player-chosen, so it is filled in after placeholder
+        // resolution and can never expand a server placeholder.
+        String resolved = MessageServiceImpl.fillParams(format,
+                Map.of("player_name", username, "display_name", displayNameOf(uuid, username)),
+                text -> core.getMessageService().resolvePlaceholders(uuid, text));
 
         if (config.showAfk && isAfk(uuid)) {
             String afkFormat = config.afkFormat == null || config.afkFormat.isBlank()
