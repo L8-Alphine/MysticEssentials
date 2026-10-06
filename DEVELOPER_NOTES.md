@@ -569,6 +569,41 @@ catalogue), `data/modules/chat/item-view.json` (inspection + panel display), and
 `data/modules/chat/mentions.json` (matching, limits, and
 `rules.staff-bypass-player-settings`).
 
+### Chat from other mods (`ChatService.deliver`)
+
+Guild, officer, party or settlement chat that another mod owns never passes
+through `PlayerChatEvent`, so nothing that enforces chat rules on that event sees
+it. `ChatService.deliver(sender, recipients, channelLabel, message[, format])`
+applies them instead and returns a `ChatDeliveryResult` (status, delivered,
+skipped, reason):
+
+```java
+ChatDeliveryResult result = chat.deliver(senderId, memberIds, guild.name(), text);
+```
+
+- **Mutes.** Mystic Essentials keeps no server mutes; `activeMute(player)` asks
+  MysticModeration (`MysticModerationAPI#punishments()` then
+  `PunishmentService#activeMute(UUID)`, through `ModerationBridge`, fail-open) — the
+  lookup its own chat gate makes. A mute refuses the line (`MUTED`, the sender gets
+  `chat-you-muted`); a `SHADOW_MUTE` shows it to the sender alone (`SHADOW_MUTED`,
+  `isDelivered()` still true, so the caller must not relay it). `activeMute(player,
+  channelId)` adds the channel moderation mute of a temporary channel.
+- **Ignores.** `isIgnoring(recipient, sender)` is the blocked-players list of the
+  recipient's `/mentions` settings (`NotificationPreferences.blockedMentioners`);
+  such a recipient is skipped.
+- **Managed accounts.** Each recipient is judged on the pair with
+  `TEXT_PUBLIC`, as for a cross-server channel line.
+- **Text safety.** The message goes through `preparePlayerMessage` (token
+  delimiters, colour permissions, length) and is filled into the format with
+  `MessageServiceImpl.fillParams`, so neither it, the nickname nor the caller's
+  label is ever parsed for placeholders; the label keeps colour codes only.
+- **Audience.** Recipients not online on this server are skipped, the sender
+  always gets their own line, the line is echoed to the server log, nothing is
+  relayed over Redis and `ChatMessagePublishedEvent` is not fired.
+
+The recipient rules live in `ChatDelivery.plan`, free of engine types and checked
+by `verifyChatDelivery`.
+
 Mystic Essentials' built-in sounds use vanilla AssetMap ids: routine notices use
 `SFX_Attn_Quiet`, announcements use `SFX_Attn_Moderate`, alerts use
 `SFX_Attn_Loud`, and critical notices use `SFX_Attn_VeryLoud`. The announcement

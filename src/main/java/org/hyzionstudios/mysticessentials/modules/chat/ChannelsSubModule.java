@@ -19,6 +19,7 @@ import java.util.logging.Level;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.hyzionstudios.mysticessentials.api.chat.ChatMute;
 import org.hyzionstudios.mysticessentials.api.event.ChannelModeratorChangedEvent;
 import org.hyzionstudios.mysticessentials.api.event.ChannelOwnershipTransferredEvent;
 import org.hyzionstudios.mysticessentials.api.event.TemporaryChannelClosedEvent;
@@ -678,6 +679,15 @@ public final class ChannelsSubModule {
         }
         Mute mute = temp.mutes.get(uuid);
         return mute != null && mute.isActive() ? Optional.ofNullable(mute.reason()) : Optional.empty();
+    }
+
+    /** The active channel moderation mute {@code uuid} holds in a temporary channel. */
+    public Optional<ChatMute> channelMute(String channelId, UUID uuid) {
+        TemporaryChannel temp = temporaryChannels.get(resolveChannelId(channelId));
+        Mute mute = temp == null || uuid == null ? null : temp.mutes.get(uuid);
+        return mute != null && mute.isActive()
+                ? Optional.of(new ChatMute(ChatMute.Scope.CHANNEL, mute.reason(), mute.expiresAt(), false))
+                : Optional.empty();
     }
 
     /** {@code true} when {@code actor} may perform owner-level management on the channel. */

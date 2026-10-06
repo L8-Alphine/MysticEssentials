@@ -190,6 +190,7 @@ Top-level settings:
 | `autoLinkPlainUrls` | `true` | Converts plain URLs into clickable links |
 | `autoLinkPermission` | `null` | Optional permission required for auto-linking |
 | `defaultFormat` | `{luckperms_prefix}{display_name} &8» &f{message}` | Fallback chat format |
+| `deliveryFormat` | `&8[&d{channel}&8] &f{display_name} &8» &7{message}` | Format for chat another mod hands over (guild, party...) without its own; `{channel}` is that mod's label |
 | `formats` | Owner example | Priority-ordered permission formats |
 | `messageColorPermissions` | See below | Permission gates for player-supplied chat formatting |
 

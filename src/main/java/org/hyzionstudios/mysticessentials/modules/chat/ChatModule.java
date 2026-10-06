@@ -6,6 +6,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -13,11 +14,17 @@ import java.util.function.UnaryOperator;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.hyzionstudios.mysticessentials.api.chat.ChatDeliveryResult;
+import org.hyzionstudios.mysticessentials.api.chat.ChatMute;
 import org.hyzionstudios.mysticessentials.api.event.ChatMessagePublishedEvent;
 import org.hyzionstudios.mysticessentials.api.mention.MentionScopeProvider;
+import org.hyzionstudios.mysticessentials.api.model.PlayerProfile;
 import org.hyzionstudios.mysticessentials.api.service.ChatService;
 import org.hyzionstudios.mysticessentials.api.voice.ChannelVoicePresenceProvider;
+import org.hyzionstudios.mysticessentials.core.integration.ManagedAccountsBridge;
+import org.hyzionstudios.mysticessentials.core.message.MessageServiceImpl;
 import org.hyzionstudios.mysticessentials.core.module.AbstractMysticModule;
+import org.hyzionstudios.mysticessentials.core.notification.NotificationServiceImpl;
 import org.hyzionstudios.mysticessentials.modules.chat.itemlink.ItemLinkSubModule;
 import org.hyzionstudios.mysticessentials.modules.chat.itemlink.ItemSnapshot;
 import org.hyzionstudios.mysticessentials.modules.chat.mention.MentionSubModule;
@@ -107,6 +114,10 @@ public final class ChatModule extends AbstractMysticModule implements ChatServic
             config.defaultFormat = defaults.defaultFormat;
         }
         config.defaultFormat = preferDisplayName(config.defaultFormat);
+        if (config.deliveryFormat == null || config.deliveryFormat.isBlank()) {
+            config.deliveryFormat = defaults.deliveryFormat;
+        }
+        config.deliveryFormat = preferDisplayName(config.deliveryFormat);
         if (config.autoLinkPlainUrls == null) {
             config.autoLinkPlainUrls = defaults.autoLinkPlainUrls;
         }
@@ -513,6 +524,110 @@ public final class ChatModule extends AbstractMysticModule implements ChatServic
     @Override
     public Set<String> temporaryChannelIds() {
         return channels == null ? Set.of() : channels.temporaryChannelIds();
+    }
+
+    // ----- Mutes, ignores and delivery for other mods ---------------------------
+
+    @Override
+    public Optional<ChatMute> activeMute(UUID player) {
+        return core.moderation().activeMute(player);
+    }
+
+    @Override
+    public Optional<ChatMute> activeMute(UUID player, String channelId) {
+        Optional<ChatMute> serverMute = activeMute(player);
+        if (serverMute.isPresent() || channels == null || player == null) {
+            return serverMute;
+        }
+        return channels.channelMute(channelId, player);
+    }
+
+    @Override
+    public boolean isIgnoring(UUID recipient, UUID sender) {
+        NotificationServiceImpl notifications = core.notifications();
+        if (notifications == null || recipient == null || sender == null || recipient.equals(sender)) {
+            return false;
+        }
+        // The block list holds names, as the /mentions settings store them.
+        String senderName = core.platform().findPlayer(sender).map(PlayerRef::getUsername)
+                .or(() -> core.getPlayerProfileService().getCached(sender).map(PlayerProfile::getUsername))
+                .orElse(null);
+        return notifications.preferences(recipient).blocks(senderName);
+    }
+
+    @Override
+    public ChatDeliveryResult deliver(UUID sender, Collection<UUID> recipients, String channelLabel,
+            String message, String format) {
+        if (config == null) {
+            return new ChatDeliveryResult(ChatDeliveryResult.Status.UNAVAILABLE, 0, 0, "");
+        }
+        PlayerRef senderRef = core.platform().findPlayer(sender).orElse(null);
+        ChatMute mute = senderRef == null ? null : activeMute(sender).orElse(null);
+        String prepared = senderRef == null ? "" : preparePlayerMessage(senderRef, message);
+        ChatDelivery.Plan plan = ChatDelivery.plan(sender, recipients, mute,
+                prepared == null || prepared.isBlank(),
+                uuid -> core.platform().findPlayer(uuid).isPresent(),
+                // A managed child's policy (MysticIdentity) is asked per listener, as for
+                // channel lines from another server.
+                (recipient, from) -> isIgnoring(recipient, from)
+                        || !core.managedAccounts().allowsInteraction(from, recipient,
+                                ManagedAccountsBridge.TEXT_PUBLIC));
+        switch (plan.status()) {
+            case DELIVERED, SHADOW_MUTED -> {
+                // Sent below.
+            }
+            case MUTED -> {
+                core.getMessageService().sendKey(senderRef, "chat-you-muted", Map.of("reason", mute.reason()));
+                return new ChatDeliveryResult(plan.status(), 0, plan.skipped(), mute.reason());
+            }
+            default -> {
+                return new ChatDeliveryResult(plan.status(), 0, plan.skipped(), "");
+            }
+        }
+
+        String label = colorTagsOnly(ChatTokens.sanitizeInput(channelLabel == null ? "" : channelLabel));
+        Message line = renderDeliveredLine(senderRef, label, prepared, format);
+        int delivered = 0;
+        int failed = 0;
+        for (UUID uuid : plan.recipients()) {
+            PlayerRef recipient = uuid.equals(sender) ? senderRef : core.platform().findPlayer(uuid).orElse(null);
+            if (recipient == null) {
+                failed++;
+                continue;
+            }
+            try {
+                recipient.sendMessage(line);
+                delivered++;
+            } catch (Throwable t) {
+                failed++;
+                log("Chat delivery failed for " + recipient.getUsername() + ": " + t);
+            }
+        }
+        // The console echo public chat gets from the engine.
+        log("[" + label + "] " + senderRef.getUsername() + ": " + plainTextOf(prepared)
+                + (plan.status() == ChatDeliveryResult.Status.SHADOW_MUTED ? " (shadow-muted)" : ""));
+        return new ChatDeliveryResult(plan.status(), delivered, plan.skipped() + failed, "");
+    }
+
+    /**
+     * Renders a line handed over by {@link #deliver}. As in public chat, the player's
+     * text, their nickname and the caller's label are filled in after placeholder
+     * resolution, so none of them is ever parsed for placeholders (design bible §17.3).
+     */
+    private Message renderDeliveredLine(PlayerRef sender, String label, String content, String format) {
+        String template = format == null || format.isBlank() ? config.deliveryFormat : format;
+        String message = content;
+        if (Boolean.TRUE.equals(config.autoLinkPlainUrls) && allows(sender, config.autoLinkPermission)) {
+            message = autoLinkPlainUrls(message);
+        }
+        UUID uuid = sender.getUuid();
+        String rendered = MessageServiceImpl.fillParams(template, Map.of(
+                        "player_name", sender.getUsername(),
+                        "display_name", displayNameOf(sender),
+                        "channel", label,
+                        "message", message),
+                text -> core.getMessageService().resolvePlaceholders(uuid, text));
+        return core.getMessageService().colorize(rendered);
     }
 
     // ----- Mention scopes ----------------------------------------------------

@@ -1,8 +1,12 @@
 package org.hyzionstudios.mysticessentials.core.integration;
 
+import java.lang.reflect.Method;
+import java.time.Instant;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.logging.Level;
 
+import org.hyzionstudios.mysticessentials.api.chat.ChatMute;
 import org.hyzionstudios.mysticessentials.core.MysticCore;
 
 import com.hypixel.hytale.common.plugin.PluginIdentifier;
@@ -21,6 +25,9 @@ import com.hypixel.hytale.server.core.plugin.PluginBase;
 public final class ModerationBridge {
 
     private static final String PROVIDER_CLASS = "org.hyzionstudios.mysticmoderation.api.MysticModerationProvider";
+    private static final String API_CLASS = "org.hyzionstudios.mysticmoderation.api.MysticModerationAPI";
+    /** The {@code PunishmentType} whose author alone sees their lines. */
+    private static final String SHADOW_MUTE = "SHADOW_MUTE";
     private static final PluginIdentifier PLUGIN_ID =
             new PluginIdentifier("org.hyzionstudios", "mysticmoderation");
 
@@ -75,6 +82,52 @@ public final class ModerationBridge {
                 return false;
             }
         }).orElse(false);
+    }
+
+    /**
+     * The chat mute MysticModeration holds for a player, through its public API
+     * ({@code MysticModerationAPI#punishments()} then {@code PunishmentService#activeMute(UUID)}):
+     * the same lookup its own chat gate makes, where a {@code SHADOW_MUTE} shows the
+     * player's lines to them alone and any other chat-blocking punishment blocks them.
+     * Empty when MysticModeration is absent, disabled in the config, or fails.
+     */
+    public Optional<ChatMute> activeMute(UUID player) {
+        if (player == null) {
+            return Optional.empty();
+        }
+        Object moderationApi = api().orElse(null);
+        if (moderationApi == null) {
+            return Optional.empty();
+        }
+        try {
+            // Resolved through the public interfaces: the implementing classes need not be public.
+            Class<?> apiType = Class.forName(API_CLASS, false, moderationApi.getClass().getClassLoader());
+            Method punishments = apiType.getMethod("punishments");
+            Object service = punishments.invoke(moderationApi);
+            if (service == null) {
+                return Optional.empty();
+            }
+            Object found = punishments.getReturnType().getMethod("activeMute", UUID.class)
+                    .invoke(service, player);
+            if (!(found instanceof Optional<?> mute) || mute.isEmpty()) {
+                return Optional.empty();
+            }
+            return Optional.of(chatMuteOf(mute.get()));
+        } catch (Throwable t) {
+            return Optional.empty();
+        }
+    }
+
+    /** Reads a MysticModeration {@code Punishment} record into a {@link ChatMute}. */
+    public static ChatMute chatMuteOf(Object punishment) throws ReflectiveOperationException {
+        Object type = punishment.getClass().getMethod("type").invoke(punishment);
+        Object reason = punishment.getClass().getMethod("reason").invoke(punishment);
+        Object expiresAt = punishment.getClass().getMethod("expiresAt").invoke(punishment);
+        String typeName = type instanceof Enum<?> constant ? constant.name() : String.valueOf(type);
+        return new ChatMute(ChatMute.Scope.SERVER,
+                reason instanceof String text ? text : "",
+                expiresAt instanceof Instant instant ? instant : null,
+                SHADOW_MUTE.equals(typeName));
     }
 
     private Optional<PluginBase> plugin() {

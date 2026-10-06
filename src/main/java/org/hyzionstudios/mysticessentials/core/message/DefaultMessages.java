@@ -353,6 +353,7 @@ public final class DefaultMessages {
         o.addProperty("chat-channel-roster-no-permission", "&cYou cannot view channel members.");
         // Participation / access enforcement
         o.addProperty("chat-channel-you-muted", "&cYou are muted in this channel. {reason}");
+        o.addProperty("chat-you-muted", "&cYou are muted. {reason}");
         o.addProperty("chat-channel-you-listener", "&cYou are a listener in this channel and cannot speak.");
         o.addProperty("chat-channel-banned", "&cYou are banned from that channel.");
         o.addProperty("chat-channel-locked", "&cThat channel is locked.");

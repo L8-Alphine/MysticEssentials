@@ -657,6 +657,7 @@ Notable per-module settings:
   colour/format markup through Custom UI `TextSpans`.
 - **spawn** — `defaultHomeLimit`, `teleportOnFirstJoin`, `teleportOnJoin`.
 - **chat** — `defaultFormat`, priority-ordered `formats` (permission-gated),
+  `deliveryFormat` (chat other mods hand over through `ChatService.deliver`),
   per-colour-style permissions, private messaging, channel definitions, temporary
   channels, and configurable channel prefixes/aliases/passwords.
   `/channel` opens the packaged channel browser UI
@@ -766,8 +767,8 @@ integration toggles plus the Redis connection without a restart.
 | **PlaceholderAPI-Hytale 1.0.8+** | Resolves external `%...%` values and registers `%mystic_<name>%` / `%mysticessentials_<name>%` | Internal `{...}` placeholders continue to work; late registration is retried |
 | **VaultUnlocked 2.20+** | Paid warps/teleports/flight/kits and AFK payouts through its current `BigDecimal` economy API | Costs become free and payouts safely no-op |
 | **MysticVanish 1.0+** | Hides vanished players from suggestions, TPA, messaging, and public lifecycle announcements | Everyone is treated as visible |
-| **MysticModeration 1.0+** | Dynamic diagnostics/API and reload bridge; discovered after startup through MysticModeration's plugin classloader | Moderation calls are unavailable; core moderation audit logs remain local |
-| **MysticIdentity 0.1+** | Managed (parentally supervised) accounts: private messages are refused between a pair the child's policy keeps apart (`TEXT_PRIVATE`), cross-server channel lines are delivered per listener (`TEXT_PUBLIC`), and bridged Discord lines skip a child whose cross-platform chat is off (`TEXT_CROSS_PLATFORM`); guardians and trusted staff are exempt inside MysticIdentity's answer | Nobody is restricted |
+| **MysticModeration 1.0+** | Dynamic diagnostics/API and reload bridge; discovered after startup through MysticModeration's plugin classloader. Its active mute (shadow mutes included) is honoured by `ChatService.deliver`, the chat other mods hand over (guild, party...) | Moderation calls are unavailable; core moderation audit logs remain local; nobody is muted in delivered chat |
+| **MysticIdentity 0.1+** | Managed (parentally supervised) accounts: private messages are refused between a pair the child's policy keeps apart (`TEXT_PRIVATE`), cross-server channel lines and lines other mods hand to `ChatService.deliver` are delivered per listener (`TEXT_PUBLIC`), and bridged Discord lines skip a child whose cross-platform chat is off (`TEXT_CROSS_PLATFORM`); guardians and trusted staff are exempt inside MysticIdentity's answer | Nobody is restricted |
 | **MysticIdentity player portal** | Mail (read-only; attachments are claimed in game), view-only vaults and patch notes on the web dashboard, plus a My identity card with unread mail, vault count and nickname. Loaded from its own source set (`src/mysticidentity/java`) so the main code never compiles against MysticIdentity; follows `integrations.mysticIdentity` | The pages do not appear |
 | **MysticRPG 1.0+** | RPG-level/safe-region checks for random teleport plus its stable item metadata contract | RTP uses terrain/config safety only; ordinary item details remain |
 | **QuestLines** | Reflection-only requirements/actions/placeholders bridge for Custom Content, plus compatible dialog/GUI imports and exports | Custom Content's native layouts and dialogs still work |

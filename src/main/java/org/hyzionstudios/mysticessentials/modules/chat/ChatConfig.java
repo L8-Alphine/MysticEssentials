@@ -17,6 +17,12 @@ public final class ChatConfig {
     public Boolean autoLinkPlainUrls = true;
     public String autoLinkPermission = null;
     public String defaultFormat = "{luckperms_prefix}{display_name} &8» &f{message}";
+    /**
+     * Line format for chat another mod hands over through {@code ChatService.deliver}
+     * (guild, officer, party or settlement chat) when it supplies none. {@code {channel}}
+     * is that mod's label, e.g. the guild name.
+     */
+    public String deliveryFormat = "&8[&d{channel}&8] &f{display_name} &8» &7{message}";
     public List<Format> formats = defaultFormats();
     public Map<String, String> messageColorPermissions = defaultColorPermissions();
     public PrivateMessaging privateMessaging = new PrivateMessaging();

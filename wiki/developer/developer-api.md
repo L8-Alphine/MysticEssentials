@@ -197,6 +197,56 @@ published as `ChannelOwnershipTransferredEvent` and
 `ChannelModeratorChangedEvent`; voice integrations may register a
 `ChannelVoicePresenceProvider`.
 
+## Chat from other mods: mutes, ignores and delivery
+
+A mod that owns its own chat contexts (guild, officer, party or settlement chat)
+hands each line to `ChatService` rather than sending it itself, so the server's
+mutes, players' ignores and Mystic's chat formatting apply to it:
+
+```java
+ChatService chat = api.getChatService(); // null while the chat module is disabled
+ChatDeliveryResult result = chat.deliver(senderId, memberIds, guild.name(), text);
+if (result.status() == ChatDeliveryResult.Status.SHADOW_MUTED) {
+    // Shown to the sender only: relay it nowhere else (other servers, Discord).
+}
+```
+
+`deliver(sender, recipients, channelLabel, message[, format])` returns a
+`ChatDeliveryResult(status, delivered, skipped, reason)`:
+
+| Status | Meaning |
+| --- | --- |
+| `DELIVERED` | Sent to the sender and every reachable recipient |
+| `SHADOW_MUTED` | The sender is shadow-muted: only they saw it (`isDelivered()` is still `true`) |
+| `MUTED` | Refused; the sender was told why (`chat-you-muted`) and `reason` holds the mute reason |
+| `SENDER_OFFLINE` | The sender is not online on this server |
+| `EMPTY` | Nothing was left of the message once cleaned |
+| `UNAVAILABLE` | The chat module is not running |
+
+The message is cleaned as public chat is (colour styles the sender may not use
+are stripped, the chat length limit applies, player text is never parsed for
+placeholders). Recipients who are not online on this server, who ignore the
+sender, or whom a managed account's policy (MysticIdentity) keeps apart from
+the sender are skipped; the sender always gets their own line. The line is
+echoed to the server log, never relayed to other servers, and does not fire
+`ChatMessagePublishedEvent`. Without a `format` the chat module's
+`deliveryFormat` is used; a format supports colour codes, the sender's
+placeholders, `{channel}`, `{player_name}`, `{display_name}` and `{message}`.
+
+The rules can also be asked directly:
+
+- `activeMute(player)` — the server chat mute in force, as a `ChatMute(scope,
+  reason, expiresAt, shadow)`. Mystic Essentials keeps no server mutes itself;
+  this is MysticModeration's, and empty without it. Never tell a player about a
+  mute whose `shadow()` is `true`.
+- `activeMute(player, channelId)` — also the channel moderation mute held in a
+  Mystic Essentials (temporary) channel; a server mute wins.
+- `isMuted(player)` — `activeMute(player).isPresent()`, shadow mutes included.
+- `isIgnoring(recipient, sender)` — whether the sender is on the recipient's
+  blocked-players list (`/mentions` settings).
+
+All of these are safe to call from any thread.
+
 ## Messages
 
 Use `MessageService` for consistent formatting:

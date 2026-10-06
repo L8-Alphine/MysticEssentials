@@ -409,6 +409,16 @@ tasks.register<JavaExec>("verifyMessageParamOrder") {
     )
 }
 
+tasks.register<JavaExec>("verifyChatDelivery") {
+    group = "verification"
+    description = "Checks ChatService.deliver's mute, ignore and recipient rules."
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets.test.get().runtimeClasspath + configurations.compileClasspath.get()
+    mainClass.set(
+        "org.hyzionstudios.mysticessentials.modules.chat.ChatDeliveryTest"
+    )
+}
+
 // Compatibility checks use a dependency-free main method rather than a test
 // framework; Gradle 9 otherwise treats their presence as a discovery failure.
 tasks.test { failOnNoDiscoveredTests = false }
@@ -421,6 +431,7 @@ tasks.named("check") {
         "verifyRtpOthersForce",
         "verifyIntegrationContracts",
         "verifyShadedJar",
-        "verifyMessageParamOrder"
+        "verifyMessageParamOrder",
+        "verifyChatDelivery"
     )
 }

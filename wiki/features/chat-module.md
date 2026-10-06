@@ -149,6 +149,16 @@ party through `ChatService.registerMentionScope(...)`; unavailable scopes stay
 hidden from player settings instead of silently accepting a rule that cannot be
 enforced. Server defaults live in `modules/chat/mentions.json`.
 
+## Chat from other mods
+
+Mods with their own chat contexts (guild, officer, party or settlement chat) can
+hand each line to Mystic through `ChatService.deliver` (see
+[Developer API](developer-api)). Such lines follow the same rules as public chat:
+a player muted by MysticModeration is refused (a shadow-muted one sees only their
+own line), players who blocked the sender in `/mentions` do not receive them,
+the sender's colour permissions and `maxMessageLength` apply, and they are
+rendered with the mod's own format or `deliveryFormat`.
+
 ## Configuration
 
 All chat settings live in one file:

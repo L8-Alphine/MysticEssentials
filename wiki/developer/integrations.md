@@ -50,6 +50,14 @@ When present, Mystic respects vanished players: they are hidden from teleport ta
 
 Ties Mystic into the MysticModeration suite for moderation-aware behavior across chat and player actions.
 
+Mystic Essentials keeps no server mutes of its own; MysticModeration enforces its
+mutes in public chat itself. Chat another mod hands to Mystic with
+`ChatService.deliver` (guild or party chat) never passes through public chat, so
+`deliver` and `ChatService.activeMute` ask MysticModeration for the player's
+active mute at the moment of delivery: a mute refuses the line and tells the
+sender why, a shadow mute shows the line to its author only. Without
+MysticModeration nobody is muted there.
+
 ## Storage backends
 
 Database and cache integrations (MySQL/MariaDB and Redis) are covered separately on the [Storage](storage) page.
@@ -70,6 +78,8 @@ the moment of delivery and never caches the answer:
 - A cross-server channel line is delivered per listener — a child whose public chat is closed
   hears only their guardians and trusted staff, and only those hear them.
 - A bridged Discord line skips a child whose cross-platform chat is off.
+- A line another mod hands over with `ChatService.deliver` (guild or party chat) is
+  delivered per listener, the same way as a cross-server channel line.
 
 Guardians and staff holding MysticIdentity's trusted-contact node are exempt inside its own
 answer, so nothing here special-cases them. Without MysticIdentity nobody is restricted.
