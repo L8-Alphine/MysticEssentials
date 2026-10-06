@@ -199,14 +199,17 @@ public final class PrivateMessagingSubModule {
         if (!config.socialSpyEnabled) {
             return;
         }
-        // A blank exempt node exempts nobody (allows() would grant it to everyone).
+        // A blank exempt node exempts nobody.
         String exemptNode = config.socialSpyExemptPermission;
         boolean exempt = exemptNode != null && !exemptNode.isBlank() && target.hasPermission(exemptNode);
         for (PlayerRef spy : core.platform().onlinePlayers()) {
             if (spy.getUuid().equals(fromUuid) || spy.getUuid().equals(target.getUuid())) {
                 continue;
             }
-            if (allows(spy, config.socialSpyPermission) && !exempt) {
+            // Reading other players' private messages is never granted by a blank
+            // node: a blank spy permission means nobody spies, not everybody.
+            String spyNode = config.socialSpyPermission;
+            if (spyNode != null && !spyNode.isBlank() && spy.hasPermission(spyNode) && !exempt) {
                 core.getMessageService().sendKey(spy, "pm-spy", Map.of(
                         "sender", fromName,
                         "target", target.getUsername(),
@@ -231,10 +234,6 @@ public final class PrivateMessagingSubModule {
                 .showAsTitle(false)
                 .source("mysticessentials:private-message")
                 .build(), NotificationAudience.player(target.getUuid()));
-    }
-
-    private boolean allows(PlayerRef player, String permission) {
-        return permission == null || permission.isBlank() || player.hasPermission(permission);
     }
 
     private final class MessageCommand extends MysticCommand {
