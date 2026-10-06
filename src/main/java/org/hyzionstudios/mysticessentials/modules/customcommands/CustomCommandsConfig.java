@@ -48,8 +48,13 @@ public final class CustomCommandsConfig {
         public int maxActionsPerChain = 32;
         /** Max nesting depth when custom commands call other custom commands. */
         public int maxExecutionDepth = 8;
-        /** Commands that {@code command} actions may never dispatch (no leading slash). */
-        public List<String> blockedCommands = new ArrayList<>(List.of("stop", "shutdown", "op", "deop"));
+        /**
+         * Commands that {@code command} actions may never dispatch (no leading
+         * slash; aliases of a listed command are blocked too). {@code sudo}
+         * ({@code su}) runs any command line as another player, so it would
+         * bypass this list.
+         */
+        public List<String> blockedCommands = new ArrayList<>(List.of("stop", "shutdown", "op", "deop", "sudo"));
     }
 
     public static final class Cooldowns {

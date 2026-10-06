@@ -15,6 +15,8 @@ import org.hyzionstudios.mysticessentials.modules.customcommands.argument.Argume
 import org.hyzionstudios.mysticessentials.modules.customcommands.condition.CommandCondition;
 import org.hyzionstudios.mysticessentials.core.MysticCore;
 
+import com.hypixel.hytale.server.core.command.system.AbstractCommand;
+import com.hypixel.hytale.server.core.command.system.CommandManager;
 import com.hypixel.hytale.server.core.command.system.CommandSender;
 import com.hypixel.hytale.server.core.console.ConsoleSender;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
@@ -326,9 +328,25 @@ public final class CustomCommandExecutor {
         return null;
     }
 
+    /**
+     * Checks the typed label and, through the engine's own lookup, the command
+     * it actually runs: an alias of a blocked command (e.g. {@code shutdown} for
+     * {@code stop}) is blocked too.
+     */
     private boolean isBlocked(String commandName) {
         List<String> blocked = module.config().safety.blockedCommands;
-        return blocked != null && blocked.stream()
-                .anyMatch(entry -> entry != null && entry.equalsIgnoreCase(commandName));
+        if (blocked == null || blocked.isEmpty()) {
+            return false;
+        }
+        String canonical = null;
+        try {
+            AbstractCommand command = CommandManager.get().resolveCommand(commandName);
+            canonical = command == null ? null : command.getName();
+        } catch (Throwable t) {
+            // No engine lookup available: the label check below still applies.
+        }
+        String resolved = canonical;
+        return blocked.stream().anyMatch(entry -> entry != null
+                && (entry.equalsIgnoreCase(commandName) || entry.equalsIgnoreCase(resolved)));
     }
 }
