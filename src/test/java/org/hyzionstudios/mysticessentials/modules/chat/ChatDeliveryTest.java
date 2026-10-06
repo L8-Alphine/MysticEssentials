@@ -13,12 +13,14 @@ import org.hyzionstudios.mysticessentials.api.chat.ChatDeliveryResult;
 import org.hyzionstudios.mysticessentials.api.chat.ChatDeliveryResult.Status;
 import org.hyzionstudios.mysticessentials.api.chat.ChatMute;
 import org.hyzionstudios.mysticessentials.api.event.ChatDeliveredEvent;
+import org.hyzionstudios.mysticessentials.api.service.MailBlockedException;
 import org.hyzionstudios.mysticessentials.core.integration.ModerationBridge;
 import org.hyzionstudios.mysticessentials.core.integration.ModerationBridge.GuardVerdict;
 import org.hyzionstudios.mysticessentials.core.notification.NotificationPreferences;
 import org.hyzionstudios.mysticessentials.core.util.Json;
 import org.hyzionstudios.mysticessentials.modules.chat.mention.MentionConfig;
 import org.hyzionstudios.mysticessentials.modules.chat.mention.MentionSubModule;
+import org.hyzionstudios.mysticessentials.modules.mail.MailModule;
 
 /**
  * Dependency-free checks of {@code ChatService.deliver}'s rules and of the ignore list
@@ -26,8 +28,8 @@ import org.hyzionstudios.mysticessentials.modules.chat.mention.MentionSubModule;
  * their own line, a chat guard or tutorial refusal blocks the line, ignoring, offline and
  * policy-blocked recipients are skipped, MysticModeration's mutes and chat guard verdicts
  * are read the way its own chat gates read them, {@code /ignore} edits the list (kept by
- * UUID, older name entries migrated), the list refuses private messages, and the
- * mention rules follow their config switches.
+ * UUID, older name entries migrated), the list refuses private messages and player
+ * mail, and the mention rules follow their config switches.
  */
 public final class ChatDeliveryTest {
 
@@ -63,6 +65,7 @@ public final class ChatDeliveryTest {
         ignoreCommandEditsTheList();
         ignoreListIsKeptByUuidAndMigratesNames();
         ignoredSendersCannotPrivateMessage();
+        ignoredSendersCannotMail();
         mentionRulesFollowTheirSwitches();
         deliveredEventsKeepTheirRecipients();
     }
@@ -249,6 +252,20 @@ public final class ChatDeliveryTest {
                 "a not yet resolved name entry let a private message through");
         require(!PrivateMessagingSubModule.refusedByIgnore(target, null, "Server", false),
                 "a console message was refused");
+    }
+
+    private static void ignoredSendersCannotMail() {
+        NotificationPreferences recipient = new NotificationPreferences();
+        recipient.setIgnored(SENDER, true);
+        require(MailModule.refusesMail(recipient, SENDER, "Steve", false), "an ignored player could send mail");
+        require(!MailModule.refusesMail(recipient, SENDER, "Steve", true), "an exempt sender's mail was refused");
+        require(!MailModule.refusesMail(recipient, MEMBER, "Alex", false), "a stranger's mail was refused");
+        require(!MailModule.refusesMail(recipient, null, "MysticGuilds", false), "server mail was refused");
+        NotificationPreferences legacy = Json.gson()
+                .fromJson("{\"blockedMentioners\":[\"alex\"]}", NotificationPreferences.class).normalized();
+        require(MailModule.refusesMail(legacy, MEMBER, "Alex", false),
+                "a not yet resolved name entry let mail through");
+        require(MEMBER.equals(new MailBlockedException(MEMBER).recipient()), "the refusal lost its recipient");
     }
 
     private static void mentionRulesFollowTheirSwitches() {

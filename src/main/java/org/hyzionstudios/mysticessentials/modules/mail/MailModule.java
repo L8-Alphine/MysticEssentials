@@ -25,9 +25,12 @@ import org.hyzionstudios.mysticessentials.api.notification.NotificationAction;
 import org.hyzionstudios.mysticessentials.api.notification.NotificationAudience;
 import org.hyzionstudios.mysticessentials.api.notification.NotificationCategory;
 import org.hyzionstudios.mysticessentials.api.notification.NotificationPriority;
+import org.hyzionstudios.mysticessentials.api.service.MailBlockedException;
 import org.hyzionstudios.mysticessentials.api.service.MailService;
 import org.hyzionstudios.mysticessentials.api.service.StorageService;
 import org.hyzionstudios.mysticessentials.core.module.AbstractMysticModule;
+import org.hyzionstudios.mysticessentials.core.notification.NotificationPreferences;
+import org.hyzionstudios.mysticessentials.core.notification.NotificationServiceImpl;
 import org.hyzionstudios.mysticessentials.core.util.Json;
 import org.hyzionstudios.mysticessentials.modules.playervaults.service.VaultItemCatalog;
 import org.hyzionstudios.mysticessentials.platform.command.MysticArgTypes;
@@ -156,7 +159,60 @@ public final class MailModule extends AbstractMysticModule implements MailServic
 
     @Override
     public CompletableFuture<Void> send(UUID sender, String senderName, UUID recipient, String body) {
-        return deliver(recipient, MailMessage.create(sender, senderName, truncateBody(body)));
+        MailMessage mail = MailMessage.create(sender, senderName, truncateBody(body));
+        if (sender == null) {
+            // Server mail is never refused.
+            return deliver(recipient, mail);
+        }
+        return ignoredBy(sender, senderName, recipient).thenCompose(refused -> refused
+                ? refuse(sender, recipient).thenCompose(told ->
+                        CompletableFuture.<Void>failedFuture(new MailBlockedException(recipient)))
+                : deliver(recipient, mail));
+    }
+
+    // ----- Ignore lists -------------------------------------------------------
+
+    /**
+     * Whether a recipient's ignore list ({@code /ignore}) refuses mail from this sender:
+     * by UUID, or by name for an entry not yet resolved to one. Holders of
+     * {@link Permissions#CHAT_IGNORE_EXEMPT} always get through, as for private messages.
+     */
+    public static boolean refusesMail(NotificationPreferences recipientPreferences, UUID sender,
+            String senderName, boolean senderExempt) {
+        return sender != null && !senderExempt && recipientPreferences.ignores(sender, senderName);
+    }
+
+    /**
+     * Whether the recipient ignores this player sender. An offline recipient's list is
+     * read from their stored profile.
+     */
+    private CompletableFuture<Boolean> ignoredBy(UUID sender, String senderName, UUID recipient) {
+        NotificationServiceImpl notifications = core.notifications();
+        if (notifications == null || sender == null || recipient == null) {
+            return CompletableFuture.completedFuture(false);
+        }
+        boolean exempt = core.platform().findPlayer(sender)
+                .map(ref -> ref.hasPermission(Permissions.CHAT_IGNORE_EXEMPT))
+                .orElseGet(() -> core.getPermissionService().has(sender, Permissions.CHAT_IGNORE_EXEMPT));
+        if (exempt) {
+            return CompletableFuture.completedFuture(false);
+        }
+        return notifications.storedPreferences(recipient)
+                .thenApply(stored -> refusesMail(stored, sender, senderName, false));
+    }
+
+    /**
+     * Tells an online sender their mail was refused, in the neutral words a refused
+     * private message uses, so it says no more about the recipient than mail already does.
+     */
+    private CompletableFuture<Void> refuse(UUID sender, UUID recipient) {
+        Optional<PlayerRef> online = core.platform().findPlayer(sender);
+        if (online.isEmpty()) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return core.getPlayerProfileService().lastKnownName(recipient).thenAccept(name ->
+                core.getMessageService().sendKey(online.get(), "mail-blocked",
+                        Map.of("player", name.orElse("that player"))));
     }
 
     @Override
@@ -806,7 +862,12 @@ public final class MailModule extends AbstractMysticModule implements MailServic
             refresh.run();
             return;
         }
-        resolveRecipient(sender, target).thenAccept(opt -> {
+        resolveRecipient(sender, target).thenCompose(opt -> opt.isEmpty()
+                ? CompletableFuture.completedFuture(opt)
+                // Checked before any attachment leaves the sender's inventory.
+                : ignoredBy(sender.getUuid(), sender.getUsername(), opt.get()).thenCompose(refused -> refused
+                        ? refuse(sender.getUuid(), opt.get()).thenApply(told -> Optional.<UUID>empty())
+                        : CompletableFuture.completedFuture(opt))).thenAccept(opt -> {
             if (opt.isEmpty()) {
                 refresh.run();
                 return;

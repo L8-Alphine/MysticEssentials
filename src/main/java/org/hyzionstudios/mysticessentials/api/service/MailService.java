@@ -10,7 +10,16 @@ import org.hyzionstudios.mysticessentials.api.model.MailMessage;
 /** Virtual mail: send to online/offline players, inbox read/unread, and bulk send. */
 public interface MailService {
 
-    /** Sends mail to a recipient (online or offline). {@code sender} may be {@code null} for server mail. */
+    /**
+     * Sends mail to a recipient (online or offline). {@code sender} may be {@code null} for
+     * server mail.
+     *
+     * <p>Mail from a player is refused when the recipient ignores them ({@code /ignore}),
+     * as private messages are; senders holding {@code mysticessentials.chat.ignore.exempt}
+     * always get through. The future then completes exceptionally with a
+     * {@link MailBlockedException}, and the sender, when online, has been told. Server
+     * mail ({@code sender == null}) and {@link #deliver} are never refused.</p>
+     */
     CompletableFuture<Void> send(UUID sender, String senderName, UUID recipient, String body);
 
     /**

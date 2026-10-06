@@ -221,6 +221,7 @@ public final class DefaultMessages {
         o.addProperty("mail-inbox-entry", "{read_color}[{id}] &7from &f{sender}&7: &f{body}");
         o.addProperty("mail-read-line", "&7from &f{sender}&7: &f{body}");
         o.addProperty("mail-sent", "&aMail sent to &f{player}");
+        o.addProperty("mail-blocked", "&cYou can't send mail to &f{player}&c right now.");
         o.addProperty("mail-sent-offline", "&aMail sent to &f{player} &7(offline)");
         o.addProperty("mail-sent-all", "&aMail sent to &f{count} &aplayers.");
         o.addProperty("mail-deleted", "&aMail deleted.");

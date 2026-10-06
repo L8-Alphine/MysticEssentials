@@ -15,6 +15,12 @@ Mail lets players send messages — and optionally items — to each other, even
 | `/mail clear` | Clear your inbox | `mysticessentials.mail.use` |
 | `/mailadmin` | Open the mail admin center | `mysticessentials.mail.announce` |
 
+Mail from a player the recipient ignores (`/ignore`) is not delivered — from
+`/mail send`, the composer (before any attachment is taken) or another mod's
+`MailService.send` with a player sender — and the sender is told they can't mail
+that player right now. Holders of `mysticessentials.chat.ignore.exempt` always get
+through; server mail, `/mail sendall` and admin announcements are never refused.
+
 ## Item attachments and announcements
 
 - Players with `mysticessentials.mail.attach` can attach items to normal mail; the items are taken from the sender's inventory and claimed by the recipient when they read the mail.

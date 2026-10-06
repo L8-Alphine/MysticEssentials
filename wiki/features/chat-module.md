@@ -29,9 +29,11 @@ When `formatChat` is on, every message is rewritten through a permission-selecte
 `/ignore <player>` (`mysticessentials.chat.ignore`) hides that player's public and
 channel chat lines, the chat other mods hand to Mystic (guild, party...), and their
 mentions, and refuses their private messages (`/msg`, `/reply`, across servers and
-as offline mail); `/ignore` alone lists who you ignore and `/unignore <player>` undoes
-it. The sender of a refused message is told they can't message you right now, the
-same reply any refused private message gets. The list is kept by UUID with your
+as offline mail) and their [mail](mail-module); `/ignore` alone lists who you ignore
+and `/unignore <player>` undoes it. The sender of a refused message or mail is told
+they can't message or mail you right now, the same reply any refused private message
+gets. An offline player's list is read from their stored profile, which with `json`
+storage is the copy this server last saved (see the README's *Ignoring players*). The list is kept by UUID with your
 notification preferences, so a renamed player stays ignored and is listed under
 their current name; it is the "blocked players" count shown in `/mentions`. Names
 stored by older versions are resolved to players when you join; one that matches

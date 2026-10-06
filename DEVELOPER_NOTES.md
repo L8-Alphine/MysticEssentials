@@ -606,8 +606,13 @@ ChatDeliveryResult result = chat.deliver(senderId, memberIds, guild.name(), text
   `rules.ignoredPlayersCanNotNotify` is on, and private messages are refused on every
   path: locally, on the target's server for a relayed one (a `pm-notice` Redis
   message tells the sender's server, which replies `pm-blocked`), and from the stored
-  profile for an offline target's mail fallback. `mysticessentials.chat.ignore.exempt`
-  senders always get through (the relay carries the flag as `ignoreExempt`).
+  profile for an offline target's mail fallback. Player mail is refused the same
+  way (`MailModule.send` with a non-null sender and the composer, before attachments
+  are taken): `mail-blocked`, and `send` completes with `MailBlockedException`;
+  server mail and `deliver` are never refused. `mysticessentials.chat.ignore.exempt`
+  senders always get through (the relay carries the flag as `ignoreExempt`). An
+  offline player's list comes from `NotificationServiceImpl.storedPreferences`,
+  which with `json` storage is this server's copy of their profile.
 - **Managed accounts.** Each recipient is judged on the pair with
   `TEXT_PUBLIC`, as for a cross-server channel line.
 - **Text safety.** The message goes through `preparePlayerMessage` (token

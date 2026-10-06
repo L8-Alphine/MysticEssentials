@@ -251,6 +251,12 @@ The rules can also be asked directly:
   Public and channel chat skip such recipients too, and their private messages
   are refused.
 
+`MailService.send` with a player sender honours the same list: when the recipient
+ignores the sender (and the sender lacks `mysticessentials.chat.ignore.exempt`),
+nothing is delivered, the online sender is told (`mail-blocked`), and the future
+completes exceptionally with `MailBlockedException`. Server mail (`sender == null`)
+and `MailService.deliver` are never refused.
+
 All of these are safe to call from any thread.
 
 ## Messages

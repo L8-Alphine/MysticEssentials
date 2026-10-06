@@ -208,7 +208,7 @@ Bypass: `mysticessentials.craftblock.bypass` (all items) or
 |---|---|---|
 | `/msg <player> <message>` | Private message (aliases `/tell`, `/w`, `/whisper`) | — |
 | `/reply <message>` | Reply to your last PM (alias `/r`) | — |
-| `/ignore [player]` | Ignore a player (their chat lines, mentions and private messages are kept from you, across renames); without a name, list who you ignore | `mysticessentials.chat.ignore` |
+| `/ignore [player]` | Ignore a player (their chat lines, mentions, private messages and mail are kept from you, across renames); without a name, list who you ignore | `mysticessentials.chat.ignore` |
 | `/unignore <player>` | Stop ignoring a player | `mysticessentials.chat.ignore` |
 | `/channel` | Open the channel browser/menu (alias `/ch`) | — |
 | `/channel <name>` or `/channel switch <name> [password]` | Switch the channel you speak in | — |
@@ -241,6 +241,27 @@ Aether, and trailing punctuation (`@Aether,`) is handled. Mentions inside URLs,
 email addresses, and item data are ignored. Sender cooldowns, a per-minute
 budget, and per-recipient sound throttling keep mentions from becoming a
 nuisance, and every recipient can retune or switch them off with `/mentions`.
+
+#### Ignoring players
+
+`/ignore <player>` keeps that player's public and channel chat lines, the chat
+other mods hand over (guild, party...), their mentions, their private messages
+(`/msg`, `/reply`, across servers and as offline mail) and their mail (`/mail
+send`, the mail composer, and player mail other mods send) away from you. A
+refused sender is told they can't message or mail you right now, the same reply
+any refused private message gets. `/ignore` alone lists who you ignore, under
+their current names, and `/unignore <player>` undoes it. The list is kept by UUID
+with your notification preferences, so renames keep it. Players with
+`mysticessentials.chat.ignore.exempt` cannot be ignored and always reach you.
+
+**Stored lists and `json` storage:** a player online on this server is checked
+against their live list, and a private message to a player online on another
+server is checked on that server. Mail, and a private message to an offline
+player, are checked against the list stored in the recipient's profile — the copy
+last saved. With `storage.provider` set to `json` every server keeps its own
+profiles, so on a network that is the copy *this* server saved: ignores added
+while the recipient was on another server are not seen here until they join this
+server again. With `mysql` or `mariadb` every server reads the same stored copy.
 
 ### Announcements & AFK
 | Command | Description | Permission |
