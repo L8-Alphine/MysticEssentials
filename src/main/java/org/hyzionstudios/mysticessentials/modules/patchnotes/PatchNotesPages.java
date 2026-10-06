@@ -278,7 +278,11 @@ final class PatchNotesPages {
         public void handleDataEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
             JsonObject payload = parse(data);
             switch (string(payload, "action")) {
-                case "select" -> module.openUi(player, field(payload, "id"), search, filter);
+                case "select" -> {
+                    // The id is client-sent: an unknown one selects the first note instead.
+                    String id = field(payload, "id");
+                    module.openUi(player, module.noteById(id) == null ? null : id, search, filter);
+                }
                 case "search" -> module.openUi(player, null, field(payload, "search"), filter);
                 case "filter" -> {
                     String next = field(payload, "filter");

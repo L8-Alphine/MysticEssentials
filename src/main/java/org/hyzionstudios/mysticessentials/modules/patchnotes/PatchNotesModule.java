@@ -9,6 +9,8 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.ToIntFunction;
 
 import org.hyzionstudios.mysticessentials.api.Permissions;
 import org.hyzionstudios.mysticessentials.api.notification.Notification;
@@ -23,6 +25,7 @@ import org.hyzionstudios.mysticessentials.platform.command.MysticArgTypes;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommand;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommandSender;
 
+import com.google.gson.JsonElement;
 import com.hypixel.hytale.server.core.command.system.arguments.system.OptionalArg;
 import com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
@@ -156,47 +159,60 @@ public final class PatchNotesModule extends AbstractMysticModule {
 
     CompletableFuture<PatchReadState> readState(UUID player) {
         StorageService storage = core.getStorageService();
-        return storage.load(READ_NAMESPACE, player.toString()).thenApply(element -> {
-            PatchReadState state = element == null ? null : Json.gson().fromJson(element, PatchReadState.class);
-            if (state == null) {
-                state = new PatchReadState(player.toString());
-            }
-            if (state.readPatchIds == null) {
-                state.readPatchIds = new ArrayList<>();
-            }
-            return state;
-        });
+        return storage.load(READ_NAMESPACE, player.toString()).thenApply(element -> toReadState(player, element));
     }
 
-    private CompletableFuture<Void> saveReadState(UUID player, PatchReadState state) {
-        state.lastOpened = Instant.now().toString();
-        return core.getStorageService().save(READ_NAMESPACE, player.toString(), Json.toTree(state));
+    private static PatchReadState toReadState(UUID player, JsonElement element) {
+        PatchReadState state = element == null ? null : Json.gson().fromJson(element, PatchReadState.class);
+        if (state == null) {
+            state = new PatchReadState(player.toString());
+        }
+        if (state.readPatchIds == null) {
+            state.readPatchIds = new ArrayList<>();
+        }
+        return state;
+    }
+
+    /**
+     * Applies {@code change} to the stored read state as one atomic
+     * read-modify-write, so quick successive marks never overwrite each other.
+     *
+     * @return future of the count {@code change} reported (nothing is written for 0)
+     */
+    private CompletableFuture<Integer> updateReadState(UUID player, ToIntFunction<PatchReadState> change) {
+        AtomicInteger changed = new AtomicInteger();
+        return core.getStorageService().update(READ_NAMESPACE, player.toString(), element -> {
+            PatchReadState state = toReadState(player, element);
+            changed.set(change.applyAsInt(state));
+            if (changed.get() == 0) {
+                return null;
+            }
+            state.lastOpened = Instant.now().toString();
+            return Json.toTree(state);
+        }).thenApply(stored -> changed.get());
     }
 
     /** Marks one patch read for a player. @return future of whether anything changed. */
     CompletableFuture<Boolean> markRead(UUID player, String patchId) {
-        return readState(player).thenCompose(state -> {
-            if (!state.markRead(patchId)) {
-                return CompletableFuture.completedFuture(false);
-            }
-            return saveReadState(player, state).thenApply(v -> true);
-        });
+        if (noteById(patchId) == null) {
+            // Ids come from the client: only loaded patches are ever recorded.
+            return CompletableFuture.completedFuture(false);
+        }
+        return updateReadState(player, state -> state.markRead(patchId) ? 1 : 0)
+                .thenApply(count -> count > 0);
     }
 
     /** Marks every currently-loaded patch read. @return future of how many were newly marked. */
     CompletableFuture<Integer> markAllRead(UUID player) {
-        return readState(player).thenCompose(state -> {
+        List<PatchNote> loaded = notes;
+        return updateReadState(player, state -> {
             int flipped = 0;
-            for (PatchNote note : notes) {
+            for (PatchNote note : loaded) {
                 if (state.markRead(note.safeId())) {
                     flipped++;
                 }
             }
-            if (flipped == 0) {
-                return CompletableFuture.completedFuture(0);
-            }
-            int total = flipped;
-            return saveReadState(player, state).thenApply(v -> total);
+            return flipped;
         });
     }
 
