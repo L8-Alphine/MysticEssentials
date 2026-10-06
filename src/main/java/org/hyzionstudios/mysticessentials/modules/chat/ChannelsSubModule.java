@@ -1719,7 +1719,10 @@ public final class ChannelsSubModule {
                 .replace("{player_name}", senderName)
                 .replace("{display_name}", senderName)
                 .replace("{channel}", displayName(channel))
-                .replace("{server_id}", originServerId == null ? "" : originServerId)
+                .replace("{server_id}", originServerId == null ? "" : originServerId);
+        // The message is substituted after placeholder resolution, as in local chat,
+        // so relayed or bridged player text is never parsed for placeholders.
+        String rendered = core.getMessageService().resolvePlaceholders(placeholderContext, line)
                 .replace("{message}", safeContent);
         // A managed child's policy (MysticIdentity) is asked per listener: a remote player's
         // line on the pair, a bridged line on the listener's own cross-platform setting.
@@ -1733,7 +1736,7 @@ public final class ChannelsSubModule {
         }
         for (PlayerRef recipient : core.managedAccounts().reachable(placeholderContext, listening,
                 ManagedAccountsBridge.TEXT_PUBLIC)) {
-            recipient.sendMessage(core.getMessageService().formatFor(placeholderContext, line));
+            recipient.sendMessage(core.getMessageService().colorize(rendered));
         }
     }
 
