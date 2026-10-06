@@ -247,6 +247,9 @@ public final class MysticCore implements MysticEssentialsAPI {
         if (moduleManager != null) {
             moduleManager.disableAll();
         }
+        if (platform != null) {
+            platform.endAllArrivalProtection();
+        }
         // Credit the final slice of every open session before profiles are saved.
         if (playtimeTracker != null) {
             playtimeTracker.stop();
@@ -331,6 +334,7 @@ public final class MysticCore implements MysticEssentialsAPI {
                 (PlayerDisconnectEvent event) -> {
                     var ref = event.getPlayerRef();
                     networkPlayerService.onQuit(ref);
+                    platform.endArrivalProtection(ref);
                     // Credit the session before the profile is persisted and evicted.
                     playtimeTracker.onQuit(ref.getUuid());
                     // Notification history and preferences live in the profile, so

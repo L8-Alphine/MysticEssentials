@@ -12,6 +12,7 @@ import java.util.OptionalInt;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
@@ -75,6 +76,8 @@ public final class HytalePlatform {
 
     private final MysticCore core;
     private final MysticessentialsPlugin plugin;
+    /** Players currently holding an arrival-protection grant this plugin added. */
+    private final Set<UUID> arrivalProtected = ConcurrentHashMap.newKeySet();
 
     public HytalePlatform(MysticCore core, MysticessentialsPlugin plugin) {
         this.core = core;
@@ -913,15 +916,59 @@ public final class HytalePlatform {
                 return;
             }
             store.ensureComponent(entity, Invulnerable.getComponentType());
+            arrivalProtected.add(uuid);
             core.scheduler().runLater(() -> findPlayer(uuid).ifPresent(live ->
                     runOnEntityThread(live, (liveStore, liveEntity, liveWorld) -> {
-                        Player playerEntity = liveStore.getComponent(liveEntity, Player.getComponentType());
-                        if (playerEntity == null || playerEntity.getGameMode() != GameMode.Creative) {
-                            liveStore.tryRemoveComponent(liveEntity, Invulnerable.getComponentType());
+                        if (arrivalProtected.remove(uuid)) {
+                            removeArrivalProtection(liveStore, liveEntity);
                         }
                     })),
                     seconds, TimeUnit.SECONDS);
         });
+    }
+
+    /**
+     * Ends a pending arrival-protection grant of a disconnecting player while the
+     * entity still exists. {@code Invulnerable} is saved with the player, so a
+     * grant still active at logout would otherwise be loaded back on the next
+     * join with nothing left to remove it: permanent god mode.
+     */
+    public void endArrivalProtection(PlayerRef player) {
+        if (!arrivalProtected.remove(player.getUuid())) {
+            return;
+        }
+        Ref<EntityStore> ref = player.getReference();
+        if (ref == null || !ref.isValid()) {
+            return;
+        }
+        Store<EntityStore> store = ref.getStore();
+        World world = store.getExternalData().getWorld();
+        if (world.isInThread()) {
+            removeArrivalProtection(store, ref);
+        } else {
+            // Queued before the engine's own removal task (Universe#removePlayer
+            // dispatches the disconnect event first), so it runs while the entity
+            // is still in the store.
+            world.execute(() -> {
+                if (ref.isValid()) {
+                    removeArrivalProtection(store, ref);
+                }
+            });
+        }
+    }
+
+    /** Ends every pending grant (plugin shutdown: the timers die with the scheduler). */
+    public void endAllArrivalProtection() {
+        for (UUID uuid : List.copyOf(arrivalProtected)) {
+            findPlayer(uuid).ifPresentOrElse(this::endArrivalProtection, () -> arrivalProtected.remove(uuid));
+        }
+    }
+
+    private static void removeArrivalProtection(Store<EntityStore> store, Ref<EntityStore> entity) {
+        Player playerEntity = store.getComponent(entity, Player.getComponentType());
+        if (playerEntity == null || playerEntity.getGameMode() != GameMode.Creative) {
+            store.tryRemoveComponent(entity, Invulnerable.getComponentType());
+        }
     }
 
     /**
