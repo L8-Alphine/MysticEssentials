@@ -438,7 +438,10 @@ public final class RandomTeleportServiceImpl implements RandomTeleportService {
             session.phase = Session.Phase.TELEPORT;
         }
         showHud(player, session, "rtp-hud-teleporting", Map.of());
-        recordBackLocation(uuid, player);
+        // Captured before the move (afterwards the player is somewhere else), but
+        // stored as the /back location only once the move succeeded: a failed RTP
+        // must not overwrite where /back currently leads.
+        MysticLocation origin = Conversions.capture(player);
 
         core.platform().teleportEntity(player, destination).whenComplete((moveResult, moveError) -> {
             if (moveError != null || moveResult != TeleportService.Result.SUCCESS) {
@@ -446,6 +449,7 @@ public final class RandomTeleportServiceImpl implements RandomTeleportService {
                         moveError != null ? moveError.toString() : String.valueOf(moveResult));
                 return;
             }
+            recordBackLocation(uuid, origin);
             onTeleportSuccess(uuid, session, destination);
         });
     }
@@ -521,9 +525,9 @@ public final class RandomTeleportServiceImpl implements RandomTeleportService {
         }
     }
 
-    private void recordBackLocation(UUID uuid, PlayerRef player) {
+    private void recordBackLocation(UUID uuid, MysticLocation origin) {
         core.getPlayerProfileService().getCached(uuid).ifPresent(profile ->
-                profile.setLastTeleportedLocation(Conversions.capture(player)));
+                profile.setLastTeleportedLocation(origin));
     }
 
     private static String searchFailureDetail(String reason, RtpDestinationResult result, Throwable error) {
