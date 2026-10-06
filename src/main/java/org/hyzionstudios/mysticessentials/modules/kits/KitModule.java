@@ -241,7 +241,7 @@ public final class KitModule extends AbstractMysticModule {
         }
         if (kitData(playerId) == null) {
             // Without the loaded profile the cooldown can be neither checked nor recorded.
-            reply.reply("nick-error-profile", Map.of());
+            reply.reply("kit-profile-not-loaded", Map.of());
             return;
         }
         if (!player.hasPermission(Permissions.KIT_BYPASS_COOLDOWN)) {

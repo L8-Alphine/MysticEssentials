@@ -252,6 +252,7 @@ public final class DefaultMessages {
         o.addProperty("kit-claimed", "&aYou received the &f{kit} &akit!");
         o.addProperty("kit-given", "&aGave kit &f{kit} &ato &f{player}&a.");
         o.addProperty("kit-cannot-afford", "&cYou cannot afford this kit (&f{cost}&c).");
+        o.addProperty("kit-profile-not-loaded", "&cYour player data is not loaded yet - try again in a moment.");
         o.addProperty("nick-error-length", "&cNicknames must be {min}-{max} characters.");
         o.addProperty("nick-error-characters", "&cNicknames may only contain letters, digits, and underscores.");
         o.addProperty("nick-error-blocked", "&cThat nickname is not allowed.");
@@ -465,7 +466,7 @@ public final class DefaultMessages {
         o.addProperty("vault-save-failed", "&cCould not save vault &f#{vault}&c. Your items are still in the vault session.");
         o.addProperty("vault-readonly", "&7This vault is open in read-only mode.");
         o.addProperty("vault-readonly-downgrade",
-                "&cThe vault lock could not be renewed; the vault is now read-only.");
+                "&cThe vault lock could not be renewed, so the vault was closed to protect its contents.");
         o.addProperty("vault-overflow-notice",
                 "&eYour current rank allows {rows} row(s). Items beyond that remain safe but unavailable.");
         o.addProperty("vault-item-blocked", "&cThat item cannot be stored in a vault.");
