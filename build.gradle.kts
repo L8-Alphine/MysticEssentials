@@ -389,6 +389,16 @@ tasks.register<JavaExec>("verifyShadedJar") {
     })
 }
 
+tasks.register<JavaExec>("verifyMessageParamOrder") {
+    group = "verification"
+    description = "Checks message params are filled after placeholders, so they never expand one."
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets.test.get().runtimeClasspath + configurations.compileClasspath.get()
+    mainClass.set(
+        "org.hyzionstudios.mysticessentials.core.message.MessageParamOrderTest"
+    )
+}
+
 // Compatibility checks use a dependency-free main method rather than a test
 // framework; Gradle 9 otherwise treats their presence as a discovery failure.
 tasks.test { failOnNoDiscoveredTests = false }
@@ -399,6 +409,7 @@ tasks.named("check") {
         "verifyMysticRpgRtpSafety",
         "verifyRtpFluidSafety",
         "verifyIntegrationContracts",
-        "verifyShadedJar"
+        "verifyShadedJar",
+        "verifyMessageParamOrder"
     )
 }
