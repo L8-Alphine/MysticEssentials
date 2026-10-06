@@ -198,7 +198,21 @@ public final class CustomCommandExecutor {
 
     /** Called by {@link CommandAction}; owns blocked-command, executor, and recursion logic. */
     public void dispatchCommandAction(CustomCommandContext context, CommandAction action) {
-        String resolved = context.resolvePlaceholders(action.commandTemplate()).trim();
+        CustomCommandContext.CommandLine line = context.resolveCommandLine(action.commandTemplate());
+        if (line.refusedArg() != null) {
+            // A typed value that would re-split into extra arguments or --flags
+            // on the target command never reaches the command line.
+            module.audit().logSafetyStop(context.command(),
+                    "refused argument '" + line.refusedArg() + "' for '" + action.commandTemplate() + "'");
+            // The refused text is not echoed: bundle messages expand placeholders.
+            context.replyKey("customcommands-arg-invalid", Map.of(
+                    "arg", line.refusedArg(),
+                    "value", "",
+                    "expected", "no quotes, backslashes or --flags"
+                            + " (and no spaces, brackets or commas in a single word)"));
+            return;
+        }
+        String resolved = line.line().trim();
         if (resolved.startsWith("/")) {
             resolved = resolved.substring(1);
         }
