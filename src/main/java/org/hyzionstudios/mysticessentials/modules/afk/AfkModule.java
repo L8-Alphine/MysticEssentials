@@ -21,6 +21,7 @@ import java.util.function.ToIntFunction;
 import org.hyzionstudios.mysticessentials.api.Permissions;
 import org.hyzionstudios.mysticessentials.api.model.MysticLocation;
 import org.hyzionstudios.mysticessentials.api.service.AfkService;
+import org.hyzionstudios.mysticessentials.api.service.TeleportService;
 import org.hyzionstudios.mysticessentials.core.message.MysticText;
 import org.hyzionstudios.mysticessentials.core.module.AbstractMysticModule;
 import org.hyzionstudios.mysticessentials.core.util.Json;
@@ -30,6 +31,7 @@ import org.hyzionstudios.mysticessentials.platform.command.MysticArgTypes;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommand;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommandSender;
 
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.hypixel.hytale.server.core.command.system.arguments.system.RequiredArg;
 import com.hypixel.hytale.server.core.command.system.arguments.types.ArgTypes;
@@ -848,18 +850,31 @@ public final class AfkModule extends AbstractMysticModule implements AfkService 
             if (data == null || !data.has(RETURN_KEY)) {
                 return;
             }
+            JsonElement stored = data.get(RETURN_KEY);
             MysticLocation location = null;
             try {
-                location = Json.gson().fromJson(data.get(RETURN_KEY), MysticLocation.class);
+                location = Json.gson().fromJson(stored, MysticLocation.class);
             } catch (RuntimeException ignored) {
-                // Corrupt entry; cleared below either way.
+                // Corrupt entry; cleared below.
             }
-            data.remove(RETURN_KEY);
-            core.getPlayerProfileService().save(profile);
-            if (location != null) {
-                core.getTeleportService().teleportNow(player, location);
+            if (location == null) {
+                data.remove(RETURN_KEY);
+                core.getPlayerProfileService().save(profile);
+                return;
+            }
+            // The entry is only consumed once the player is actually back; a failed
+            // move keeps it for the next join.
+            core.getTeleportService().teleportNow(player, location).thenAccept(result -> {
+                if (result != TeleportService.Result.SUCCESS) {
+                    return;
+                }
+                // Leave a newer return point (a zone entered since) alone.
+                if (stored.equals(data.get(RETURN_KEY))) {
+                    data.remove(RETURN_KEY);
+                    core.getPlayerProfileService().save(profile);
+                }
                 core.getMessageService().sendKey(player, "afk-zone-returned");
-            }
+            });
         });
     }
 
