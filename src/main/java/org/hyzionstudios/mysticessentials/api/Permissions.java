@@ -51,7 +51,6 @@ public final class Permissions {
     public static final String RTP_USE = "mysticessentials.teleport.rtp.use";
     public static final String RTP_CANCEL = "mysticessentials.teleport.rtp.cancel";
     public static final String RTP_STATUS = "mysticessentials.teleport.rtp.status";
-    public static final String RTP_BIOME = "mysticessentials.teleport.rtp.biome";
     public static final String RTP_OTHERS = "mysticessentials.teleport.rtp.others";
     public static final String RTP_BYPASS_WARMUP = "mysticessentials.teleport.rtp.bypass.warmup";
     public static final String RTP_BYPASS_COOLDOWN = "mysticessentials.teleport.rtp.bypass.cooldown";

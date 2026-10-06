@@ -131,7 +131,6 @@ public final class DefaultMessages {
         o.addProperty("rtp-info-unknown", "&cUnknown random-teleport profile: &f{name}");
         o.addProperty("rtp-usage-world", "&7Usage: &f/rtp world <world> [player]");
         o.addProperty("rtp-usage-profile", "&7Usage: &f/rtp profile <profile> [player]");
-        o.addProperty("rtp-usage-biome", "&7Usage: &f/rtp biome <biome>");
         o.addProperty("rtp-admin-reloaded", "&aReloaded random teleport ({count} profiles).");
         o.addProperty("rtp-admin-test-start", "&7Testing profile &f{profile}&7...");
         o.addProperty("rtp-admin-test-found", "&aFound: &f{x}, {y}, {z} &7in {attempts} attempts.");

@@ -29,6 +29,8 @@ All nodes are prefixed `mysticessentials.`.
 | `mysticessentials.teleport.back` | `/back` |
 | `mysticessentials.teleport.bypass.warmup` | Skip teleport warmups |
 | `mysticessentials.teleport.bypass.cooldown` | Skip teleport cooldowns |
+| `mysticessentials.teleport.rtp.bypass.cost` | Your own `/rtp` is never charged; allows the `/rtp ... --bypass-cost` flag |
+| `mysticessentials.teleport.rtp.admin.force` | `/rtp ... --force` (skip the permission, cooldown, limit, cost and warmup checks) and `--silent` |
 
 ## Spawn & Homes
 

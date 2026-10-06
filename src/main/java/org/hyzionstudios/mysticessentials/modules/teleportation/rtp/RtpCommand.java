@@ -27,13 +27,13 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
  * /rtp &lt;player&gt;                admin: another online player
  * /rtp world &lt;world&gt; [player]
  * /rtp profile &lt;profile&gt; [player]
- * /rtp biome &lt;biome&gt;
  * /rtp cancel | status | info [world/profile]
  * </pre>
  *
- * Trailing {@code --force}, {@code --silent}, {@code --bypass-cost} flags need
- * {@code rtp.admin.force}. They are declared flag arguments: the engine parses
- * every {@code --name} token itself and rejects undeclared ones before the
+ * Trailing {@code --force} and {@code --silent} flags need {@code rtp.admin.force};
+ * {@code --bypass-cost} needs {@code rtp.bypass.cost}. They are declared flag
+ * arguments: the engine parses every {@code --name} token itself and rejects
+ * undeclared ones, and ones the sender lacks the permission for, before the
  * command runs.
  */
 final class RtpCommand extends MysticCommand {
@@ -46,7 +46,7 @@ final class RtpCommand extends MysticCommand {
             .setPermission(Permissions.RTP_ADMIN_FORCE);
     private final FlagArg bypassCostFlag = withFlagArg("bypass-cost", "Do not charge the RTP cost.")
             .addAliases("bypasscost")
-            .setPermission(Permissions.RTP_ADMIN_FORCE);
+            .setPermission(Permissions.RTP_BYPASS_COST);
 
     RtpCommand(MysticCore core, RtpSubsystem rtp) {
         super(core, "rtp", "Randomly teleport to a safe location.");
@@ -80,7 +80,7 @@ final class RtpCommand extends MysticCommand {
                 if (uiDefault && sender.isPlayer()) {
                     openMenu(sender);
                 } else {
-                    runRtp(sender, null, null, null, null, flags);
+                    runRtp(sender, null, null, null, flags);
                 }
             }
             case "menu", "ui" -> openMenu(sender);
@@ -91,32 +91,23 @@ final class RtpCommand extends MysticCommand {
                 if (args.size() < 2) {
                     sender.replyKey("rtp-usage-world");
                 } else {
-                    runRtp(sender, args.size() > 2 ? args.get(2) : null, null, args.get(1), null, flags);
+                    runRtp(sender, args.size() > 2 ? args.get(2) : null, null, args.get(1), flags);
                 }
             }
             case "profile" -> {
                 if (args.size() < 2) {
                     sender.replyKey("rtp-usage-profile");
                 } else {
-                    runRtp(sender, args.size() > 2 ? args.get(2) : null, args.get(1), null, null, flags);
-                }
-            }
-            case "biome" -> {
-                if (!sender.hasPermission(Permissions.RTP_BIOME)) {
-                    sender.replyKey("no-permission");
-                } else if (args.size() < 2) {
-                    sender.replyKey("rtp-usage-biome");
-                } else {
-                    runRtp(sender, null, null, null, args.get(1), flags);
+                    runRtp(sender, args.size() > 2 ? args.get(2) : null, args.get(1), null, flags);
                 }
             }
             // Anything else is treated as a target player name (admin form).
-            default -> runRtp(sender, args.get(0), null, null, null, flags);
+            default -> runRtp(sender, args.get(0), null, null, flags);
         }
     }
 
     private void runRtp(MysticCommandSender sender, String targetName, String profileId, String world,
-            String biome, Flags flags) {
+            Flags flags) {
         UUID actor = sender.isPlayer() ? sender.uuid() : null;
         UUID targetUuid;
         boolean adminInitiated;
@@ -147,7 +138,6 @@ final class RtpCommand extends MysticCommand {
         RtpRequest request = RtpRequest.builder(targetUuid)
                 .profileId(profileId)
                 .world(world)
-                .biome(biome)
                 .actor(actor)
                 .force(flags.force || adminInitiated)
                 .silent(flags.silent)
