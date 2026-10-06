@@ -717,7 +717,9 @@ Notable per-module settings:
   `itemId`, overflow drops), and `command` (runs `command` as the console with
   `{player}`/`{uuid}` placeholders). `weight` sets relative odds, an optional
   `message` overrides the default reward message, and `maxRollsPerDay` caps
-  total rolls per player per day (`0` = unlimited). Example:
+  total rolls per player per day (`0` = unlimited). The daily counts behind
+  `maxDailyReward` and `maxRollsPerDay` are kept per player per UTC day in the
+  player profile, so a restart or relog does not reset them. Example:
 
   ```json
   "rewardPool": [
