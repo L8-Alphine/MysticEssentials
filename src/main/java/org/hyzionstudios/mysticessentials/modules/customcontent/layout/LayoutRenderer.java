@@ -55,6 +55,8 @@ public final class LayoutRenderer {
     /** Namespace for this surface's generated ids; see {@link UiAssets}. */
     private final String prefix;
     private int nextSelector;
+    /** Selector of the node whose content is being rendered, {@code null} at the root. */
+    private String enclosing;
 
     private record Binding(CustomUIEventBindingType type, String selector, String action, UiNode node,
             String nodeSelector, String valueSelector) {
@@ -149,7 +151,7 @@ public final class LayoutRenderer {
     private void renderNode(UiNode node, String parentSelector, UiStyle.Flow parentFlow,
             Integer gap, Integer cellWidth) {
         String selector = nextSelector();
-        rendered.register(selector, node);
+        rendered.register(selector, node, enclosing);
 
         // A requirement that fails hides the node rather than dropping it, so a
         // refresh can reveal it later without rebuilding the page.
@@ -158,6 +160,10 @@ public final class LayoutRenderer {
             rendered.registerGated(node, selector);
         }
 
+        // Everything rendered while this node renders is inside it, so a click
+        // can be checked against every enclosing requirement.
+        String outer = enclosing;
+        enclosing = selector;
         switch (node.kind) {
             case CHROME_BUTTON ->
                     renderChromeButton(node, selector, parentSelector, parentFlow, gap, cellWidth);
@@ -167,6 +173,7 @@ public final class LayoutRenderer {
             case PROGRESS -> renderProgress(node, selector, parentSelector, parentFlow, gap, cellWidth);
             default -> renderElement(node, selector, parentSelector, parentFlow, gap, cellWidth);
         }
+        enclosing = outer;
 
         if (!visible) {
             cmd.set(selector + ".Visible", false);

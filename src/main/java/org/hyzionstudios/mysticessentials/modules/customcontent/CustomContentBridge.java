@@ -30,6 +30,7 @@ final class CustomContentBridge implements LayoutBridge {
     private Method substituteVariables;
     private volatile BiConsumer<PlayerRef, String> guiOpener = (player, id) -> {
     };
+    private volatile boolean warnedUncheckedRequirements;
 
     CustomContentBridge(MysticCore core, CustomContentConfig config) {
         this.core = core;
@@ -83,7 +84,14 @@ final class CustomContentBridge implements LayoutBridge {
             return true;
         }
         if (!connected() || meetsRequirements == null) {
-            return true;
+            // Nothing can check (or consume) them: fail closed, so a gated
+            // element stays hidden and unclickable instead of free for all.
+            if (!warnedUncheckedRequirements) {
+                warnedUncheckedRequirements = true;
+                core.log(Level.WARNING, "[customcontent] GUI requirements " + requirements
+                        + " cannot be checked without the compatibility plugin; gated elements stay hidden.");
+            }
+            return false;
         }
         try {
             return Boolean.TRUE.equals(meetsRequirements.invoke(api, player, requirements));

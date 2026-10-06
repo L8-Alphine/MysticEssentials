@@ -30,6 +30,8 @@ public final class RenderedLayout {
     }
 
     private final Map<String, UiNode> nodesBySelector = new LinkedHashMap<>();
+    /** Node selector to the selector of the node it was rendered inside. */
+    private final Map<String, String> parents = new LinkedHashMap<>();
     private final Map<String, String> inputSelectors = new LinkedHashMap<>();
     private final List<Live> live = new ArrayList<>();
     private final List<Gated> gated = new ArrayList<>();
@@ -38,8 +40,12 @@ public final class RenderedLayout {
     private final Set<String> emitted = new LinkedHashSet<>();
     private final List<String> problems = new ArrayList<>();
 
-    void register(String selector, UiNode node) {
+    /** @param parent selector of the node {@code node} was rendered inside, or {@code null} at the root */
+    void register(String selector, UiNode node, String parent) {
         nodesBySelector.put(selector, node);
+        if (parent != null) {
+            parents.put(selector, parent);
+        }
     }
 
     void registerEmitted(String selector) {
@@ -86,6 +92,20 @@ public final class RenderedLayout {
     /** @return the node an event payload refers to, or {@code null}. */
     UiNode node(String selector) {
         return selector == null ? null : nodesBySelector.get(selector);
+    }
+
+    /** @return the nodes enclosing {@code selector}'s node, innermost first. */
+    List<UiNode> ancestors(String selector) {
+        List<UiNode> ancestors = new ArrayList<>();
+        String current = selector == null ? null : parents.get(selector);
+        while (current != null) {
+            UiNode node = nodesBySelector.get(current);
+            if (node != null) {
+                ancestors.add(node);
+            }
+            current = parents.get(current);
+        }
+        return ancestors;
     }
 
     /** @return input name to element selector, for reading values on activation. */
