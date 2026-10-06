@@ -910,6 +910,11 @@ public final class ChannelsSubModule {
             pendingTransfers.remove(requestId);
             return ManageResult.NOT_TEMPORARY;
         }
+        if (!request.from().equals(temp.owner)) {
+            // Ownership changed since the offer (succession, forced transfer).
+            pendingTransfers.remove(requestId);
+            return ManageResult.EXPIRED;
+        }
         ManageResult eligibility = transferEligible(temp, target.getUuid());
         if (eligibility != ManageResult.OK) {
             pendingTransfers.remove(requestId);
@@ -997,6 +1002,8 @@ public final class ChannelsSubModule {
         temp.owner = newOwner;
         temp.ownerDisconnectedAt = null;
         cancelGrace(temp);
+        // Offers made by the previous owner no longer speak for the channel.
+        pendingTransfers.values().removeIf(req -> req.channelId().equals(id));
         // The new owner can no longer be a moderator/muted/restricted of their own channel.
         temp.moderators.remove(newOwner);
         temp.mutes.remove(newOwner);
