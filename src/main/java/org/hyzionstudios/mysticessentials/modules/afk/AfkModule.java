@@ -1009,7 +1009,16 @@ public final class AfkModule extends AbstractMysticModule implements AfkService 
                 }
             });
         }
-        rewards.keySet().retainAll(onlineUuids());
+        // The daily caps must survive a relog, so a logged-out player keeps today's
+        // entry (only its session part resets); entries from past days are dropped.
+        rewards.values().removeIf(state -> state.dayIndex != today);
+        Set<UUID> online = onlineUuids();
+        rewards.forEach((uuid, state) -> {
+            if (!online.contains(uuid)) {
+                state.session = 0;
+                state.nextRollAtMillis = 0;
+            }
+        });
     }
 
     /**
