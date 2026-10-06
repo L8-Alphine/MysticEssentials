@@ -20,6 +20,8 @@ public final class VaultItemStack {
     public double maxDurability;
     /** JSON form of the item's BSON metadata; {@code null} when the item has none. */
     public String metadata;
+    /** Quality id overriding the item's own quality; {@code null} when not overridden. */
+    public String quality;
 
     public VaultItemStack() {
     }
@@ -35,6 +37,8 @@ public final class VaultItemStack {
     }
 
     public VaultItemStack copy() {
-        return new VaultItemStack(slot, itemId, quantity, durability, maxDurability, metadata);
+        VaultItemStack copy = new VaultItemStack(slot, itemId, quantity, durability, maxDurability, metadata);
+        copy.quality = quality;
+        return copy;
     }
 }

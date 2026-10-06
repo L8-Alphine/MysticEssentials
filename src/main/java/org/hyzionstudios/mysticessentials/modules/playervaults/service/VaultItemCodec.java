@@ -27,8 +27,10 @@ public final class VaultItemCodec {
             return null;
         }
         String json = ItemStackMetadata.toJson(stack);
-        return new VaultItemStack(slot, stack.getItemId(), stack.getQuantity(),
+        VaultItemStack stored = new VaultItemStack(slot, stack.getItemId(), stack.getQuantity(),
                 stack.getDurability(), stack.getMaxDurability(), json);
+        stored.quality = ItemStackMetadata.customQuality(stack);
+        return stored;
     }
 
     /**
@@ -40,8 +42,8 @@ public final class VaultItemCodec {
         BsonDocument metadata = stored.metadata == null || stored.metadata.isBlank()
                 ? null
                 : BsonDocument.parse(stored.metadata);
-        return new ItemStack(stored.itemId, Math.max(1, stored.quantity),
-                stored.durability, stored.maxDurability, metadata);
+        return ItemStackMetadata.rebuild(stored.itemId, Math.max(1, stored.quantity),
+                stored.durability, stored.maxDurability, metadata, stored.quality);
     }
 
     /** @return {@code true} if this item id may not be stored in a vault. */

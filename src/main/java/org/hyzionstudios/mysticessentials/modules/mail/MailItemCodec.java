@@ -23,8 +23,10 @@ final class MailItemCodec {
             return null;
         }
         String json = ItemStackMetadata.toJson(stack);
-        return new MailAttachment(stack.getItemId(), Math.max(1, quantity),
+        MailAttachment stored = new MailAttachment(stack.getItemId(), Math.max(1, quantity),
                 stack.getDurability(), stack.getMaxDurability(), json);
+        stored.quality = ItemStackMetadata.customQuality(stack);
+        return stored;
     }
 
     /** Rebuilds a live item from a stored attachment, restoring full metadata. */
@@ -33,7 +35,7 @@ final class MailItemCodec {
         BsonDocument metadata = stored.metadata == null || stored.metadata.isBlank()
                 ? null
                 : BsonDocument.parse(stored.metadata);
-        return new ItemStack(stored.itemId, Math.max(1, stored.quantity),
-                stored.durability, stored.maxDurability, metadata);
+        return ItemStackMetadata.rebuild(stored.itemId, Math.max(1, stored.quantity),
+                stored.durability, stored.maxDurability, metadata, stored.quality);
     }
 }

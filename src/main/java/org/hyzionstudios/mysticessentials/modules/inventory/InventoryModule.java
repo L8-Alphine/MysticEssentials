@@ -224,6 +224,7 @@ public final class InventoryModule extends AbstractMysticModule {
             item.durability = stack.getDurability();
             item.maxDurability = stack.getMaxDurability();
             item.metadata = ItemStackMetadata.toJson(stack);
+            item.quality = ItemStackMetadata.customQuality(stack);
             slots.add(item);
         }
         return slots;
@@ -368,8 +369,8 @@ public final class InventoryModule extends AbstractMysticModule {
         BsonDocument metadata = item.metadata == null || item.metadata.isBlank()
                 ? null
                 : BsonDocument.parse(item.metadata);
-        return new ItemStack(item.itemId, Math.max(1, item.quantity),
-                item.durability, item.maxDurability, metadata);
+        return ItemStackMetadata.rebuild(item.itemId, Math.max(1, item.quantity),
+                item.durability, item.maxDurability, metadata, item.quality);
     }
 
     // ----- UI ------------------------------------------------------------------

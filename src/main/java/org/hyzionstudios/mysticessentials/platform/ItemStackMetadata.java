@@ -4,6 +4,7 @@ import org.bson.BsonDocument;
 import org.bson.BsonValue;
 
 import com.hypixel.hytale.codec.ExtraInfo;
+import com.hypixel.hytale.server.core.asset.type.item.config.ItemQuality;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 
 /**
@@ -33,5 +34,39 @@ public final class ItemStackMetadata {
     public static String toJson(ItemStack stack) {
         BsonDocument metadata = read(stack);
         return metadata == null || metadata.isEmpty() ? null : metadata.toJson();
+    }
+
+    /**
+     * The id of the stack's quality when it was overridden away from its item's
+     * own (e.g. {@code ItemStack#withQuality}), else {@code null}: nothing to store.
+     * Stored by id because quality indexes are assigned at asset load and are not
+     * stable across restarts.
+     */
+    public static String customQuality(ItemStack stack) {
+        try {
+            int index = stack.getQualityIndex();
+            if (index == stack.getItem().getQualityIndex()) {
+                return null;
+            }
+            ItemQuality quality = ItemQuality.getAssetMap().getAsset(index);
+            return quality == null ? null : quality.getId();
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Rebuilds a stored stack. A stored quality override is re-applied while that
+     * quality still exists; otherwise the item's own quality applies.
+     */
+    public static ItemStack rebuild(String itemId, int quantity, double durability, double maxDurability,
+            BsonDocument metadata, String quality) {
+        if (quality != null && !quality.isBlank()) {
+            int index = ItemQuality.getAssetMap().getIndex(quality);
+            if (ItemQuality.getAssetMap().getAsset(index) != null) {
+                return new ItemStack(itemId, quantity, durability, maxDurability, index, metadata);
+            }
+        }
+        return new ItemStack(itemId, quantity, durability, maxDurability, metadata);
     }
 }

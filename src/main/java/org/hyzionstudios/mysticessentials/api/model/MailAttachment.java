@@ -20,6 +20,8 @@ public final class MailAttachment {
     public double maxDurability;
     /** JSON form of the item's BSON metadata; {@code null} when the item has none. */
     public String metadata;
+    /** Quality id overriding the item's own quality; {@code null} when not overridden. */
+    public String quality;
 
     public MailAttachment() {
     }
@@ -34,6 +36,8 @@ public final class MailAttachment {
     }
 
     public MailAttachment copy() {
-        return new MailAttachment(itemId, quantity, durability, maxDurability, metadata);
+        MailAttachment copy = new MailAttachment(itemId, quantity, durability, maxDurability, metadata);
+        copy.quality = quality;
+        return copy;
     }
 }
