@@ -374,14 +374,15 @@ public final class ChatModule extends AbstractMysticModule implements ChatServic
             message = autoLinkPlainUrls(message);
         }
         message = expandTokens(message, viewer, mentioned);
-        // The player message is substituted after placeholder resolution so
-        // player content is never parsed for placeholders (design bible §17.3).
+        // The player message and the player-chosen nickname are substituted after
+        // placeholder resolution so player content is never parsed for
+        // placeholders (design bible §17.3).
         String finalMessage = message;
         UnaryOperator<String> literalPipe = literal -> core.getMessageService()
                 .resolvePlaceholders(uuid, literal
                         .replace("{player_name}", sender.getUsername())
-                        .replace("{display_name}", displayName)
                         .replace("{channel}", channelName))
+                .replace("{display_name}", displayName)
                 .replace("{message}", finalMessage);
 
         return core.getMessageService().colorize(literalPipe.apply(template));
@@ -391,7 +392,16 @@ public final class ChatModule extends AbstractMysticModule implements ChatServic
         return core.getPlayerProfileService().getCached(sender.getUuid())
                 .map(p -> p.getMetadata().get("nickname"))
                 .filter(nick -> nick != null && !nick.isBlank())
+                .map(ChatModule::colorTagsOnly)
                 .orElse(sender.getUsername());
+    }
+
+    /**
+     * Nicknames stored before the Nick module filtered them may carry link,
+     * translation or other tags; only colour tags are rendered into chat lines.
+     */
+    private static String colorTagsOnly(String nickname) {
+        return nickname.replaceAll("(?i)<(?!/?(?:(?:c|color):)?#[0-9a-f]{3}(?:[0-9a-f]{3})?>)[^>]*>", "");
     }
 
     String sanitizeColors(PlayerRef sender, String content) {
