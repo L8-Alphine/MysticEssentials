@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.UnaryOperator;
 import java.util.logging.Level;
 
 import org.hyzionstudios.mysticessentials.api.service.MessageService;
@@ -20,10 +21,11 @@ import com.hypixel.hytale.server.core.receiver.IMessageReceiver;
  * loaded message bundle so every module produces consistent output.
  *
  * <p>Pipeline order (per design): internal placeholders &rarr; PlaceholderAPI
- * &rarr; color/gradient/MiniMessage parse &rarr; Hytale {@link Message}. The
- * placeholder stages are wired to the Core services; the color stage is handled
- * by {@link MysticText}, which builds a coloured {@link Message} tree from
- * legacy, hex, gradient, rainbow, and MiniMessage-style markup.</p>
+ * &rarr; {@code {key}} params &rarr; color/gradient/MiniMessage parse &rarr; Hytale
+ * {@link Message}. The placeholder stages are wired to the Core services; the
+ * color stage is handled by {@link MysticText}, which builds a coloured
+ * {@link Message} tree from legacy, hex, gradient, rainbow, and MiniMessage-style
+ * markup.</p>
  */
 public final class MessageServiceImpl implements MessageService {
 
@@ -69,7 +71,7 @@ public final class MessageServiceImpl implements MessageService {
         if (raw == null) {
             return Message.empty();
         }
-        return formatFor(null, substitute(raw, params));
+        return colorize(fillParams(raw, params, text -> resolvePlaceholders(null, text)));
     }
 
     @Override
@@ -109,7 +111,8 @@ public final class MessageServiceImpl implements MessageService {
 
     @Override
     public String plainFromKey(String key, Map<String, String> params) {
-        return MysticText.stripMarkup(resolvePlaceholders(null, substitute(lookup(key), params)));
+        return MysticText.stripMarkup(
+                fillParams(lookup(key), params, text -> resolvePlaceholders(null, text)));
     }
 
     @Override
@@ -140,12 +143,42 @@ public final class MessageServiceImpl implements MessageService {
         return key;
     }
 
-    private static String substitute(String raw, Map<String, String> params) {
-        String result = raw;
-        for (Map.Entry<String, String> entry : params.entrySet()) {
-            result = result.replace("{" + entry.getKey() + "}", entry.getValue());
+    /**
+     * Resolves placeholders in {@code raw} and fills its {@code {key}} params, in that
+     * order: {@code placeholders} only sees the template text around the param tokens,
+     * and each value is inserted verbatim afterwards. Player text passed as a param (a
+     * PM body, a mute reason, a nickname...) can therefore never expand a {@code {name}}
+     * or {@code %name%} placeholder, nor another param's token, while a param still wins
+     * over a placeholder of the same name. Values are not escaped: their colour markup
+     * still renders when the result is colourized.
+     */
+    static String fillParams(String raw, Map<String, String> params, UnaryOperator<String> placeholders) {
+        if (params.isEmpty()) {
+            return placeholders.apply(raw);
         }
-        return result;
+        StringBuilder result = new StringBuilder(raw.length());
+        int literalStart = 0;
+        int open = raw.indexOf('{');
+        while (open >= 0) {
+            String value = null;
+            int close = -1;
+            for (Map.Entry<String, String> entry : params.entrySet()) {
+                String token = "{" + entry.getKey() + "}";
+                if (raw.startsWith(token, open)) {
+                    value = entry.getValue();
+                    close = open + token.length();
+                    break;
+                }
+            }
+            if (close < 0) {
+                open = raw.indexOf('{', open + 1);
+                continue;
+            }
+            result.append(placeholders.apply(raw.substring(literalStart, open))).append(value);
+            literalStart = close;
+            open = raw.indexOf('{', close);
+        }
+        return result.append(placeholders.apply(raw.substring(literalStart))).toString();
     }
 
     private static boolean mergeMissing(JsonObject target, JsonObject defaults) {

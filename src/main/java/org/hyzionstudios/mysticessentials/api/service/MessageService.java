@@ -10,16 +10,20 @@ import com.hypixel.hytale.server.core.receiver.IMessageReceiver;
  * Shared formatting pipeline used by every module so output looks consistent.
  *
  * <p>Formatting flows: raw string &rarr; internal placeholders &rarr;
- * PlaceholderAPI &rarr; color/gradient/MiniMessage parsing &rarr; Hytale
- * {@link Message}. A receiver is anything that can accept a message, including a
- * {@code PlayerRef} or the console.</p>
+ * PlaceholderAPI &rarr; {@code {key}} params &rarr; color/gradient/MiniMessage
+ * parsing &rarr; Hytale {@link Message}. A receiver is anything that can accept
+ * a message, including a {@code PlayerRef} or the console.</p>
  */
 public interface MessageService {
 
     /** Runs the full pipeline on a raw string and returns a ready-to-send Hytale {@link Message}. */
     Message format(String raw);
 
-    /** As {@link #format(String)} but substitutes {@code {key}} placeholders from {@code params} first. */
+    /**
+     * As {@link #format(String)} but fills {@code {key}} tokens from {@code params} after
+     * placeholder resolution: a value is inserted verbatim and never expands a placeholder,
+     * though its colour markup still renders. The {@code params} overloads below do the same.
+     */
     Message format(String raw, Map<String, String> params);
 
     /** Full pipeline with a player context, so internal and PlaceholderAPI placeholders resolve for that player. */
