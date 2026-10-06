@@ -45,6 +45,9 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.hypixel.hytale.registry.Registration;
+import com.hypixel.hytale.server.core.command.system.AbstractCommand;
+import com.hypixel.hytale.server.core.command.system.CommandManager;
+import com.hypixel.hytale.server.core.command.system.CommandRegistration;
 import com.hypixel.hytale.server.core.command.system.CommandSender;
 import com.hypixel.hytale.server.core.command.system.arguments.system.RequiredArg;
 import com.hypixel.hytale.server.core.command.system.arguments.types.ArgTypes;
@@ -91,7 +94,8 @@ public final class ChannelsSubModule {
     private final Map<String, TemporaryChannel> temporaryChannels = new ConcurrentHashMap<>();
     private final Map<UUID, TransferRequest> pendingTransfers = new ConcurrentHashMap<>();
     private final Set<String> seenRemoteMessages = ConcurrentHashMap.newKeySet();
-    private final Set<String> registeredAliases = ConcurrentHashMap.newKeySet();
+    /** Alias commands this submodule registered, by name, with their engine handles. */
+    private final Map<String, AliasCommand> aliasCommands = new ConcurrentHashMap<>();
     private final Set<String> subscribedRedisTopics = ConcurrentHashMap.newKeySet();
     private final Consumer<String> redisMessageHandler = this::handleRemoteChannelMessage;
     private final Consumer<String> redisStateHandler = this::handleRemoteState;
@@ -103,7 +107,6 @@ public final class ChannelsSubModule {
     private ChatConfig.Channels config = new ChatConfig.Channels();
     private Map<String, ChatConfig.Channel> configuredChannels = Map.of();
     private Map<String, String> aliasToChannel = Map.of();
-    private Consumer<MysticCommand> commandRegistrar;
     private Registration disconnectListener;
     private Registration connectListener;
     private boolean stateSubscribed;
@@ -115,10 +118,9 @@ public final class ChannelsSubModule {
     }
 
     public void enable(ChatConfig.Channels config, Consumer<MysticCommand> commandRegistrar) {
-        this.commandRegistrar = commandRegistrar;
         reload(config);
         commandRegistrar.accept(new ChannelCommand());
-        registerConfiguredAliasCommands(commandRegistrar);
+        registerConfiguredAliasCommands();
         disconnectListener = core.platform().onEvent(PlayerDisconnectEvent.class, (PlayerDisconnectEvent event) ->
                 handleDisconnect(event.getPlayerRef()));
         connectListener = core.platform().onEvent(PlayerConnectEvent.class, (PlayerConnectEvent event) ->
@@ -137,7 +139,7 @@ public final class ChannelsSubModule {
                 }
                 String id = normalize(channel.id);
                 next.put(id, channel);
-                indexAliases(aliases, channel);
+                indexAliases(aliases, channel, false);
                 if (channel.crossServer && !core.redis().isEnabled()) {
                     core.log(Level.WARNING, "Chat channel '" + channel.id
                             + "' is crossServer=true but Redis is disabled; messages will stay local until Redis works.");
@@ -164,7 +166,7 @@ public final class ChannelsSubModule {
         }
         loadRedisTemporaryChannels();
         for (TemporaryChannel temp : temporaryChannels.values()) {
-            indexAliases(aliases, temp.channel);
+            indexAliases(aliases, temp.channel, true);
         }
         aliasToChannel = aliases;
     }
@@ -189,6 +191,19 @@ public final class ChannelsSubModule {
         for (TemporaryChannel temp : temporaryChannels.values()) {
             cancelGrace(temp);
         }
+        // Unregistering removes whatever command holds the name by then, so only
+        // drop the alias commands that are still ours.
+        Map<String, AbstractCommand> registered = CommandManager.get().getCommandRegistration();
+        aliasCommands.forEach((name, alias) -> {
+            if (registered.get(name) == alias.command()) {
+                try {
+                    alias.registration().unregister();
+                } catch (Throwable ignored) {
+                    // One-shot handle; already gone or engine shutting down.
+                }
+            }
+        });
+        aliasCommands.clear();
         pendingTransfers.clear();
         speakChannels.clear();
         listeningChannels.clear();
@@ -1499,12 +1514,11 @@ public final class ChannelsSubModule {
         speakChannels.put(owner, id);
         listeningChannels(owner).add(id);
         publishTempCreated(id, owner);
+        // Player-chosen aliases resolve only inside /channel; they are never
+        // registered as top-level commands.
         Map<String, String> aliasesNext = new HashMap<>(aliasToChannel);
-        indexAliases(aliasesNext, channel);
+        indexAliases(aliasesNext, channel, true);
         aliasToChannel = aliasesNext;
-        if (commandRegistrar != null) {
-            registerAliasCommands(channel.aliases, commandRegistrar);
-        }
         saveRedisTemporaryChannel(id, temp);
         publishChannelState("update", id, temp.version);
         return true;
@@ -1893,10 +1907,10 @@ public final class ChannelsSubModule {
     private void rebuildAliasIndex() {
         Map<String, String> aliases = new HashMap<>();
         for (ChatConfig.Channel channel : configuredChannels.values()) {
-            indexAliases(aliases, channel);
+            indexAliases(aliases, channel, false);
         }
         for (TemporaryChannel temp : temporaryChannels.values()) {
-            indexAliases(aliases, temp.channel);
+            indexAliases(aliases, temp.channel, true);
         }
         aliasToChannel = aliases;
     }
@@ -1929,9 +1943,6 @@ public final class ChannelsSubModule {
                     continue;
                 }
                 temporaryChannels.put(normalize(temp.channel.id), temp);
-                if (commandRegistrar != null) {
-                    registerAliasCommands(temp.channel.aliases, commandRegistrar);
-                }
                 // Restored channels re-announce so external bridges reconcile after restart.
                 publishTempCreated(normalize(temp.channel.id), temp.owner);
             }
@@ -2084,43 +2095,69 @@ public final class ChannelsSubModule {
         return Math.max(1, config.temporaryChannelDefaultMinutes) * 60L;
     }
 
-    private void indexAliases(Map<String, String> aliases, ChatConfig.Channel channel) {
+    /**
+     * Indexes a channel's id and aliases. A temporary channel's names never replace
+     * an entry that is already indexed, so a player-chosen alias such as "global"
+     * cannot redirect another channel (configured channels are indexed first).
+     */
+    private void indexAliases(Map<String, String> aliases, ChatConfig.Channel channel, boolean temporary) {
         if (channel == null || channel.id == null || channel.id.isBlank()) {
             return;
         }
         String channelId = normalize(channel.id);
-        aliases.put(channelId, channelId);
+        indexAlias(aliases, channelId, channelId, temporary);
         if (channel.aliases == null) {
             return;
         }
         for (String alias : channel.aliases) {
             String normalized = normalizeAlias(alias);
             if (!normalized.isBlank()) {
-                aliases.put(normalized, channelId);
+                indexAlias(aliases, normalized, channelId, temporary);
             }
         }
     }
 
-    private void registerConfiguredAliasCommands(Consumer<MysticCommand> registrar) {
-        if (registrar == null || config.channels == null) {
-            return;
-        }
-        for (ChatConfig.Channel channel : config.channels) {
-            registerAliasCommands(channel.aliases, registrar);
+    private static void indexAlias(Map<String, String> aliases, String alias, String channelId, boolean temporary) {
+        if (temporary) {
+            aliases.putIfAbsent(alias, channelId);
+        } else {
+            aliases.put(alias, channelId);
         }
     }
 
-    private void registerAliasCommands(List<String> aliases, Consumer<MysticCommand> registrar) {
-        if (aliases == null || registrar == null) {
+    private void registerConfiguredAliasCommands() {
+        if (config.channels == null) {
+            return;
+        }
+        for (ChatConfig.Channel channel : config.channels) {
+            registerAliasCommands(channel.aliases);
+        }
+    }
+
+    /**
+     * Registers configured channel aliases as top-level commands. The engine replaces
+     * a command of the same name without a check, so a name it already resolves is
+     * skipped (still usable as {@code /channel <alias>}) instead of being taken over.
+     */
+    private void registerAliasCommands(List<String> aliases) {
+        if (aliases == null) {
             return;
         }
         for (String alias : aliases) {
             String normalized = normalizeAlias(alias);
-            if (normalized.isBlank() || "channel".equals(normalized) || "ch".equals(normalized)) {
+            if (normalized.isBlank() || "channel".equals(normalized) || "ch".equals(normalized)
+                    || aliasCommands.containsKey(normalized)) {
                 continue;
             }
-            if (registeredAliases.add(normalized)) {
-                registrar.accept(new ChannelAliasCommand(normalized));
+            if (CommandManager.get().resolveCommand(normalized) != null) {
+                core.log(Level.WARNING, "Chat channel alias '/" + normalized
+                        + "' is already a command; it was not registered (use /channel " + normalized + ").");
+                continue;
+            }
+            ChannelAliasCommand command = new ChannelAliasCommand(normalized);
+            CommandRegistration registration = core.platform().registerCommand(command);
+            if (registration != null) {
+                aliasCommands.put(normalized, new AliasCommand(command, registration));
             }
         }
     }
@@ -2179,7 +2216,9 @@ public final class ChannelsSubModule {
         for (String alias : channel.aliases) {
             String normalized = normalizeAlias(alias);
             if (!normalized.isBlank()) {
-                aliases.add("/" + normalized);
+                // Only registered alias commands are typed with a slash; the rest
+                // (temporary-channel aliases) work as /channel <alias>.
+                aliases.add(aliasCommands.containsKey(normalized) ? "/" + normalized : normalized);
             }
         }
         return aliases;
@@ -2289,6 +2328,10 @@ public final class ChannelsSubModule {
 
     /** A pending ownership-transfer request awaiting the target's acceptance (§9). */
     private record TransferRequest(UUID requestId, String channelId, UUID from, UUID to, Instant expiresAt) {
+    }
+
+    /** A configured-alias command this submodule registered, with its engine handle. */
+    private record AliasCommand(ChannelAliasCommand command, CommandRegistration registration) {
     }
 
     /** Channel ids the sender can see. */
