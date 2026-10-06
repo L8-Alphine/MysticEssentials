@@ -523,6 +523,9 @@ public final class CustomContentModule extends AbstractMysticModule {
         GuiAliasCommand(String name, String guiId) {
             super(CustomContentModule.this.core, name, "Open the " + guiId + " CustomGUI.");
             this.guiId = guiId;
+            // A player-facing shortcut: what the GUI may do is gated by its own
+            // requirements and actions (server actions need the admin node).
+            requireNoPermission();
         }
 
         @Override

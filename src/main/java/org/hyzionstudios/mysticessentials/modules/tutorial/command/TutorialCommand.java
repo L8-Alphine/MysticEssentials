@@ -45,6 +45,9 @@ public final class TutorialCommand extends MysticCommand {
         super(core, "tutorial", "Play and manage server tutorials.");
         this.module = module;
         allowExtraArguments();
+        // Every subcommand checks its own tutorial node (TutorialCommandPermissions);
+        // the engine's generated node would make even /tutorial skip op-only.
+        requireNoPermission();
     }
 
     @Override

@@ -345,6 +345,9 @@ public final class PatchNotesModule extends AbstractMysticModule {
 
             OpenCommand() {
                 super(PatchNotesModule.this.core, "open", "Open patch notes (optionally for another player).");
+                // Declared, not left to the engine: its generated node (the
+                // parent's node + ".open") is one players are never granted.
+                requirePermission(Permissions.PATCHNOTES_VIEW);
             }
 
             @Override
@@ -394,6 +397,7 @@ public final class PatchNotesModule extends AbstractMysticModule {
 
             MarkReadCommand() {
                 super(PatchNotesModule.this.core, "markread", "Mark all patch notes as read.");
+                requirePermission(Permissions.PATCHNOTES_VIEW);
             }
 
             @Override
@@ -423,6 +427,7 @@ public final class PatchNotesModule extends AbstractMysticModule {
         private final class ListCommand extends MysticCommand {
             ListCommand() {
                 super(PatchNotesModule.this.core, "list", "List patch notes in chat.");
+                requirePermission(Permissions.PATCHNOTES_VIEW);
             }
 
             @Override
