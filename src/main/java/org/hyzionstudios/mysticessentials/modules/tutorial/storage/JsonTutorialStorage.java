@@ -1,6 +1,7 @@
 package org.hyzionstudios.mysticessentials.modules.tutorial.storage;
 
 import java.nio.file.Path;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -30,6 +31,8 @@ public final class JsonTutorialStorage implements TutorialStorage {
 
     private final Map<UUID, TutorialPlayerData> cache = new ConcurrentHashMap<>();
     private final Set<UUID> dirty = ConcurrentHashMap.newKeySet();
+    /** Unloads whose save is still running; a load (quick rejoin) cancels the eviction. Guarded by itself. */
+    private final Map<UUID, Object> unloading = new HashMap<>();
     private ScheduledFuture<?> autosaveTask;
 
     public JsonTutorialStorage(MysticCore core, String moduleId) {
@@ -52,7 +55,13 @@ public final class JsonTutorialStorage implements TutorialStorage {
 
     @Override
     public CompletableFuture<TutorialPlayerData> load(UUID playerId, String username) {
-        TutorialPlayerData existing = cache.get(playerId);
+        TutorialPlayerData existing;
+        synchronized (unloading) {
+            // A rejoin while the quit save runs keeps using the cached instance,
+            // so that instance must not be evicted afterwards.
+            unloading.remove(playerId);
+            existing = cache.get(playerId);
+        }
         if (existing != null) {
             return CompletableFuture.completedFuture(existing);
         }
@@ -99,9 +108,18 @@ public final class JsonTutorialStorage implements TutorialStorage {
 
     @Override
     public CompletableFuture<Void> unload(UUID playerId) {
+        Object token = new Object();
+        synchronized (unloading) {
+            unloading.put(playerId, token);
+        }
         return save(playerId).whenComplete((v, t) -> {
-            cache.remove(playerId);
-            dirty.remove(playerId);
+            synchronized (unloading) {
+                // Evict only if no load (a rejoin) happened since this unload began.
+                if (unloading.remove(playerId, token)) {
+                    cache.remove(playerId);
+                    dirty.remove(playerId);
+                }
+            }
         });
     }
 
@@ -122,12 +140,15 @@ public final class JsonTutorialStorage implements TutorialStorage {
     }
 
     private void writeQuietly(UUID playerId, TutorialPlayerData data) {
+        // Clear the mark before writing, so a change made during the write marks
+        // the entry dirty again instead of being forgotten.
+        dirty.remove(playerId);
         try {
             synchronized (data) {
                 Json.writeFile(fileFor(playerId), data);
             }
-            dirty.remove(playerId);
         } catch (Exception e) {
+            dirty.add(playerId);
             core.log(Level.SEVERE, "[" + moduleId + "] Failed to save player data for "
                     + playerId + ": " + e.getMessage());
         }
