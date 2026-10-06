@@ -33,7 +33,8 @@ import com.google.gson.JsonElement;
  */
 public final class PlayerProfileServiceImpl implements PlayerProfileService {
 
-    private static final String NAMESPACE = "players";
+    /** Storage namespace of the profile documents, keyed by UUID. */
+    public static final String NAMESPACE = "players";
     private static final String NAME_INDEX = "usernames";
 
     private final MysticCore core;
@@ -125,6 +126,27 @@ public final class PlayerProfileServiceImpl implements PlayerProfileService {
                 return Optional.<UUID>empty();
             }
         }).exceptionally(failure -> Optional.empty()); // e.g. a name that cannot be a storage key
+    }
+
+    @Override
+    public CompletableFuture<Optional<String>> lastKnownName(UUID uuid) {
+        if (uuid == null) {
+            return CompletableFuture.completedFuture(Optional.empty());
+        }
+        // Online here, then cached, then on another network server, then the stored profile.
+        Optional<String> live = core.platform().findPlayer(uuid).map(ref -> ref.getUsername())
+                .or(() -> getCached(uuid).map(PlayerProfile::getUsername))
+                .or(() -> core.networkPlayers() == null
+                        ? Optional.empty()
+                        : core.networkPlayers().find(uuid).map(player -> player.username()));
+        if (live.isPresent()) {
+            return CompletableFuture.completedFuture(live);
+        }
+        return core.getStorageService().load(NAMESPACE, uuid.toString()).thenApply(element -> {
+            PlayerProfile stored = element == null ? null : Json.fromJson(element, PlayerProfile.class);
+            return Optional.ofNullable(stored == null ? null : stored.getUsername())
+                    .filter(name -> !name.isBlank());
+        }).exceptionally(failure -> Optional.empty());
     }
 
     @Override

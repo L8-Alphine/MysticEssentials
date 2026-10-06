@@ -1866,7 +1866,7 @@ public final class ChannelsSubModule {
         for (PlayerRef recipient : core.managedAccounts().reachable(placeholderContext, listening,
                 ManagedAccountsBridge.TEXT_PUBLIC)) {
             // A player's line skips those who ignore them, as on the server it came from.
-            if (placeholderContext != null && chat.ignores(recipient.getUuid(), name)) {
+            if (placeholderContext != null && chat.ignores(recipient.getUuid(), placeholderContext, name)) {
                 continue;
             }
             recipient.sendMessage(core.getMessageService().colorize(rendered));

@@ -67,7 +67,7 @@ final class MentionSettingsPage extends MysticPage {
 
         toggle(cmd, event, "#DndToggle", "Do Not Disturb", preferences.doNotDisturb, "dnd");
 
-        int blocked = preferences.blockedNames().size();
+        int blocked = preferences.ignoredCount();
         cmd.set("#BlockedInfo.TextSpans", uiText("#BlockedInfo.TextSpans",
                 blocked == 0
                         ? "No blocked players. Use /ignore to hide someone's chat and mentions."

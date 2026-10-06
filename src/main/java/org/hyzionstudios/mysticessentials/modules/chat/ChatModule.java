@@ -230,9 +230,10 @@ public final class ChatModule extends AbstractMysticModule implements ChatServic
         }
         // Players who ignore the sender do not get the line; the sender keeps their own.
         if (event.getTargets() != null) {
+            UUID senderId = sender.getUuid();
             String senderName = sender.getUsername();
             event.setTargets(ChatDelivery.withoutIgnoring(event.getTargets(), PlayerRef::getUuid,
-                    sender.getUuid(), recipient -> ignores(recipient, senderName)));
+                    senderId, recipient -> ignores(recipient, senderId, senderName)));
         }
 
         List<PlayerRef> recipients = recipients(event, sender);
@@ -565,18 +566,21 @@ public final class ChatModule extends AbstractMysticModule implements ChatServic
         if (notifications == null || recipient == null || sender == null || recipient.equals(sender)) {
             return false;
         }
-        // The ignore list holds names, as /ignore and the /mentions settings store them.
+        // The name only matters for entries stored before the list was kept by UUID.
         String senderName = core.platform().findPlayer(sender).map(PlayerRef::getUsername)
                 .or(() -> core.getPlayerProfileService().getCached(sender).map(PlayerProfile::getUsername))
                 .orElse(null);
-        return ignores(recipient, senderName);
+        return ignores(recipient, sender, senderName);
     }
 
-    /** Whether {@code recipient} has the player named {@code senderName} on their ignore list. */
-    boolean ignores(UUID recipient, String senderName) {
+    /**
+     * Whether {@code recipient} ignores the sender, by UUID or (for an entry not yet
+     * resolved to a UUID) by {@code senderName}.
+     */
+    boolean ignores(UUID recipient, UUID sender, String senderName) {
         NotificationServiceImpl notifications = core.notifications();
-        return notifications != null && recipient != null && senderName != null
-                && notifications.preferences(recipient).blocks(senderName);
+        return notifications != null && recipient != null
+                && notifications.preferences(recipient).ignores(sender, senderName);
     }
 
     @Override

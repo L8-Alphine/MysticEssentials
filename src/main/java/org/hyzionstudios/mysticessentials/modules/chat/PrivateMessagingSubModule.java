@@ -7,6 +7,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
+import org.hyzionstudios.mysticessentials.api.Permissions;
 import org.hyzionstudios.mysticessentials.api.event.PrivateMessageEvent;
 import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.core.integration.ManagedAccountsBridge;
@@ -15,6 +16,8 @@ import org.hyzionstudios.mysticessentials.api.notification.Notification;
 import org.hyzionstudios.mysticessentials.api.notification.NotificationAudience;
 import org.hyzionstudios.mysticessentials.api.notification.NotificationCategory;
 import org.hyzionstudios.mysticessentials.api.notification.NotificationPriority;
+import org.hyzionstudios.mysticessentials.core.notification.NotificationPreferences;
+import org.hyzionstudios.mysticessentials.core.notification.NotificationServiceImpl;
 import org.hyzionstudios.mysticessentials.core.util.Json;
 import org.hyzionstudios.mysticessentials.platform.command.MysticArgTypes;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommand;
@@ -25,15 +28,21 @@ import com.hypixel.hytale.server.core.command.system.arguments.system.RequiredAr
 import com.hypixel.hytale.server.core.command.system.arguments.types.ArgTypes;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 
-/** Private messaging, reply targets, social spy, Redis relay, and offline-mail fallback. */
+/**
+ * Private messaging, reply targets, social spy, Redis relay, and offline-mail fallback.
+ * A target who ignores the sender ({@code /ignore}) refuses their messages on every path.
+ */
 public final class PrivateMessagingSubModule {
 
     private static final String CHANNEL_PM = "pm";
+    /** Tells a sender's server that a relayed message was refused on the target's server. */
+    private static final String CHANNEL_PM_NOTICE = "pm-notice";
 
     private final MysticCore core;
     private final ChatModule chat;
     private final Map<UUID, UUID> replyTargets = new ConcurrentHashMap<>();
     private final Consumer<String> redisHandler = this::handleRemotePm;
+    private final Consumer<String> noticeHandler = this::handleRemoteNotice;
 
     private ChatConfig.PrivateMessaging config = new ChatConfig.PrivateMessaging();
 
@@ -50,6 +59,7 @@ public final class PrivateMessagingSubModule {
         commandRegistrar.accept(new MessageCommand());
         commandRegistrar.accept(new ReplyCommand());
         core.redis().subscribe(CHANNEL_PM, redisHandler);
+        core.redis().subscribe(CHANNEL_PM_NOTICE, noticeHandler);
     }
 
     public void reload(ChatConfig.PrivateMessaging config) {
@@ -58,6 +68,7 @@ public final class PrivateMessagingSubModule {
 
     public void disable() {
         core.redis().unsubscribe(CHANNEL_PM, redisHandler);
+        core.redis().unsubscribe(CHANNEL_PM_NOTICE, noticeHandler);
         replyTargets.clear();
     }
 
@@ -86,8 +97,15 @@ public final class PrivateMessagingSubModule {
             return CompletableFuture.completedFuture(false);
         }
         String fromName = sender.map(PlayerRef::getUsername).orElse("Server");
+        boolean exempt = sender.map(ref -> ref.hasPermission(Permissions.CHAT_IGNORE_EXEMPT)).orElse(false);
         String prepared = sender.map(ref -> chat.preparePlayerMessage(ref, message)).orElse(message);
+        NotificationServiceImpl notifications = core.notifications();
         if (target.isPresent()) {
+            if (notifications != null && refusedByIgnore(notifications.preferences(target.get().getUuid()),
+                    from, fromName, exempt)) {
+                refuse(sender, target.get().getUsername());
+                return CompletableFuture.completedFuture(false);
+            }
             deliverLocalPm(from, fromName, target.get(), prepared);
             return CompletableFuture.completedFuture(true);
         }
@@ -96,12 +114,27 @@ public final class PrivateMessagingSubModule {
         // instead of a relay nobody receives.
         NetworkPlayer remote = remotePlayer(to).orElse(null);
         if (remote != null) {
-            publishPm(from.toString(), fromName, to.toString(), null, prepared);
+            // The target's ignore list lives on their server, which judges the message
+            // there and sends a refusal back (handleRemotePm, handleRemoteNotice).
+            publishPm(from.toString(), fromName, to.toString(), null, prepared, exempt);
             echoToSender(from, remote.username(), prepared);
             return CompletableFuture.completedFuture(true);
         }
         if (config.offlineToMail && core.getMailService() != null) {
-            return core.getMailService().send(from, fromName, to, prepared).thenApply(ignored -> true);
+            // An offline target's ignore list is read from their stored profile.
+            CompletableFuture<Boolean> refused = notifications == null || exempt
+                    ? CompletableFuture.completedFuture(false)
+                    : notifications.storedPreferences(to).thenApply(stored ->
+                            refusedByIgnore(stored, from, fromName, false));
+            return refused.thenCompose(ignoredBy -> {
+                if (ignoredBy) {
+                    return core.getPlayerProfileService().lastKnownName(to).thenApply(name -> {
+                        refuse(sender, name.orElse("that player"));
+                        return false;
+                    });
+                }
+                return core.getMailService().send(from, fromName, to, prepared).thenApply(ignored -> true);
+            });
         }
         return CompletableFuture.completedFuture(false);
     }
@@ -138,13 +171,33 @@ public final class PrivateMessagingSubModule {
                 from, fromName, target.getUuid(), target.getUsername(), message, false));
     }
 
+    /**
+     * Whether a target's ignore list ({@code /ignore}) refuses this sender: by UUID, or by
+     * name for an entry not yet resolved to one. Holders of
+     * {@link Permissions#CHAT_IGNORE_EXEMPT} always get through.
+     */
+    static boolean refusedByIgnore(NotificationPreferences targetPreferences, UUID from, String fromName,
+            boolean senderExempt) {
+        return !senderExempt && targetPreferences.ignores(from, fromName);
+    }
+
+    /**
+     * Tells the sender their message was not delivered, in the words a managed-account
+     * refusal uses, so it says no more about the target than a private message does.
+     */
+    private void refuse(Optional<PlayerRef> sender, String targetName) {
+        sender.ifPresent(ref -> core.getMessageService().sendKey(ref, "pm-blocked",
+                Map.of("target", targetName)));
+    }
+
     private void echoToSender(UUID from, String toLabel, String message) {
         core.platform().findPlayer(from).ifPresent(ref ->
                 core.getMessageService().sendKey(ref, "pm-sent",
                         Map.of("target", toLabel, "message", message)));
     }
 
-    private void publishPm(String fromUuid, String fromName, String toUuid, String toName, String message) {
+    private void publishPm(String fromUuid, String fromName, String toUuid, String toName, String message,
+            boolean ignoreExempt) {
         JsonObject envelope = new JsonObject();
         envelope.addProperty("fromUuid", fromUuid);
         envelope.addProperty("fromName", fromName);
@@ -155,6 +208,8 @@ public final class PrivateMessagingSubModule {
             envelope.addProperty("toName", toName);
         }
         envelope.addProperty("message", message);
+        // Whether the sender may not be ignored; their permissions are only known here.
+        envelope.addProperty("ignoreExempt", ignoreExempt);
         core.redis().publish(CHANNEL_PM, Json.toString(envelope));
     }
 
@@ -186,6 +241,16 @@ public final class PrivateMessagingSubModule {
                 ManagedAccountsBridge.TEXT_PRIVATE)) {
             return;
         }
+        // The target's ignore list is only here: refuse, and tell the sender's server.
+        boolean exempt = o.has("ignoreExempt") && o.get("ignoreExempt").getAsBoolean();
+        NotificationServiceImpl notifications = core.notifications();
+        if (notifications != null
+                && refusedByIgnore(notifications.preferences(target.getUuid()), fromUuid, fromName, exempt)) {
+            if (fromUuid != null) {
+                publishNotice(fromUuid, target.getUsername());
+            }
+            return;
+        }
         notifyPrivateMessage(target, fromName, message);
         if (fromUuid != null) {
             replyTargets.put(target.getUuid(), fromUuid);
@@ -193,6 +258,32 @@ public final class PrivateMessagingSubModule {
         notifySocialSpies(fromUuid, fromName, target, message);
         core.getEventBus().publish(new PrivateMessageEvent(
                 fromUuid, fromName, target.getUuid(), target.getUsername(), message, true));
+    }
+
+    private void publishNotice(UUID toUuid, String targetName) {
+        JsonObject notice = new JsonObject();
+        notice.addProperty("toUuid", toUuid.toString());
+        notice.addProperty("target", targetName);
+        core.redis().publish(CHANNEL_PM_NOTICE, Json.toString(notice));
+    }
+
+    /** A message this server relayed was refused on the target's server: tell its sender. */
+    private void handleRemoteNotice(String payload) {
+        if (!config.enabled || !config.allowCrossServer) {
+            return;
+        }
+        JsonObject o = Json.asObject(Json.parse(payload));
+        if (!o.has("toUuid")) {
+            return;
+        }
+        UUID sender;
+        try {
+            sender = UUID.fromString(o.get("toUuid").getAsString());
+        } catch (IllegalArgumentException e) {
+            return;
+        }
+        String targetName = o.has("target") ? o.get("target").getAsString() : "that player";
+        refuse(core.platform().findPlayer(sender), targetName);
     }
 
     private void notifySocialSpies(UUID fromUuid, String fromName, PlayerRef target, String message) {

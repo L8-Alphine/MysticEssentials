@@ -208,7 +208,7 @@ Bypass: `mysticessentials.craftblock.bypass` (all items) or
 |---|---|---|
 | `/msg <player> <message>` | Private message (aliases `/tell`, `/w`, `/whisper`) | — |
 | `/reply <message>` | Reply to your last PM (alias `/r`) | — |
-| `/ignore [player]` | Ignore a player (their chat lines and mentions are hidden from you); without a name, list who you ignore | `mysticessentials.chat.ignore` |
+| `/ignore [player]` | Ignore a player (their chat lines, mentions and private messages are kept from you, across renames); without a name, list who you ignore | `mysticessentials.chat.ignore` |
 | `/unignore <player>` | Stop ignoring a player | `mysticessentials.chat.ignore` |
 | `/channel` | Open the channel browser/menu (alias `/ch`) | — |
 | `/channel <name>` or `/channel switch <name> [password]` | Switch the channel you speak in | — |

@@ -123,8 +123,9 @@ public interface ChatService {
 
     /**
      * Whether {@code recipient} ignores {@code sender}: the sender is on the recipient's
-     * ignore list ({@code /ignore}, also shown in {@code /mentions}). Such a recipient gets
-     * none of the sender's public, channel or delivered chat lines nor their mentions.
+     * ignore list ({@code /ignore}, kept by UUID, also shown in {@code /mentions}). Such a
+     * recipient gets none of the sender's public, channel or delivered chat lines, mentions
+     * or private messages.
      * Always {@code false} for the same player.
      */
     default boolean isIgnoring(UUID recipient, UUID sender) {

@@ -152,9 +152,9 @@ public final class Permissions {
     public static final String CHAT_PRIVATE_REPLY = "mysticessentials.chat.private.reply";
     public static final String CHAT_SOCIALSPY = "mysticessentials.chat.socialspy";
     public static final String CHAT_SOCIALSPY_EXEMPT = "mysticessentials.chat.socialspy.exempt";
-    /** {@code /ignore} and {@code /unignore}: hide a player's chat lines and mentions. */
+    /** {@code /ignore} and {@code /unignore}: hide a player's chat lines, mentions and private messages. */
     public static final String CHAT_IGNORE = "mysticessentials.chat.ignore";
-    /** Cannot be added to anyone's ignore list (staff who must stay reachable). */
+    /** Cannot be added to anyone's ignore list, and private messages always get through (staff). */
     public static final String CHAT_IGNORE_EXEMPT = "mysticessentials.chat.ignore.exempt";
     public static final String CHAT_CHANNEL_CREATE_TEMP = "mysticessentials.chat.channel.create.temp";
     /** Dynamic: {@code mysticessentials.chat.channel.<id>[.speak|.listen|.moderator]}. */

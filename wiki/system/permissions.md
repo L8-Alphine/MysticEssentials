@@ -124,7 +124,7 @@ config page); players without it cannot use that portal.
 | `mysticessentials.chat.socialspy` | See other players' private messages |
 | `mysticessentials.chat.socialspy.exempt` | Hide a player's private messages from social spy |
 | `mysticessentials.chat.ignore` | `/ignore` and `/unignore` |
-| `mysticessentials.chat.ignore.exempt` | Cannot be added to anyone's ignore list |
+| `mysticessentials.chat.ignore.exempt` | Cannot be added to anyone's ignore list; private messages always get through |
 | `mysticessentials.chat.channel.create.temp` | Create temporary channels (up to `channels.maxTemporaryChannelsPerOwner` owned at once) |
 | `mysticessentials.chat.channel.<id>` | Dynamic per-channel gate |
 | `mysticessentials.chat.channel.<id>.speak` | Dynamic speak gate for a channel |

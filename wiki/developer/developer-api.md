@@ -247,8 +247,9 @@ The rules can also be asked directly:
   Mystic Essentials (temporary) channel; a server mute wins.
 - `isMuted(player)` — `activeMute(player).isPresent()`, shadow mutes included.
 - `isIgnoring(recipient, sender)` — whether the sender is on the recipient's
-  ignore list (`/ignore`; the blocked players of `/mentions`). Public and channel
-  chat skip such recipients too.
+  ignore list (`/ignore`, kept by UUID; the blocked players of `/mentions`).
+  Public and channel chat skip such recipients too, and their private messages
+  are refused.
 
 All of these are safe to call from any thread.
 

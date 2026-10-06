@@ -11,6 +11,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -128,6 +129,14 @@ public final class NotificationServiceImpl implements NotificationService {
     /** Persists a player's preferences after an edit through the settings UI. */
     public void savePreferences(UUID player) {
         store.savePreferences(player);
+    }
+
+    /**
+     * Preferences for a player who may be offline: the live ones while their profile is
+     * loaded, otherwise read from storage without caching. Defaults when unreadable.
+     */
+    public CompletableFuture<NotificationPreferences> storedPreferences(UUID player) {
+        return store.storedPreferences(player);
     }
 
     /** Flushes and drops a player's cached notification state on disconnect. */

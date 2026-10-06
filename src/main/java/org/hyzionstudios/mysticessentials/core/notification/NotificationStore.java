@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.function.Consumer;
@@ -20,6 +21,7 @@ import org.hyzionstudios.mysticessentials.api.notification.NotificationCategory;
 import org.hyzionstudios.mysticessentials.api.notification.NotificationPriority;
 import org.hyzionstudios.mysticessentials.api.notification.NotificationRecord;
 import org.hyzionstudios.mysticessentials.core.MysticCore;
+import org.hyzionstudios.mysticessentials.core.profile.PlayerProfileServiceImpl;
 import org.hyzionstudios.mysticessentials.core.util.Json;
 
 import com.google.gson.JsonArray;
@@ -76,7 +78,61 @@ final class NotificationStore {
         if (!profileLoaded(player)) {
             return new NotificationPreferences();
         }
-        return preferences.computeIfAbsent(player, this::loadPreferences);
+        boolean[] loaded = {false};
+        NotificationPreferences current = preferences.computeIfAbsent(player, id -> {
+            loaded[0] = true;
+            return loadPreferences(id);
+        });
+        if (loaded[0]) {
+            migrateIgnoredNames(player, current);
+        }
+        return current;
+    }
+
+    /**
+     * Resolves ignore-list names stored before the list was kept by UUID, once per load.
+     * A name no known player has yet is kept (and still applies by name) until a later
+     * load resolves it.
+     */
+    private void migrateIgnoredNames(UUID player, NotificationPreferences current) {
+        for (String name : current.pendingIgnoredNames()) {
+            core.getPlayerProfileService().resolveUuid(name).whenComplete((found, failure) -> {
+                if (found != null && found.isPresent()) {
+                    if (current.resolvePendingIgnore(name, found.get())) {
+                        savePreferences(player);
+                    }
+                } else {
+                    core.log(Level.INFO, "[notifications] Ignore list of " + player + ": '" + name
+                            + "' is not a known player yet; kept by name until it resolves.");
+                }
+            });
+        }
+    }
+
+    /**
+     * This player's preferences wherever they are: the live ones while their profile is
+     * loaded here, otherwise read from their stored profile without being cached (an
+     * offline player). Defaults when there are none or they cannot be read.
+     */
+    CompletableFuture<NotificationPreferences> storedPreferences(UUID player) {
+        if (player == null) {
+            return CompletableFuture.completedFuture(new NotificationPreferences());
+        }
+        if (profileLoaded(player)) {
+            return CompletableFuture.completedFuture(preferences(player));
+        }
+        return core.getStorageService().load(PlayerProfileServiceImpl.NAMESPACE, player.toString())
+                .thenApply(element -> {
+                    PlayerProfile profile = element == null ? null : Json.fromJson(element, PlayerProfile.class);
+                    JsonObject data = profile == null ? null : profile.getModuleData().get(MODULE_KEY);
+                    if (data == null || !data.has(PREFERENCES_FIELD)) {
+                        return new NotificationPreferences();
+                    }
+                    NotificationPreferences stored = Json.gson()
+                            .fromJson(data.get(PREFERENCES_FIELD), NotificationPreferences.class);
+                    return stored == null ? new NotificationPreferences() : stored.normalized();
+                })
+                .exceptionally(failure -> new NotificationPreferences());
     }
 
     private NotificationPreferences loadPreferences(UUID player) {
@@ -103,7 +159,7 @@ final class NotificationStore {
             return;
         }
         mutateModuleData(player, data -> {
-            // The ignore list is edited under this lock (NotificationPreferences.setBlocked).
+            // The ignore list is edited under this lock (NotificationPreferences.setIgnored).
             synchronized (current) {
                 data.add(PREFERENCES_FIELD, Json.toTree(current));
             }

@@ -491,7 +491,7 @@ api.getNotificationService().send(
   do-not-disturb can still find them in `/notifications`. Low and normal sends
   must explicitly opt in with `storeInHistory(true)`.
 - **Critical notifications bypass player preferences** unless the server sets
-  `notifications.critical.allow-player-disable`. That rule is enforced in one
+  `critical.allowPlayerDisable` in `notifications.json`. That rule is enforced in one
   place, not at each call site.
 
 - **Notification Center tabs are registerable.** Mystic Essentials ships only
@@ -523,7 +523,7 @@ api.getNotificationService().send(
   recipient's muted categories, disabled surfaces, and do-not-disturb. It is a
   per-send decision rather than a permission the sender simply holds, so a
   moderator's contact gets through while their ordinary chatter does not. It
-  still honours `notifications.critical.allow-player-disable`, so a server that
+  still honours `critical.allowPlayerDisable`, so a server that
   has explicitly handed control to players keeps that promise.
 
 ### Mention scopes
@@ -564,10 +564,11 @@ chat.registerMentionScope(new MentionScopeProvider() {
   in-memory lookup; a throw is treated as "no" and logged, never breaking the
   message.
 
-Config lives in `data/modules/core/notifications.json` (profiles + category
-catalogue), `data/modules/chat/item-view.json` (inspection + panel display), and
-`data/modules/chat/mentions.json` (matching, limits, and
-`rules.staff-bypass-player-settings`).
+Config lives in `modules/core/notifications.json` (profiles + category
+catalogue), `modules/chat/item-view.json` (inspection + panel display), and
+`modules/chat/mentions.json` (matching, limits, and rules such as
+`rules.staffBypassPlayerSettings`, `rules.ignoredPlayersCanNotNotify` and
+`rules.mutedPlayersCanNotNotify`).
 
 ### Chat from other mods (`ChatService.deliver`)
 
@@ -596,11 +597,17 @@ ChatDeliveryResult result = chat.deliver(senderId, memberIds, guild.name(), text
   unpublished means "allow"; installed but failing (`ModerationUnavailableException`)
   refuses the line with `chat-moderation-unavailable`.
 - **Ignores.** `isIgnoring(recipient, sender)` is the recipient's ignore list
-  (`/ignore`, `NotificationPreferences.blockedMentioners`, lower-case names edited
-  under the preferences' lock); such a recipient is skipped. Public chat
-  (`ChatDelivery.withoutIgnoring` on the event targets) and lines from other servers
-  (`deliverInbound`) apply the same list, and mentions honour it while
-  `rules.ignoredPlayersCanNotNotify` is on.
+  (`/ignore`, `NotificationPreferences.ignoredPlayers`, UUIDs edited under the
+  preferences' lock); such a recipient is skipped. Names stored before the list was
+  kept by UUID (`blockedMentioners`) are resolved with `PlayerProfileService.resolveUuid`
+  when the preferences load; an unresolved one is logged and keeps applying by name.
+  Public chat (`ChatDelivery.withoutIgnoring` on the event targets) and lines from
+  other servers (`deliverInbound`) apply the same list, mentions honour it while
+  `rules.ignoredPlayersCanNotNotify` is on, and private messages are refused on every
+  path: locally, on the target's server for a relayed one (a `pm-notice` Redis
+  message tells the sender's server, which replies `pm-blocked`), and from the stored
+  profile for an offline target's mail fallback. `mysticessentials.chat.ignore.exempt`
+  senders always get through (the relay carries the flag as `ignoreExempt`).
 - **Managed accounts.** Each recipient is judged on the pair with
   `TEXT_PUBLIC`, as for a cross-server channel line.
 - **Text safety.** The message goes through `preparePlayerMessage` (token

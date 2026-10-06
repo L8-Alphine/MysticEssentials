@@ -1,5 +1,6 @@
 package org.hyzionstudios.mysticessentials.modules.chat;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -8,6 +9,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
 import org.hyzionstudios.mysticessentials.api.Permissions;
+import org.hyzionstudios.mysticessentials.api.model.PlayerProfile;
 import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.core.notification.NotificationPreferences;
 import org.hyzionstudios.mysticessentials.core.notification.NotificationServiceImpl;
@@ -20,9 +22,10 @@ import com.hypixel.hytale.server.core.command.system.arguments.system.RequiredAr
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 
 /**
- * {@code /ignore} and {@code /unignore}: each player's ignore list, the blocked-players
- * list kept in their notification preferences (and shown in {@code /mentions}). An
- * ignored player's chat lines and mentions do not reach the player ignoring them.
+ * {@code /ignore} and {@code /unignore}: each player's ignore list, kept by UUID in
+ * their notification preferences (the blocked players {@code /mentions} counts). An
+ * ignored player's chat lines, mentions and private messages do not reach the player
+ * ignoring them. Lists show players by their current name.
  */
 final class IgnoreSubModule {
 
@@ -43,26 +46,26 @@ final class IgnoreSubModule {
     }
 
     /**
-     * Adds or removes {@code targetName} on {@code preferences}' ignore list.
+     * Adds or removes {@code target} on {@code preferences}' ignore list.
      *
-     * @param ownName      the name of the player whose list it is
+     * @param owner        the player whose list it is
      * @param targetExempt whether the target holds {@link Permissions#CHAT_IGNORE_EXEMPT}
      */
-    static Outcome apply(NotificationPreferences preferences, String ownName, String targetName,
-            boolean ignore, boolean targetExempt) {
+    static Outcome apply(NotificationPreferences preferences, UUID owner, UUID target, boolean ignore,
+            boolean targetExempt) {
         if (!ignore) {
-            return preferences.setBlocked(targetName, false) ? Outcome.REMOVED : Outcome.NOT_IGNORED;
+            return preferences.setIgnored(target, false) ? Outcome.REMOVED : Outcome.NOT_IGNORED;
         }
-        if (targetName.equalsIgnoreCase(ownName)) {
+        if (target.equals(owner)) {
             return Outcome.SELF;
         }
-        if (preferences.blocks(targetName)) {
+        if (preferences.ignores(target, null)) {
             return Outcome.ALREADY;
         }
         if (targetExempt) {
             return Outcome.EXEMPT;
         }
-        preferences.setBlocked(targetName, true);
+        preferences.setIgnored(target, true);
         return Outcome.ADDED;
     }
 
@@ -78,7 +81,7 @@ final class IgnoreSubModule {
         sender.replyKey(key, Map.of("player", targetName));
     }
 
-    /** The command sender's online player and notification engine, or a reply saying why not. */
+    /** The command sender's online player while notifications run, or a reply saying why not. */
     private Optional<PlayerRef> playerFor(MysticCommandSender sender) {
         PlayerRef player = sender.player().orElse(null);
         if (player == null) {
@@ -92,11 +95,36 @@ final class IgnoreSubModule {
         return Optional.of(player);
     }
 
+    /** A UUID for a typed name: the online player of that name, else any name seen before. */
+    private CompletableFuture<Optional<UUID>> resolve(String name) {
+        Optional<UUID> online = core.platform().findPlayerByName(name).map(PlayerRef::getUuid);
+        return online.isPresent()
+                ? CompletableFuture.completedFuture(online)
+                : core.getPlayerProfileService().resolveUuid(name);
+    }
+
+    /** A player's current name without touching storage: online here, cached, or on the network. */
+    private Optional<String> knownNameNow(UUID player) {
+        return core.platform().findPlayer(player).map(PlayerRef::getUsername)
+                .or(() -> core.getPlayerProfileService().getCached(player).map(PlayerProfile::getUsername))
+                .or(() -> core.networkPlayers() == null
+                        ? Optional.empty()
+                        : core.networkPlayers().find(player).map(found -> found.username()));
+    }
+
+    /** Suggestions for {@code /unignore}: the current names the sender's list resolves to now. */
     private List<String> ignoredNames(CommandSender commandSender) {
         NotificationServiceImpl notifications = core.notifications();
-        return notifications == null || commandSender.getUuid() == null
-                ? List.of()
-                : notifications.preferences(commandSender.getUuid()).blockedNames();
+        if (notifications == null || commandSender.getUuid() == null) {
+            return List.of();
+        }
+        NotificationPreferences preferences = notifications.preferences(commandSender.getUuid());
+        List<String> names = new ArrayList<>();
+        for (UUID id : preferences.ignoredIds()) {
+            knownNameNow(id).ifPresent(names::add);
+        }
+        names.addAll(preferences.pendingIgnoredNames());
+        return names;
     }
 
     /** {@code /ignore} lists the ignored players; {@code /ignore <player>} is the variant below. */
@@ -113,14 +141,27 @@ final class IgnoreSubModule {
             if (player == null) {
                 return;
             }
-            List<String> names = core.notifications().preferences(player.getUuid()).blockedNames();
-            if (names.isEmpty()) {
-                sender.replyKey("chat-ignore-list-empty");
-                return;
+            NotificationPreferences preferences = core.notifications().preferences(player.getUuid());
+            List<CompletableFuture<String>> names = new ArrayList<>();
+            for (UUID id : preferences.ignoredIds()) {
+                // The name the player goes by now, so a rename shows as such.
+                names.add(core.getPlayerProfileService().lastKnownName(id)
+                        .thenApply(found -> found.orElse(id.toString()))
+                        .exceptionally(failure -> id.toString()));
             }
-            sender.replyKey("chat-ignore-list", Map.of(
-                    "count", Integer.toString(names.size()),
-                    "players", String.join(", ", names)));
+            List<String> pending = preferences.pendingIgnoredNames();
+            CompletableFuture.allOf(names.toArray(CompletableFuture[]::new)).whenComplete((done, failure) -> {
+                List<String> shown = new ArrayList<>();
+                names.forEach(name -> shown.add(name.join()));
+                shown.addAll(pending);
+                if (shown.isEmpty()) {
+                    sender.replyKey("chat-ignore-list-empty");
+                    return;
+                }
+                sender.replyKey("chat-ignore-list", Map.of(
+                        "count", Integer.toString(shown.size()),
+                        "players", String.join(", ", shown)));
+            });
         }
     }
 
@@ -129,7 +170,7 @@ final class IgnoreSubModule {
                 MysticArgTypes.NETWORK_PLAYER_NAME);
 
         IgnorePlayerVariant() {
-            super(IgnoreSubModule.this.core, "Hide a player's chat and mentions.");
+            super(IgnoreSubModule.this.core, "Hide a player's chat, mentions and private messages.");
             requirePermission(Permissions.CHAT_IGNORE);
         }
 
@@ -143,11 +184,8 @@ final class IgnoreSubModule {
             // An online player is named as they spell it; anyone else must be known to
             // this server, so a typo does not silently fill the list.
             Optional<PlayerRef> online = core.platform().findPlayerByName(typed);
-            CompletableFuture<Optional<UUID>> resolved = online.isPresent()
-                    ? CompletableFuture.completedFuture(online.map(PlayerRef::getUuid))
-                    : core.getPlayerProfileService().resolveUuid(typed);
             String name = online.map(PlayerRef::getUsername).orElse(typed);
-            resolved.thenAccept(uuid -> {
+            resolve(typed).thenAccept(uuid -> {
                 if (uuid.isEmpty()) {
                     sender.replyKey("player-not-found");
                     return;
@@ -155,9 +193,11 @@ final class IgnoreSubModule {
                 boolean exempt = online.map(ref -> ref.hasPermission(Permissions.CHAT_IGNORE_EXEMPT))
                         .orElseGet(() -> core.getPermissionService().has(uuid.get(),
                                 Permissions.CHAT_IGNORE_EXEMPT));
-                Outcome outcome = apply(core.notifications().preferences(player.getUuid()),
-                        player.getUsername(), name, true, exempt);
-                if (outcome == Outcome.ADDED) {
+                NotificationPreferences preferences = core.notifications().preferences(player.getUuid());
+                // An entry for this name from before the list was kept by UUID moves to it.
+                boolean migrated = preferences.resolvePendingIgnore(typed, uuid.get());
+                Outcome outcome = apply(preferences, player.getUuid(), uuid.get(), true, exempt);
+                if (outcome == Outcome.ADDED || migrated) {
                     core.notifications().savePreferences(player.getUuid());
                 }
                 reply(sender, outcome, name);
@@ -181,12 +221,21 @@ final class IgnoreSubModule {
                 return;
             }
             String name = sender.get(target).trim();
-            Outcome outcome = apply(core.notifications().preferences(player.getUuid()),
-                    player.getUsername(), name, false, false);
-            if (outcome == Outcome.REMOVED) {
+            NotificationPreferences preferences = core.notifications().preferences(player.getUuid());
+            if (preferences.removePendingIgnore(name)) {
                 core.notifications().savePreferences(player.getUuid());
+                reply(sender, Outcome.REMOVED, name);
+                return;
             }
-            reply(sender, outcome, name);
+            resolve(name).thenAccept(uuid -> {
+                Outcome outcome = uuid.isEmpty()
+                        ? Outcome.NOT_IGNORED
+                        : apply(preferences, player.getUuid(), uuid.get(), false, false);
+                if (outcome == Outcome.REMOVED) {
+                    core.notifications().savePreferences(player.getUuid());
+                }
+                reply(sender, outcome, name);
+            });
         }
     }
 }

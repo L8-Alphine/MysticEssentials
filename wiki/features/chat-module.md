@@ -28,10 +28,17 @@ When `formatChat` is on, every message is rewritten through a permission-selecte
 
 `/ignore <player>` (`mysticessentials.chat.ignore`) hides that player's public and
 channel chat lines, the chat other mods hand to Mystic (guild, party...), and their
-mentions; `/ignore` alone lists who you ignore and `/unignore <player>` undoes it.
-The list is saved with your notification preferences and is the "blocked players"
-count shown in `/mentions`. You always see your own lines, you cannot ignore yourself,
-and players with `mysticessentials.chat.ignore.exempt` cannot be ignored.
+mentions, and refuses their private messages (`/msg`, `/reply`, across servers and
+as offline mail); `/ignore` alone lists who you ignore and `/unignore <player>` undoes
+it. The sender of a refused message is told they can't message you right now, the
+same reply any refused private message gets. The list is kept by UUID with your
+notification preferences, so a renamed player stays ignored and is listed under
+their current name; it is the "blocked players" count shown in `/mentions`. Names
+stored by older versions are resolved to players when you join; one that matches
+no known player yet keeps applying by name (and is logged) until it does. You
+always see your own lines, you cannot ignore yourself, and players with
+`mysticessentials.chat.ignore.exempt` cannot be ignored and always reach you by
+private message.
 
 Private messaging can deliver across servers over Redis (`allowCrossServer`): `/msg` tab-completes and resolves players on every server in the network, and a player online nowhere falls back to [mail](mail-module) (`offlineToMail`). **Social spy** (`mysticessentials.chat.socialspy`) lets staff monitor private messages; players with `mysticessentials.chat.socialspy.exempt` are hidden from it.
 

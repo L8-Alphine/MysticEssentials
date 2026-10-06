@@ -436,7 +436,7 @@ public final class MentionSubModule {
         NotificationServiceImpl notifications = core.notifications();
         if (notifications != null) {
             NotificationPreferences preferences = notifications.preferences(target.getUuid());
-            if (recipientRefuses(config.rules, preferences, sender.getUsername())) {
+            if (recipientRefuses(config.rules, preferences, sender.getUuid(), sender.getUsername())) {
                 return false;
             }
             if (!scopeAllows(preferences, sender.getUuid(), target.getUuid())) {
@@ -454,8 +454,9 @@ public final class MentionSubModule {
      * list (unless {@code rules.ignoredPlayersCanNotNotify} is off) or do-not-disturb.
      */
     public static boolean recipientRefuses(MentionConfig.Rules rules, NotificationPreferences preferences,
-            String senderName) {
-        return (rules.ignoredPlayersCanNotNotify && preferences.blocks(senderName)) || preferences.doNotDisturb;
+            UUID sender, String senderName) {
+        return (rules.ignoredPlayersCanNotNotify && preferences.ignores(sender, senderName))
+                || preferences.doNotDisturb;
     }
 
     /** Whether a sender may ping anyone, given whether they are muted. */

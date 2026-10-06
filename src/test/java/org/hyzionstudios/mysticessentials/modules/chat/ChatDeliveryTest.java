@@ -16,6 +16,7 @@ import org.hyzionstudios.mysticessentials.api.event.ChatDeliveredEvent;
 import org.hyzionstudios.mysticessentials.core.integration.ModerationBridge;
 import org.hyzionstudios.mysticessentials.core.integration.ModerationBridge.GuardVerdict;
 import org.hyzionstudios.mysticessentials.core.notification.NotificationPreferences;
+import org.hyzionstudios.mysticessentials.core.util.Json;
 import org.hyzionstudios.mysticessentials.modules.chat.mention.MentionConfig;
 import org.hyzionstudios.mysticessentials.modules.chat.mention.MentionSubModule;
 
@@ -24,7 +25,8 @@ import org.hyzionstudios.mysticessentials.modules.chat.mention.MentionSubModule;
  * shared with public chat: a muted sender is refused, a shadow-muted one is shown only
  * their own line, a chat guard or tutorial refusal blocks the line, ignoring, offline and
  * policy-blocked recipients are skipped, MysticModeration's mutes and chat guard verdicts
- * are read the way its own chat gates read them, {@code /ignore} edits the list, and the
+ * are read the way its own chat gates read them, {@code /ignore} edits the list (kept by
+ * UUID, older name entries migrated), the list refuses private messages, and the
  * mention rules follow their config switches.
  */
 public final class ChatDeliveryTest {
@@ -59,6 +61,8 @@ public final class ChatDeliveryTest {
         muteReasonsFallBackToADefault();
         chatGuardVerdictsAreReadLikeItsChatGate();
         ignoreCommandEditsTheList();
+        ignoreListIsKeptByUuidAndMigratesNames();
+        ignoredSendersCannotPrivateMessage();
         mentionRulesFollowTheirSwitches();
         deliveredEventsKeepTheirRecipients();
     }
@@ -194,33 +198,72 @@ public final class ChatDeliveryTest {
 
     private static void ignoreCommandEditsTheList() {
         NotificationPreferences preferences = new NotificationPreferences();
-        require(IgnoreSubModule.apply(preferences, "Steve", "Alex", true, false) == IgnoreSubModule.Outcome.ADDED,
+        require(IgnoreSubModule.apply(preferences, SENDER, MEMBER, true, false) == IgnoreSubModule.Outcome.ADDED,
                 "/ignore did not add a player");
-        require(preferences.blocks("ALEX") && preferences.blockedNames().equals(List.of("alex")),
-                "the ignore list is not case-insensitive: " + preferences.blockedNames());
-        require(IgnoreSubModule.apply(preferences, "Steve", "alex", true, false) == IgnoreSubModule.Outcome.ALREADY,
+        require(preferences.ignores(MEMBER, null) && preferences.ignoredIds().equals(List.of(MEMBER)),
+                "the ignore list did not keep the UUID: " + preferences.ignoredIds());
+        require(IgnoreSubModule.apply(preferences, SENDER, MEMBER, true, false) == IgnoreSubModule.Outcome.ALREADY,
                 "a second /ignore added a duplicate");
-        require(IgnoreSubModule.apply(preferences, "Steve", "steve", true, false) == IgnoreSubModule.Outcome.SELF,
+        require(IgnoreSubModule.apply(preferences, SENDER, SENDER, true, false) == IgnoreSubModule.Outcome.SELF,
                 "a player ignored themselves");
-        require(IgnoreSubModule.apply(preferences, "Steve", "Mod", true, true) == IgnoreSubModule.Outcome.EXEMPT
-                && !preferences.blocks("Mod"), "an exempt player was ignored");
-        require(IgnoreSubModule.apply(preferences, "Steve", "Alex", false, false) == IgnoreSubModule.Outcome.REMOVED
-                && !preferences.blocks("Alex"), "/unignore did not remove the player");
-        require(IgnoreSubModule.apply(preferences, "Steve", "Alex", false, false)
+        require(IgnoreSubModule.apply(preferences, SENDER, IGNORER, true, true) == IgnoreSubModule.Outcome.EXEMPT
+                && !preferences.ignores(IGNORER, null), "an exempt player was ignored");
+        require(IgnoreSubModule.apply(preferences, SENDER, MEMBER, false, false) == IgnoreSubModule.Outcome.REMOVED
+                && !preferences.ignores(MEMBER, null), "/unignore did not remove the player");
+        require(IgnoreSubModule.apply(preferences, SENDER, MEMBER, false, false)
                 == IgnoreSubModule.Outcome.NOT_IGNORED, "/unignore of a player not ignored reported a change");
+    }
+
+    private static void ignoreListIsKeptByUuidAndMigratesNames() {
+        // A list stored before it was kept by UUID: names only.
+        NotificationPreferences legacy = Json.gson()
+                .fromJson("{\"blockedMentioners\":[\"alex\",\"ghost\"]}", NotificationPreferences.class)
+                .normalized();
+        require(legacy.ignores(null, "Alex") && legacy.ignoredCount() == 2,
+                "an unresolved name entry stopped applying: " + legacy.pendingIgnoredNames());
+        require(legacy.resolvePendingIgnore("ALEX", MEMBER), "a pending name did not resolve");
+        require(legacy.ignores(MEMBER, "Alex2") && !legacy.ignores(null, "alex"),
+                "a resolved entry still matched by name, or not by UUID after a rename");
+        require(legacy.pendingIgnoredNames().equals(List.of("ghost")) && legacy.ignores(null, "ghost"),
+                "an unresolved name was dropped instead of kept");
+        require(!legacy.resolvePendingIgnore("alex", IGNORER), "a name resolved twice");
+
+        NotificationPreferences reloaded = Json.gson()
+                .fromJson(Json.toString(Json.gson().toJsonTree(legacy)), NotificationPreferences.class).normalized();
+        require(reloaded.ignoredIds().equals(List.of(MEMBER)) && reloaded.pendingIgnoredNames().equals(List.of("ghost")),
+                "the ignore list did not survive a save: " + reloaded.ignoredIds() + " " + reloaded.pendingIgnoredNames());
+        require(reloaded.removePendingIgnore("Ghost") && reloaded.ignoredCount() == 1, "/unignore of a pending name failed");
+    }
+
+    private static void ignoredSendersCannotPrivateMessage() {
+        NotificationPreferences target = new NotificationPreferences();
+        target.setIgnored(SENDER, true);
+        require(PrivateMessagingSubModule.refusedByIgnore(target, SENDER, "Steve", false),
+                "an ignored player could send a private message");
+        require(!PrivateMessagingSubModule.refusedByIgnore(target, SENDER, "Steve", true),
+                "an exempt sender was refused");
+        require(!PrivateMessagingSubModule.refusedByIgnore(target, MEMBER, "Alex", false), "a stranger was refused");
+        NotificationPreferences legacy = Json.gson()
+                .fromJson("{\"blockedMentioners\":[\"alex\"]}", NotificationPreferences.class).normalized();
+        require(PrivateMessagingSubModule.refusedByIgnore(legacy, MEMBER, "Alex", false),
+                "a not yet resolved name entry let a private message through");
+        require(!PrivateMessagingSubModule.refusedByIgnore(target, null, "Server", false),
+                "a console message was refused");
     }
 
     private static void mentionRulesFollowTheirSwitches() {
         MentionConfig.Rules rules = new MentionConfig.Rules();
         NotificationPreferences preferences = new NotificationPreferences();
-        preferences.setBlocked("Alex", true);
-        require(MentionSubModule.recipientRefuses(rules, preferences, "Alex"), "an ignored player could mention");
-        require(!MentionSubModule.recipientRefuses(rules, preferences, "Steve"), "a stranger was refused");
+        preferences.setIgnored(MEMBER, true);
+        require(MentionSubModule.recipientRefuses(rules, preferences, MEMBER, "Alex"),
+                "an ignored player could mention");
+        require(!MentionSubModule.recipientRefuses(rules, preferences, SENDER, "Steve"), "a stranger was refused");
         rules.ignoredPlayersCanNotNotify = false;
-        require(!MentionSubModule.recipientRefuses(rules, preferences, "Alex"),
+        require(!MentionSubModule.recipientRefuses(rules, preferences, MEMBER, "Alex"),
                 "ignoredPlayersCanNotNotify=false still refused an ignored player");
         preferences.doNotDisturb = true;
-        require(MentionSubModule.recipientRefuses(rules, preferences, "Steve"), "do-not-disturb stopped working");
+        require(MentionSubModule.recipientRefuses(rules, preferences, SENDER, "Steve"),
+                "do-not-disturb stopped working");
 
         MentionConfig.Rules defaults = new MentionConfig.Rules();
         require(!MentionSubModule.senderMayNotify(defaults, true), "a muted player could mention");
