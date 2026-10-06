@@ -40,6 +40,7 @@ import org.hyzionstudios.mysticessentials.modules.chat.roster.RosterTags;
 import org.hyzionstudios.mysticessentials.platform.command.MysticArgTypes;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommand;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommandSender;
+import org.joml.Vector3d;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -1607,11 +1608,33 @@ public final class ChannelsSubModule {
     }
 
     private boolean sameScope(PlayerRef sender, PlayerRef target, ChatConfig.Channel channel) {
+        if (channel.radiusBlocks > 0 && !sender.getUuid().equals(target.getUuid())
+                && !withinRadius(sender, target, channel.radiusBlocks)) {
+            return false;
+        }
         String scope = channel.scope == null ? "server" : channel.scope.toLowerCase(Locale.ROOT);
         if ("world".equals(scope)) {
             return sender.getWorldUuid().equals(target.getWorldUuid());
         }
         return true;
+    }
+
+    /**
+     * Same world and within {@code radius} blocks. Reads each player's last-tick
+     * transform snapshot ({@link PlayerRef#getTransform}), which is safe off the
+     * world thread.
+     */
+    private static boolean withinRadius(PlayerRef sender, PlayerRef target, int radius) {
+        UUID world = sender.getWorldUuid();
+        if (world == null || !world.equals(target.getWorldUuid())) {
+            return false;
+        }
+        Vector3d from = sender.getTransform().getPosition();
+        Vector3d to = target.getTransform().getPosition();
+        double dx = from.x - to.x;
+        double dy = from.y - to.y;
+        double dz = from.z - to.z;
+        return dx * dx + dy * dy + dz * dz <= (double) radius * radius;
     }
 
     private boolean canSpeak(PlayerRef player, ChatConfig.Channel channel) {
