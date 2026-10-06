@@ -379,7 +379,7 @@ public final class ChatModule extends AbstractMysticModule implements ChatServic
                 .orElse(sender.getUsername());
     }
 
-    private String sanitizeColors(PlayerRef sender, String content) {
+    String sanitizeColors(PlayerRef sender, String content) {
         Map<String, String> perms = config.messageColorPermissions;
         boolean legacy = allows(sender, perms.get("legacy"));
         boolean hex = allows(sender, perms.get("hex"));

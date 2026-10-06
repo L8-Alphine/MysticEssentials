@@ -65,6 +65,8 @@ public final class ChannelsSubModule {
     private static final String TEMP_INDEX_KEY = "chat:temp:index";
     private static final String TEMP_KEY_PREFIX = "chat:temp:";
     private static final Pattern HEX_COLOR = Pattern.compile("(?:&|<|color:|c:)#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})");
+    /** Player-chosen temporary-channel ids and aliases. */
+    private static final Pattern TEMP_NAME = Pattern.compile("[a-z0-9_-]{1,16}");
     private static final Map<Character, String> LEGACY_COLORS = Map.ofEntries(
             Map.entry('0', "#000000"),
             Map.entry('1', "#0000AA"),
@@ -1433,7 +1435,7 @@ public final class ChannelsSubModule {
             TemporaryChannel temp = entry.getValue();
             if (owner.equals(temp.owner)) {
                 temp.channel.password = blankToNull(password);
-                temp.channel.prefix = temporaryPrefix(entry.getKey(), prefix);
+                temp.channel.prefix = temporaryPrefix(entry.getKey(), sanitizePrefix(owner, prefix));
                 temp.channel.format = temporaryFormat(entry.getKey(), temp.channel.prefix);
                 saveRedisTemporaryChannel(entry.getKey(), temp);
                 return true;
@@ -1492,15 +1494,26 @@ public final class ChannelsSubModule {
             return false;
         }
         String id = normalize(channelId);
-        if (id.isBlank() || configuredChannels.containsKey(id) || temporaryChannels.containsKey(id)) {
+        // The id is shown in every line and menu, so it is a plain name; it must not
+        // collide with an existing channel id or alias either.
+        if (!TEMP_NAME.matcher(id).matches() || configuredChannels.containsKey(id)
+                || temporaryChannels.containsKey(id) || aliasToChannel.containsKey(id)) {
             return false;
         }
-        String resolvedPrefix = temporaryPrefix(id, prefix);
+        String resolvedPrefix = temporaryPrefix(id, sanitizePrefix(owner, prefix));
         ChatConfig.Channel channel = new ChatConfig.Channel(id, id, "permission",
                 temporaryFormat(id, resolvedPrefix));
         channel.prefix = resolvedPrefix;
         channel.password = blankToNull(password);
-        channel.aliases = aliases == null ? new ArrayList<>() : new ArrayList<>(aliases);
+        channel.aliases = new ArrayList<>();
+        if (aliases != null) {
+            for (String alias : aliases) {
+                String normalized = normalizeAlias(alias);
+                if (TEMP_NAME.matcher(normalized).matches()) {
+                    channel.aliases.add(normalized);
+                }
+            }
+        }
         channel.joinPermission = blankToNull(permissionGate);
         channel.speakPermission = blankToNull(permissionGate);
         channel.listenPermission = blankToNull(permissionGate);
@@ -1526,6 +1539,21 @@ public final class ChannelsSubModule {
 
     private static String temporaryPrefix(String id, String prefix) {
         return blankToNull(prefix) == null ? "&8[&d" + id + "&8]" : prefix;
+    }
+
+    /**
+     * A player-written prefix becomes part of every line's format, so it keeps only
+     * the markup its author may use in chat, and no placeholder syntax.
+     */
+    private String sanitizePrefix(UUID owner, String prefix) {
+        if (prefix == null) {
+            return null;
+        }
+        String cleaned = prefix.replaceAll("[{}%]", "");
+        PlayerRef author = core.platform().findPlayer(owner).orElse(null);
+        return author == null
+                ? ChatColors.sanitize(cleaned, false, false, false, false, false, false)
+                : chat.sanitizeColors(author, cleaned);
     }
 
     private static String temporaryFormat(String id, String prefix) {
