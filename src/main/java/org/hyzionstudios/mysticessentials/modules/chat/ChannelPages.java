@@ -347,7 +347,7 @@ final class ChannelPages {
             cmd.append(ROSTER_UI);
             cmd.set("#RosterChannel.TextSpans", uiText("#RosterChannel.TextSpans", channels.displayNameOfId(channelId)));
 
-            List<ChannelMemberView> members = channels.rosterFor(channelId);
+            List<ChannelMemberView> members = channels.rosterFor(channelId, player);
             cmd.set("#RosterCounts.TextSpans", uiText("#RosterCounts.TextSpans", countsSummary(members)));
             cmd.set("#RosterEmpty.Visible", members.isEmpty());
 
@@ -396,7 +396,7 @@ final class ChannelPages {
                 Store<EntityStore> store) {
             cmd.append(MEMBERS_UI);
 
-            List<ChannelMemberView> all = channels.rosterFor(channelId);
+            List<ChannelMemberView> all = channels.rosterFor(channelId, player);
             cmd.set("#InfoName.TextSpans", uiText("#InfoName.TextSpans", channels.displayNameOfId(channelId)));
             cmd.set("#InfoType.TextSpans", uiText("#InfoType.TextSpans", channels.isTemporaryChannel(channelId)
                     ? "Temporary Channel" : "Server Channel"));
@@ -485,7 +485,7 @@ final class ChannelPages {
             event.addEventBinding(CustomUIEventBindingType.Activating, "#BackBtn",
                     new EventData().put("action", "back"));
 
-            ChannelMemberView view = channels.rosterMember(channelId, target).orElse(null);
+            ChannelMemberView view = channels.rosterMember(channelId, target, player).orElse(null);
             if (view == null) {
                 cmd.set("#MName.TextSpans", uiText("#MName.TextSpans", "Member left the channel"));
                 cmd.set("#MTags.TextSpans", uiText("#MTags.TextSpans", ""));

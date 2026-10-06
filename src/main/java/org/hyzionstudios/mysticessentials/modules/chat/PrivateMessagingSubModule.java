@@ -62,10 +62,19 @@ public final class PrivateMessagingSubModule {
     }
 
     public CompletableFuture<Boolean> privateMessage(UUID from, UUID to, String message) {
+        return privateMessage(from, to, message, false);
+    }
+
+    /**
+     * @param hideUnseen treat a local target the sender cannot see (vanish) as offline,
+     *                   for name-resolved sends that must not reveal a vanished player
+     */
+    private CompletableFuture<Boolean> privateMessage(UUID from, UUID to, String message, boolean hideUnseen) {
         if (!config.enabled) {
             return CompletableFuture.completedFuture(false);
         }
-        Optional<PlayerRef> target = core.platform().findPlayer(to);
+        Optional<PlayerRef> target = core.platform().findPlayer(to)
+                .filter(ref -> !hideUnseen || core.vanish().canSee(from, ref.getUuid()));
         Optional<PlayerRef> sender = core.platform().findPlayer(from);
         // A managed child's policy (MysticIdentity) decides whether these two may message
         // at all; guardians and trusted staff are exempt inside that answer. Asked here so
@@ -266,7 +275,9 @@ public final class PrivateMessagingSubModule {
             if (config.offlineToMail && core.getMailService() != null) {
                 core.getPlayerProfileService().resolveUuid(name).thenAccept(found -> {
                     if (found.isPresent()) {
-                        privateMessage(sender.uuid(), found.get(), body);
+                        // The name lookup above already hid a vanished player; this
+                        // fallback must not deliver to (and confirm) them either.
+                        privateMessage(sender.uuid(), found.get(), body, true);
                     } else {
                         sender.replyKey("player-not-found");
                     }

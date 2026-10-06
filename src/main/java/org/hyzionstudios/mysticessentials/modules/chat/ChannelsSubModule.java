@@ -440,18 +440,19 @@ public final class ChannelsSubModule {
     /**
      * The current members of a channel as roster rows, grouped authority-first then
      * speakers before listeners then alphabetically (§5.3). Membership is defined as
-     * the online players currently listening to the channel.
+     * the online players currently listening to the channel. Empty when {@code viewer}
+     * cannot listen to the channel; members {@code viewer} cannot see (vanish) are left out.
      */
-    public List<ChannelMemberView> rosterFor(String channelId) {
+    public List<ChannelMemberView> rosterFor(String channelId, PlayerRef viewer) {
         ChatConfig.Channel channel = findChannel(channelId).orElse(null);
-        if (channel == null) {
+        if (channel == null || !canListen(viewer, channel)) {
             return List.of();
         }
         TemporaryChannel temp = temporaryChannels.get(resolveChannelId(channelId));
         UUID ownerId = temp == null ? null : temp.owner;
         List<ChannelMemberView> members = new ArrayList<>();
         for (PlayerRef online : core.platform().onlinePlayers()) {
-            if (isListening(online, channel)) {
+            if (isListening(online, channel) && core.vanish().canSee(viewer.getUuid(), online.getUuid())) {
                 members.add(buildMemberView(online, channel, ownerId, temp));
             }
         }
@@ -462,9 +463,9 @@ public final class ChannelsSubModule {
         return members;
     }
 
-    /** A single member's roster view within a channel, if they are currently a member. */
-    public Optional<ChannelMemberView> rosterMember(String channelId, UUID playerId) {
-        return rosterFor(channelId).stream()
+    /** A single member's roster view within a channel, if they are currently a member {@code viewer} can see. */
+    public Optional<ChannelMemberView> rosterMember(String channelId, UUID playerId, PlayerRef viewer) {
+        return rosterFor(channelId, viewer).stream()
                 .filter(view -> view.playerId().equals(playerId))
                 .findFirst();
     }
@@ -2457,6 +2458,15 @@ public final class ChannelsSubModule {
                     return;
                 }
                 String targetChannel = args.length >= 2 ? args[1] : currentChannelId(player);
+                ChatConfig.Channel rosterChannel = findChannel(targetChannel).orElse(null);
+                if (rosterChannel == null) {
+                    sender.replyKey("chat-channel-unknown");
+                    return;
+                }
+                if (!canListen(player, rosterChannel)) {
+                    sender.replyKey("chat-channel-no-listen");
+                    return;
+                }
                 if ("roster".equals(action)) {
                     core.platform().openPage(player,
                             new ChannelPages.ChannelRosterPage(core, ChannelsSubModule.this, player,
