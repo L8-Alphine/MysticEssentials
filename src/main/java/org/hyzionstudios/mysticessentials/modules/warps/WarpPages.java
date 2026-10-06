@@ -207,6 +207,12 @@ final class WarpPages {
             switch (action) {
                 case "savehere", "savedetails" -> {
                     String name = field(payload, "name");
+                    // Same guard as /setwarp: a temporary world disappears with its warps.
+                    if ("savehere".equals(action) && core.platform().isInTemporaryWorld(player)) {
+                        core.getMessageService().sendKey(player, "warp-temp-world");
+                        reopen(ref, store, new WarpAdminPage(core, warps, player, warpName, search));
+                        return;
+                    }
                     WarpModule.SaveResult result = warps.saveServerWarpFromUi(player, warpName, name,
                             field(payload, "description"), field(payload, "permission"),
                             parseDouble(field(payload, "cost"), 0.0),
@@ -421,6 +427,12 @@ final class WarpPages {
                             renamed ? newName : warpName));
                 }
                 case "movehere" -> {
+                    // Same guard as /pwarp create.
+                    if (core.platform().isInTemporaryWorld(player)) {
+                        core.getMessageService().sendKey(player, "pwarp-temp-world");
+                        reopen(ref, store, new PlayerWarpManagerPage(core, warps, player, warpName));
+                        return;
+                    }
                     boolean moved = warps.relocatePlayerWarp(player, warpName);
                     core.getMessageService().sendKey(player, moved
                             ? "pwarp-moved"
