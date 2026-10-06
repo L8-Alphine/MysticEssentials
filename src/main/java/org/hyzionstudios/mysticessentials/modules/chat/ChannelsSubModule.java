@@ -1061,10 +1061,13 @@ public final class ChannelsSubModule {
             temp.ownerDisconnectedAt = Instant.now();
             String id = entry.getKey();
             if (grace == 0) {
-                runSuccession(id, leaving);
+                // Still inside PlayerDisconnectEvent: the leaving owner is not removed
+                // from the universe yet, so the "back online" check must be skipped.
+                runSuccession(id, leaving, true);
             } else {
                 cancelGrace(temp);
-                temp.graceFuture = core.scheduler().runLater(() -> runSuccession(id, leaving), grace, TimeUnit.SECONDS);
+                temp.graceFuture = core.scheduler().runLater(() -> runSuccession(id, leaving, false),
+                        grace, TimeUnit.SECONDS);
             }
         }
     }
@@ -1081,12 +1084,12 @@ public final class ChannelsSubModule {
         }
     }
 
-    private void runSuccession(String channelId, UUID expectedOwner) {
+    private void runSuccession(String channelId, UUID expectedOwner, boolean ownerLeaving) {
         TemporaryChannel temp = temporaryChannels.get(channelId);
         if (temp == null || !expectedOwner.equals(temp.owner) || temp.ownerDisconnectedAt == null) {
             return; // Ownership changed, channel gone, or the owner already returned.
         }
-        if (core.platform().findPlayer(expectedOwner).isPresent()) {
+        if (!ownerLeaving && core.platform().findPlayer(expectedOwner).isPresent()) {
             temp.ownerDisconnectedAt = null; // Owner is back online.
             return;
         }
