@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -11,23 +12,30 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.UnaryOperator;
+import java.util.logging.Level;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.hyzionstudios.mysticessentials.api.chat.ChatDeliveryResult;
 import org.hyzionstudios.mysticessentials.api.chat.ChatMute;
+import org.hyzionstudios.mysticessentials.api.event.ChatDeliveredEvent;
 import org.hyzionstudios.mysticessentials.api.event.ChatMessagePublishedEvent;
 import org.hyzionstudios.mysticessentials.api.mention.MentionScopeProvider;
 import org.hyzionstudios.mysticessentials.api.model.PlayerProfile;
+import org.hyzionstudios.mysticessentials.api.service.AfkService;
 import org.hyzionstudios.mysticessentials.api.service.ChatService;
 import org.hyzionstudios.mysticessentials.api.voice.ChannelVoicePresenceProvider;
 import org.hyzionstudios.mysticessentials.core.integration.ManagedAccountsBridge;
+import org.hyzionstudios.mysticessentials.core.integration.ModerationBridge.GuardVerdict;
+import org.hyzionstudios.mysticessentials.core.integration.ModerationBridge.ModerationUnavailableException;
 import org.hyzionstudios.mysticessentials.core.message.MessageServiceImpl;
+import org.hyzionstudios.mysticessentials.core.message.MysticText;
 import org.hyzionstudios.mysticessentials.core.module.AbstractMysticModule;
 import org.hyzionstudios.mysticessentials.core.notification.NotificationServiceImpl;
 import org.hyzionstudios.mysticessentials.modules.chat.itemlink.ItemLinkSubModule;
 import org.hyzionstudios.mysticessentials.modules.chat.itemlink.ItemSnapshot;
 import org.hyzionstudios.mysticessentials.modules.chat.mention.MentionSubModule;
+import org.hyzionstudios.mysticessentials.modules.tutorial.TutorialService;
 
 import com.hypixel.hytale.event.EventPriority;
 import com.hypixel.hytale.registry.Registration;
@@ -49,6 +57,7 @@ public final class ChatModule extends AbstractMysticModule implements ChatServic
     private ChannelsSubModule channels;
     private ItemLinkSubModule itemLinks;
     private MentionSubModule mentions;
+    private IgnoreSubModule ignoreList;
     /** The chat pipeline listener; registered at a set priority, so tracked here rather than by the base class. */
     private Registration chatListener;
 
@@ -65,11 +74,13 @@ public final class ChatModule extends AbstractMysticModule implements ChatServic
 
         itemLinks = new ItemLinkSubModule(core, core.itemInspection());
         mentions = new MentionSubModule(core);
+        ignoreList = new IgnoreSubModule(core);
 
         privateMessaging.enable(config.privateMessaging, this::registerCommand);
         channels.enable(config.channels, this::registerCommand);
         itemLinks.enable(this::registerCommand);
         mentions.enable(this::registerCommand);
+        ignoreList.enable(this::registerCommand);
         registerEvent(PlayerDisconnectEvent.class, event -> {
             itemLinks.invalidate(event.getPlayerRef().getUuid());
             mentions.invalidate(event.getPlayerRef().getUuid());
@@ -216,6 +227,12 @@ public final class ChatModule extends AbstractMysticModule implements ChatServic
         }
         if (event.isCancelled()) {
             return event;
+        }
+        // Players who ignore the sender do not get the line; the sender keeps their own.
+        if (event.getTargets() != null) {
+            String senderName = sender.getUsername();
+            event.setTargets(ChatDelivery.withoutIgnoring(event.getTargets(), PlayerRef::getUuid,
+                    sender.getUuid(), recipient -> ignores(recipient, senderName)));
         }
 
         List<PlayerRef> recipients = recipients(event, sender);
@@ -548,11 +565,18 @@ public final class ChatModule extends AbstractMysticModule implements ChatServic
         if (notifications == null || recipient == null || sender == null || recipient.equals(sender)) {
             return false;
         }
-        // The block list holds names, as the /mentions settings store them.
+        // The ignore list holds names, as /ignore and the /mentions settings store them.
         String senderName = core.platform().findPlayer(sender).map(PlayerRef::getUsername)
                 .or(() -> core.getPlayerProfileService().getCached(sender).map(PlayerProfile::getUsername))
                 .orElse(null);
-        return notifications.preferences(recipient).blocks(senderName);
+        return ignores(recipient, senderName);
+    }
+
+    /** Whether {@code recipient} has the player named {@code senderName} on their ignore list. */
+    boolean ignores(UUID recipient, String senderName) {
+        NotificationServiceImpl notifications = core.notifications();
+        return notifications != null && recipient != null && senderName != null
+                && notifications.preferences(recipient).blocks(senderName);
     }
 
     @Override
@@ -562,9 +586,41 @@ public final class ChatModule extends AbstractMysticModule implements ChatServic
             return new ChatDeliveryResult(ChatDeliveryResult.Status.UNAVAILABLE, 0, 0, "");
         }
         PlayerRef senderRef = core.platform().findPlayer(sender).orElse(null);
-        ChatMute mute = senderRef == null ? null : activeMute(sender).orElse(null);
-        String prepared = senderRef == null ? "" : preparePlayerMessage(senderRef, message);
-        ChatDelivery.Plan plan = ChatDelivery.plan(sender, recipients, mute,
+        ChatMute mute = null;
+        Refusal refusal = null;
+        String prepared = "";
+        if (senderRef != null) {
+            // Any line a player writes is activity, as public chat is for the AFK module.
+            AfkService afk = core.getAfkService();
+            if (afk != null) {
+                afk.markActivity(sender);
+            }
+            try {
+                mute = core.moderation().lookupMute(sender).orElse(null);
+            } catch (ModerationUnavailableException e) {
+                refusal = moderationUnavailable(e);
+            }
+            if (refusal == null && tutorialBlocksChat(sender)) {
+                refusal = new Refusal(core.getMessageService().plainFromKey("tutorial-chat-blocked"),
+                        core.getMessageService().fromKey("tutorial-chat-blocked"));
+            }
+            prepared = preparePlayerMessage(senderRef, message);
+            if (refusal == null && (mute == null || mute.shadow()) && prepared != null && !prepared.isBlank()) {
+                // MysticModeration's chat guard: filter, chat lock and slow mode, as in public chat.
+                try {
+                    GuardVerdict verdict = core.moderation().checkChat(sender, senderRef.getUsername(), prepared);
+                    if (verdict.outcome() == GuardVerdict.Outcome.BLOCK) {
+                        refusal = new Refusal(MysticText.stripMarkup(verdict.text()),
+                                core.getMessageService().colorize(verdict.text()));
+                    } else if (verdict.outcome() == GuardVerdict.Outcome.REWRITE) {
+                        prepared = ChatTokens.sanitizeInput(verdict.text());
+                    }
+                } catch (ModerationUnavailableException e) {
+                    refusal = moderationUnavailable(e);
+                }
+            }
+        }
+        ChatDelivery.Plan plan = ChatDelivery.plan(sender, recipients, mute, refusal != null,
                 prepared == null || prepared.isBlank(),
                 uuid -> core.platform().findPlayer(uuid).isPresent(),
                 // A managed child's policy (MysticIdentity) is asked per listener, as for
@@ -577,8 +633,14 @@ public final class ChatModule extends AbstractMysticModule implements ChatServic
                 // Sent below.
             }
             case MUTED -> {
-                core.getMessageService().sendKey(senderRef, "chat-you-muted", Map.of("reason", mute.reason()));
-                return new ChatDeliveryResult(plan.status(), 0, plan.skipped(), mute.reason());
+                String reason = ChatDelivery.reasonOrDefault(mute.reason(),
+                        core.getMessageService().plainFromKey("chat-mute-no-reason"));
+                core.getMessageService().sendKey(senderRef, "chat-you-muted", Map.of("reason", reason));
+                return new ChatDeliveryResult(plan.status(), 0, plan.skipped(), reason);
+            }
+            case BLOCKED -> {
+                senderRef.sendMessage(refusal.feedback());
+                return new ChatDeliveryResult(plan.status(), 0, plan.skipped(), refusal.reason());
             }
             default -> {
                 return new ChatDeliveryResult(plan.status(), 0, plan.skipped(), "");
@@ -587,7 +649,7 @@ public final class ChatModule extends AbstractMysticModule implements ChatServic
 
         String label = colorTagsOnly(ChatTokens.sanitizeInput(channelLabel == null ? "" : channelLabel));
         Message line = renderDeliveredLine(senderRef, label, prepared, format);
-        int delivered = 0;
+        Set<UUID> reached = new LinkedHashSet<>();
         int failed = 0;
         for (UUID uuid : plan.recipients()) {
             PlayerRef recipient = uuid.equals(sender) ? senderRef : core.platform().findPlayer(uuid).orElse(null);
@@ -597,16 +659,45 @@ public final class ChatModule extends AbstractMysticModule implements ChatServic
             }
             try {
                 recipient.sendMessage(line);
-                delivered++;
+                reached.add(uuid);
             } catch (Throwable t) {
                 failed++;
                 log("Chat delivery failed for " + recipient.getUsername() + ": " + t);
             }
         }
-        // The console echo public chat gets from the engine.
-        log("[" + label + "] " + senderRef.getUsername() + ": " + plainTextOf(prepared)
-                + (plan.status() == ChatDeliveryResult.Status.SHADOW_MUTED ? " (shadow-muted)" : ""));
-        return new ChatDeliveryResult(plan.status(), delivered, plan.skipped() + failed, "");
+        boolean shadow = plan.status() == ChatDeliveryResult.Status.SHADOW_MUTED;
+        String plain = plainTextOf(prepared);
+        // The console echo public chat gets from the engine, and the hook moderation
+        // tooling (logs, spy, reports) reads these lines from.
+        log("[" + label + "] " + senderRef.getUsername() + ": " + plain + (shadow ? " (shadow-muted)" : ""));
+        core.getEventBus().publish(new ChatDeliveredEvent(sender, senderRef.getUsername(),
+                displayNameOf(senderRef), label, plain, reached, shadow));
+        return new ChatDeliveryResult(plan.status(), reached.size(), plan.skipped() + failed, "");
+    }
+
+    /** Why a delivered line was refused: the result's reason and what the sender is shown. */
+    private record Refusal(String reason, Message feedback) {
+    }
+
+    /**
+     * MysticModeration is installed but could not answer: the line is refused rather
+     * than let through unchecked.
+     */
+    private Refusal moderationUnavailable(ModerationUnavailableException e) {
+        core.log(Level.WARNING, "[chat] MysticModeration could not check a delivered line; refusing it: "
+                + e.getCause());
+        return new Refusal(core.getMessageService().plainFromKey("chat-moderation-unavailable"),
+                core.getMessageService().fromKey("chat-moderation-unavailable"));
+    }
+
+    /** Whether the tutorial module currently blocks this player's chat. */
+    private boolean tutorialBlocksChat(UUID player) {
+        return core.getModuleManager().isEnabled("tutorial")
+                && core.getModuleManager().getModule("tutorial")
+                        .filter(TutorialService.class::isInstance)
+                        .map(TutorialService.class::cast)
+                        .map(tutorials -> tutorials.isChatBlocked(player))
+                        .orElse(false);
     }
 
     /**

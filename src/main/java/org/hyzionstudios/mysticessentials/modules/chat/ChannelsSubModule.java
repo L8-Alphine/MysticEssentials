@@ -243,9 +243,8 @@ public final class ChannelsSubModule {
         TemporaryChannel temp = temporaryChannels.get(normalize(channel.id));
         ChannelParticipation participation = effectiveParticipation(sender, channel, temp);
         if (participation == ChannelParticipation.MUTED) {
-            Mute mute = temp == null ? null : temp.mutes.get(sender.getUuid());
             core.getMessageService().sendKey(sender, "chat-channel-you-muted",
-                    Map.of("reason", mute == null || mute.reason() == null ? "" : mute.reason()));
+                    Map.of("reason", muteReason(channel.id, sender.getUuid()).orElse("")));
             event.setCancelled(true);
             return event;
         }
@@ -672,13 +671,13 @@ public final class ChannelsSubModule {
         return temp == null ? Optional.empty() : Optional.ofNullable(temp.joinedAt.get(uuid));
     }
 
+    /**
+     * The reason for the active channel moderation mute {@code uuid} holds in a temporary
+     * channel, or the {@code chat-mute-no-reason} text when the moderator gave none.
+     */
     public Optional<String> muteReason(String channelId, UUID uuid) {
-        TemporaryChannel temp = temporaryChannels.get(resolveChannelId(channelId));
-        if (temp == null) {
-            return Optional.empty();
-        }
-        Mute mute = temp.mutes.get(uuid);
-        return mute != null && mute.isActive() ? Optional.ofNullable(mute.reason()) : Optional.empty();
+        return channelMute(channelId, uuid).map(mute -> ChatDelivery.reasonOrDefault(mute.reason(),
+                core.getMessageService().plainFromKey("chat-mute-no-reason")));
     }
 
     /** The active channel moderation mute {@code uuid} holds in a temporary channel. */
@@ -801,7 +800,8 @@ public final class ChannelsSubModule {
                         + " reason=" + (reason == null ? "" : reason));
         notify(target, "chat-channel-you-muted-notice", Map.of(
                 "channel", displayNameOfId(channelId),
-                "reason", reason == null ? "" : reason));
+                "reason", ChatDelivery.reasonOrDefault(reason,
+                        core.getMessageService().plainFromKey("chat-mute-no-reason"))));
         return ManageResult.OK;
     }
 
@@ -1865,6 +1865,10 @@ public final class ChannelsSubModule {
         }
         for (PlayerRef recipient : core.managedAccounts().reachable(placeholderContext, listening,
                 ManagedAccountsBridge.TEXT_PUBLIC)) {
+            // A player's line skips those who ignore them, as on the server it came from.
+            if (placeholderContext != null && chat.ignores(recipient.getUuid(), name)) {
+                continue;
+            }
             recipient.sendMessage(core.getMessageService().colorize(rendered));
         }
     }

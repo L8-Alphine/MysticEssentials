@@ -581,16 +581,26 @@ skipped, reason):
 ChatDeliveryResult result = chat.deliver(senderId, memberIds, guild.name(), text);
 ```
 
-- **Mutes.** Mystic Essentials keeps no server mutes; `activeMute(player)` asks
-  MysticModeration (`MysticModerationAPI#punishments()` then
-  `PunishmentService#activeMute(UUID)`, through `ModerationBridge`, fail-open) — the
-  lookup its own chat gate makes. A mute refuses the line (`MUTED`, the sender gets
-  `chat-you-muted`); a `SHADOW_MUTE` shows it to the sender alone (`SHADOW_MUTED`,
-  `isDelivered()` still true, so the caller must not relay it). `activeMute(player,
-  channelId)` adds the channel moderation mute of a temporary channel.
-- **Ignores.** `isIgnoring(recipient, sender)` is the blocked-players list of the
-  recipient's `/mentions` settings (`NotificationPreferences.blockedMentioners`);
-  such a recipient is skipped.
+- **Mutes.** Mystic Essentials keeps no server mutes; `ModerationBridge.lookupMute`
+  asks MysticModeration (`ModerationServiceRegistry#find(PunishmentService)` then
+  `PunishmentService#activeMute(UUID)`) — the lookup its own chat gate makes. A mute
+  refuses the line (`MUTED`, the sender gets `chat-you-muted`); a `SHADOW_MUTE` shows
+  it to the sender alone (`SHADOW_MUTED`, `isDelivered()` still true, so the caller
+  must not relay it). The public `activeMute(player)` is the same lookup, empty on
+  failure; `activeMute(player, channelId)` adds a temporary channel's moderation mute.
+- **Chat guard and tutorial.** `ModerationBridge.checkChat` runs
+  `ChatGuardService#evaluate(uuid, name, message)` (filter, chat lock, slow mode;
+  `BLOCK` refuses with its detail as feedback, `REWRITE` replaces the text), and
+  `TutorialService.isChatBlocked` refuses lines while a tutorial blocks chat; both
+  give `BLOCKED`. MysticModeration absent, disabled in the config, or with the module
+  unpublished means "allow"; installed but failing (`ModerationUnavailableException`)
+  refuses the line with `chat-moderation-unavailable`.
+- **Ignores.** `isIgnoring(recipient, sender)` is the recipient's ignore list
+  (`/ignore`, `NotificationPreferences.blockedMentioners`, lower-case names edited
+  under the preferences' lock); such a recipient is skipped. Public chat
+  (`ChatDelivery.withoutIgnoring` on the event targets) and lines from other servers
+  (`deliverInbound`) apply the same list, and mentions honour it while
+  `rules.ignoredPlayersCanNotNotify` is on.
 - **Managed accounts.** Each recipient is judged on the pair with
   `TEXT_PUBLIC`, as for a cross-server channel line.
 - **Text safety.** The message goes through `preparePlayerMessage` (token
@@ -598,8 +608,10 @@ ChatDeliveryResult result = chat.deliver(senderId, memberIds, guild.name(), text
   `MessageServiceImpl.fillParams`, so neither it, the nickname nor the caller's
   label is ever parsed for placeholders; the label keeps colour codes only.
 - **Audience.** Recipients not online on this server are skipped, the sender
-  always gets their own line, the line is echoed to the server log, nothing is
-  relayed over Redis and `ChatMessagePublishedEvent` is not fired.
+  always gets their own line and it counts as their AFK activity
+  (`AfkService.markActivity`). The line is echoed to the server log and published as
+  `ChatDeliveredEvent` for moderation tooling; nothing is relayed over Redis and
+  `ChatMessagePublishedEvent` is not fired, so bridges never repeat it.
 
 The recipient rules live in `ChatDelivery.plan`, free of engine types and checked
 by `verifyChatDelivery`.

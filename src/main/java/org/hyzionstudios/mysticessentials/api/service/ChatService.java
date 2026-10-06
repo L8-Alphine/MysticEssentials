@@ -122,9 +122,10 @@ public interface ChatService {
     }
 
     /**
-     * Whether {@code recipient} ignores {@code sender}: the sender is on the blocked
-     * players list of the recipient's {@code /mentions} settings. Always {@code false}
-     * for the same player.
+     * Whether {@code recipient} ignores {@code sender}: the sender is on the recipient's
+     * ignore list ({@code /ignore}, also shown in {@code /mentions}). Such a recipient gets
+     * none of the sender's public, channel or delivered chat lines nor their mentions.
+     * Always {@code false} for the same player.
      */
     default boolean isIgnoring(UUID recipient, UUID sender) {
         return false;
@@ -149,19 +150,27 @@ public interface ChatService {
      * Essentials' chat rules:
      *
      * <ul>
-     *   <li>the sender must be online on this server;</li>
+     *   <li>the sender must be online on this server; the line counts as their activity
+     *       for the AFK module;</li>
      *   <li>a muted sender ({@link #activeMute(UUID)}) is refused with
      *       {@link ChatDeliveryResult.Status#MUTED} and told why; a shadow-muted one sees
      *       the line alone ({@link ChatDeliveryResult.Status#SHADOW_MUTED});</li>
      *   <li>the message is cleaned as public chat is: colour styles the sender lacks the
      *       permission for are stripped, it is cut to the chat length limit, and it is
      *       never parsed for placeholders;</li>
+     *   <li>MysticModeration's chat guard (word filter, chat lock, slow mode and its other
+     *       rules) and a tutorial that blocks the sender's chat refuse the line with
+     *       {@link ChatDeliveryResult.Status#BLOCKED}, and the sender is told why; a guard
+     *       rewrite replaces the text. While MysticModeration is installed but cannot
+     *       answer, lines are refused rather than let through unchecked;</li>
      *   <li>a recipient who is not online here, who ignores the sender
      *       ({@link #isIgnoring(UUID, UUID)}), or whom a managed account's policy keeps
      *       apart from the sender (MysticIdentity) is skipped;</li>
      *   <li>the sender always gets their own line, whether or not they are in
      *       {@code recipients};</li>
-     *   <li>the line is echoed to the server log, like public chat.</li>
+     *   <li>the line is echoed to the server log, like public chat, and a
+     *       {@link org.hyzionstudios.mysticessentials.api.event.ChatDeliveredEvent} is
+     *       published for moderation tooling.</li>
      * </ul>
      *
      * <p>Nothing is relayed to other servers and no

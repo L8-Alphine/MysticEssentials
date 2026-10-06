@@ -2,6 +2,7 @@ package org.hyzionstudios.mysticessentials.modules.tutorial;
 
 import java.util.Collection;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 import org.hyzionstudios.mysticessentials.modules.tutorial.config.TutorialDefinition;
@@ -34,6 +35,11 @@ public interface TutorialService {
     CompletableFuture<TutorialStopResult> stopTutorial(PlayerRef player, TutorialStopReason reason);
 
     boolean isInTutorial(PlayerRef player);
+
+    /** Whether the player's running tutorial blocks their chat right now. */
+    default boolean isChatBlocked(UUID player) {
+        return false;
+    }
 
     Optional<TutorialSession> getActiveSession(PlayerRef player);
 

@@ -218,18 +218,22 @@ if (result.status() == ChatDeliveryResult.Status.SHADOW_MUTED) {
 | --- | --- |
 | `DELIVERED` | Sent to the sender and every reachable recipient |
 | `SHADOW_MUTED` | The sender is shadow-muted: only they saw it (`isDelivered()` is still `true`) |
-| `MUTED` | Refused; the sender was told why (`chat-you-muted`) and `reason` holds the mute reason |
+| `MUTED` | Refused; the sender was told why (`chat-you-muted`) and `reason` holds the mute reason (`chat-mute-no-reason` when none was given) |
+| `BLOCKED` | Refused by MysticModeration's chat guard (filter, chat lock, slow mode), the sender's tutorial, or MysticModeration being installed but unable to answer; the sender was told why and `reason` holds what they were told |
 | `SENDER_OFFLINE` | The sender is not online on this server |
 | `EMPTY` | Nothing was left of the message once cleaned |
 | `UNAVAILABLE` | The chat module is not running |
 
 The message is cleaned as public chat is (colour styles the sender may not use
 are stripped, the chat length limit applies, player text is never parsed for
-placeholders). Recipients who are not online on this server, who ignore the
-sender, or whom a managed account's policy (MysticIdentity) keeps apart from
-the sender are skipped; the sender always gets their own line. The line is
-echoed to the server log, never relayed to other servers, and does not fire
-`ChatMessagePublishedEvent`. Without a `format` the chat module's
+placeholders), and a MysticModeration chat-guard rewrite replaces it. Recipients
+who are not online on this server, who ignore the sender, or whom a managed
+account's policy (MysticIdentity) keeps apart from the sender are skipped; the
+sender always gets their own line, and it counts as their AFK activity. The line is
+echoed to the server log and published as a `ChatDeliveredEvent` (sender, label,
+plain text, recipients, `shadowMuted`) for moderation tooling — chat logs, spy,
+reports. It is never relayed to other servers and does not fire
+`ChatMessagePublishedEvent`, so bridges do not repeat it. Without a `format` the chat module's
 `deliveryFormat` is used; a format supports colour codes, the sender's
 placeholders, `{channel}`, `{player_name}`, `{display_name}` and `{message}`.
 
@@ -243,7 +247,8 @@ The rules can also be asked directly:
   Mystic Essentials (temporary) channel; a server mute wins.
 - `isMuted(player)` — `activeMute(player).isPresent()`, shadow mutes included.
 - `isIgnoring(recipient, sender)` — whether the sender is on the recipient's
-  blocked-players list (`/mentions` settings).
+  ignore list (`/ignore`; the blocked players of `/mentions`). Public and channel
+  chat skip such recipients too.
 
 All of these are safe to call from any thread.
 

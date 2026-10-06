@@ -237,6 +237,10 @@ public final class MentionSubModule {
         if (matches.isEmpty()) {
             return Result.unchanged(message);
         }
+        if (!senderMayNotify(config.rules, core.moderation().activeMute(sender.getUuid()).isPresent())) {
+            // Left as typed: a muted sender's line pings nobody, even where it still shows.
+            return Result.unchanged(message);
+        }
         if (!withinSenderBudget(sender)) {
             // Over budget: the message still sends, it just stops pinging. Silently
             // dropping the whole line would be a far worse failure mode.
@@ -432,7 +436,7 @@ public final class MentionSubModule {
         NotificationServiceImpl notifications = core.notifications();
         if (notifications != null) {
             NotificationPreferences preferences = notifications.preferences(target.getUuid());
-            if (preferences.blocks(sender.getUsername()) || preferences.doNotDisturb) {
+            if (recipientRefuses(config.rules, preferences, sender.getUsername())) {
                 return false;
             }
             if (!scopeAllows(preferences, sender.getUuid(), target.getUuid())) {
@@ -443,6 +447,20 @@ public final class MentionSubModule {
         Long lastPair = lastMentionByPair.get(pairKey(sender.getUuid(), target.getUuid()));
         return lastPair == null
                 || now - lastPair >= config.limits.sameTargetCooldownSeconds * 1000L;
+    }
+
+    /**
+     * Whether the recipient's own settings refuse this sender's mention: their ignore
+     * list (unless {@code rules.ignoredPlayersCanNotNotify} is off) or do-not-disturb.
+     */
+    public static boolean recipientRefuses(MentionConfig.Rules rules, NotificationPreferences preferences,
+            String senderName) {
+        return (rules.ignoredPlayersCanNotNotify && preferences.blocks(senderName)) || preferences.doNotDisturb;
+    }
+
+    /** Whether a sender may ping anyone, given whether they are muted. */
+    public static boolean senderMayNotify(MentionConfig.Rules rules, boolean muted) {
+        return !(rules.mutedPlayersCanNotNotify && muted);
     }
 
     /**

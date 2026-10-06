@@ -8,8 +8,10 @@ package org.hyzionstudios.mysticessentials.api.chat;
  * @param skipped   how many requested recipients, other than the sender, it was not sent
  *                  to: not online on this server, ignoring the sender, kept apart from
  *                  them by a managed account's policy, or the line was refused
- * @param reason    the mute reason when {@code status} is {@link Status#MUTED} (may be
- *                  empty), otherwise empty; never {@code null}
+ * @param reason    the mute reason when {@code status} is {@link Status#MUTED} (the
+ *                  {@code chat-mute-no-reason} text when none was given), what the
+ *                  sender was told when it is {@link Status#BLOCKED}, otherwise empty;
+ *                  never {@code null}
  */
 public record ChatDeliveryResult(Status status, int delivered, int skipped, String reason) {
 
@@ -38,6 +40,13 @@ public record ChatDeliveryResult(Status status, int delivered, int skipped, Stri
         SHADOW_MUTED,
         /** The sender is muted: nothing was sent, and the sender was told why. */
         MUTED,
+        /**
+         * Another chat rule refused the line: MysticModeration's chat guard (filter, chat
+         * lock, slow mode), the sender's tutorial, or MysticModeration being installed but
+         * unable to answer. Nothing was sent; the sender was told why and {@code reason}
+         * holds what they were told.
+         */
+        BLOCKED,
         /** The sender is not online on this server: nothing was sent. */
         SENDER_OFFLINE,
         /** Nothing was left of the message once it was cleaned: nothing was sent. */

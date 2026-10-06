@@ -74,7 +74,12 @@ public final class MentionConfig {
 
     public static final class Rules {
         public boolean allowSelfMention = false;
+        /** A player on the recipient's ignore list ({@code /ignore}) cannot mention them. */
         public boolean ignoredPlayersCanNotNotify = true;
+        /**
+         * A player MysticModeration has muted (a shadow mute included) mentions nobody,
+         * even in a line that still shows.
+         */
         public boolean mutedPlayersCanNotNotify = true;
         /** Whether a vanished player can be mentioned (and thereby revealed). */
         public boolean vanishedPlayersReceiveMentions = false;

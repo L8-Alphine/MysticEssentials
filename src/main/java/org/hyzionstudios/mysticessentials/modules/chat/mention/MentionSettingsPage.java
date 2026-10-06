@@ -67,11 +67,11 @@ final class MentionSettingsPage extends MysticPage {
 
         toggle(cmd, event, "#DndToggle", "Do Not Disturb", preferences.doNotDisturb, "dnd");
 
-        int blocked = preferences.blockedMentioners.size();
+        int blocked = preferences.blockedNames().size();
         cmd.set("#BlockedInfo.TextSpans", uiText("#BlockedInfo.TextSpans",
                 blocked == 0
-                        ? "No blocked players. Use /ignore to block someone from mentioning you."
-                        : blocked + " blocked player(s) cannot mention you."));
+                        ? "No blocked players. Use /ignore to hide someone's chat and mentions."
+                        : blocked + " blocked player(s) cannot chat to or mention you."));
 
         event.addEventBinding(CustomUIEventBindingType.Activating, "#ResetButton",
                 new EventData().put("action", "reset"));

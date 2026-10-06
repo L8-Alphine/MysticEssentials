@@ -1,6 +1,7 @@
 package org.hyzionstudios.mysticessentials.core.notification;
 
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
@@ -54,7 +55,11 @@ public final class NotificationPreferences {
     /** Category ids this player has switched off. */
     public Set<String> mutedCategories = new LinkedHashSet<>();
 
-    /** Player names this player refuses mentions from. */
+    /**
+     * Lower-case names of the players this player ignores ({@code /ignore}): their
+     * chat lines and mentions do not reach this player. Read and written through the
+     * synchronized accessors below, since chat threads read it while a command edits it.
+     */
     public Set<String> blockedMentioners = new LinkedHashSet<>();
 
     /** The chosen scope id, normalized. Never blank. */
@@ -99,23 +104,25 @@ public final class NotificationPreferences {
         }
     }
 
-    public boolean blocks(String playerName) {
+    public synchronized boolean blocks(String playerName) {
         if (playerName == null) {
             return false;
         }
         return blockedMentioners.contains(playerName.toLowerCase(Locale.ROOT));
     }
 
-    public void setBlocked(String playerName, boolean blocked) {
+    /** @return whether the list changed */
+    public synchronized boolean setBlocked(String playerName, boolean blocked) {
         if (playerName == null || playerName.isBlank()) {
-            return;
+            return false;
         }
-        String normalized = playerName.toLowerCase(Locale.ROOT);
-        if (blocked) {
-            blockedMentioners.add(normalized);
-        } else {
-            blockedMentioners.remove(normalized);
-        }
+        String normalized = playerName.trim().toLowerCase(Locale.ROOT);
+        return blocked ? blockedMentioners.add(normalized) : blockedMentioners.remove(normalized);
+    }
+
+    /** The ignored names, in the order they were added. */
+    public synchronized List<String> blockedNames() {
+        return List.copyOf(blockedMentioners);
     }
 
     /** Restores collections nulled out by a hand-edited or partial JSON document. */

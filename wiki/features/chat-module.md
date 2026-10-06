@@ -24,6 +24,15 @@ When `formatChat` is on, every message is rewritten through a permission-selecte
 | `/tell`, `/w`, `/whisper` | Aliases for `/msg` | `mysticessentials.chat.private.message` |
 | `/reply <message>`, `/r <message>` | Reply to your last private message | `mysticessentials.chat.private.reply` |
 
+### Ignoring players
+
+`/ignore <player>` (`mysticessentials.chat.ignore`) hides that player's public and
+channel chat lines, the chat other mods hand to Mystic (guild, party...), and their
+mentions; `/ignore` alone lists who you ignore and `/unignore <player>` undoes it.
+The list is saved with your notification preferences and is the "blocked players"
+count shown in `/mentions`. You always see your own lines, you cannot ignore yourself,
+and players with `mysticessentials.chat.ignore.exempt` cannot be ignored.
+
 Private messaging can deliver across servers over Redis (`allowCrossServer`): `/msg` tab-completes and resolves players on every server in the network, and a player online nowhere falls back to [mail](mail-module) (`offlineToMail`). **Social spy** (`mysticessentials.chat.socialspy`) lets staff monitor private messages; players with `mysticessentials.chat.socialspy.exempt` are hidden from it.
 
 ## Channels
@@ -155,9 +164,12 @@ Mods with their own chat contexts (guild, officer, party or settlement chat) can
 hand each line to Mystic through `ChatService.deliver` (see
 [Developer API](developer-api)). Such lines follow the same rules as public chat:
 a player muted by MysticModeration is refused (a shadow-muted one sees only their
-own line), players who blocked the sender in `/mentions` do not receive them,
-the sender's colour permissions and `maxMessageLength` apply, and they are
-rendered with the mod's own format or `deliveryFormat`.
+own line), MysticModeration's chat guard (filter, chat lock, slow mode) and a
+tutorial that blocks chat refuse the line, players who ignore the sender do not
+receive it, the sender's colour permissions and `maxMessageLength` apply, the line
+counts as AFK activity, and it is rendered with the mod's own format or
+`deliveryFormat`. While MysticModeration is installed but cannot answer, such lines
+are refused rather than sent unchecked.
 
 ## Configuration
 

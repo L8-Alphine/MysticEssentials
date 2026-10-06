@@ -3,6 +3,7 @@ package org.hyzionstudios.mysticessentials.modules.tutorial;
 import java.util.Collection;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
@@ -130,8 +131,7 @@ public final class TutorialModule extends AbstractMysticModule implements Tutori
         // Chat block while a session says so (async cancellable chat event).
         registerAsyncEvent(PlayerChatEvent.class,
                 (CompletableFuture<PlayerChatEvent> future) -> future.thenApply(event -> {
-                    if (active && config.enabled && event.getSender() != null
-                            && sessions.isChatBlocked(event.getSender().getUuid())) {
+                    if (event.getSender() != null && isChatBlocked(event.getSender().getUuid())) {
                         event.setCancelled(true);
                         core.getMessageService().sendKey(event.getSender(), "tutorial-chat-blocked");
                     }
@@ -299,6 +299,11 @@ public final class TutorialModule extends AbstractMysticModule implements Tutori
     @Override
     public boolean isInTutorial(PlayerRef player) {
         return service.isInTutorial(player);
+    }
+
+    @Override
+    public boolean isChatBlocked(UUID player) {
+        return active && config.enabled && player != null && sessions.isChatBlocked(player);
     }
 
     @Override

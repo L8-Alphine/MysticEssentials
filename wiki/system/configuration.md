@@ -279,7 +279,12 @@ Mention matching and delivery use `modules/chat/mentions.json`. Defaults require
 exact case-insensitive names, cap mentions at 3 per message and 10 per minute,
 apply 5-second sender/15-second same-target cooldowns, throttle recipient sounds
 to 3 seconds, and apply a 300-second mass-mention cooldown. Player preferences
-and block lists are managed with `/mentions`.
+are managed with `/mentions`, ignore lists with `/ignore`.
+
+| Setting | Default | Description |
+| --- | --- | --- |
+| `rules.ignoredPlayersCanNotNotify` | `true` | A player on the recipient's ignore list cannot mention them |
+| `rules.mutedPlayersCanNotNotify` | `true` | A player MysticModeration has muted (shadow mutes included) mentions nobody |
 
 See the [Item Links](itemlinks-module) page for the full workflow, commands, and rarity rules.
 

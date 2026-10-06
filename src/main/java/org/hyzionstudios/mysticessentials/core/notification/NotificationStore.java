@@ -102,8 +102,12 @@ final class NotificationStore {
         if (current == null) {
             return;
         }
-        mutateModuleData(player, data ->
-                data.add(PREFERENCES_FIELD, Json.toTree(current)));
+        mutateModuleData(player, data -> {
+            // The ignore list is edited under this lock (NotificationPreferences.setBlocked).
+            synchronized (current) {
+                data.add(PREFERENCES_FIELD, Json.toTree(current));
+            }
+        });
     }
 
     // ----- History -------------------------------------------------------------------

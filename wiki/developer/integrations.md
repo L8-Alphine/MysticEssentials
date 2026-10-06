@@ -51,12 +51,23 @@ When present, Mystic respects vanished players: they are hidden from teleport ta
 Ties Mystic into the MysticModeration suite for moderation-aware behavior across chat and player actions.
 
 Mystic Essentials keeps no server mutes of its own; MysticModeration enforces its
-mutes in public chat itself. Chat another mod hands to Mystic with
+mutes and chat guard in public chat itself. Chat another mod hands to Mystic with
 `ChatService.deliver` (guild or party chat) never passes through public chat, so
-`deliver` and `ChatService.activeMute` ask MysticModeration for the player's
-active mute at the moment of delivery: a mute refuses the line and tells the
-sender why, a shadow mute shows the line to its author only. Without
-MysticModeration nobody is muted there.
+`deliver` asks MysticModeration at the moment of delivery:
+
+- its active mute (`PunishmentService#activeMute`): a mute refuses the line and
+  tells the sender why, a shadow mute shows the line to its author only;
+- its chat guard (`ChatGuardService#evaluate`): the word filter, link, caps and
+  spam rules, chat lock and slow mode block or rewrite the line, with
+  MysticModeration's own bypass permission. The public `evaluate` does not record
+  the line, so slow mode and the spam rules compare it with the player's last
+  public chat line.
+
+Without MysticModeration (or with `integrations.mysticModeration` off, or its
+punishments / chat guard module disabled) these checks pass. While it is installed
+but cannot answer, delivered lines are refused with `chat-moderation-unavailable`
+and a warning is logged. A muted player's public line also never pings anyone
+(`rules.mutedPlayersCanNotNotify` in `mentions.json`).
 
 ## Storage backends
 

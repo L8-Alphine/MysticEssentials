@@ -354,6 +354,9 @@ public final class DefaultMessages {
         // Participation / access enforcement
         o.addProperty("chat-channel-you-muted", "&cYou are muted in this channel. {reason}");
         o.addProperty("chat-you-muted", "&cYou are muted. {reason}");
+        o.addProperty("chat-mute-no-reason", "No reason was given.");
+        o.addProperty("chat-moderation-unavailable",
+                "&cChat moderation is unavailable right now, so your message was not sent.");
         o.addProperty("chat-channel-you-listener", "&cYou are a listener in this channel and cannot speak.");
         o.addProperty("chat-channel-banned", "&cYou are banned from that channel.");
         o.addProperty("chat-channel-locked", "&cThat channel is locked.");
@@ -414,6 +417,15 @@ public final class DefaultMessages {
         o.addProperty("pm-blocked", "&cYou can't send private messages to &f{target}&c right now.");
         o.addProperty("pm-reply-no-permission", "&cYou do not have permission to reply to private messages.");
         o.addProperty("pm-reply-none", "&cYou have no one to reply to.");
+        o.addProperty("chat-ignore-added", "&aYou are now ignoring &f{player}&a: their chat and mentions are hidden.");
+        o.addProperty("chat-ignore-removed", "&aYou are no longer ignoring &f{player}&a.");
+        o.addProperty("chat-ignore-already", "&7You are already ignoring &f{player}&7.");
+        o.addProperty("chat-ignore-not-ignored", "&7You are not ignoring &f{player}&7.");
+        o.addProperty("chat-ignore-self", "&cYou cannot ignore yourself.");
+        o.addProperty("chat-ignore-exempt", "&f{player} &ccannot be ignored.");
+        o.addProperty("chat-ignore-list", "&7Ignored players (&f{count}&7): &f{players}");
+        o.addProperty("chat-ignore-list-empty", "&7You are not ignoring anyone. Use &f/ignore <player>&7.");
+        o.addProperty("chat-ignore-unavailable", "&cIgnoring players is unavailable on this server.");
         o.addProperty("announcement-broadcast", "{message}");
         o.addProperty("tutorial-started", "&aTutorial &f{tutorial} &astarted.");
         o.addProperty("tutorial-started-other", "&aStarted tutorial &f{tutorial} &afor &f{player}&a.");

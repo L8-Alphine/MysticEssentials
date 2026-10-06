@@ -2,6 +2,7 @@ package org.hyzionstudios.mysticessentials.modules.chat;
 
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -11,13 +12,20 @@ import java.util.function.Predicate;
 import org.hyzionstudios.mysticessentials.api.chat.ChatDeliveryResult;
 import org.hyzionstudios.mysticessentials.api.chat.ChatDeliveryResult.Status;
 import org.hyzionstudios.mysticessentials.api.chat.ChatMute;
+import org.hyzionstudios.mysticessentials.api.event.ChatDeliveredEvent;
 import org.hyzionstudios.mysticessentials.core.integration.ModerationBridge;
+import org.hyzionstudios.mysticessentials.core.integration.ModerationBridge.GuardVerdict;
+import org.hyzionstudios.mysticessentials.core.notification.NotificationPreferences;
+import org.hyzionstudios.mysticessentials.modules.chat.mention.MentionConfig;
+import org.hyzionstudios.mysticessentials.modules.chat.mention.MentionSubModule;
 
 /**
- * Dependency-free checks of {@code ChatService.deliver}'s rules: a muted sender is
- * refused, a shadow-muted one is shown only their own line, ignoring, offline and
- * policy-blocked recipients are skipped, and MysticModeration's mutes are read the way
- * its own chat gate reads them.
+ * Dependency-free checks of {@code ChatService.deliver}'s rules and of the ignore list
+ * shared with public chat: a muted sender is refused, a shadow-muted one is shown only
+ * their own line, a chat guard or tutorial refusal blocks the line, ignoring, offline and
+ * policy-blocked recipients are skipped, MysticModeration's mutes and chat guard verdicts
+ * are read the way its own chat gates read them, {@code /ignore} edits the list, and the
+ * mention rules follow their config switches.
  */
 public final class ChatDeliveryTest {
 
@@ -46,6 +54,13 @@ public final class ChatDeliveryTest {
         senderGetsTheLineEvenWhenNotListed();
         moderationMutesAreReadLikeItsChatGate();
         resultsNeverCarryNulls();
+        blockedLinesAreRefusedAfterMutes();
+        publicChatDropsTargetsWhoIgnoreTheSender();
+        muteReasonsFallBackToADefault();
+        chatGuardVerdictsAreReadLikeItsChatGate();
+        ignoreCommandEditsTheList();
+        mentionRulesFollowTheirSwitches();
+        deliveredEventsKeepTheirRecipients();
     }
 
     private static void reachesOnlineRecipientsAndTheSender() {
@@ -84,11 +99,11 @@ public final class ChatDeliveryTest {
     }
 
     private static void offlineSenderIsRefused() {
-        ChatDelivery.Plan plan = ChatDelivery.plan(OFFLINE, List.of(MEMBER), null, false, IS_ONLINE,
+        ChatDelivery.Plan plan = ChatDelivery.plan(OFFLINE, List.of(MEMBER), null, false, false, IS_ONLINE,
                 IGNORES_SENDER);
         require(plan.status() == Status.SENDER_OFFLINE && plan.recipients().isEmpty(),
                 "a sender who is not on this server was delivered for: " + plan);
-        require(ChatDelivery.plan(null, List.of(MEMBER), null, false, IS_ONLINE, IGNORES_SENDER).status()
+        require(ChatDelivery.plan(null, List.of(MEMBER), null, false, false, IS_ONLINE, IGNORES_SENDER).status()
                 == Status.SENDER_OFFLINE, "a null sender was delivered for");
     }
 
@@ -126,8 +141,115 @@ public final class ChatDeliveryTest {
                 "a mute carried a null reason");
     }
 
+    private static void blockedLinesAreRefusedAfterMutes() {
+        ChatDelivery.Plan plan = ChatDelivery.plan(SENDER, List.of(MEMBER), null, true, false, IS_ONLINE,
+                IGNORES_SENDER);
+        require(plan.status() == Status.BLOCKED && plan.recipients().isEmpty() && plan.skipped() == 1,
+                "a blocked line was sent: " + plan);
+        require(ChatDelivery.plan(SENDER, List.of(MEMBER), MUTE, true, false, IS_ONLINE, IGNORES_SENDER).status()
+                == Status.MUTED, "a chat guard refusal hid the mute from the sender");
+        require(ChatDelivery.plan(SENDER, List.of(MEMBER), SHADOW, true, false, IS_ONLINE, IGNORES_SENDER).status()
+                == Status.BLOCKED, "a shadow-muted line skipped the chat guard");
+        require(ChatDelivery.plan(SENDER, List.of(MEMBER), null, true, true, IS_ONLINE, IGNORES_SENDER).status()
+                == Status.BLOCKED, "an empty line hid a refusal the sender must hear about");
+        require(!new ChatDeliveryResult(Status.BLOCKED, 0, 1, "Chat is locked").isDelivered(),
+                "a blocked line looked delivered");
+    }
+
+    private static void publicChatDropsTargetsWhoIgnoreTheSender() {
+        List<UUID> kept = ChatDelivery.withoutIgnoring(Arrays.asList(SENDER, MEMBER, null, IGNORER),
+                id -> id, SENDER, id -> IGNORES_SENDER.test(id, SENDER));
+        require(kept.equals(List.of(SENDER, MEMBER)), "an ignoring target kept the line: " + kept);
+        List<UUID> own = ChatDelivery.withoutIgnoring(List.of(SENDER), id -> id, SENDER, id -> true);
+        require(own.equals(List.of(SENDER)), "the sender lost their own line");
+    }
+
+    private static void muteReasonsFallBackToADefault() {
+        require("spam".equals(ChatDelivery.reasonOrDefault("spam", "none")), "a given reason was replaced");
+        require("none".equals(ChatDelivery.reasonOrDefault("", "none"))
+                && "none".equals(ChatDelivery.reasonOrDefault(null, "none"))
+                && "none".equals(ChatDelivery.reasonOrDefault("  ", "none")), "a missing reason stayed empty");
+    }
+
+    private static void chatGuardVerdictsAreReadLikeItsChatGate() throws Exception {
+        require(ModerationBridge.guardVerdictOf(new FakeCheck(FakeOutcome.ALLOW, null, null)) == GuardVerdict.ALLOW,
+                "ALLOW was not allowed");
+        GuardVerdict blocked = ModerationBridge.guardVerdictOf(
+                new FakeCheck(FakeOutcome.BLOCK, "CHAT_LOCK", "&cChat is currently locked by staff."));
+        require(blocked.outcome() == GuardVerdict.Outcome.BLOCK
+                && "&cChat is currently locked by staff.".equals(blocked.text()),
+                "BLOCK lost its feedback: " + blocked);
+        GuardVerdict rewritten = ModerationBridge.guardVerdictOf(new FakeCheck(FakeOutcome.REWRITE, "CAPS", "hello"));
+        require(rewritten.outcome() == GuardVerdict.Outcome.REWRITE && "hello".equals(rewritten.text()),
+                "REWRITE lost its text: " + rewritten);
+        require(ModerationBridge.guardVerdictOf(new FakeCheck(FakeOutcome.REWRITE, "CAPS", null))
+                == GuardVerdict.ALLOW, "an empty rewrite would have sent nothing");
+        try {
+            ModerationBridge.guardVerdictOf(new FakeCheck(FakeOutcome.QUARANTINE, null, null));
+            throw new AssertionError("an unknown chat guard outcome was let through");
+        } catch (ReflectiveOperationException expected) {
+            // Correct: an outcome the bridge does not know refuses the line.
+        }
+    }
+
+    private static void ignoreCommandEditsTheList() {
+        NotificationPreferences preferences = new NotificationPreferences();
+        require(IgnoreSubModule.apply(preferences, "Steve", "Alex", true, false) == IgnoreSubModule.Outcome.ADDED,
+                "/ignore did not add a player");
+        require(preferences.blocks("ALEX") && preferences.blockedNames().equals(List.of("alex")),
+                "the ignore list is not case-insensitive: " + preferences.blockedNames());
+        require(IgnoreSubModule.apply(preferences, "Steve", "alex", true, false) == IgnoreSubModule.Outcome.ALREADY,
+                "a second /ignore added a duplicate");
+        require(IgnoreSubModule.apply(preferences, "Steve", "steve", true, false) == IgnoreSubModule.Outcome.SELF,
+                "a player ignored themselves");
+        require(IgnoreSubModule.apply(preferences, "Steve", "Mod", true, true) == IgnoreSubModule.Outcome.EXEMPT
+                && !preferences.blocks("Mod"), "an exempt player was ignored");
+        require(IgnoreSubModule.apply(preferences, "Steve", "Alex", false, false) == IgnoreSubModule.Outcome.REMOVED
+                && !preferences.blocks("Alex"), "/unignore did not remove the player");
+        require(IgnoreSubModule.apply(preferences, "Steve", "Alex", false, false)
+                == IgnoreSubModule.Outcome.NOT_IGNORED, "/unignore of a player not ignored reported a change");
+    }
+
+    private static void mentionRulesFollowTheirSwitches() {
+        MentionConfig.Rules rules = new MentionConfig.Rules();
+        NotificationPreferences preferences = new NotificationPreferences();
+        preferences.setBlocked("Alex", true);
+        require(MentionSubModule.recipientRefuses(rules, preferences, "Alex"), "an ignored player could mention");
+        require(!MentionSubModule.recipientRefuses(rules, preferences, "Steve"), "a stranger was refused");
+        rules.ignoredPlayersCanNotNotify = false;
+        require(!MentionSubModule.recipientRefuses(rules, preferences, "Alex"),
+                "ignoredPlayersCanNotNotify=false still refused an ignored player");
+        preferences.doNotDisturb = true;
+        require(MentionSubModule.recipientRefuses(rules, preferences, "Steve"), "do-not-disturb stopped working");
+
+        MentionConfig.Rules defaults = new MentionConfig.Rules();
+        require(!MentionSubModule.senderMayNotify(defaults, true), "a muted player could mention");
+        require(MentionSubModule.senderMayNotify(defaults, false), "an unmuted player could not mention");
+        defaults.mutedPlayersCanNotNotify = false;
+        require(MentionSubModule.senderMayNotify(defaults, true),
+                "mutedPlayersCanNotNotify=false still silenced a muted player");
+    }
+
+    private static void deliveredEventsKeepTheirRecipients() {
+        Set<UUID> reached = new LinkedHashSet<>(List.of(SENDER, MEMBER));
+        ChatDeliveredEvent event = new ChatDeliveredEvent(SENDER, "Steve", "Steve", "Guild", "hi", reached, false);
+        reached.clear();
+        require(event.recipients().equals(Set.of(SENDER, MEMBER)), "the event shares the caller's set");
+        require(new ChatDeliveredEvent(SENDER, "Steve", "Steve", "Guild", "hi", null, true).recipients().isEmpty(),
+                "a null recipient set leaked");
+    }
+
     private static ChatDelivery.Plan plan(List<UUID> recipients, ChatMute mute, boolean empty) {
-        return ChatDelivery.plan(SENDER, recipients, mute, empty, IS_ONLINE, IGNORES_SENDER);
+        return ChatDelivery.plan(SENDER, recipients, mute, false, empty, IS_ONLINE, IGNORES_SENDER);
+    }
+
+    /** MysticModeration's {@code ChatGuardService.ChatCheck.Outcome}, plus one it does not have. */
+    public enum FakeOutcome {
+        ALLOW, BLOCK, REWRITE, QUARANTINE
+    }
+
+    /** MysticModeration's {@code ChatGuardService.ChatCheck} record, in the part the bridge reads. */
+    public record FakeCheck(FakeOutcome outcome, String violation, String detail) {
     }
 
     /** MysticModeration's {@code PunishmentType}, in the part the bridge reads. */

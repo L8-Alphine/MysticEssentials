@@ -103,6 +103,9 @@ Alias: `/portals`. Portals are configured in-game by pressing Use (F) on a porta
 | `/msg <player> <message>` | Send a private message | `mysticessentials.chat.private.message` |
 | `/tell`, `/w`, `/whisper` | Aliases for `/msg` | `mysticessentials.chat.private.message` |
 | `/reply <message>`, `/r <message>` | Reply to the last private message | `mysticessentials.chat.private.reply` |
+| `/ignore` | List the players you ignore | `mysticessentials.chat.ignore` |
+| `/ignore <player>` | Hide a player's chat lines and mentions from you | `mysticessentials.chat.ignore` |
+| `/unignore <player>` | Stop ignoring a player | `mysticessentials.chat.ignore` |
 | `/channel`, `/ch` | Open the channel browser or show channel state | None by default |
 | `/channel <name>` | Switch speaking channel | Channel permissions may apply |
 | `/channel switch <name> [password]` | Switch speaking channel | Channel permissions may apply |

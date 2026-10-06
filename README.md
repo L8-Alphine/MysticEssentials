@@ -208,6 +208,8 @@ Bypass: `mysticessentials.craftblock.bypass` (all items) or
 |---|---|---|
 | `/msg <player> <message>` | Private message (aliases `/tell`, `/w`, `/whisper`) | — |
 | `/reply <message>` | Reply to your last PM (alias `/r`) | — |
+| `/ignore [player]` | Ignore a player (their chat lines and mentions are hidden from you); without a name, list who you ignore | `mysticessentials.chat.ignore` |
+| `/unignore <player>` | Stop ignoring a player | `mysticessentials.chat.ignore` |
 | `/channel` | Open the channel browser/menu (alias `/ch`) | — |
 | `/channel <name>` or `/channel switch <name> [password]` | Switch the channel you speak in | — |
 | `/channel join <name> [password]` | Listen to a channel you can access | — |
@@ -767,7 +769,7 @@ integration toggles plus the Redis connection without a restart.
 | **PlaceholderAPI-Hytale 1.0.8+** | Resolves external `%...%` values and registers `%mystic_<name>%` / `%mysticessentials_<name>%` | Internal `{...}` placeholders continue to work; late registration is retried |
 | **VaultUnlocked 2.20+** | Paid warps/teleports/flight/kits and AFK payouts through its current `BigDecimal` economy API | Costs become free and payouts safely no-op |
 | **MysticVanish 1.0+** | Hides vanished players from suggestions, TPA, messaging, and public lifecycle announcements | Everyone is treated as visible |
-| **MysticModeration 1.0+** | Dynamic diagnostics/API and reload bridge; discovered after startup through MysticModeration's plugin classloader. Its active mute (shadow mutes included) is honoured by `ChatService.deliver`, the chat other mods hand over (guild, party...) | Moderation calls are unavailable; core moderation audit logs remain local; nobody is muted in delivered chat |
+| **MysticModeration 1.0+** | Dynamic diagnostics/API and reload bridge; discovered after startup through MysticModeration's plugin classloader. `ChatService.deliver`, the chat other mods hand over (guild, party...), honours its active mute (shadow mutes included) and its chat guard (filter, chat lock, slow mode), and refuses lines while it is installed but cannot answer; a muted player's line never pings anyone | Moderation calls are unavailable; core moderation audit logs remain local; delivered chat is not moderated |
 | **MysticIdentity 0.1+** | Managed (parentally supervised) accounts: private messages are refused between a pair the child's policy keeps apart (`TEXT_PRIVATE`), cross-server channel lines and lines other mods hand to `ChatService.deliver` are delivered per listener (`TEXT_PUBLIC`), and bridged Discord lines skip a child whose cross-platform chat is off (`TEXT_CROSS_PLATFORM`); guardians and trusted staff are exempt inside MysticIdentity's answer | Nobody is restricted |
 | **MysticIdentity player portal** | Mail (read-only; attachments are claimed in game), view-only vaults and patch notes on the web dashboard, plus a My identity card with unread mail, vault count and nickname. Loaded from its own source set (`src/mysticidentity/java`) so the main code never compiles against MysticIdentity; follows `integrations.mysticIdentity` | The pages do not appear |
 | **MysticRPG 1.0+** | RPG-level/safe-region checks for random teleport plus its stable item metadata contract | RTP uses terrain/config safety only; ordinary item details remain |
