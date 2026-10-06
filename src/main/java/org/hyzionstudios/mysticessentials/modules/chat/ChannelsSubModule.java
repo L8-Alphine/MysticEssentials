@@ -1502,7 +1502,7 @@ public final class ChannelsSubModule {
 
     public boolean createTemporaryChannel(UUID owner, String channelId, String permissionGate, String password,
             String prefix, List<String> aliases) {
-        if (!config.enabled || !config.allowTemporaryChannels) {
+        if (!config.enabled || !config.allowTemporaryChannels || temporaryChannelLimitReached(owner)) {
             return false;
         }
         String id = normalize(channelId);
@@ -1575,6 +1575,36 @@ public final class ChannelsSubModule {
     boolean canCreateTemporaryChannel(PlayerRef player) {
         return config.createTemporaryPermission == null || config.createTemporaryPermission.isBlank()
                 || player.hasPermission(config.createTemporaryPermission);
+    }
+
+    /**
+     * {@code true} when {@code owner} already owns {@code maxTemporaryChannelsPerOwner}
+     * temporary channels. Channels owned on other servers count too: they are mirrored
+     * here over Redis. {@code 0} or less is unlimited; staff-override holders are exempt.
+     */
+    boolean temporaryChannelLimitReached(UUID owner) {
+        int limit = config.maxTemporaryChannelsPerOwner;
+        if (limit <= 0 || core.platform().findPlayer(owner).map(this::hasStaffOverride).orElse(false)) {
+            return false;
+        }
+        return ownedTemporaryChannelCount(owner) >= limit;
+    }
+
+    /** Placeholders for the {@code chat-channel-temp-limit} message. */
+    Map<String, String> temporaryChannelLimitPlaceholders(UUID owner) {
+        return Map.of("count", String.valueOf(ownedTemporaryChannelCount(owner)),
+                "limit", String.valueOf(config.maxTemporaryChannelsPerOwner));
+    }
+
+    private int ownedTemporaryChannelCount(UUID owner) {
+        pruneExpired();
+        int count = 0;
+        for (TemporaryChannel temp : temporaryChannels.values()) {
+            if (owner.equals(temp.owner)) {
+                count++;
+            }
+        }
+        return count;
     }
 
     private Optional<ChatConfig.Channel> channelForSender(PlayerRef sender) {
@@ -2527,6 +2557,10 @@ public final class ChannelsSubModule {
             if ("temp".equals(action) || "create".equals(action)) {
                 if (!sender.hasPermission(config.createTemporaryPermission)) {
                     sender.replyKey("chat-channel-temp-no-permission");
+                    return;
+                }
+                if (temporaryChannelLimitReached(sender.uuid())) {
+                    sender.replyKey("chat-channel-temp-limit", temporaryChannelLimitPlaceholders(sender.uuid()));
                     return;
                 }
                 if (args.length < 2) {

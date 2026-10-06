@@ -97,7 +97,8 @@ that portal. Leave the field empty to allow everyone.
 | `mysticessentials.chat.private.reply` | `/reply` |
 | `mysticessentials.chat.socialspy` | See other players' private messages |
 | `mysticessentials.chat.socialspy.exempt` | Hidden from social spy |
-| `mysticessentials.chat.channel.create.temp` | `/channel temp` — temporary channels |
+| `mysticessentials.chat.channel.create.temp` | `/channel temp` — temporary channels (up to `channels.maxTemporaryChannelsPerOwner` owned at once, default 1) |
+| `mysticessentials.channel.staff.override` | Manage, force-transfer or force-close any temporary channel; not limited by `maxTemporaryChannelsPerOwner` |
 | `mysticessentials.chat.channel.<id>[.speak/.listen/.moderator]` | Dynamic per-channel gates (configured per channel) |
 | `mysticessentials.chat.color.legacy/hex/gradient/rainbow/minimessage/links` | Colour/markup styles in chat messages |
 | `mysticessentials.chat.itemlink.use` | Share the held item in chat with the `[item]` tag |

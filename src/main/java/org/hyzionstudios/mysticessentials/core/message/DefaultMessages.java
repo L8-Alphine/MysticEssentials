@@ -328,6 +328,7 @@ public final class DefaultMessages {
         o.addProperty("chat-channel-temp-usage", "&cUsage: /channel temp <id> [password|-] [prefix|-] [alias1,alias2|-] [permission]");
         o.addProperty("chat-channel-temp-created", "&aCreated temporary channel &f{channel}&a.");
         o.addProperty("chat-channel-temp-failed", "&cCould not create that temporary channel.");
+        o.addProperty("chat-channel-temp-limit", "&cYou already own {count} temporary channel(s) (limit {limit}). Close one first.");
         o.addProperty("chat-channel-joined", "&aNow listening to &f{channel}&a.");
         o.addProperty("chat-channel-already-listening", "&7Already listening to &f{channel}&7.");
         o.addProperty("chat-channel-password-required", "&cThat channel requires a password.");

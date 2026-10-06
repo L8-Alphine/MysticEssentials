@@ -663,6 +663,9 @@ Notable per-module settings:
   Temporary channels are session channels: without Redis they stay open until
   the server is empty or restarts; with Redis enabled they can be restored after
   restart for `temporaryChannelDefaultMinutes` (default `120`) minutes.
+  `maxTemporaryChannelsPerOwner` (default `1`; `0` = unlimited) caps how many
+  temporary channels one player may own at once, across all servers when Redis
+  is enabled; holders of `mysticessentials.channel.staff.override` are exempt.
 - **announcements** — `autoBroadcastEnabled`, `intervalSeconds`, `randomOrder`,
   and `messages`. Message entries may be legacy strings or JSON objects:
   `{"lines":["&7Line one","&fLine two"],"click":{"action":"command","value":"/spawn"}}`.

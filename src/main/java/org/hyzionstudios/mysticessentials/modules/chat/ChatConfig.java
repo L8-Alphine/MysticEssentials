@@ -63,6 +63,12 @@ public final class ChatConfig {
         public String crossServerPrefix = "&8[&b{server_id}&8] ";
         public boolean allowTemporaryChannels = true;
         public int temporaryChannelDefaultMinutes = 120;
+        /**
+         * Temporary channels one player may own at once, counted across the network
+         * when Redis is enabled. {@code 0} or less is unlimited; holders of
+         * {@code mysticessentials.channel.staff.override} are not limited.
+         */
+        public int maxTemporaryChannelsPerOwner = 1;
         public String createTemporaryPermission = "mysticessentials.chat.channel.create.temp";
         public List<Channel> channels = defaultChannels();
         public Roster roster = new Roster();

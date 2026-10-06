@@ -229,6 +229,12 @@ final class ChannelPages {
                     reopen(ref, store, new ChannelsPage(core, channels, player));
                     return;
                 }
+                if (channels.temporaryChannelLimitReached(player.getUuid())) {
+                    core.getMessageService().sendKey(player, "chat-channel-temp-limit",
+                            channels.temporaryChannelLimitPlaceholders(player.getUuid()));
+                    reopen(ref, store, new ChannelsPage(core, channels, player));
+                    return;
+                }
                 boolean created = channels.createTemporaryChannel(player.getUuid(), id, null,
                         blankToNull(field(payload, "password")),
                         blankToNull(field(payload, "prefix")),
