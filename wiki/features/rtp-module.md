@@ -14,12 +14,12 @@ The `/rtp` command is free-form parsed, so its many forms never collide.
 | `/rtp menu`, `/rtp ui` | Open the RTP selection UI | `mysticessentials.teleport.rtp.use` |
 | `/rtp world <world> [player]` | RTP into a specific world | `mysticessentials.teleport.rtp.use` |
 | `/rtp profile <profile> [player]` | RTP using a named profile | `mysticessentials.teleport.rtp.use` |
-| `/rtp <player>` | Send another online player (admin form) | `mysticessentials.teleport.rtp.others` |
+| `/rtp <player>` | Send another online player; they go through the normal checks unless you hold `mysticessentials.teleport.rtp.admin.force` | `mysticessentials.teleport.rtp.others` |
 | `/rtp cancel` | Cancel your active warmup, queued search, or pending teleport | `mysticessentials.teleport.rtp.use` |
 | `/rtp status` | Show your active search phase, queue position, and per-profile cooldowns | `mysticessentials.teleport.rtp.use` |
 | `/rtp info [profile]` | Show a profile's world, radius, shape, cost, warmup, and cooldown | `mysticessentials.teleport.rtp.use` |
 
-Admin forms accept trailing flags: `--force` (skip warmup/cooldown/cost checks) and `--silent` (no chat feedback to the target), which need `mysticessentials.teleport.rtp.admin.force`, and `--bypass-cost`, which needs `mysticessentials.teleport.rtp.bypass.cost`.
+Sending another player with only `mysticessentials.teleport.rtp.others` puts them through the normal checks: their profile permission, cooldown, limits and warmup, and the cost is charged to them (unless they hold `mysticessentials.teleport.rtp.bypass.cost`). A sender holding `mysticessentials.teleport.rtp.admin.force` skips those checks, as does the trailing `--force` flag; `--silent` (no chat feedback to the target) needs the same node.
 
 ## Admin commands
 

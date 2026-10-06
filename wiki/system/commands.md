@@ -40,7 +40,7 @@ See the [Random Teleport](rtp-module) page for full details.
 | `/rtp` | Teleport to a random safe location (or open the RTP UI) | `mysticessentials.teleport.rtp.use` |
 | `/rtp world <world> [player]` | RTP into a specific world | `mysticessentials.teleport.rtp.use` |
 | `/rtp profile <profile> [player]` | RTP using a named profile | `mysticessentials.teleport.rtp.use` |
-| `/rtp <player>` | RTP another online player | `mysticessentials.teleport.rtp.others` |
+| `/rtp <player>` | RTP another online player (normal checks unless you hold `...rtp.admin.force`) | `mysticessentials.teleport.rtp.others` |
 | `/rtp cancel` / `status` / `info [profile]` | Cancel, check status, or inspect a profile | `mysticessentials.teleport.rtp.use` |
 | `/rtpadmin`, `/rtpa` | Administer profiles, queue, and search (reload/test/preview/debug/enable/disable/setcenter/clearcache/queue/ui/cancel/spread/queue-login) | `mysticessentials.teleport.rtp.admin` |
 

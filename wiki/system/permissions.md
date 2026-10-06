@@ -30,12 +30,12 @@ All permission nodes are prefixed with `mysticessentials.`. Dynamic nodes such a
 | Node | Grants |
 | --- | --- |
 | `mysticessentials.teleport.rtp.use` | `/rtp` and the selection UI |
-| `mysticessentials.teleport.rtp.others` | `/rtp <player>` (send another player) |
+| `mysticessentials.teleport.rtp.others` | `/rtp <player>` (send another player through the normal checks) |
 | `mysticessentials.teleport.rtp.cancel` / `.status` | Cancel / status forms |
 | `mysticessentials.teleport.rtp.bypass.warmup` | Skip RTP warmups |
 | `mysticessentials.teleport.rtp.bypass.cooldown` | Skip RTP cooldowns |
-| `mysticessentials.teleport.rtp.bypass.cost` | Skip RTP costs; allows the `--bypass-cost` flag |
-| `mysticessentials.teleport.rtp.admin.force` | `--force` and `--silent` flags |
+| `mysticessentials.teleport.rtp.bypass.cost` | Skip RTP costs |
+| `mysticessentials.teleport.rtp.admin.force` | Skip the target's checks: the `--force` flag and every `/rtp <player>` its holder sends; also `--silent` |
 | `mysticessentials.teleport.rtp.bypass.combat` | RTP while in combat |
 | `mysticessentials.teleport.rtp.bypass.queue` | Skip the search queue |
 | `mysticessentials.teleport.rtp.bypass.limits` | Ignore per-hour/day use limits |

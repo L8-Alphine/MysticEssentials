@@ -352,6 +352,16 @@ tasks.register<JavaExec>("verifyMysticRpgRtpSafety") {
     )
 }
 
+tasks.register<JavaExec>("verifyRtpOthersForce") {
+    group = "verification"
+    description = "Checks /rtp only forces another player for holders of rtp.admin.force."
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets.test.get().runtimeClasspath + configurations.compileClasspath.get()
+    mainClass.set(
+        "org.hyzionstudios.mysticessentials.modules.teleportation.rtp.RtpOthersForceTest"
+    )
+}
+
 tasks.register<JavaExec>("verifyRtpFluidSafety") {
     group = "verification"
     description = "Checks RTP handling of Hytale fluid ids and missing-section sentinels."
@@ -408,6 +418,7 @@ tasks.named("check") {
         "verifyItemDetailsLayout",
         "verifyMysticRpgRtpSafety",
         "verifyRtpFluidSafety",
+        "verifyRtpOthersForce",
         "verifyIntegrationContracts",
         "verifyShadedJar",
         "verifyMessageParamOrder"
