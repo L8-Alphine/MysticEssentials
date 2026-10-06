@@ -199,11 +199,14 @@ public final class PrivateMessagingSubModule {
         if (!config.socialSpyEnabled) {
             return;
         }
+        // A blank exempt node exempts nobody (allows() would grant it to everyone).
+        String exemptNode = config.socialSpyExemptPermission;
+        boolean exempt = exemptNode != null && !exemptNode.isBlank() && target.hasPermission(exemptNode);
         for (PlayerRef spy : core.platform().onlinePlayers()) {
             if (spy.getUuid().equals(fromUuid) || spy.getUuid().equals(target.getUuid())) {
                 continue;
             }
-            if (allows(spy, config.socialSpyPermission) && !allows(target, config.socialSpyExemptPermission)) {
+            if (allows(spy, config.socialSpyPermission) && !exempt) {
                 core.getMessageService().sendKey(spy, "pm-spy", Map.of(
                         "sender", fromName,
                         "target", target.getUsername(),
