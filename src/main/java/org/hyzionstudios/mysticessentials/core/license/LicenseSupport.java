@@ -4,6 +4,7 @@ import java.util.logging.Level;
 
 import org.hyzionstudios.mysticessentials.core.MysticCore;
 
+import com.hypixel.hytale.server.core.plugin.PluginManager;
 import com.mysticlicensing.license.LicenseGate;
 import com.mysticlicensing.license.LicenseLog;
 import com.mysticlicensing.license.Products;
@@ -23,8 +24,10 @@ import com.mysticlicensing.license.Products;
  *
  * <p>The license file belongs next to the mod's own config, at
  * {@code mods/MysticEssentials/license.mclicense}. The server's licensing id is
- * generated on first run and kept in {@code server-id.txt} beside it; that is
- * the value an operator registers in the portal.
+ * generated on first run (or adopted from the {@code server-id.txt} this mod kept
+ * beside it before) and kept in {@code mods/.mystic/server-id.txt}, shared by
+ * every Mystic mod on the server; that is the value an operator registers in the
+ * portal.
  */
 public final class LicenseSupport {
 
@@ -41,6 +44,7 @@ public final class LicenseSupport {
     public static LicenseGate create(MysticCore core) {
         return LicenseGate.builder(Products.ESSENTIALS)
                 .dataDir(core.paths().root())
+                .modsDir(PluginManager.MODS_PATH)
                 .modVersion(core.getVersion())
                 .logger(adapt(core))
                 .build();

@@ -64,6 +64,7 @@ class LicenseGateTest {
     private LicenseGate.Builder gate(Path dir, RecordingLog log) {
         return LicenseGate.builder(Products.ESSENTIALS)
                 .dataDir(dir)
+                .modsDir(dir) // keeps the shared identity inside the test's directory
                 .withoutEmbeddedKeys()
                 .trustSigningKey(TestLicenses.SIGNING_KEY_ID, licenses.publicKeySpkiBase64())
                 .addContentKey(TestLicenses.CONTENT_KEY_ID, licenses.contentKeyBase64Url())
@@ -500,11 +501,13 @@ class LicenseGateTest {
     }
 
     @Test
-    @DisplayName("without an override the gate persists a server identity itself")
+    @DisplayName("without an override the gate persists a shared server identity itself")
     void serverIdentityIsPersisted(@TempDir Path dir) throws Exception {
+        Path mods = dir.resolve("mods");
+        Path data = mods.resolve("MysticEssentials");
         RecordingLog log = new RecordingLog();
         LicenseGate license = LicenseGate.builder(Products.ESSENTIALS)
-                .dataDir(dir)
+                .dataDir(data) // no modsDir: the data directory's parent is the mods folder
                 .withoutEmbeddedKeys()
                 .trustSigningKey(TestLicenses.SIGNING_KEY_ID, licenses.publicKeySpkiBase64())
                 .addContentKey(TestLicenses.CONTENT_KEY_ID, licenses.contentKeyBase64Url())
@@ -515,11 +518,81 @@ class LicenseGateTest {
 
         license.start();
 
-        Path identity = dir.resolve(ServerIdentity.IDENTITY_FILE);
+        Path identity = mods.resolve(ServerIdentity.SHARED_DIR).resolve(ServerIdentity.IDENTITY_FILE);
         assertTrue(Files.exists(identity), "the server id must be persisted on first run");
+        assertFalse(Files.exists(data.resolve(ServerIdentity.IDENTITY_FILE)),
+                "the id is shared, not kept per mod");
         UUID persisted = UUID.fromString(
                 Files.readString(identity, StandardCharsets.UTF_8).trim());
         assertEquals(persisted, license.serverUuid());
+    }
+
+    @Test
+    @DisplayName("a mod's per-mod server id is moved into the shared file and its license keeps working")
+    void perModIdentityIsMigrated(@TempDir Path dir) throws Exception {
+        Path mods = dir.resolve("mods");
+        Path data = mods.resolve("MysticEssentials");
+        writeLicense(data, licenses.license()
+                .boundTo(TestLicenses.SERVER_UUID)
+                .grants(Products.ESSENTIALS, "*")
+                .bytes());
+        Files.writeString(data.resolve(ServerIdentity.IDENTITY_FILE), TestLicenses.SERVER_UUID + "\n");
+        RecordingLog log = new RecordingLog();
+
+        LicenseGate license = gate(data, log).modsDir(mods).serverUuid(null).build();
+
+        assertEquals(LicenseStatus.VALID, license.start());
+        assertEquals(UUID.fromString(TestLicenses.SERVER_UUID), license.serverUuid());
+        Path shared = mods.resolve(ServerIdentity.SHARED_DIR).resolve(ServerIdentity.IDENTITY_FILE);
+        assertEquals(TestLicenses.SERVER_UUID, Files.readString(shared, StandardCharsets.UTF_8).trim());
+        assertTrue(Files.exists(data.resolve(ServerIdentity.IDENTITY_FILE)),
+                "older mod versions still read the per-mod file");
+        assertTrue(log.info.stream().anyMatch(line -> line.contains("shared by every Mystic mod")),
+                log.info::toString);
+    }
+
+    @Test
+    @DisplayName("a license bound to the mod's own pre-shared id still verifies, with a warning")
+    void licenseBoundToOwnPerModIdStillVerifies(@TempDir Path dir) throws Exception {
+        Path mods = dir.resolve("mods");
+        Path data = mods.resolve("MysticGuilds");
+        writeLicense(data, licenses.license()
+                .boundTo(TestLicenses.SERVER_UUID)
+                .grants(Products.ESSENTIALS, "*")
+                .bytes());
+        Files.writeString(data.resolve(ServerIdentity.IDENTITY_FILE), TestLicenses.SERVER_UUID);
+        Path shared = mods.resolve(ServerIdentity.SHARED_DIR);
+        Files.createDirectories(shared);
+        Files.writeString(shared.resolve(ServerIdentity.IDENTITY_FILE), TestLicenses.OTHER_SERVER_UUID);
+        RecordingLog log = new RecordingLog();
+
+        LicenseGate license = gate(data, log).modsDir(mods).serverUuid(null).build();
+
+        assertEquals(LicenseStatus.VALID, license.start(),
+                "updating a mod must not strand a license bound to the id it kept before");
+        assertEquals(UUID.fromString(TestLicenses.SERVER_UUID), license.serverUuid());
+        assertTrue(log.warn.stream().anyMatch(line -> line.contains("server-replacement")),
+                log.warn::toString);
+    }
+
+    @Test
+    @DisplayName("a license bound to neither the shared nor the per-mod id is still the wrong server")
+    void licenseBoundElsewhereIsWrongServer(@TempDir Path dir) throws Exception {
+        Path mods = dir.resolve("mods");
+        Path data = mods.resolve("MysticEssentials");
+        writeLicense(data, licenses.license()
+                .boundTo(TestLicenses.SERVER_UUID)
+                .grants(Products.ESSENTIALS, "*")
+                .bytes());
+        Files.writeString(data.resolve(ServerIdentity.IDENTITY_FILE), UUID.randomUUID().toString());
+        Path shared = mods.resolve(ServerIdentity.SHARED_DIR);
+        Files.createDirectories(shared);
+        Files.writeString(shared.resolve(ServerIdentity.IDENTITY_FILE), TestLicenses.OTHER_SERVER_UUID);
+
+        LicenseGate license = gate(data, new RecordingLog()).modsDir(mods).serverUuid(null).build();
+
+        assertEquals(LicenseStatus.WRONG_SERVER, license.start());
+        assertEquals(UUID.fromString(TestLicenses.OTHER_SERVER_UUID), license.serverUuid());
     }
 
     @Test

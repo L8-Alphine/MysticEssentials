@@ -2,6 +2,17 @@
 
 All notable changes to `mystic-license` are recorded here.
 
+## [Unreleased]
+
+### Changed
+
+- The server id is shared by every Mystic mod on a server, in
+  `mods/.mystic/server-id.txt` (`ServerIdentity.resolveShared`,
+  `LicenseGate.Builder.modsDir`). The first start without it adopts the per-mod
+  `server-id.txt` files: the only id, or `MysticEssentials`' when they differ,
+  naming the others in a warning. Per-mod files are left in place, and a license
+  bound to a mod's own earlier id still verifies for that mod.
+
 ## [1.0.0] — 2026-07-28
 
 First release.

@@ -24,7 +24,9 @@ import java.util.logging.Logger;
  * <ol>
  *   <li><b>Where the license file lives</b> - here, the mod's data directory.</li>
  *   <li><b>The server UUID</b> - here, left to {@link LicenseGate}'s own
- *       persisted identity. A mod with a real server id passes
+ *       persisted identity, which every Mystic mod shares in
+ *       {@code mods/.mystic/server-id.txt} (the data directory's parent is taken
+ *       as the mods folder). A mod with a real server id passes
  *       {@code .serverUuid(...)} instead.</li>
  *   <li><b>Logging</b> - a three-line adapter over the host's logger.</li>
  * </ol>
@@ -40,8 +42,8 @@ public final class ExampleModLicensing {
     private final LicenseGate gate;
 
     /**
-     * @param dataDir the mod's own data directory, writable, where
-     *                {@code license.mclicense} and {@code server-id.txt} live
+     * @param dataDir the mod's own data directory under the mods folder, writable,
+     *                where {@code license.mclicense} lives
      */
     public ExampleModLicensing(Logger hostLogger, Path dataDir) {
         this.gate = LicenseGate.builder(Products.GUILDS)
