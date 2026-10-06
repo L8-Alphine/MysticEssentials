@@ -88,8 +88,8 @@ public final class AnnouncementModule extends AbstractMysticModule implements An
         core.redis().publish(CHANNEL, message);
     }
 
-    /** Shows a broadcast to this server's players only. */
-    private void broadcastLocal(String message) {
+    /** Shows a broadcast to this server's players only (no network relay). */
+    public void broadcastLocal(String message) {
         sendAnnouncement(message, NotificationAudience.all());
     }
 

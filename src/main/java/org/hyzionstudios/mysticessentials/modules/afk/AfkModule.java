@@ -21,8 +21,10 @@ import java.util.function.ToIntFunction;
 import org.hyzionstudios.mysticessentials.api.Permissions;
 import org.hyzionstudios.mysticessentials.api.model.MysticLocation;
 import org.hyzionstudios.mysticessentials.api.service.AfkService;
+import org.hyzionstudios.mysticessentials.core.message.MysticText;
 import org.hyzionstudios.mysticessentials.core.module.AbstractMysticModule;
 import org.hyzionstudios.mysticessentials.core.util.Json;
+import org.hyzionstudios.mysticessentials.modules.announcements.AnnouncementModule;
 import org.hyzionstudios.mysticessentials.platform.Conversions;
 import org.hyzionstudios.mysticessentials.platform.command.MysticArgTypes;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommand;
@@ -466,12 +468,28 @@ public final class AfkModule extends AbstractMysticModule implements AfkService 
         return (dx * dx + dy * dy + dz * dz) > MOVE_EPSILON_SQ;
     }
 
-    /** Broadcasts an AFK status line, unless the player is vanished. */
+    /**
+     * Broadcasts an AFK status line to this server's players, unless the player is
+     * vanished. Local only: {@code announce} is "to the server", and the network
+     * relay would carry every status line (and its reason) to every server.
+     */
     private void announce(UUID player, String message) {
-        if (config.announce && core.getAnnouncementService() != null
+        if (config.announce && core.getAnnouncementService() instanceof AnnouncementModule announcements
                 && !core.vanish().isVanished(player)) {
-            core.getAnnouncementService().broadcast("&8* &7" + message);
+            announcements.broadcastLocal("&8* &7" + message);
         }
+    }
+
+    /**
+     * A player-written AFK reason is shown to others through the formatting
+     * pipeline, so it is reduced to plain text: no markup and no placeholder syntax.
+     */
+    private static String plainReason(String reason) {
+        String plain = MysticText.stripMarkup(reason)
+                .replaceAll("<[^>]*>", "")
+                .replaceAll("[<>&{}%]", "")
+                .trim();
+        return plain.isEmpty() ? null : plain;
     }
 
     // ----- Reward zones ------------------------------------------------------
@@ -1148,7 +1166,7 @@ public final class AfkModule extends AbstractMysticModule implements AfkService 
                 markActivity(uuid);
                 return;
             }
-            String reason = sender.args().length > 0 ? String.join(" ", sender.args()) : null;
+            String reason = sender.args().length > 0 ? plainReason(String.join(" ", sender.args())) : null;
             // With several zones to choose from (and not already inside one),
             // let the player pick in a UI; going AFK happens on selection.
             PlayerRef player = sender.player().orElse(null);
