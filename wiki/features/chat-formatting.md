@@ -36,7 +36,7 @@ The sender's format is chosen by scanning `formats` from **highest `priority` do
     "id": "vip",
     "priority": 50,
     "permission": "mysticessentials.chat.format.vip",
-    "format": "{rank_icon}&8[&6VIP&8] {display_name} &8» &f{message}"
+    "format": "&8[&6VIP&8] {display_name} &8» &f{message}"
   }
 ]
 ```
@@ -58,7 +58,7 @@ Assign the gating nodes (`mysticessentials.chat.format.owner`, `...vip`) to the 
 | `{playtime_session}` | Length of the current session, formatted |
 | `{playtime_*_seconds}`, `{playtime_*_hours}` | The same counters as raw seconds or whole hours |
 
-The **player's message is substituted last** — after all other placeholders resolve. This means chat text is never re-parsed for placeholders or rank-icon tokens, so players cannot inject formatting or icons through what they type.
+The **player's message is substituted last** — after all other placeholders resolve. This means chat text is never re-parsed for placeholders, so players cannot inject placeholder values through what they type.
 
 To print a literal `{` or `%`, escape it with a backslash: `\{not_a_placeholder}`.
 
@@ -79,7 +79,7 @@ You can repoint any style at a different permission by editing its value in `mes
 
 ### Legacy color code reference
 
-`&0`–`&9` and `&a`–`&f` are the 16 legacy colors; `&k` obfuscated, `&l` bold, `&m` strikethrough, `&n` underline, `&o` italic, `&r` reset.
+`&0`–`&9` and `&a`–`&f` are the 16 legacy colors; `&l` bold, `&m` strikethrough, `&n` underline, `&o` italic, and `&r` reset. Hytale has no protocol field for obfuscated text, so `&k` is ignored.
 
 ## Links
 
@@ -87,15 +87,10 @@ When `autoLinkPlainUrls` is `true`, plain `http(s)://` URLs in a message become 
 
 ## How rendering works
 
-Internally the formatter runs one of two paths:
-
-- **String path** (default): the template is colorized and placeholders resolved into a single formatted string.
-- **Rich path** (when rank icons are enabled): the template is split into literal runs and typed tokens. Literal runs go through the exact same string pipeline; typed tokens such as `{rank_icon}` become image fragments. The pieces are then assembled into one message, with empty fragments dropped and adjacent text merged.
-
-The rich pipeline is what lets inline images coexist with legacy color codes. Rank-icon rendering reads only from in-memory state, so formatting stays fast on the async chat thread.
+The formatter resolves the format and player placeholders, substitutes the player's sanitized message last, then parses legacy, hex, gradient, rainbow, MiniMessage-style, and link markup into Hytale's formatted message tree. Update 6 supports strikethrough; hover text and obfuscated text are not representable by the current protocol.
 
 ## Related pages
 
-- [Chat module](chat-module) — private messages, channels, glyphs, and the full command list
+- [Chat module](chat-module) — private messages, channels, mentions, item links, and the full command list
 - [Configuration Reference](configuration) — every `modules/chat/config.json` field
 - [Permissions Reference](permissions) — all chat permission nodes

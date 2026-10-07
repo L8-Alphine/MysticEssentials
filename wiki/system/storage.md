@@ -43,7 +43,7 @@ Redis is optional and layers a shared cache and pub/sub on top of the storage pr
 | `storage.redis.username` | `""` | ACL user (Redis 6+); blank for the `default` user |
 | `storage.redis.password` | `""` | Password; blank for none |
 | `storage.redis.serverId` | `"survival-1"` | Unique id for this server |
-| `storage.redis.networkId` | `"mystic-network"` | Shared id for all servers in the network |
+| `storage.redis.networkId` | `"mystic_network"` | Shared id for all servers in the network |
 | `storage.redis.advertisedHost` | `""` | Hostname/IP clients use when another server refers them here (cross-server TPA). Blank = auto-detected from the bound interface / first LAN or public IPv4 |
 | `storage.redis.advertisedPort` | `0` | Public game port paired with `advertisedHost`; `0` = the port this server is bound to |
 | `storage.redis.presenceTtlSeconds` | `30` | How long a server's roster entry survives without a heartbeat |

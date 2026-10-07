@@ -13,6 +13,7 @@ Use teleport requests when you want to visit another player or invite them to yo
 | `/tpaccept [player]` | Accept the newest request, or a request from a specific player |
 | `/tpdeny [player]` | Deny the newest request, or a request from a specific player |
 | `/tpcancel` | Cancel your outgoing requests |
+| `/tptoggle` | Toggle whether other players may send you requests |
 | `/tpa` | Open the Teleport Requests UI |
 
 Requests expire after the server's configured timeout. Accepted teleports may have a warmup. If you move or take damage during warmup, the teleport can be cancelled.

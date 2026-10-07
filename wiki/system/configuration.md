@@ -29,7 +29,7 @@ Important sections:
 | `storage.redis.username` | `""` | Redis ACL user (Redis 6+); blank for the `default` user |
 | `storage.redis.password` | `""` | Redis password; blank for none |
 | `storage.redis.serverId` | `"survival-1"` | Unique id for this server |
-| `storage.redis.networkId` | `"mystic-network"` | Shared id for all servers in the network |
+| `storage.redis.networkId` | `"mystic_network"` | Shared id for all servers in the network |
 | `storage.redis.advertisedHost` | `""` | Hostname/IP clients use when another server refers them here (cross-server TPA); blank = auto-detected |
 | `storage.redis.advertisedPort` | `0` | Public game port paired with `advertisedHost`; `0` = the bound game port |
 | `storage.redis.presenceTtlSeconds` | `30` | How long a server's network roster entry survives without a heartbeat |
@@ -49,6 +49,8 @@ Important sections:
 | `playerList.afkFormat` | `"{name} (AFK)"` | Applied to AFK players; `{name}` is the result of `format` |
 | `playerList.refreshSeconds` | `5` | How often names are recomputed |
 | `playerList.rebuildEntries` | `true` | Remove-then-add each replaced row |
+
+The `modules` object controls module startup. Mail, spawn, teleportation, warps, announcements, AFK, chat, greetings, kits, flight, inventory, nicknames, patch notes, portals, and craft blocking default to `true`. Tutorial, Custom Commands, Player Vaults, and licensed CustomContent default to `false`; Tutorial, Custom Commands, and Player Vaults also require `enabled: true` in their own module config.
 
 ### Server Players list
 
@@ -93,6 +95,10 @@ modules/teleportation/config.json
 | `tpaCooldownSeconds` | `5` | Cooldown between TPA uses |
 | `backWarmupSeconds` | `0` | Warmup for `/back` |
 | `backCooldownSeconds` | `5` | Cooldown between `/back` uses |
+| `crossServer.enabled` | `true` | Use Redis for network-wide TPA and staff transfers when Redis is enabled |
+| `crossServer.arrivalDelaySeconds` | `1` | Delay after a referred player becomes ready before completing the move |
+| `crossServer.arrivalTimeoutSeconds` | `30` | Expire an accepted transfer if the player does not arrive in time |
+| `worldWhitelist` / `worldBlacklist` | `[]` / `[]` | Global destination allow/deny lists for module teleports; blacklist wins |
 
 Players with `mysticessentials.teleport.bypass.warmup` skip warmups. Players with `mysticessentials.teleport.bypass.cooldown` skip cooldowns.
 
@@ -112,6 +118,7 @@ Top-level structure:
 | `randomTeleport.defaultSelectionMode` | `DEFAULT_WORLD` | How a bare `/rtp` picks a destination (`DEFAULT_WORLD`, `CURRENT_WORLD`, `PER_WORLD_PROFILE`, `PERMISSION_PROFILE`) |
 | `randomTeleport.defaultWorld` | `"default"` | Default destination world |
 | `randomTeleport.defaultProfile` | `"default-wilderness"` | Default profile id |
+| `randomTeleport.allowCurrentWorldFallback` | `true` | Fall back to the current world when selection cannot resolve the configured default |
 | `randomTeleport.openUiOnRtp` | `false` | Open the selection UI instead of teleporting on bare `/rtp` |
 | `randomTeleport.worldProfiles` | `{}` | World → profile map for the per-world modes |
 | `randomTeleport.enabledWorlds` / `disabledWorlds` | `[]` | World allow/deny lists (disabled wins) |
@@ -135,6 +142,19 @@ Search engine and warmup blocks:
 | `warmup.cancelOnMovement` | `true` | Cancel warmup on movement |
 | `warmup.movementTolerance` | `0.25` | Blocks a player may drift before movement counts |
 | `warmup.cancelOnDamage` / `cancelOnCombat` / `cancelOnWorldChange` / `cancelOnLogout` | `true` | Other cancellation triggers |
+| `unsafeGroundTags` | Mystic unsafe-ground + Hytale damaging-block tags | Reject tagged landing floors when the server exposes block-tag lookup |
+| `unsafeBodyTags` | Mystic unsafe-body tag | Reject tagged blocks in the player's body space |
+
+MysticRPG-aware safety is enabled automatically when MysticRPG's World module is available:
+
+| Setting | Default | Description |
+| --- | --- | --- |
+| `mysticRpgSafety.enabled` | `true` | Check RPG content level and safe regions |
+| `mysticRpgSafety.minimumLevelOffset` | `-10` | Lowest content level relative to the requesting player |
+| `mysticRpgSafety.maximumLevelOffset` | `3` | Highest content level relative to the requesting player |
+| `mysticRpgSafety.allowSafeRegions` | `true` | Accept MysticRPG safe regions regardless of level |
+| `mysticRpgSafety.rejectWhenProfileUnavailable` | `true` | Refuse RTP when MysticRPG is active but the player's profile is not ready |
+| `mysticRpgSafety.rejectOnIntegrationError` | `true` | Fail closed when the installed MysticRPG API cannot be queried |
 
 Each profile in `profiles` controls its own region (`shape`, `center`, `minimumRadius`, `maximumRadius`, `minimumY`/`maximumY`, …), `warmupSeconds`, `cooldownSeconds`, `cost`, `safety`, `arrivalProtection`, and `filters`. See the [Random Teleport](rtp-module) page for the complete field list and shape/selection reference.
 
@@ -168,8 +188,14 @@ modules/mail/config.json
 | Setting | Default | Description |
 | --- | --- | --- |
 | `maxInboxSize` | `50` | Maximum messages per inbox; `0` means unlimited |
-| `maxMessageLength` | `256` | Maximum mail body length; `0` means unlimited |
+| `maxMessageLength` | `2000` | Maximum mail body length; `0` means unlimited |
 | `notifyUnreadOnJoin` | `true` | Shows unread count when a player joins |
+| `allowPlayerItemAttachments` | `true` | Allow permitted players to attach inventory items |
+| `maxAttachments` | `9` | Maximum item stacks on one mail |
+| `allowAnnouncementCommands` | `true` | Allow console-command rewards on admin announcement mail |
+| `blockedItemIds` | `[]` | Item ids players may not attach |
+| `pageSize` | `6` | Mail rows shown per UI page |
+| `broadcastBatchSize` | `50` | Recipients processed per sequential admin broadcast batch |
 
 When an inbox is full, Mystic removes the oldest read message first. If no read messages exist, it removes the oldest message.
 
@@ -213,6 +239,8 @@ Private messaging settings:
 | `privateMessaging.allowCrossServer` | `true` | Allows Redis-backed PM delivery |
 | `privateMessaging.offlineToMail` | `true` | Can fall back to mail for offline players |
 | `privateMessaging.socialSpyEnabled` | `true` | Enables social spy |
+| `privateMessaging.messagePermission` / `replyPermission` | chat PM nodes | Permission nodes used by `/msg` and `/reply` |
+| `privateMessaging.socialSpyPermission` / `socialSpyExemptPermission` | social-spy nodes | Staff monitor and exemption nodes |
 
 Channel settings:
 
@@ -229,10 +257,21 @@ Channel settings:
 | `channels.roster.viewPermission` | `mysticessentials.channel.members.view` | Permission required to open rosters; blank allows everyone |
 | `channels.roster.showServerRanks` | `true` | Show LuckPerms/server rank below the channel role |
 | `channels.roster.activity.enabled` | `true` | Show recent text and provider-backed voice activity |
+| `channels.roster.groupAuthorityMembers` | `true` | Group owners/moderators separately |
+| `channels.roster.allowSecondaryTags` / `maximumSecondaryTags` | `true` / `1` | Allow a secondary role tag and cap how many show |
+| `channels.roster.maximumVisibleMembers` | `50` | Compact-roster row cap before the full-list hint |
+| `channels.roster.activity.recentTextActivitySeconds` | `30` | Recent-text indicator duration |
+| `channels.roster.activity.activeSpeakerIndicator` | `true` | Show provider-backed live voice activity |
+| `channels.roster.activity.typingIndicator` | `false` | Reserved compatibility switch; Hytale exposes no typing signal |
 | `channels.tempManagement.ownershipTransfer.enabled` | `true` | Allow ownership transfer requests |
 | `channels.tempManagement.ownershipTransfer.targetMustAccept` | `true` | Require the target to accept a transfer |
+| `channels.tempManagement.ownershipTransfer.requestExpirationSeconds` | `60` | Transfer-request lifetime |
+| `channels.tempManagement.ownershipTransfer.previousOwnerRole` | `CHANNEL_MODERATOR` | Role assigned to the previous owner after transfer |
 | `channels.tempManagement.ownerDisconnect.gracePeriodSeconds` | `300` | Wait before applying succession |
 | `channels.tempManagement.ownerDisconnect.successionMode` | `PROMOTE_MODERATOR` | Owner-disconnect policy |
+| `channels.tempManagement.ownerDisconnect.fallbackMode` | `PROMOTE_OLDEST_MEMBER` | Fallback when the preferred succession cannot choose an owner |
+| `channels.tempManagement.moderation.moderatorsCanRemoveMembers` / `moderatorsCanMuteMembers` / `moderatorsCanChangeParticipation` | `true` | Default moderator member controls |
+| `channels.tempManagement.moderation.moderatorsCanPromoteModerators` / `moderatorsCanCloseChannel` / `moderatorsCanBanMembers` | `false` | Higher-impact moderator controls |
 
 Default channels:
 
@@ -304,7 +343,8 @@ modules/announcements/config.json
 | `broadcastPrefix` | `&8[&dBroadcast&8] &f` | Prefix for `/broadcast` |
 | `alertPrefix` | `&8[&c&lALERT&8] &c` | Prefix for `/alert` |
 | `broadcastTitle` / `alertTitle` | `Announcement` / `Alert` | Event-title headline |
-| `broadcastSound` / `alertSound` | Hytale attention SFX | Sounds for short-form and rotating notices |
+| `broadcastSound` | Hytale announcement SFX | Sound for rotating announcements and AnnouncementService sends |
+| `alertSound` | Hytale alert SFX | Deprecated compatibility setting; manual alerts require `--sound <asset-id>` |
 | `messages` | Welcome/home/TPA examples | Auto-broadcast entries |
 
 Announcement messages can be strings or JSON objects:
@@ -336,7 +376,7 @@ modules/afk/config.json
 | --- | --- | --- |
 | `autoAfkEnabled` | `true` | Enables automatic AFK |
 | `autoAfkSeconds` | `300` | Idle seconds before auto-AFK |
-| `checkIntervalSeconds` | `10` | Idle check interval |
+| `checkIntervalSeconds` | `10` | Deprecated compatibility key; polling uses a fixed one-second tick |
 | `bypassPermission` | `mysticessentials.afk.bypass.auto` | Permission that prevents auto-AFK |
 | `announce` | `true` | Announces AFK state changes |
 
@@ -418,6 +458,23 @@ modules/flight/config.json
 | `horizontalSpeedMultiplier` | `1.0` | Flight horizontal speed multiplier |
 | `verticalSpeedMultiplier` | `1.0` | Flight vertical speed multiplier |
 
+## Craft Blocking
+
+File:
+
+```text
+modules/craftblock/config.json
+```
+
+| Setting | Default | Description |
+| --- | --- | --- |
+| `blockedItems` | Example workstation ids | Case-insensitive recipe/output ids; supports `*` wildcards |
+| `notifyPlayer` | `true` | Show a danger toast for a denied craft |
+| `messageInChat` | `false` | Also send the denial in chat |
+| `logAttempts` | `false` | Log player and item id for denied attempts |
+
+See [Craft Blocking](craftblock-module) for matching rules, bypass permissions, and the processing-bench limitation.
+
 ## Inventory
 
 File:
@@ -449,6 +506,9 @@ modules/nick/config.json
 | `blockedNames` | `admin`, `owner`, `server`, `console` | Names players cannot take |
 | `nickMarker` | `~` | Staff-visible marker prefix |
 | `nickFormat` | `{marker}{nickname}` | Stored/displayed nickname format |
+| `allowCustomHex` | `true` | Allow custom hex colors for players with the nickname color permission |
+| `defaultColor` | `""` | Color applied for permitted players when the nickname contains no explicit color |
+| `colors` | named presets | Preset name → hex color map used by the UI and typed `<name>` values |
 
 ## Patch Notes
 
@@ -491,20 +551,23 @@ The module is disabled by default: set `enabled: true` here **and** `"playervaul
 | `maxVaults` | `100` | Hard ceiling on vault numbers |
 | `maxRows` | `6` | Hard ceiling on rows per vault (platform-safe cap) |
 | `slotsPerRow` | `9` | Slots per row |
+| `allowVaultRenaming` / `allowVaultColors` / `allowVaultIcons` / `allowVaultDescriptions` | `true` | Enable individual metadata editing features |
+| `allowAnyItemAsIcon` / `consumeIconItem` | `true` / `false` | Icon selection policy |
 | `showLockedVaults` | `true` | Show inaccessible vaults as locked cards |
 | `preventStorageOfBlacklistedItems` | `true` | Enforce `blockedItemIds` |
 | `blockedItemIds` / `blockedIconItemIds` | `[]` | Item / icon blacklists |
 | `defaultIconItemId` | `Furniture_Crude_Chest_Small` | Default card icon |
+| `iconPickerResultLimit` | `45` | Maximum icon-search results |
 | `maxNameLength` / `maxDescriptionLength` | `32` / `96` | Metadata length caps |
 
 Grouped blocks control more behavior:
 
 | Block | Controls |
 | --- | --- |
-| `crossServer` | Redis locks, cache, and pub/sub (`enabled`, `requireRedis`, `lockTtlSeconds`, `lockRenewSeconds`, `cacheTtlSeconds`, `pubSubChannel`) |
+| `crossServer` | Redis locks, cache, and pub/sub (`enabled`, `requireRedis`, `lockVaults`, `lockTtlSeconds`, `lockRenewSeconds`, `allowReadOnlyAdminViewWhenLocked`, `allowAdminForceUnlock`, `cacheTtlSeconds`, `pubSubChannel`) |
 | `saving` | `saveOnClose`, `saveIntervalSeconds`, `writeThrough`, `saveBackups`, `maxBackupsPerVault`, `conflictSnapshots` |
-| `ui` | Custom list/editor UI and stats toggles |
-| `admin` | Admin logging, owner notification, `defaultAdminMode`, `maxLogEntriesPerPlayer` |
+| `ui` | `useCustomVaultListUi`, `useCustomEditorUi`, `useScrollableVaultContent`, `showVaultStats`, `showLastOpened` |
+| `admin` | `logAdminOpens`, `logAdminEdits`, `notifyOnlinePlayerWhenAdminOpensVault`, `defaultAdminMode`, `maxLogEntriesPerPlayer` |
 
 See the [Player Vaults](playervaults-module) page for the full breakdown.
 
@@ -522,6 +585,37 @@ is used at each priority. Categories provide names, accents, sounds, chat
 prefixes, a default profile, a minimum priority, and whether players can disable
 them. History keeps 50 records per player for 24 hours by default; critical
 records can persist across reconnects.
+
+| Setting | Default | Description |
+| --- | --- | --- |
+| `enabled` | `true` | Master switch |
+| `history.enabled` | `true` | Enable profile-selected history storage |
+| `history.maximumPerPlayer` | `50` | Stored records per player |
+| `history.persistCritical` | `true` | Retain critical records across reconnects after read |
+| `history.defaultExpirationHours` | `24` | Routine record lifetime |
+| `critical.allowPlayerDisable` | `false` | Permit players to suppress critical alerts |
+
+Profile timing uses `fadeInMillis`, `stayMillis`, and `fadeOutMillis`; banner profiles also use `durationSeconds` and `dismissible`. Category records expose `displayName`, `icon`, `accent`, `sound`, `defaultProfile`, `minimumPriority`, `chatPrefix`, and `playerDisableable`.
+
+## Tutorial
+
+File:
+
+```text
+modules/tutorial/config.json
+```
+
+Tutorial is disabled by default and must be enabled both here (`enabled: true`) and in the main `modules` map. The file controls first-join playback, scene provider and camera interpolation, player freezing, error recovery, UI behavior, JSON persistence, and logging. Tutorial definitions, pages, and scene files live in adjacent subdirectories. See [Tutorial](tutorial-module) for the complete schema and examples.
+
+## Custom Commands
+
+File:
+
+```text
+modules/customcommands/config.json
+```
+
+Custom Commands is disabled by default and must be enabled both here (`enabled: true`) and in the main `modules` map. Its config controls example generation, command override policy, action/depth safety limits, cooldown persistence, Redis cooldown/reload synchronization, and audit logging. Command definitions live in `modules/customcommands/commands/*.json`; see [Custom Commands](customcommands-module) for the full schema.
 
 ## CustomGUIs & CustomDialogs
 

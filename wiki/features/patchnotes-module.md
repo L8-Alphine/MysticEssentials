@@ -49,20 +49,20 @@ Each **section** is `{ "type": "<category-id>", "title": "...", "body": "..." }`
 ```json
 {
   "id": "1.2.0",
-  "title": "Random Teleport & Rank Icons",
+  "title": "Random Teleport & Craft Blocking",
   "version": "1.2.0",
   "date": "2026-07-13",
   "author": "Staff",
   "pinned": true,
   "priority": 10,
   "showOnLogin": true,
-  "summary": "Big update: /rtp, chat rank icons, and more.",
+  "summary": "Big update: /rtp, craft restrictions, and more.",
   "categories": ["additions", "fixes"],
   "sections": [
     {
       "type": "additions",
       "title": "Additions",
-      "body": "+ Added `/rtp` random teleport with safe-search profiles.\n+ Added LuckPerms rank icons in chat."
+      "body": "+ Added `/rtp` random teleport with safe-search profiles.\n+ Added configurable craft blocking."
     },
     {
       "type": "fixes",
@@ -107,7 +107,7 @@ modules/patchnotes/config.json
 | `categories` | Additions/Fixes/Changes/Removals | Filter categories, in display order |
 | `generateExamples` | `true` | Generate bundled example patches on first startup |
 
-> The viewer's colors are baked into its `.ui` files because Hytale 0.5.6 Custom UI labels only support a static style, so they cannot be re-themed at runtime.
+> The viewer's colors are baked into its `.ui` files because Update 6 Custom UI labels only support a static style, so they cannot be re-themed at runtime.
 
 ## See also
 

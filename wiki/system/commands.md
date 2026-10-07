@@ -8,6 +8,7 @@ Optional arguments use `[brackets]`. Required arguments use `<angle brackets>`.
 | --- | --- | --- |
 | `/mystic`, `/mysticessentials`, `/me` | Show Mystic Essentials information | None |
 | `/mystic reload` | Reload core and module configuration | `mysticessentials.reload` |
+| `/mystic network` | Show this server's advertised address and the Redis network roster | `mysticessentials.network` |
 | `/mystic migrate scan <source> [path]` | Preview file-based migration from a legacy essentials data folder | `mysticessentials.migrate` |
 | `/mystic migrate import <source> [path] [--replace] [--dry-run]` | Import supported legacy data into Mystic Essentials | `mysticessentials.migrate` |
 | `/mystic license [reload]` | Show license status/server id, or reload `license.mclicense` | `mysticessentials.license` |
@@ -24,6 +25,7 @@ Optional arguments use `[brackets]`. Required arguments use `<angle brackets>`.
 | `/tpaccept [player]` | Accept the newest request or one from a specific player | `mysticessentials.teleport.tpa` |
 | `/tpdeny [player]` | Deny the newest request or one from a specific player | `mysticessentials.teleport.tpa` |
 | `/tpcancel` | Cancel outgoing teleport requests | `mysticessentials.teleport.tpa` |
+| `/tptoggle` | Toggle whether other players may send you teleport requests | `mysticessentials.teleport.tpa` |
 | `/tp [player]` | Teleport to a player; without a player, open the requests UI | `mysticessentials.teleport.tp` |
 | `/tp world <player> <world>` | Send a player to another world's spawn | `mysticessentials.teleport.tp.world` |
 | `/tphere <player>` | Teleport one player to you | `mysticessentials.teleport.tphere` |
@@ -38,6 +40,7 @@ See the [Random Teleport](rtp-module) page for full details.
 | Command | Description | Permission |
 | --- | --- | --- |
 | `/rtp` | Teleport to a random safe location (or open the RTP UI) | `mysticessentials.teleport.rtp.use` |
+| `/rtp menu`, `/rtp ui` | Open the RTP selection UI | `mysticessentials.teleport.rtp.use` |
 | `/rtp world <world> [player]` | RTP into a specific world | `mysticessentials.teleport.rtp.use` |
 | `/rtp profile <profile> [player]` | RTP using a named profile | `mysticessentials.teleport.rtp.use` |
 | `/rtp <player>` | RTP another online player (normal checks unless you hold `...rtp.admin.force`) | `mysticessentials.teleport.rtp.others` |
@@ -111,7 +114,7 @@ Alias: `/portals`. Portals are configured in-game by pressing Use (F) on a porta
 | `/channel switch <name> [password]` | Switch speaking channel | Channel permissions may apply |
 | `/channel join <name> [password]` | Listen to a channel | Channel permissions may apply |
 | `/channel leave <name>` | Stop listening to a channel | None by default |
-| `/channel temp <id> [password|-] [prefix|-] [alias1,alias2|-] [permission]` | Create a temporary channel | `mysticessentials.chat.channel.create.temp` |
+| `/channel temp <id> [password\|-] [prefix\|-] [alias1,alias2\|-] [permission]` | Create a temporary channel | `mysticessentials.chat.channel.create.temp` |
 | `/channel manage [channel]` | Manage your temporary channel; name it when you own several | Owner/moderator rules apply |
 | `/channel close\|lock\|unlock [channel]` | Close, lock or unlock a temporary channel you manage | Owner/moderator rules apply |
 | `/mentions`, `/mentionsettings` | Configure mention scope, delivery, block list, and do-not-disturb | None |
@@ -128,6 +131,12 @@ Alias: `/portals`. Portals are configured in-game by pressing Use (F) on a porta
 | `/broadcast [category] [priority] <message> [flags]`, `/bc ...` | Send a targeted notification; the short form keeps the configured prefix | `mysticessentials.announcement.broadcast` |
 | `/alert [category] [priority] <message> [flags]` | Send a higher-priority targeted notification | `mysticessentials.announcement.alert` |
 | `/afk [reason]` | Toggle AFK | `mysticessentials.afk.use` |
+| `/afkzone pos1`, `/afkzone pos2` | Select the two corners of an AFK reward zone | `mysticessentials.afk.zone.admin` |
+| `/afkzone create <name>` | Create a zone from the selected corners | `mysticessentials.afk.zone.admin` |
+| `/afkzone delete <name>` | Delete a zone | `mysticessentials.afk.zone.admin` |
+| `/afkzone permission <name> <node\|->` | Set or clear a zone-specific permission | `mysticessentials.afk.zone.admin` |
+| `/afkzone default <name\|->` | Set or clear the default auto-AFK destination | `mysticessentials.afk.zone.admin` |
+| `/afkzone list`, `/afkzone check` | List zones or identify the zone at your position | `mysticessentials.afk.zone.admin` |
 
 ## Kits
 
@@ -144,6 +153,15 @@ Alias: `/portals`. Portals are configured in-game by pressing Use (F) on a porta
 | --- | --- | --- |
 | `/fly` | Toggle your flight | `mysticessentials.fly.use` |
 | `/fly <player>` | Toggle flight for another player | `mysticessentials.fly.others` |
+
+## Craft Blocking
+
+See [Craft Blocking](craftblock-module) for matching behavior and limitations.
+
+| Command | Description | Permission |
+| --- | --- | --- |
+| `/craftblock` | List the configured recipe/output block entries | `mysticessentials.craftblock.admin` |
+| `/craftblock check` | Show the held item id and whether it is blocked | `mysticessentials.craftblock.admin` |
 
 ## Inventory
 
@@ -170,7 +188,7 @@ See the [Player Vaults](playervaults-module) page. The module is disabled by def
 
 | Command | Description | Permission |
 | --- | --- | --- |
-| `/pv`, `/playervault`, `/vault`, `/vaults` | Open your vault list | `mysticessentials.vaults.command.open` |
+| `/pv`, `/playervault`, `/playervaults`, `/vault`, `/vaults` | Open your vault list | `mysticessentials.vaults.command` + `mysticessentials.vaults.command.open` |
 | `/pv <number>` | Open a specific vault | `mysticessentials.vaults.command.open` |
 | `/pv edit <number>` | Edit vault name/color/icon/description | `mysticessentials.vaults.command.edit` |
 | `/pv list` | List your vaults | `mysticessentials.vaults.command.list` |
@@ -202,6 +220,7 @@ See the [Tutorial module](tutorial-module) page for the full command tree.
 ## Custom Commands
 
 See the [Custom Commands module](customcommands-module) page. Operator-defined commands are also registered dynamically.
+The admin command aliases are `/ccmd`, `/customcmd`, and `/mecustomcommands`.
 
 | Command | Description | Permission |
 | --- | --- | --- |

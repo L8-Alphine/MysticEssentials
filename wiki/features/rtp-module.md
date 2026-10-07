@@ -66,6 +66,8 @@ When `/rtp` is run with no world or profile, `randomTeleport.defaultSelectionMod
 | `PER_WORLD_PROFILE` | Map the player's current world to a specific profile |
 | `PERMISSION_PROFILE` | Use the highest-priority profile granted by the player's permissions |
 
+`randomTeleport.allowCurrentWorldFallback` controls whether resolution may fall back to the player's current world when the configured selection cannot produce a destination.
+
 ### Warmup cancellation
 
 Warmups can be cancelled by movement, damage, combat, world changes, or logout. Each trigger is individually toggleable under the `warmup` block, and `movementTolerance` sets how far a player may drift before movement counts.
@@ -116,6 +118,22 @@ Profiles are defined in the `profiles` map of `rtp.json`, keyed by id. Each prof
 ### Filters and cross-module gates
 
 The `filters` block adds optional constraints: included/excluded regions, minimum distance from spawn/other players/claims, allowed dimensions, block-tag requirements, a `permission` gate, and per-hour/per-day use caps. Fields that depend on APIs not verified on the running server — or on other Mystic mods (claims via MysticGuilds, level via MysticRPG) — are honored only when a matching capability or exclusion provider is registered; otherwise they are ignored so a search never silently fails.
+
+### MysticRPG-aware safety
+
+When MysticRPG's World module is available, RTP also checks the requesting player's RPG level against the content level at each candidate and at the final destination. The default band accepts content from 10 levels below through 3 levels above the player; MysticRPG safe regions remain valid regardless of level.
+
+Centered shapes adapt the search when content is unsuitable: they narrow inward when the sampled content is too high-level and expand outward when it is too low-level. Servers without MysticRPG continue with the normal terrain and profile checks.
+
+| Setting | Default | Description |
+| --- | --- | --- |
+| `mysticRpgSafety.enabled` | `true` | Enable the optional integration |
+| `minimumLevelOffset` / `maximumLevelOffset` | `-10` / `3` | Accepted content-level band relative to the player |
+| `allowSafeRegions` | `true` | Accept MysticRPG safe regions regardless of content level |
+| `rejectWhenProfileUnavailable` | `true` | Refuse RTP while the player's MysticRPG profile is unavailable |
+| `rejectOnIntegrationError` | `true` | Fail closed if an installed/incompatible API cannot be queried |
+
+The top-level `unsafeGroundTags` and `unsafeBodyTags` lists add block-tag hazards when the running server exposes tag lookup. The built-in solid-ground, headroom, liquid, and fluid checks still run independently.
 
 ## Search engine
 

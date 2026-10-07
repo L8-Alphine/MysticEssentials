@@ -142,14 +142,8 @@ mysticessentials.nick.color
 
 Also make sure the visible nickname length is within `minLength` and `maxLength` after color codes are stripped.
 
-## Custom glyphs do not render
+## A blocked item can still be crafted
 
-Check:
+Check that `craftblock` is `true` in the main module map and that the item or recipe id matches `blockedItems` in `modules/craftblock/config.json`. Matching is case-insensitive and accepts `*` wildcards; `/craftblock check` prints the held item id.
 
-- `glyphs.enabled` is true.
-- `glyphs.registerCommonAssets` is true.
-- The server includes Mystic's asset pack.
-- The client has the needed font/asset binding for private-use glyph codepoints.
-- The player has the required glyph permission tier.
-
-If glyph assets are missing from logs, verify the jar contains `Common/Resources/MysticEssentials/Chat/Glyphs/`.
+Also check whether the player has `mysticessentials.craftblock.bypass` or the matching per-item bypass. Processing benches such as smelters do not fire Hytale's craft pre-event and cannot be blocked by this module.

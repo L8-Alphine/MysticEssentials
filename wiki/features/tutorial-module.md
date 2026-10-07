@@ -98,10 +98,10 @@ A tutorial follows this flow:
 
 The cinematic part of a tutorial is handled by a **scene provider**, chosen with `sceneProvider.type` in the module config. This is the piece that reads a scene file and turns it into an actual on-screen cutscene.
 
-| Provider (`sceneProvider.type`) | What it does | Works on Hytale 0.5.6? |
+| Provider (`sceneProvider.type`) | What it does | Works on the supported Update 6 client? |
 | --- | --- | --- |
 | `camera` **(default)** | Server drives the player's camera along the scene's keyframe path: it samples the path over time and pushes `SetServerCamera` (the packet behind the built-in `/camera`) at a fixed rate, and the client smoothly interpolates between updates. The player stays put; only the camera flies the path. | **Yes.** This is the mode that actually plays cutscenes. |
-| `machinima` | Sends the `UpdateMachinimaScene` packet to the client. | **No.** The 0.5.6 client has no receiver for a server-initiated machinima scene, so nothing plays. Kept only in case a future client adds one. |
+| `machinima` | Sends the `UpdateMachinimaScene` packet to the client. | **No.** The supported Update 6 client has no receiver for a server-initiated machinima scene, so nothing plays. Kept only in case a future client adds one. |
 | `debug` | Logs what would play without sending camera packets. Useful for testing flow, requirements, and completion pages. | Yes (diagnostic only). |
 | `noop` | Does nothing and reports instant completion. Lets the rest of the tutorial flow run with no cinematic. | Yes. |
 
@@ -117,7 +117,7 @@ The camera *mechanism* differs, and that is expected:
 - **Replay** moves the shot by **teleporting the player entity** along the path each tick (in a free-camera movement mode) so the client renders from the moving body.
 - **Mystic's `camera` provider** leaves the player in place and pushes a **locked custom server camera** along the path (`SetServerCamera` with `PositionType.Custom` + absolute position and `RotationType.Custom` + rotation).
 
-Both are valid ways to play a cutscene on 0.5.6. Mystic uses the server-camera approach because it does not move the player's body (safer for onboarding — no risk of the player ending up somewhere unexpected) and because the built-in `/camera` recipe is a verified, supported packet path. If your camera work in the machinima editor and your camera flight both use keyframes, the two systems are compatible in spirit: you can author a scene in the editor and Mystic will fly its camera keyframes for you.
+Both are valid ways to play a cutscene on the supported Update 6 server. Mystic uses the server-camera approach because it does not move the player's body (safer for onboarding — no risk of the player ending up somewhere unexpected) and because the built-in `/camera` recipe is a verified, supported packet path. If your camera work in the machinima editor and your camera flight both use keyframes, the two systems are compatible in spirit: you can author a scene in the editor and Mystic will fly its camera keyframes for you.
 
 ### Authoring and importing scenes
 
@@ -270,7 +270,7 @@ This example shows the main areas of `modules/tutorial/config.json`:
 
 | Field | Description |
 | --- | --- |
-| `sceneProvider.type` | `camera` (default — plays cutscenes on 0.5.6), `machinima` (no client receiver on 0.5.6, plays nothing), `debug`, or `noop`. |
+| `sceneProvider.type` | `camera` (default — plays cutscenes on Update 6), `machinima` (no supported client receiver, plays nothing), `debug`, or `noop`. |
 | `sceneProvider.fallbackToNoOp` | If the chosen provider cannot initialize, fall back to `noop` so tutorials never leave a player stuck. |
 | `sceneProvider.logMissingSceneProvider` | Warn in the log when the configured provider is unavailable. |
 
@@ -520,7 +520,7 @@ Tutorial page text and messages support MysticEssentials message formatting, inc
 | `/tutorial list` is empty | Make sure the module is enabled and tutorial JSON files are in `modules/tutorial/tutorials/`. Run `/tutorial reload`. |
 | First-join tutorial does not start | Check `firstJoin.enabled`, `firstJoin.tutorialId`, completion data, and bypass permission. |
 | Player can move during tutorial | Check `defaults.disableMovement`, `defaults.freezePlayer`, and the tutorial's `playerState` overrides. |
-| Scene does not play | Make sure `sceneProvider.type` is `camera` (the `machinima` type has no client receiver on 0.5.6 and plays nothing). Check the scene is registered (`/tutorial scene list`), that `machinima.enabled` is `true` and `machinima.sceneId` matches, then test directly with `/tutorial scene play <sceneId> relocate`. |
+| Scene does not play | Make sure `sceneProvider.type` is `camera` (the `machinima` type has no supported client receiver and plays nothing). Check the scene is registered (`/tutorial scene list`), that `machinima.enabled` is `true` and `machinima.sceneId` matches, then test directly with `/tutorial scene play <sceneId> relocate`. |
 | Cutscene plays at the wrong place | Scenes store absolute coordinates. Set `machinima.placement` to `relocate` with an `anchor` so the scene replays at the player's location. |
 | Camera angle/height looks off | Tune `cameraPlayback`: `invertPitch`/`invertYaw`, `yawOffsetDegrees`/`pitchOffsetDegrees`, `pitchFromLook`, and `eyeHeightOffset` (try `1.6` if shots sit too low). |
 | World keeps moving during the cutscene | Enable `cameraPlayback.freezeWorld` (world freezes via time dilation, like the Replay mod). It always unfreezes on reset. |

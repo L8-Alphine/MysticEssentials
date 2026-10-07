@@ -1,6 +1,6 @@
 # Chat
 
-The Chat module owns everything that happens to a chat message: how public chat is formatted, private messages, chat channels, custom glyphs and emoji, and LuckPerms rank icons. Each part is a sub-feature you can enable or disable independently in `modules/chat/config.json`.
+The Chat module owns public formatting, private messages, managed channels, item sharing, mentions, and ignore lists. Its major sub-features can be configured independently in `modules/chat/config.json` and the adjacent chat config files.
 
 Three of the larger sub-features have their own pages:
 
@@ -166,6 +166,18 @@ permissions. Addons can register relationship scopes such as friends, guild or
 party through `ChatService.registerMentionScope(...)`; unavailable scopes stay
 hidden from player settings instead of silently accepting a rule that cannot be
 enforced. Server defaults live in `modules/chat/mentions.json`.
+
+Mention config groups:
+
+| Block | Settings |
+| --- | --- |
+| `matching` | `caseSensitive`, `exactNameRequired`, `allowDisplayNames`, `allowNicknames` |
+| `limits` | `senderGlobalCooldownSeconds`, `sameTargetCooldownSeconds`, `recipientSoundCooldownSeconds`, `maxMentionsPerMessage`, `maxMentionsPerMinute` |
+| `notifications` | `chatHighlight`, `titleEnabled`, `subtitleEnabled`, `actionbarEnabled`, `soundEnabled`, sound/title/subtitle values, `highlightFormat`, and `bystanderFormat` |
+| `rules` | `perViewerRendering`, `allowSelfMention`, ignored/muted sender behavior, `vanishedPlayersReceiveMentions`, `staffBypassPlayerSettings`, and `offlineMentionsEnabled` |
+| `massMentions` | Master toggle, cooldown, and `everyoneKeyword`, `onlineKeyword`, `staffKeyword`, and `channelKeyword` |
+
+The generated defaults use exact case-insensitive account names, disable display-name/nickname matching and offline mentions, cap a message at 3 mentions and a sender at 10 per minute, and give mass mentions a 300-second cooldown.
 
 ## Chat from other mods
 

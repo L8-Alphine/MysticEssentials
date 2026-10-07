@@ -48,7 +48,7 @@ The bundled rules match common keywords in the item id:
 | `uncommon` | Uncommon | green |
 | *(no match)* | Common | white |
 
-Edit `rarityRules` in `modules/chat/item-links.json` to match your own naming convention. Each rule supports a plain case-insensitive substring, or a regular expression when `regex` is `true`.
+Edit `classificationRules` in `modules/chat/item-view.json` to match your own naming convention. Each rule supports a plain case-insensitive substring, or a regular expression when `regex` is `true`, and may provide quality, rarity, tier, grade, and color independently.
 
 ## Commands
 
@@ -79,23 +79,37 @@ modules/chat/item-links.json
 | `viewCommand` | `"itemview"` | The command shown/used to open the viewer (also registered as an alias) |
 | `underlineChatName` | `true` | Underline the chat name to hint interactivity |
 | `showQuantityInChat` | `true` | Show the `×quantity` suffix on the chat name |
-| `rarityRules` | keyword rules | Item-id → rarity rules (see [Rarity](#rarity)) |
+| `expiredLabel` | `[Item Link Expired]` | Replacement text for an expired snapshot |
+| `unavailableLabel` | `[Item Unavailable]` | Replacement text for an unknown snapshot |
+| `noItemLabel` | `[no item]` | Replacement text when the sender holds no item |
 
-Snapshot lifetime (`snapshot` block):
+Inspection, classification, snapshot lifetime, and recent history use a second file:
+
+```text
+modules/chat/item-view.json
+```
 
 | Setting | Default | Description |
 | --- | --- | --- |
-| `retentionSeconds` | `600` | How long a shared item stays inspectable |
-| `maximumSnapshots` | `500` | Cap on live snapshots kept in memory |
-
-History (`history` block):
-
-| Setting | Default | Description |
-| --- | --- | --- |
-| `enabled` | `true` | Keep a per-player recent-links history |
-| `maximumEntries` | `25` | Recent entries kept per player |
-
-Viewer (`inspectionUi` block) toggles the page sections: `showStats`, `showDurability`, and `showShareInformation`.
+| `enabled` | `true` | Master toggle for item inspection |
+| `display.showQuality` / `showRarity` / `showTier` / `showGrade` | `true` | Classification badges shown by the viewer |
+| `display.showItemId` / `showSourceMod` | `false` / `true` | Technical identity shown in the summary |
+| `display.showOriginalTooltipButton` | `true` | Show the native tooltip control |
+| `display.compactBelowWidth` | `900` | Switch to the compact single-column layout below this width |
+| `sections.classification` / `primaryStatistics` / `secondaryStatistics` / `modifiers` / `customSections` | `true` | Classification and statistic sections |
+| `sections.requirements` / `description` / `lore` / `durability` / `shareInformation` / `technicalInformation` | `true` | Remaining detail sections |
+| `fallback.hideMissingQuality` | `true` | Hide the quality badge instead of inventing one when quality is absent |
+| `fallback.missingQualityDisplayName` | `Unclassified` | Label used only when missing quality is not hidden |
+| `fallback.neutralAccentColor` | `#7a9cc6` | Accent used when no classification provides one |
+| `snapshots.expirationMinutes` | `30` | How long a shared item stays inspectable |
+| `snapshots.maxPerPlayer` | `50` | Snapshots retained per sharing player |
+| `snapshots.maximumSnapshots` | `500` | Global cap on live snapshots |
+| `snapshots.maximumMetadataBytes` | `65536` | Serialized metadata cap for one snapshot |
+| `snapshots.historyEntriesPerPlayer` | `25` | Recent entries kept per recipient |
+| `qualities` | Common through Mythic | Engine quality-index names and colors |
+| `classificationRules` | keyword rules | Item-id classification overrides (see [Rarity](#rarity)) |
+| `providers.catchProviderErrors` / `logProviderErrors` | `true` | Contain and log failing addon metadata providers |
+| `providers.errorLogCooldownSeconds` | `60` | Suppress repeat provider logs within this window |
 
 ## Permissions
 

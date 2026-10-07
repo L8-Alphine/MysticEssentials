@@ -62,11 +62,26 @@ Key top-level settings:
 | `maxVaults` | `100` | Hard ceiling on vault numbers |
 | `maxRows` | `6` | Hard ceiling on rows per vault |
 | `slotsPerRow` | `9` | Slots per row in the container UI |
+| `allowVaultRenaming` / `allowVaultColors` / `allowVaultIcons` / `allowVaultDescriptions` | `true` | Enable each metadata-editing surface (permissions still apply) |
+| `allowAnyItemAsIcon` | `true` | Allow any eligible item to represent a vault |
+| `consumeIconItem` | `false` | Consume the selected icon item when saving |
 | `showLockedVaults` | `true` | Show vaults the viewer lacks permission for as locked cards |
 | `preventStorageOfBlacklistedItems` | `true` | Enforce `blockedItemIds` on insert/move/restore |
+| `blockedItemIds` / `blockedIconItemIds` | `[]` | Storage and icon item blacklists |
+| `maxNameLength` / `maxDescriptionLength` | `32` / `96` | Vault metadata length caps |
 | `defaultIconItemId` | `Furniture_Crude_Chest_Small` | Icon shown on cards with no custom icon |
+| `iconPickerResultLimit` | `45` | Maximum icon search results |
 
-Additional grouped blocks control metadata editing, item/icon blacklists, and name/description length, plus `crossServer`, `saving`, `ui`, and `admin` settings. See the [Configuration Reference](configuration) for the full breakdown.
+Grouped blocks:
+
+| Block | Settings |
+| --- | --- |
+| `crossServer` | `enabled` (`false`), `requireRedis`, `lockVaults`, `lockTtlSeconds`, `lockRenewSeconds`, `allowReadOnlyAdminViewWhenLocked`, `allowAdminForceUnlock`, `cacheTtlSeconds`, and `pubSubChannel` |
+| `saving` | Save-on-close, interval, write-through, backups/retention, and conflict snapshots |
+| `ui` | `useCustomVaultListUi`, `useCustomEditorUi`, `useScrollableVaultContent`, `showVaultStats`, and `showLastOpened` |
+| `admin` | `logAdminOpens`, `logAdminEdits`, `notifyOnlinePlayerWhenAdminOpensVault`, `defaultAdminMode`, and `maxLogEntriesPerPlayer` |
+
+See the [Configuration Reference](configuration) for a shorter cross-module summary.
 
 ## See also
 

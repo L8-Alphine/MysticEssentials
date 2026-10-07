@@ -10,6 +10,7 @@ All permission nodes are prefixed with `mysticessentials.`. Dynamic nodes such a
 | `mysticessentials.migrate` | `/mystic migrate scan`, `/mystic migrate import` |
 | `mysticessentials.network` | `/mystic network` — Redis roster and this server's advertised address |
 | `mysticessentials.license` | `/mystic license`, `/mystic license reload` |
+| `mysticessentials.update.notify` | Receive update-available notices on join |
 
 ## Teleportation
 
@@ -180,6 +181,14 @@ config page); players without it cannot use that portal.
 | `mysticessentials.fly.others` | `/fly <player>` |
 | `mysticessentials.fly.unlimited` | Unlimited/free flight in paid flight mode |
 | `mysticessentials.fly.free` | Exempt from paid flight charges |
+
+## Craft Blocking
+
+| Node | Grants |
+| --- | --- |
+| `mysticessentials.craftblock.admin` | `/craftblock` and `/craftblock check` |
+| `mysticessentials.craftblock.bypass` | Craft every blocked recipe/output |
+| `mysticessentials.craftblock.bypass.<matched id>` | Dynamic: bypass one blocked item or recipe; use the lowercased matched id |
 
 ## Inventory
 

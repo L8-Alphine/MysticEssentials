@@ -18,6 +18,7 @@ The nickname feeds the `{display_name}` placeholder used in [chat formatting](ch
 - Nicknames must be between `minLength` and `maxLength` visible characters.
 - Names in `blockedNames` (such as `admin`, `owner`, `server`, `console`) are rejected.
 - Color codes require `mysticessentials.nick.color`.
+- Custom hex colors also require `allowCustomHex: true`; for players with color permission, `defaultColor` supplies a color when the nickname contains none.
 - A `nickMarker` (default `~`) is applied through `nickFormat` so staff can tell a nickname from a real username.
 
 ## Configuration
@@ -35,6 +36,9 @@ modules/nick/config.json
 | `blockedNames` | `admin`, `owner`, `server`, `console` | Names players cannot take |
 | `nickMarker` | `~` | Staff-visible marker prefix |
 | `nickFormat` | `{marker}{nickname}` | Stored/displayed nickname format |
+| `allowCustomHex` | `true` | Allow custom hex nickname colors |
+| `defaultColor` | `""` | Optional color applied when no explicit color was supplied |
+| `colors` | red/orange/yellow/green/aqua/blue/purple/pink/white/gray/gold | Named color presets and their hex values |
 
 ## See also
 

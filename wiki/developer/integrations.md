@@ -22,7 +22,7 @@ Set a value to `false` to force Mystic to ignore an integration even if it is in
 Provides permission checks, group/rank resolution, meta prefixes and suffixes, and numeric limit nodes.
 
 - Chat formats can use `{luckperms_prefix}` and `{luckperms_suffix}`.
-- [Chat Formatting](chat-formatting) rank icons resolve a player's primary group (and optional meta override) to an inline icon.
+- [Chat Formatting](chat-formatting) can use LuckPerms prefixes, suffixes, primary groups, and permission-selected formats.
 - Numeric limits (homes, player warps, vaults) are read from permission suffixes such as `mysticessentials.home.limit.10`.
 
 Without LuckPerms, Mystic falls back to the server's basic permission checks and rank-based features resolve against defaults only.
@@ -69,15 +69,23 @@ but cannot answer, delivered lines are refused with `chat-moderation-unavailable
 and a warning is logged. A muted player's public line also never pings anyone
 (`rules.mutedPlayersCanNotNotify` in `mentions.json`).
 
+## MysticRPG
+
+When MysticRPG and its World module are available, Random Teleport checks every candidate and final destination against the requesting player's RPG level. By default, content may range from 10 levels below through 3 levels above the player; MysticRPG safe regions are always accepted. Configure the offsets and fail-closed behavior under `mysticRpgSafety` in `modules/teleportation/rtp.json`.
+
+Mystic also reads MysticRPG's stable item metadata contract for richer Item Details pages. Without MysticRPG, RTP keeps its terrain/config safety rules and ordinary item inspection continues.
+
+## QuestLines
+
+Licensed CustomContent detects QuestLines without a hard dependency. It can bridge requirements, actions, and placeholders through reflection and import/export compatible dialog and GUI data. Native CustomDialogs and CustomGUIs continue to work when QuestLines is absent.
+
+## Item metadata providers
+
+Item Details recognizes the stable BSON metadata written by SimpleEnchantments and LuxReforge without linking to their jars. Those sections are shown when metadata is present and omitted otherwise. Addons can also register their own inspection providers through the public API.
+
 ## Storage backends
 
 Database and cache integrations (MySQL/MariaDB and Redis) are covered separately on the [Storage](storage) page.
-
-## See also
-
-- [Configuration Reference](configuration)
-- [Storage](storage)
-- [Developer API](developer-api)
 
 ## MysticIdentity
 
@@ -94,3 +102,11 @@ the moment of delivery and never caches the answer:
 
 Guardians and staff holding MysticIdentity's trusted-contact node are exempt inside its own
 answer, so nothing here special-cases them. Without MysticIdentity nobody is restricted.
+
+## See also
+
+- [Configuration Reference](configuration)
+- [Storage](storage)
+- [Developer API](developer-api)
+- [Random Teleport](rtp-module)
+- [Item Links](itemlinks-module)

@@ -21,10 +21,10 @@ Default modules:
 ```json
 {
   "modules": {
-    "teleportation": true,
-    "spawn": true,
-    "warps": true,
     "mail": true,
+    "spawn": true,
+    "teleportation": true,
+    "warps": true,
     "announcements": true,
     "afk": true,
     "chat": true,
@@ -34,14 +34,17 @@ Default modules:
     "inventory": true,
     "nick": true,
     "patchnotes": true,
-    "tutorial": true,
-    "customcommands": true,
-    "playervaults": false
+    "portals": true,
+    "craftblock": true,
+    "tutorial": false,
+    "customcommands": false,
+    "playervaults": false,
+    "customcontent": false
   }
 }
 ```
 
-Some modules depend on others. Warps and spawn features route movement through the teleport service, so keep `teleportation` enabled when you use spawn, homes, warps, player warps, RTP, or AFK rewards. **Player Vaults ships disabled** — set `"playervaults": true` here and `enabled: true` in its own config to turn it on.
+Some modules depend on others. Warps and spawn features route movement through the teleport service, so keep `teleportation` enabled when you use spawn, homes, warps, player warps, RTP, or AFK rewards. Tutorial, Custom Commands, Player Vaults, and licensed CustomContent ship disabled; the first three also have an `enabled` switch in their own module config where documented.
 
 ## Staff setup checklist
 
@@ -51,7 +54,7 @@ Recommended staff permissions:
 | --- | --- |
 | Helper | `mysticessentials.teleport.tpa`, `mysticessentials.spawn.use`, `mysticessentials.home.*`, `mysticessentials.mail.use`, `mysticessentials.chat.private.*` |
 | Moderator | Helper nodes plus `mysticessentials.teleport.tphere`, `mysticessentials.teleport.back`, `mysticessentials.chat.socialspy`, staff channel nodes |
-| Admin | Moderator nodes plus `mysticessentials.reload`, `mysticessentials.spawn.set`, `mysticessentials.warp.set`, `mysticessentials.mail.send.all`, `mysticessentials.inventory.restore` |
+| Admin | Moderator nodes plus `mysticessentials.reload`, `mysticessentials.spawn.set`, `mysticessentials.warp.set`, `mysticessentials.mail.send.all`, `mysticessentials.craftblock.admin`, `mysticessentials.inventory.restore` |
 | Owner | Full `mysticessentials.*` or explicit all-module nodes |
 
 Avoid giving broad admin-only commands such as `/tpall`, `/clearinventory all`, `/mail sendall`, and `/kit give` to general staff unless they need them.
@@ -110,16 +113,11 @@ RTP is configured in `modules/teleportation/rtp.json`. A worked-example `default
 
 See the [Random Teleport](rtp-module) page for the full profile field list.
 
-## Rank icons setup
+## Managing craft restrictions
 
-Rank icons (`modules/chat/rank-icons.json`) map LuckPerms groups to inline chat images. They are disabled by default and require LuckPerms.
+Craft Blocking is enabled by default. Review `modules/craftblock/config.json` before opening the server: its generated `blockedItems` list contains example workstation ids. Entries are case-insensitive and support `*` wildcards.
 
-1. Set `enabled: true` and add `{rank_icon}` (and optionally `{rank_icon_space}`) to your chat formats.
-2. Drop PNGs into the rank-icon uploads directory, then `/rankicon import <icon> <file> <group>`.
-3. `/rankicon validate` and `/rankicon status` confirm files, hashes, and mappings are healthy.
-4. `/rankicon previewrank <player>` shows what a given player resolves to; `/rankicon debug <player>` prints the full resolution trace.
-
-Newly staged assets may report `pending restart` until `/rankicon rebuild` or a restart registers them. See [Chat Formatting](chat-formatting) for how rich chat rendering works.
+Use `/craftblock check` while holding an item to find its exact id, edit the list, then run `/mystic reload`. Grant `mysticessentials.craftblock.bypass` to trusted builders who may craft everything, or `mysticessentials.craftblock.bypass.<item id>` for one lowercased item id. Processing benches such as smelters cannot be intercepted by Hytale's craft event and are not covered.
 
 ## Mail operations
 

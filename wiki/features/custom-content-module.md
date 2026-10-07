@@ -11,12 +11,11 @@ CustomContent is a licensed feature. Access requires all of the following:
 
 1. Join the [Hyzion Discord](https://discord.gg/9aq3Gqg3Gy) and become a partner.
 2. Purchase an eligible [Hyzion Patreon membership](https://www.patreon.com/cw/Hyzion).
-3. Sign in with Discord at [license.hyzion.net](https://license.hyzion.net) to
+3. Sign in with Discord at [licenses.hyzion.net](https://licenses.hyzion.net) to
    link that Discord account.
 4. Run `/mystic license` on the server and register the displayed server
    licensing id in the portal.
-5. Download `license.mclicense` and place it at
-   `mods/MysticEssentials/license.mclicense`.
+5. Create `license.key` file and in `mods/MysticEssentials/` then place the key generated from your license panel into the file.
 6. Run `/mystic license reload`, followed by `/mystic reload` to start the newly
    unlocked module without restarting the server.
 

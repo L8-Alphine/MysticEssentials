@@ -12,9 +12,12 @@ surfaces, store history, play sounds, and carry command or URL actions.
 | `/alert [category] [priority] <message> [flags]` | Send a higher-priority notice | `mysticessentials.announcement.alert` |
 
 The short forms remain compatible: `/broadcast The market is open` and `/alert
-Restart soon` use the configured prefixes, title and sound. The precise form can
-select a category (`announcement`, `event`, `maintenance`, `warning`, `critical`,
-and others), a `low`, `normal`, `important`, or `critical` priority, and flags:
+Restart soon` use the configured prefix and title. Manual broadcasts and alerts
+are silent and transient by default; add `--sound <asset-id>` or `--history` when
+the notice should play a sound or remain in notification history. The precise
+form can select a category (`announcement`, `event`, `maintenance`, `warning`,
+`critical`, and others), a `low`, `normal`, `important`, or `critical` priority,
+and flags:
 
 ```text
 /alert critical --title "Server Restart" --subtitle "60 seconds" \
@@ -24,15 +27,16 @@ and others), a `low`, `normal`, `important`, or `critical` priority, and flags:
 Supported value flags are `--title`, `--subtitle`, `--message`, `--sound`,
 `--icon`, `--source`, `--command`, `--url`, `--duration`, and `--audience`.
 Surface switches are `--bossbar`/`--banner`, `--toast`, `--actionbar`,
-`--no-chat`, `--no-history`, and `--sticky`.
+`--no-chat`, `--history`, `--no-history`, and `--sticky`.
 
 Audiences include `all`, `staff`, `world:<name>`, `channel:<id>`,
 `permission:<node>`, and `player:<name>`. `guild:<id>`, `party:<id>`, and
 `region:<id>` work when an addon registers the matching audience resolver.
 
-Priority controls the default delivery profile: low is chat-only, normal adds
-action bar/toast/history, important adds a title, and critical also pins a
-non-dismissible banner. Critical sending needs
+Manual commands default to chat, toast, and Hytale's title surface at every
+priority; they do not use action bar, banner, sound, or history unless a flag
+requests it. Priority still identifies severity, respects a category's minimum,
+and controls preference handling. Critical sending needs
 `mysticessentials.notifications.critical` and cannot be suppressed by player
 preferences unless the server explicitly changes that policy.
 
@@ -94,7 +98,8 @@ modules/announcements/config.json
 | `broadcastPrefix` | `&8[&dBroadcast&8] &f` | Prefix for `/broadcast` |
 | `alertPrefix` | `&8[&c&lALERT&8] &c` | Prefix for `/alert` |
 | `broadcastTitle` / `alertTitle` | `Announcement` / `Alert` | Built-in event-title headline |
-| `broadcastSound` / `alertSound` | Hytale attention SFX | Sound used by short-form and rotating notices |
+| `broadcastSound` | Hytale announcement SFX | Sound for rotating announcements and AnnouncementService sends |
+| `alertSound` | Hytale alert SFX | Deprecated compatibility setting; manual alerts require `--sound <asset-id>` |
 | `messages` | Welcome/home/TPA examples | Auto-broadcast entries |
 
 ## See also

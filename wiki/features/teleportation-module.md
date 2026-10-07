@@ -12,6 +12,7 @@ The Teleportation module provides player-to-player teleport requests, staff tele
 | `/tpaccept [player]` | Accept the newest request, or one from a specific player | `mysticessentials.teleport.tpa` |
 | `/tpdeny [player]` | Deny the newest request, or one from a specific player | `mysticessentials.teleport.tpa` |
 | `/tpcancel` | Cancel your outgoing requests | `mysticessentials.teleport.tpa` |
+| `/tptoggle` | Toggle whether you accept incoming teleport requests | `mysticessentials.teleport.tpa` |
 
 Requests expire after `requestExpirySeconds`. When a request is accepted, the mover waits out `tpaWarmupSeconds`; moving or taking damage during the warmup cancels the teleport. A `tpaCooldownSeconds` cooldown then applies.
 

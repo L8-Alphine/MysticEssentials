@@ -21,7 +21,7 @@ read.
 | Priority | Default behavior |
 | --- | --- |
 | `low` | Chat only; no history |
-| `normal` | Chat, action bar, toast, sound, and history according to category |
+| `normal` | Use the category's configured default profile |
 | `important` | Chat, title/subtitle, toast, sound, and history |
 | `critical` | Important surfaces plus a pinned, non-dismissible banner |
 
@@ -40,6 +40,25 @@ Built-in targets include all players, one or more players, a permission, world,
 channel, nearby radius, staff, or an API predicate. Guild, party, region, and
 other relationship owners can register named audience resolvers through the
 public API.
+
+## Configuration
+
+File:
+
+```text
+modules/core/notifications.json
+```
+
+| Setting | Default | Description |
+| --- | --- | --- |
+| `enabled` | `true` | Master notification-engine switch |
+| `history.enabled` | `true` | Store notifications whose selected profile enables history |
+| `history.maximumPerPlayer` | `50` | Stored records retained per player |
+| `history.persistCritical` | `true` | Keep critical records across reconnects even after read |
+| `history.defaultExpirationHours` | `24` | Routine record lifetime |
+| `critical.allowPlayerDisable` | `false` | Allow players to suppress critical alerts |
+
+Each profile selects `chat`, `title`, `subtitle`, `actionbar`, `toast`, `banner`, `sound`, and `history`, plus title fade/stay timing and banner `durationSeconds`/`dismissible`. Each category supplies `displayName`, `icon`, `accent`, `sound`, `defaultProfile`, `minimumPriority`, `chatPrefix`, and `playerDisableable`.
 
 See [Announcements](announcements-module) for `/broadcast` and `/alert` syntax,
 or [Developer API](developer-api) to send notifications from another mod.
