@@ -827,6 +827,35 @@ The build uses AzureDoom's `com.azuredoom.hytale-tools` Gradle plugin: the
 Hytale version, mod identity and manifest fields live in `gradle.properties`,
 and `src/main/resources/manifest.json` is rewritten from them on every build.
 
+### Local build environment
+
+Create a local `.env` containing the licensing endpoint and public
+verification-key metadata:
+
+```properties
+mystic.licensing.url=https://licenses.example.com
+mystic.licensing.keys=key-id=public-verification-key
+```
+
+`.env` is ignored by Git and is never copied into the artifact. The build
+packages only the allowlisted `mystic.licensing.url` and
+`mystic.licensing.keys` values in
+`META-INF/mysticessentials/build-environment.properties`. Because those values
+are readable from the JAR, never put private keys, tokens, passwords, or other
+secrets in either setting.
+
+CI may set `MYSTIC_LICENSING_URL` and `MYSTIC_LICENSING_KEYS` instead; those
+variables override the local file. Every artifact-producing build automatically
+injects both values and fails with their property names—not their values—if the
+configuration is incomplete. No extra build flag is needed:
+
+```bash
+./gradlew build
+```
+
+For an intentionally unconfigured development artifact, opt out explicitly with
+`-PrequireBuildEnv=false`.
+
 ## Running a dev server
 
 ```bash

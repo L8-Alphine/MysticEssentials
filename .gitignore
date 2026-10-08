@@ -17,8 +17,9 @@ local.properties
 /.agents/
 Mystic_Essentials_Feature_and_Structure_Design_Chat_Expanded.docx
 /wiki/*
-.env
-.env.*
+/.env
+/.env.*
 !.env.example
 !/wiki/features/
 !/wiki/features/craftblock-module.md
+/.env.example

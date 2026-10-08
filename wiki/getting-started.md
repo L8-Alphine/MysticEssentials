@@ -37,7 +37,7 @@ an eligible [Hyzion Patreon membership](https://www.patreon.com/cw/Hyzion), then
 sign in with Discord at [licenses.hyzion.net](https://licenses.hyzion.net) to link
 your account and server. Run `/mystic license` to obtain the server licensing id.
 
-Download `license.mclicense` from the licensing server, place it in `mods/MysticEssentials/`, and enable
+Create `license.key` file and fill it with the key from the licensing server, place it in `mods/MysticEssentials/`, and enable
 `"customcontent": true` in the main module map, and run `/mystic license reload`
 followed by `/mystic reload`. An invalid or missing license disables only this
 module. See [CustomGUIs & CustomDialogs](custom-content-module) for setup and the

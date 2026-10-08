@@ -1,5 +1,35 @@
 import java.util.zip.ZipFile
 
+/**
+ * Reads the small dotenv subset used by the build: KEY=VALUE lines, optional
+ * `export`, comments, and single/double quoted values. The whole file is never
+ * copied into an artifact; callers must select an explicit allowlist.
+ */
+fun readBuildDotEnv(file: File): Map<String, String> {
+    if (!file.isFile) return emptyMap()
+    val values = linkedMapOf<String, String>()
+    file.forEachLine(Charsets.UTF_8) { rawLine ->
+        val line = rawLine.trim()
+        if (line.isEmpty() || line.startsWith("#")) return@forEachLine
+        val assignment = if (line.startsWith("export ")) line.substring(7).trimStart() else line
+        val separator = assignment.indexOf('=')
+        if (separator <= 0) return@forEachLine
+        val key = assignment.substring(0, separator).trim()
+        var value = assignment.substring(separator + 1).trim()
+        if (value.length >= 2 && ((value.startsWith('"') && value.endsWith('"'))
+                    || (value.startsWith('\'') && value.endsWith('\'')))) {
+            value = value.substring(1, value.length - 1)
+        }
+        values[key] = value
+    }
+    return values
+}
+
+fun escapeBuildProperty(value: String): String = value
+    .replace("\\", "\\\\")
+    .replace("\r", "\\r")
+    .replace("\n", "\\n")
+
 plugins {
     idea
     java
@@ -88,6 +118,84 @@ dependencies {
 
 tasks.withType<JavaCompile>().configureEach {
     options.compilerArgs.add("-Xlint:deprecation")
+}
+
+// Local/CI build metadata. `.env` remains outside source control and is never
+// packaged wholesale. Only these explicitly public values can enter the jar;
+// environment variables take precedence so CI does not need a disk file.
+val embeddedBuildEnvironmentKeys = linkedMapOf(
+    "mystic.licensing.url" to "MYSTIC_LICENSING_URL",
+    "mystic.licensing.keys" to "MYSTIC_LICENSING_KEYS"
+)
+val localBuildEnvironment = layout.projectDirectory.file(".env")
+val generatedBuildEnvironmentDir = layout.buildDirectory.dir("generated/build-environment")
+val generatedBuildEnvironmentFile = generatedBuildEnvironmentDir.map {
+    it.file("META-INF/mysticessentials/build-environment.properties")
+}
+val requireBuildEnvironment = providers.gradleProperty("requireBuildEnv")
+    .orElse(providers.environmentVariable("MYSTIC_REQUIRE_BUILD_ENV"))
+    .map { value ->
+        value.toBooleanStrictOrNull()
+            ?: throw GradleException("requireBuildEnv/MYSTIC_REQUIRE_BUILD_ENV must be true or false")
+    }
+    .orElse(true)
+
+val generateBuildEnvironment = tasks.register("generateBuildEnvironment") {
+    group = "build setup"
+    description = "Injects allowlisted public build metadata from .env or CI environment variables."
+    outputs.file(generatedBuildEnvironmentFile)
+    outputs.upToDateWhen { false }
+    outputs.cacheIf { false }
+
+    doLast {
+        val fileValues = readBuildDotEnv(localBuildEnvironment.asFile)
+        val selected = linkedMapOf<String, String>()
+        embeddedBuildEnvironmentKeys.forEach { (propertyName, environmentName) ->
+            val value = sequenceOf(
+                System.getenv(environmentName),
+                System.getenv(propertyName),
+                fileValues[propertyName],
+                fileValues[environmentName]
+            ).firstOrNull { !it.isNullOrBlank() }?.trim()
+            if (value != null) selected[propertyName] = value
+        }
+
+        val missing = embeddedBuildEnvironmentKeys.keys - selected.keys
+        if (requireBuildEnvironment.get() && missing.isNotEmpty()) {
+            throw GradleException(
+                "Required build environment is incomplete. Missing: ${missing.joinToString()}. " +
+                    "Create .env with the documented properties or set the CI environment variables."
+            )
+        }
+
+        val output = generatedBuildEnvironmentFile.get().asFile
+        if (output.exists() && !output.delete()) {
+            throw GradleException("Could not replace generated build environment resource")
+        }
+        if (selected.isEmpty()) {
+            logger.lifecycle("Build environment: no allowlisted values configured; resource omitted.")
+            return@doLast
+        }
+
+        output.parentFile.mkdirs()
+        output.writeText(
+            selected.entries.joinToString(separator = "\n", postfix = "\n") {
+                "${it.key}=${escapeBuildProperty(it.value)}"
+            },
+            Charsets.UTF_8
+        )
+        logger.lifecycle(
+            "Build environment: embedded ${selected.size} allowlisted public value(s) " +
+                "in META-INF/mysticessentials/build-environment.properties."
+        )
+    }
+}
+
+sourceSets.named("main") {
+    resources.srcDir(generatedBuildEnvironmentDir)
+}
+tasks.named("processResources") {
+    dependsOn(generateBuildEnvironment)
 }
 
 // The plain jar has no Jedis/JDBC/jsoup inside and must never be what gets
@@ -425,6 +533,7 @@ tasks.test { failOnNoDiscoveredTests = false }
 tasks.named("check") {
     dependsOn(
         "verifyItemMetadataCompatibility",
+        "generateBuildEnvironment",
         "verifyItemDetailsLayout",
         "verifyMysticRpgRtpSafety",
         "verifyRtpFluidSafety",
