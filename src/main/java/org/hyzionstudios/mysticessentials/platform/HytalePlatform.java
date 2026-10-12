@@ -59,8 +59,9 @@ import com.hypixel.hytale.server.core.modules.entity.teleport.Teleport;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
-import com.hypixel.hytale.server.core.universe.world.chunk.BlockChunk;
 import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
+import com.hypixel.hytale.server.core.universe.world.chunk.heightmap.HeightmapColumn;
+import com.hypixel.hytale.server.core.universe.world.chunk.section.BlockSection;
 import com.hypixel.hytale.server.core.universe.world.chunk.section.FluidSection;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -262,29 +263,42 @@ public final class HytalePlatform {
      * world's configured spawn provider (the same source the engine uses on
      * world join).
      *
-     * @return empty if the world is unknown or has no spawn provider.
+     * <p>The provider resolves asynchronously (it may load the spawn column
+     * first), so the result is a future.</p>
+     *
+     * @return empty if the world is unknown, has no spawn provider, or the
+     *         spawn point cannot be resolved.
      */
-    public Optional<MysticLocation> worldSpawn(String worldName, UUID player) {
+    public CompletableFuture<Optional<MysticLocation>> worldSpawn(String worldName, UUID player) {
         World world = world(worldName).orElse(null);
         if (world == null) {
-            return Optional.empty();
+            return CompletableFuture.completedFuture(Optional.empty());
         }
         try {
             var config = world.getWorldConfig();
             var provider = config == null ? null : config.getSpawnProvider();
-            Transform spawn = provider == null ? null : provider.getSpawnPoint(world, player);
-            if (spawn == null) {
-                return Optional.empty();
+            if (provider == null) {
+                return CompletableFuture.completedFuture(Optional.empty());
             }
-            Vector3d position = spawn.getPosition();
-            Rotation3f rotation = spawn.getRotation();
-            return Optional.of(new MysticLocation(world.getName(),
-                    position.x, position.y, position.z,
-                    rotation == null ? 0.0f : rotation.yaw(),
-                    rotation == null ? 0.0f : rotation.pitch()));
+            return provider.getSpawnPointAsync(world, player)
+                    .thenApply(spawn -> {
+                        if (spawn == null) {
+                            return Optional.<MysticLocation>empty();
+                        }
+                        Vector3d position = spawn.getPosition();
+                        Rotation3f rotation = spawn.getRotation();
+                        return Optional.of(new MysticLocation(world.getName(),
+                                position.x, position.y, position.z,
+                                rotation == null ? 0.0f : rotation.yaw(),
+                                rotation == null ? 0.0f : rotation.pitch()));
+                    })
+                    .exceptionally(t -> {
+                        core.log(Level.WARNING, "Failed to resolve spawn point for world '" + worldName + "': " + t);
+                        return Optional.empty();
+                    });
         } catch (Throwable t) {
             core.log(Level.WARNING, "Failed to resolve spawn point for world '" + worldName + "': " + t);
-            return Optional.empty();
+            return CompletableFuture.completedFuture(Optional.empty());
         }
     }
 
@@ -552,7 +566,7 @@ public final class HytalePlatform {
         }
         int localX = ChunkUtil.localCoordinate(blockX);
         int localZ = ChunkUtil.localCoordinate(blockZ);
-        int topY = chunk.getHeight(localX, localZ);
+        int topY = columnHeight(chunk, localX, localZ);
         if (topY < ChunkUtil.MIN_Y) {
             outcome.complete(Optional.empty());
             return;
@@ -618,7 +632,7 @@ public final class HytalePlatform {
             }
             int localX = ChunkUtil.localCoordinate(blockX);
             int localZ = ChunkUtil.localCoordinate(blockZ);
-            int surfaceY = chunk.getHeight(localX, localZ);
+            int surfaceY = columnHeight(chunk, localX, localZ);
             if (surfaceY < ChunkUtil.MIN_Y) {
                 // No terrain in this column (void).
                 outcome.complete(Optional.empty());
@@ -630,14 +644,14 @@ public final class HytalePlatform {
                 return;
             }
             // The surface block must be solid ground to stand on.
-            if (blockId(chunk, localX, surfaceY, localZ) == AIR_BLOCK_ID) {
+            if (blockId(world, blockX, surfaceY, blockZ) == AIR_BLOCK_ID) {
                 outcome.complete(Optional.empty());
                 return;
             }
             // Require clear air for the player's body.
             int headroom = Math.max(1, requiredHeadroom);
             for (int dy = 0; dy < headroom; dy++) {
-                if (blockId(chunk, localX, feetY + dy, localZ) != AIR_BLOCK_ID) {
+                if (blockId(world, blockX, feetY + dy, blockZ) != AIR_BLOCK_ID) {
                     outcome.complete(Optional.empty());
                     return;
                 }
@@ -713,8 +727,6 @@ public final class HytalePlatform {
                 outcome.complete(Optional.empty());
                 return;
             }
-            int localX = ChunkUtil.localCoordinate(blockX);
-            int localZ = ChunkUtil.localCoordinate(blockZ);
             int headroom = Math.max(1, requiredHeadroom);
             int range = Math.max(0, maxVerticalDistance);
             int top = Math.min(ChunkUtil.HEIGHT - headroom, preferredFeetY + range);
@@ -728,14 +740,14 @@ public final class HytalePlatform {
                     break;
                 }
                 int floorY = feetY - 1;
-                int floor = blockId(chunk, localX, floorY, localZ);
+                int floor = blockId(world, blockX, floorY, blockZ);
                 if (floor == AIR_BLOCK_ID || contains(blockedBlockIds, floor)
                         || contains(blockedFluidIds, fluidId(world, blockX, floorY, blockZ))) {
                     continue;
                 }
                 boolean clear = true;
                 for (int dy = 0; dy < headroom && clear; dy++) {
-                    clear = blockId(chunk, localX, feetY + dy, localZ) == AIR_BLOCK_ID
+                    clear = blockId(world, blockX, feetY + dy, blockZ) == AIR_BLOCK_ID
                             && !contains(blockedFluidIds, fluidId(world, blockX, feetY + dy, blockZ));
                 }
                 if (!clear) {
@@ -760,14 +772,32 @@ public final class HytalePlatform {
         return ids != null && !ids.isEmpty() && ids.contains(id);
     }
 
-    /** Reads the numeric block id used by RTP safety configuration. */
-    private static int blockId(WorldChunk chunk, int x, int y, int z) {
-        var reference = chunk.getReference();
-        if (reference == null) {
+    /**
+     * Reads the numeric block id used by RTP safety configuration from its
+     * chunk-section component; a section that is not resident reads as
+     * {@link BlockType#UNKNOWN_ID}, which the safety checks treat as unsafe.
+     */
+    private static int blockId(World world, int blockX, int blockY, int blockZ) {
+        ChunkStore chunks = world.getChunkStore();
+        Ref<ChunkStore> sectionRef = chunks.getChunkSectionReferenceAtBlock(blockX, blockY, blockZ);
+        if (sectionRef == null || !sectionRef.isValid()) {
             return BlockType.UNKNOWN_ID;
         }
-        BlockChunk blocks = reference.getStore().getComponent(reference, BlockChunk.getComponentType());
-        return blocks == null ? BlockType.UNKNOWN_ID : blocks.getBlock(x, y, z);
+        BlockSection blocks = chunks.getStore().getComponent(sectionRef, BlockSection.getComponentType());
+        return blocks == null ? BlockType.UNKNOWN_ID : blocks.get(blockX, blockY, blockZ);
+    }
+
+    /**
+     * The column's opacity top (highest non-transparent block) from the
+     * chunk's heightmap component, or {@link HeightmapColumn#NO_HEIGHT}.
+     */
+    private static int columnHeight(WorldChunk chunk, int x, int z) {
+        var reference = chunk.getReference();
+        if (reference == null) {
+            return HeightmapColumn.NO_HEIGHT;
+        }
+        HeightmapColumn heightmap = reference.getStore().getComponent(reference, HeightmapColumn.getComponentType());
+        return heightmap == null ? HeightmapColumn.NO_HEIGHT : heightmap.getHeight(x, z);
     }
 
     /** Resolves a loaded chunk column through Update 6's component-backed chunk store. */

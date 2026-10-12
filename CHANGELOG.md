@@ -1,5 +1,30 @@
 # Mystic Essentials Changelog
 
+## 1.0.5 — Hytale 0.7.0
+
+Not yet released.
+
+Mystic Essentials 1.0.5 moves to Hytale Server 0.7.0, whose chunk and spawn APIs
+changed shape.
+
+### Compatibility
+
+- Built and verified against Hytale Server `0.7.0`.
+- Supports Hytale Server `>=0.7.0 <0.8.0`; 0.6.x servers stay on 1.0.4.
+- Compiles against the MysticIdentity API `0.1.1`.
+
+### Hytale 0.7.0 Migration
+
+- `/tp world` and world portals resolve spawn points through the asynchronous
+  spawn-provider API. A portal applies its teleport on the player's world thread
+  once the point resolves.
+- `/top` and random-teleport ground sampling read column heights from the chunk's
+  `HeightmapColumn` component and blocks from chunk-section components, replacing
+  the removed `WorldChunk#getHeight` and `BlockChunk#getBlock`. The height is the
+  same opacity top as before, so destinations do not move.
+- Event-title notifications use the `EventTitleStyle` overload instead of the
+  deprecated `isMajor` flag.
+
 ## 1.0.4 — Integration Upgrade and Lifecycle Reliability
 
 Released August 30, 2026.

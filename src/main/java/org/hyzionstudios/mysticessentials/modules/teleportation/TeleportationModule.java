@@ -1223,12 +1223,18 @@ public final class TeleportationModule extends AbstractMysticModule {
                         "world", worldName));
                 return;
             }
-            MysticLocation destination = core.platform().worldSpawn(worldName, targetPlayer.getUuid())
-                    .orElse(null);
-            if (destination == null) {
-                sender.replyKey("teleport-world-no-spawn", Map.of("world", worldName));
-                return;
-            }
+            core.platform().worldSpawn(worldName, targetPlayer.getUuid()).thenAccept(spawn -> {
+                MysticLocation destination = spawn.orElse(null);
+                if (destination == null) {
+                    sender.replyKey("teleport-world-no-spawn", Map.of("world", worldName));
+                    return;
+                }
+                teleportToWorldSpawn(sender, targetPlayer, destination);
+            });
+        }
+
+        private void teleportToWorldSpawn(MysticCommandSender sender, PlayerRef targetPlayer,
+                MysticLocation destination) {
             core.getTeleportService().teleportNow(targetPlayer, destination).thenAccept(result -> {
                 if (result == TeleportService.Result.SUCCESS) {
                     sender.replyKey("teleport-world-success", Map.of(

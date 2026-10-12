@@ -262,7 +262,7 @@ val mysticIdentity: SourceSet = sourceSets.create("mysticIdentity") {
 }
 
 dependencies {
-    "mysticIdentityCompileOnly"(files("../MysticIdentity/mysticidentity-api/build/libs/mysticidentity-api-0.1.0.jar"))
+    "mysticIdentityCompileOnly"(files("../MysticIdentity/mysticidentity-api/build/libs/mysticidentity-api-0.1.1.jar"))
 }
 
 tasks.shadowJar {
