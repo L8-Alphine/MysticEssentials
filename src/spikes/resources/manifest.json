@@ -1,0 +1,17 @@
+{
+    "Group": "org.hyzionstudios",
+    "Name": "MysticLootBoxSpikes",
+    "Version": "0.1.0",
+    "Main": "org.hyzionstudios.mysticessentials.spikes.LootBoxSpikesPlugin",
+    "ServerVersion": ">=0.7.2 <0.8.0",
+    "Description": "DEV ONLY. LootBox Phase 0 engine spikes (S2, S3, S6, S7). Never install on a live server.",
+    "Authors": [
+        {
+            "Name": "Alphine"
+        }
+    ],
+    "Dependencies": {},
+    "OptionalDependencies": {},
+    "IncludesAssetPack": true,
+    "DisabledByDefault": false
+}

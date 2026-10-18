@@ -1,0 +1,56 @@
+// DEV ONLY - LootBox spike S3 (TabNavigation (header tabs)). Opened by /lbspike ui. If this page shows,
+// the document parsed; watch the client log for "Markup Error" otherwise.
+$C = "../Common.ui";
+
+$C.@PageOverlay {}
+
+$C.@Container {
+  Anchor: (Width: 680, Height: 460);
+
+  #Title {
+    Group {
+      $C.@Title {
+        @Text = "S3 - TabNavigation (header tabs)";
+      }
+    }
+  }
+
+  #Content {
+    LayoutMode: Top;
+
+    Label #Status {
+      Anchor: (Height: 24, Bottom: 10);
+      Text: "Document parsed. Check the widget below renders and responds.";
+    }
+
+    TabNavigation #Tabs {
+      Anchor: (Height: 40);
+      Style: $C.@HeaderTabsStyle;
+      SelectedTab: "General";
+
+      TabButton #General {
+        Id: "General";
+        TooltipText: "General";
+      }
+
+      TabButton #Rewards {
+        Id: "Rewards";
+        TooltipText: "Rewards";
+      }
+
+      TabButton #Keys {
+        Id: "Keys";
+        TooltipText: "Keys";
+      }
+    }
+
+    Group {
+      FlexWeight: 1;
+    }
+
+    $C.@TextButton #CloseButton {
+      @Text = "Close";
+      @Anchor = (Width: 150);
+    }
+  }
+}

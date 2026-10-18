@@ -286,6 +286,22 @@ tasks.register<JavaExec>("verifyPortalAdapter") {
 
 tasks.named("check") { dependsOn("verifyPortalAdapter") }
 
+// LootBox Phase 0 spikes (docs/lootbox/implementation-plan.md §10): a throwaway, dev-only plugin
+// that probes engine behaviour in a live server. It is its own jar with its own manifest and is
+// never packed into the mod jar — install it on a development server only.
+// Sources and resources use the source set's default src/spikes/{java,resources}.
+val spikes: SourceSet = sourceSets.create("spikes") {
+    compileClasspath += sourceSets.main.get().compileClasspath
+}
+
+tasks.register<Jar>("spikesJar") {
+    group = "build"
+    description = "Builds the dev-only LootBox spike plugin (MysticLootBoxSpikes.jar)."
+    archiveBaseName.set("MysticLootBoxSpikes")
+    archiveVersion.set("0.1.0")
+    from(spikes.output)
+}
+
 /**
  * Validates every `$C.@Component { ... }` instantiation in our shipped `.ui`
  * documents against the parameter contract declared in the game's `Common.ui`.
@@ -319,6 +335,8 @@ tasks.register("validateUiDocuments") {
     description = "Checks shipped .ui documents supply every required Common.ui parameter."
 
     val uiDir = layout.projectDirectory.dir("src/main/resources/Common/UI/Custom")
+    // The dev-only spike plugin's documents can break other mods' UI the same way, so they are checked too.
+    val spikeUiDir = layout.projectDirectory.dir("src/spikes/resources/Common/UI/Custom")
     inputs.dir(uiDir)
     outputs.upToDateWhen { false }
 
@@ -383,7 +401,9 @@ tasks.register("validateUiDocuments") {
         val problems = mutableListOf<String>()
         var checked = 0
 
-        uiDir.asFile.walkTopDown().filter { it.isFile && it.extension == "ui" }.forEach { file ->
+        listOf(uiDir.asFile, spikeUiDir.asFile).filter { it.isDirectory }
+            .flatMap { dir -> dir.walkTopDown().filter { it.isFile && it.extension == "ui" }.toList() }
+            .forEach { file ->
             val text = file.readText()
             header.findAll(text).forEach { use ->
                 val alias = use.groupValues[1]

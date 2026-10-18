@@ -1,0 +1,100 @@
+// DEV ONLY - LootBox spike S3 (ReorderableList). Opened by /lbspike ui. If this page shows,
+// the document parsed; watch the client log for "Markup Error" otherwise.
+$C = "../Common.ui";
+
+$C.@PageOverlay {}
+
+$C.@Container {
+  Anchor: (Width: 680, Height: 460);
+
+  #Title {
+    Group {
+      $C.@Title {
+        @Text = "S3 - ReorderableList";
+      }
+    }
+  }
+
+  #Content {
+    LayoutMode: Top;
+
+    Label #Status {
+      Anchor: (Height: 24, Bottom: 10);
+      Text: "Document parsed. Check the widget below renders and responds.";
+    }
+
+    ReorderableList #List {
+      Anchor: (Height: 200);
+      LayoutMode: Top;
+
+      Group #RowA {
+        Anchor: (Height: 34, Bottom: 4);
+        LayoutMode: Left;
+        Background: #0a0f16(0.38);
+
+        ReorderableListGrip {
+          Anchor: (Width: 28);
+
+          Group {
+            Anchor: (Full: 0);
+            Background: #ffffff(0.15);
+          }
+        }
+
+        Label {
+          Anchor: (Left: 10);
+          Text: "Iron Sword - 45.00%";
+        }
+      }
+
+      Group #RowB {
+        Anchor: (Height: 34, Bottom: 4);
+        LayoutMode: Left;
+        Background: #0a0f16(0.38);
+
+        ReorderableListGrip {
+          Anchor: (Width: 28);
+
+          Group {
+            Anchor: (Full: 0);
+            Background: #ffffff(0.15);
+          }
+        }
+
+        Label {
+          Anchor: (Left: 10);
+          Text: "250 Gold - 30.00%";
+        }
+      }
+
+      Group #RowC {
+        Anchor: (Height: 34, Bottom: 4);
+        LayoutMode: Left;
+        Background: #0a0f16(0.38);
+
+        ReorderableListGrip {
+          Anchor: (Width: 28);
+
+          Group {
+            Anchor: (Full: 0);
+            Background: #ffffff(0.15);
+          }
+        }
+
+        Label {
+          Anchor: (Left: 10);
+          Text: "Guardian Companion - 1.00%";
+        }
+      }
+    }
+
+    Group {
+      FlexWeight: 1;
+    }
+
+    $C.@TextButton #CloseButton {
+      @Text = "Close";
+      @Anchor = (Width: 150);
+    }
+  }
+}

@@ -1,0 +1,40 @@
+// DEV ONLY - LootBox spike S3 (ProgressBar). Opened by /lbspike ui. If this page shows,
+// the document parsed; watch the client log for "Markup Error" otherwise.
+$C = "../Common.ui";
+
+$C.@PageOverlay {}
+
+$C.@Container {
+  Anchor: (Width: 680, Height: 460);
+
+  #Title {
+    Group {
+      $C.@Title {
+        @Text = "S3 - ProgressBar";
+      }
+    }
+  }
+
+  #Content {
+    LayoutMode: Top;
+
+    Label #Status {
+      Anchor: (Height: 24, Bottom: 10);
+      Text: "Document parsed. Check the widget below renders and responds.";
+    }
+
+    $C.@ProgressBar #Bar {
+      @Anchor = (Top: 12);
+      Value: 0.25;
+    }
+
+    Group {
+      FlexWeight: 1;
+    }
+
+    $C.@TextButton #CloseButton {
+      @Text = "Close";
+      @Anchor = (Width: 150);
+    }
+  }
+}

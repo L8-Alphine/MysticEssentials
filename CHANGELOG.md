@@ -2,8 +2,6 @@
 
 ## 1.0.5 — Hytale 0.7.0
 
-Not yet released.
-
 Mystic Essentials 1.0.5 moves to Hytale Server 0.7.0, whose chunk and spawn APIs
 changed shape.
 
