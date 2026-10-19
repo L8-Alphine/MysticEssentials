@@ -56,6 +56,7 @@ reward, chance and delivery status.
 | `/lootbox crate remove [crateId]` / `enable <crateId>` | Unbind or reactivate a crate | `mysticessentials.lootbox.crates.manage` |
 | `/lootbox reconcile <openingId> <regrant\|dismiss>` | Resolve a delivery held for review | `mysticessentials.lootbox.restore` |
 | `/lootbox admin` | Open the manager screen | `mysticessentials.lootbox.admin` |
+| Manager: Create, Edit, Clone, Archive | Edit drafts in game (coming in a later update) | `mysticessentials.lootbox.edit` |
 | `/lootbox reload` | Reload drafts and settings | `mysticessentials.lootbox.admin` |
 
 Every subcommand also needs `mysticessentials.lootbox.use`, which gates the
@@ -238,6 +239,7 @@ modules/lootbox/config.json
 | --- | --- |
 | `modules/lootbox/lootboxes/*.json` | Pool drafts (edit these) |
 | `modules/lootbox/keys/*.json` | Key drafts (edit these) |
+| `modules/lootbox/lootboxes/_archive/`, `keys/_archive/` | Archived drafts, named `<id>-<yyyyMMddHHmmss>.json` (UTC; a key id's `:` becomes `.`); never loaded. Move a file back to restore it |
 | `data/modules/lootbox/secret.key` | Key-signing secret (private) |
 | `lootbox_def`, `lootbox_rev`, `lootbox_keydef` | Each pool's active revision and status, published pool revisions, published key definitions |
 | `lootbox_player`, `lootbox_serial`, `lootbox_open`, `lootbox_pending` | Player balances and receipts, key serials, openings, pending inboxes |
