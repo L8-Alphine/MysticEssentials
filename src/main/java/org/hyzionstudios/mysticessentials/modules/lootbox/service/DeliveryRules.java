@@ -9,9 +9,10 @@ import org.hyzionstudios.mysticessentials.modules.lootbox.model.PlayerLootState;
 
 /**
  * The delivery rules of §4.4 that decide whether a reward runs again: which
- * openings recovery resumes, which actions of an opening still run, and what
- * settling an opening does to the player document. Engine-free;
- * {@link RewardService} and {@link OpeningService#recover} apply them.
+ * openings recovery resumes, when staff may reconcile one, which actions of an
+ * opening still run, and what settling an opening does to the player document.
+ * Engine-free; {@link RewardService}, {@link OpeningService#recover} and
+ * {@link OpeningService#reconcile} apply them.
  */
 public final class DeliveryRules {
 
@@ -48,6 +49,28 @@ public final class DeliveryRules {
     public static boolean resumes(Opening opening, Long runningSince, long now) {
         return opening != null && !opening.isTerminal()
                 && (runningSince == null || now - runningSince >= STALLED_MS);
+    }
+
+    /**
+     * {@code null} when staff may reconcile {@code opening} now; otherwise why not.
+     * Only an opening in REVIEW is reconciled, and never while this server is
+     * delivering it ({@code runningSince}, read before the load as for
+     * {@link #resumes}): a regrant that passed the review check may not have
+     * written its first mark yet, and a second regrant beside it would hand the
+     * reward out twice. Asked in the player's lane, so no delivery starts between
+     * the answer and the regrant's own.
+     */
+    public static String reconcileProblem(Opening opening, Long runningSince) {
+        if (opening == null) {
+            return "unknown opening";
+        }
+        if (runningSince != null) {
+            return "already being delivered";
+        }
+        if (!Opening.REVIEW.equals(opening.state)) {
+            return "not under review (" + opening.state + ")";
+        }
+        return null;
     }
 
     /**

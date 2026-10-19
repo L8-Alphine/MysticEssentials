@@ -45,8 +45,9 @@ import com.google.gson.JsonElement;
  * is spent, a confirmation sent twice yields one opening, a multi-use key spends
  * one use per opening and is REDEEMED only at zero, a virtual balance never goes
  * negative even when openings race, recovery after a crash between the commit
- * and the delivery follows {@link RecoveryPolicy} and delivers exactly once, and
- * recovery leaves a delivery this server is still running to finish.
+ * and the delivery follows {@link RecoveryPolicy} and delivers exactly once,
+ * recovery leaves a delivery this server is still running to finish, and two
+ * staff regrants racing on one reviewed opening hand the reward out once.
  *
  * <p>{@code OpeningService} needs a running server (PlayerRef, world threads), so
  * {@link Saga} drives the rules it applies ({@link OpeningRules},
@@ -83,6 +84,7 @@ public final class LootBoxSagaTest {
             onlyReplaySafeActionsRunAgain();
             recoveryAfterACrashDeliversOnce();
             recoveryLeavesARunningDeliveryAlone();
+            racingRegrantsGiveTheRewardOnce();
         } finally {
             IO.shutdownNow();
         }
@@ -354,6 +356,15 @@ public final class LootBoxSagaTest {
                 && DeliveryRules.resumes(inState(Opening.DELIVERING), stalled, now)
                 && !DeliveryRules.resumes(inState(Opening.DELIVERED), stalled, now),
                 "a delivery running on this server was resumed, or a stalled one was not");
+        require(DeliveryRules.reconcileProblem(inState(Opening.REVIEW), null) == null,
+                "staff may not reconcile an opening under review");
+        require("already being delivered".equals(DeliveryRules.reconcileProblem(inState(Opening.REVIEW), now))
+                && "already being delivered".equals(DeliveryRules.reconcileProblem(inState(Opening.REVIEW), stalled)),
+                "staff may reconcile an opening this server is delivering");
+        require(DeliveryRules.reconcileProblem(inState(Opening.DELIVERED), null) != null
+                && DeliveryRules.reconcileProblem(inState(Opening.DELIVERING), null) != null
+                && "unknown opening".equals(DeliveryRules.reconcileProblem(null, null)),
+                "staff may reconcile an opening that is not under review");
 
         PlayerLootState state = new PlayerLootState();
         state.openDeliveries.addAll(List.of("a", "b"));
@@ -574,6 +585,51 @@ public final class LootBoxSagaTest {
         PlayerLootState state = stateOf(world, player);
         require(Opening.REVIEW.equals(openingOf(world, openingId).state) && state.openDeliveries.isEmpty()
                 && "Under review".equals(state.receipts.get(0).status), "the stalled delivery is not in review");
+    }
+
+    // ----- Staff regrants -----------------------------------------------------
+
+    /**
+     * Two staff members run {@code /lootbox reconcile <id> regrant} on one REVIEW
+     * opening at the same time, and both commands read REVIEW before either
+     * delivery writes its first mark. The decision runs in the player's lane, so
+     * they take turns: the first starts the delivery, the second finds it running
+     * (or already settled) and is refused instead of handing the reward out again.
+     */
+    private static void racingRegrantsGiveTheRewardOnce() {
+        World world = new World(revision(3, 4500, 3000, 2500));
+        UUID player = UUID.randomUUID();
+        grantVirtual(world, player, 1);
+        Saga crashing = new Saga(world);
+        crashing.crash = Crash.DURING_DELIVERY;
+        Result result = await(crashing.open(player, crashing.preview(player)));
+        await(result.delivery());
+        String openingId = result.opening().openingId;
+        Saga restarted = new Saga(world);
+        await(restarted.recover(player));
+        require(Opening.REVIEW.equals(openingOf(world, openingId).state), "the opening did not reach REVIEW");
+        // Staff judged the interrupted give lost: one regrant hands it out again.
+        int before = world.effects(openingId + "#0");
+
+        // Both commands' loads of the opening run before either delivery's first mark.
+        CompletableFuture<Void> together = world.memory.hold("lootbox_open", openingId);
+        CompletableFuture<String> first = restarted.regrant(openingId);
+        CompletableFuture<String> second = restarted.regrant(openingId);
+        together.complete(null);
+        List<String> replies = List.of(await(first), await(second));
+        int given = world.effects(openingId + "#0") - before;
+        require(given == 1, "two racing regrants handed the reward out " + given + " times: " + replies);
+        require(replies.stream().filter("Delivered"::equals).count() == 1,
+                "the racing regrants replied " + replies);
+        Opening regranted = openingOf(world, openingId);
+        PlayerLootState state = stateOf(world, player);
+        require(Opening.DELIVERED.equals(regranted.state)
+                && Opening.Fulfillment.DELIVERED.equals(regranted.fulfillments.get(0).state)
+                && state.openDeliveries.isEmpty() && "Delivered".equals(state.receipts.get(0).status),
+                "the regranted opening is " + regranted.state);
+        String later = await(restarted.regrant(openingId));
+        require(later.startsWith("not under review") && world.effects(openingId + "#0") - before == 1,
+                "a regrant of a delivered opening replied " + later);
     }
 
     private static void requireDeliveredOnce(World world, UUID player, String openingId) {
@@ -874,7 +930,7 @@ public final class LootBoxSagaTest {
             opening.committedAt = System.currentTimeMillis();
             LootBoxDraft.RewardSpec reward = rewardOf(revision, opening.outcomeId);
             return storage.saveOpening(opening)
-                    .thenApply(saved -> new Result(Outcome.COMMITTED, opening, deliver(opening, reward)));
+                    .thenApply(saved -> new Result(Outcome.COMMITTED, opening, deliver(opening, reward, false)));
         }
 
         CompletableFuture<Result> abort(Opening opening, Outcome outcome) {
@@ -895,7 +951,7 @@ public final class LootBoxSagaTest {
         }
 
         /** {@code RewardService.deliver}: registered as running, every action as {@link DeliveryRules} says, then settle. */
-        CompletableFuture<Void> deliver(Opening opening, LootBoxDraft.RewardSpec reward) {
+        CompletableFuture<Void> deliver(Opening opening, LootBoxDraft.RewardSpec reward, boolean force) {
             long started = System.currentTimeMillis();
             delivering.put(opening.openingId, started);
             CompletableFuture<String> chain = CompletableFuture.completedFuture(Opening.DELIVERED);
@@ -905,7 +961,7 @@ public final class LootBoxSagaTest {
                     if (worst == null) {
                         return CompletableFuture.<String>completedFuture(null);
                     }
-                    return deliverOne(opening, index, reward)
+                    return deliverOne(opening, index, reward, force)
                             .thenApply(state -> state == null ? null : Opening.REVIEW.equals(worst) ? worst : state);
                 });
             }
@@ -915,9 +971,10 @@ public final class LootBoxSagaTest {
         }
 
         /** {@code RewardService.deliverOne}; {@code null} when the crash hit after the reward took effect. */
-        CompletableFuture<String> deliverOne(Opening opening, int index, LootBoxDraft.RewardSpec reward) {
+        CompletableFuture<String> deliverOne(Opening opening, int index, LootBoxDraft.RewardSpec reward,
+                boolean force) {
             Opening.Fulfillment action = opening.fulfillments.get(index);
-            DeliveryRules.Step step = DeliveryRules.step(action, DeliveryRules.replaySafe(reward), false);
+            DeliveryRules.Step step = DeliveryRules.step(action, DeliveryRules.replaySafe(reward), force);
             if (step == DeliveryRules.Step.SETTLED) {
                 return CompletableFuture.completedFuture(Opening.DELIVERED);
             }
@@ -1054,11 +1111,40 @@ public final class LootBoxSagaTest {
                         }
                         LootBoxDraft.RewardSpec reward = rewardOf(world.revisions.get(opening.revision),
                                 opening.outcomeId);
-                        return reward == null ? CompletableFuture.<Void>completedFuture(null) : deliver(opening, reward);
+                        return reward == null ? CompletableFuture.<Void>completedFuture(null)
+                                : deliver(opening, reward, false);
                     });
                 });
             }
             return chain;
+        }
+
+        /** {@code reconcile} with regrant: staff re-run a reviewed delivery, decided in the player's lane. */
+        CompletableFuture<String> regrant(String openingId) {
+            return storage.loadOpening(openingId).thenCompose(found -> {
+                if (found == null) {
+                    return CompletableFuture.completedFuture("unknown opening");
+                }
+                return lanes.run(UUID.fromString(found.player), () -> regrantInLane(openingId))
+                        .thenCompose(reply -> reply);
+            });
+        }
+
+        /** {@code reconcileInLane}: the inner future completes once the regrant settled. */
+        CompletableFuture<CompletableFuture<String>> regrantInLane(String openingId) {
+            Long runningSince = delivering.get(openingId);
+            return storage.loadOpening(openingId).thenApply(opening -> {
+                String problem = DeliveryRules.reconcileProblem(opening, runningSince);
+                if (problem != null) {
+                    return CompletableFuture.completedFuture(problem);
+                }
+                LootBoxDraft.RewardSpec reward = rewardOf(world.revisions.get(opening.revision), opening.outcomeId);
+                if (reward == null) {
+                    return CompletableFuture.completedFuture("its revision or reward is gone");
+                }
+                return deliver(opening, reward, true)
+                        .thenApply(settled -> Opening.REVIEW.equals(opening.state) ? "Under review" : "Delivered");
+            });
         }
 
         private static CompletableFuture<Result> done(Outcome outcome) {
@@ -1139,6 +1225,24 @@ public final class LootBoxSagaTest {
 
         long count(String namespace) {
             return documents.keySet().stream().filter(id -> id.startsWith(namespace + "/")).count();
+        }
+
+        /**
+         * Holds the document's later operations until the returned future completes,
+         * so reads sent a moment apart run back to back, as two commands arriving
+         * together do, before anything either of them writes next.
+         */
+        CompletableFuture<Void> hold(String namespace, String key) {
+            String id = id(namespace, key);
+            CompletableFuture<Void> release = new CompletableFuture<>();
+            CompletableFuture<Void> done = new CompletableFuture<>();
+            CompletableFuture<Void> previous = queues.put(id, done);
+            CompletableFuture<?> before = previous == null ? CompletableFuture.completedFuture(null) : previous;
+            before.handle((ignored, failure) -> null).thenCompose(ignored -> release).whenComplete((value, failure) -> {
+                done.complete(null);
+                queues.remove(id, done);
+            });
+            return release;
         }
 
         private <T> CompletableFuture<T> inOrder(String id, Supplier<T> operation) {
