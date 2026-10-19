@@ -5,6 +5,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 
 import org.hyzionstudios.mysticessentials.core.MysticCore;
@@ -26,7 +27,8 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
  * Delivers a committed outcome (§4.4). Every action is recorded ATTEMPTED before
  * it runs and DELIVERED after, so a crash in between is visible. Only actions
  * that are safe to repeat (inbox entries, permission nodes, templates marked
- * idempotent) are retried; everything else goes to REVIEW for staff.
+ * idempotent) are retried; everything else goes to REVIEW for staff. The
+ * deliveries this server is running are tracked, so recovery leaves them to finish.
  */
 public final class RewardService {
 
@@ -51,6 +53,8 @@ public final class RewardService {
     private final LootBoxStorage storage;
     private final AuditService audit;
     private volatile LootBoxConfig config;
+    /** Openings this server is delivering, with when each delivery started. */
+    private final Map<String, Long> delivering = new ConcurrentHashMap<>();
 
     public RewardService(MysticCore core, LootBoxStorage storage, AuditService audit, LootBoxConfig config) {
         this.core = core;
@@ -69,13 +73,23 @@ public final class RewardService {
      */
     public CompletableFuture<Status> deliver(Opening opening, LootBoxDraft.RewardSpec reward, boolean force) {
         UUID player = UUID.fromString(opening.player);
+        // Registered before the first step: the opening's lane lets go as soon as
+        // this returns, and recovery in that lane must already see it running.
+        long started = System.currentTimeMillis();
+        delivering.put(opening.openingId, started);
         CompletableFuture<Status> chain = CompletableFuture.completedFuture(Status.DELIVERED);
         for (int i = 0; i < opening.fulfillments.size(); i++) {
             int index = i;
             chain = chain.thenCompose(worst -> deliverOne(opening, index, reward, player, force)
                     .thenApply(status -> worse(worst, status)));
         }
-        return chain.thenCompose(status -> settle(opening, player, status));
+        return chain.thenCompose(status -> settle(opening, player, status))
+                .whenComplete((status, error) -> delivering.remove(opening.openingId, started));
+    }
+
+    /** When this server started delivering {@code openingId}, or {@code null} if it is not delivering it. */
+    public Long deliveringSince(String openingId) {
+        return delivering.get(openingId);
     }
 
     private CompletableFuture<Status> deliverOne(Opening opening, int index, LootBoxDraft.RewardSpec reward,

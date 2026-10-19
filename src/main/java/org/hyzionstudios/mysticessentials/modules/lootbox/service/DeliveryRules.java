@@ -1,6 +1,7 @@
 package org.hyzionstudios.mysticessentials.modules.lootbox.service;
 
 import java.util.Locale;
+import java.util.concurrent.TimeUnit;
 
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.LootBoxDraft;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.Opening;
@@ -24,12 +25,29 @@ public final class DeliveryRules {
         RUN
     }
 
+    /**
+     * How long a delivery may run on this server before recovery treats it as
+     * lost. Far beyond any real delivery (the longest wait inside one is the
+     * platform's 30 s hold for a player's entity), but a world task the platform
+     * drops never completes, and its opening should not wait for a restart.
+     */
+    public static final long STALLED_MS = TimeUnit.MINUTES.toMillis(10);
+
     private DeliveryRules() {
     }
 
-    /** Whether recovery resumes the delivery of {@code opening}. */
-    public static boolean resumes(Opening opening) {
-        return opening != null && !opening.isTerminal();
+    /**
+     * Whether recovery resumes the delivery of {@code opening}. {@code runningSince}
+     * is when this server started delivering it, or {@code null} if it is not. A
+     * running delivery is left to finish until it stalls: recovery would find its
+     * action ATTEMPTED, send an ITEM to REVIEW although it is being given, and run
+     * a replay-safe action a second time beside it. Read {@code runningSince}
+     * before loading {@code opening}: a delivery not running then has already
+     * settled, so the load shows how it ended.
+     */
+    public static boolean resumes(Opening opening, Long runningSince, long now) {
+        return opening != null && !opening.isTerminal()
+                && (runningSince == null || now - runningSince >= STALLED_MS);
     }
 
     /**
