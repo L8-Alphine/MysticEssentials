@@ -3,6 +3,7 @@ package org.hyzionstudios.mysticessentials.modules.lootbox.ui;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.logging.Level;
 
 import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.core.message.MysticText;
@@ -11,6 +12,8 @@ import org.hyzionstudios.mysticessentials.modules.lootbox.model.LootBoxDraft;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.LootBoxRevision;
 import org.hyzionstudios.mysticessentials.modules.lootbox.odds.OddsTable;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.OpeningService;
+import org.hyzionstudios.mysticessentials.modules.lootbox.ui.editor.EditorSession;
+import org.hyzionstudios.mysticessentials.modules.lootbox.ui.editor.PoolEditorPage;
 
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 
@@ -56,6 +59,36 @@ public final class LootBoxUi {
 
     public void openManager(PlayerRef player) {
         core.platform().openPage(player, new LootBoxManagerPage(core, player, module, LootBoxManagerPage.State.initial()));
+    }
+
+    /**
+     * Loads pool draft {@code lootboxId} off the world thread and opens it in the
+     * editor, ending any editor the player had open. A file with fields the model
+     * does not know gets a one-time warning, because saving here drops them (P2-D4).
+     *
+     * @param notice shown at the top of the editor, or {@code null}
+     */
+    public void openPoolEditor(PlayerRef player, String lootboxId, String notice) {
+        module.registry().poolStore().load(lootboxId).whenComplete((loaded, error) -> {
+            if (error != null || loaded == null || loaded.isEmpty()) {
+                if (error != null) {
+                    core.log(Level.WARNING, "[lootbox] opening draft " + lootboxId + " failed: " + error);
+                }
+                core.platform().openPage(player, new LootBoxManagerPage(core, player, module,
+                        LootBoxManagerPage.State.selecting(lootboxId, "&cCould not open &f" + lootboxId
+                                + "&c: its draft file is missing or unreadable.")));
+                return;
+            }
+            var draft = loaded.get();
+            EditorSession<LootBoxDraft> session = module.editors().start(player.getUuid(), lootboxId,
+                    LootBoxDraft.class, draft.draft(), draft.hash());
+            String warning = draft.hadUnknownFields()
+                    ? "&eThis file has fields the editor doesn't know (" + String.join(", ", draft.unknownFields())
+                            + "); saving here drops them."
+                    : null;
+            core.platform().openPage(player, new PoolEditorPage(core, player, module, session,
+                    PoolEditorPage.View.of(notice != null ? notice : warning)));
+        });
     }
 
     /** What happens after a confirmation comes back from the opening saga. */

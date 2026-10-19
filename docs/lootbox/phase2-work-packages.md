@@ -54,8 +54,9 @@ P2-A and P2-B don't share files and can run at the same time. P2-C needs both. P
 |---|---|---|
 | P2-A | Done; build and code-ref sweep clean | `4462154`, merged in `533e691` |
 | P2-B | Done; build, UI and code-ref sweeps clean | `b39b3d6`, merged in `6cac06f` |
-| P2-C | Built on `feature/lootbox-module` (not committed yet). Build, UI and code-ref sweeps clean; the dev server boots and republishing reports "unchanged". **Not yet tried in game** | `ui/LootBoxManagerPage.java`, `LootBoxManager.ui`, `LootBoxManagerRow.ui` |
-| P2-D, P2-E | Not started | |
+| P2-C | Done; build, UI and code-ref sweeps clean, dev server boots. **Not yet tried in game** | `ef84a15` |
+| P2-D | Built (not committed yet). Build, UI and code-ref sweeps clean, dev server boots. **Not yet tried in game** | `ui/editor/PoolEditorPage.java`, `OddsConverter.java`, `DraftDiff.java`, `LootBoxEditor.ui`, `LootBoxEditorToggleRow.ui` |
+| P2-E | Not started; the Rewards tab is read-only until then | |
 
 ### P2-A — Draft store and lifecycle (engine-free) · M · part of P2-WP1
 
@@ -99,6 +100,7 @@ P2-A and P2-B don't share files and can run at the same time. P2-C needs both. P
 | **Publish** | Live `DraftValidator` problems as a list, with a jump-to-tab button on each. A **diff against the active revision**: rewards added or removed, weight or percent changes shown as old % → new %, and whether the odds id will change. Buttons: **Save draft**, **Revert to saved**, **Publish** (confirm page repeating the diff; needs `publish`, plus `rewards.command` when the pool has command rewards) |
 | **Behaviour** | Tab switches keep the working copy in the `EditorSession` and never write to disk. A dirty marker shows in the header. Closing a dirty editor asks Save / Discard / Cancel. A save conflict (P2-D2) shows Reload or Overwrite |
 | **In-game** | Edit `test_pool`: change its name and icon, link `mystic:example_key`, then Save; check the file on disk. Make it invalid on purpose and check the Publish tab lists why |
+| **As built** | `ui/editor/PoolEditorPage` over an `EditorSession`. Two engine-free helpers carry the logic and have checks in `verifyLootBox`: `OddsConverter` (percent → weights exact via ×10⁶ then GCD; weights → percent exact when every share terminates within 6 places, else half-up with the largest reward absorbing the remainder, and every moved reward listed) and `DraftDiff` (settings, keys, rewards added and removed, and chances compared as exact fractions, shown old % → new %). The Rewards tab is a read-only list with live chances until P2-E. Conflicts show Load From Disk / Overwrite in the footer; Overwrite asks first. Publish asks first, then saves unsaved changes before publishing the file. New Pool in the Manager now opens the editor; Close returns to the Manager with the pool selected |
 
 ### P2-E — Rewards tab (RewardEditor + ProbabilityEditor) · L · P2-WP2
 

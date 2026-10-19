@@ -1,0 +1,273 @@
+// LootBox pool editor (P2-D): tabs General, Rewards, Keys & Rules and Publish
+// over one working copy. Tabs come from LootBoxEditorTab.ui (appended into
+// #Tabs); only the active tab's panel is visible. Lines in #RewardList,
+// #ProblemList and #DiffList are LootBoxConfirmActionLine.ui; key rows in
+// #KeyList are LootBoxEditorToggleRow.ui.
+$C = "../Common.ui";
+$M = "MysticTheme.ui";
+
+$C.@PageOverlay {}
+
+$C.@Container {
+  Anchor: (Width: 960, Height: 700);
+
+  #Title {
+    Group {
+      $C.@Title #HeaderTitle {
+        @Text = "Edit Pool";
+      }
+
+      $M.@HeaderMeta #HeaderInfo {
+        @Width = 360;
+      }
+    }
+  }
+
+  #Content {
+    LayoutMode: Top;
+
+    Group #Tabs {
+      LayoutMode: Left;
+      Anchor: (Height: 34, Bottom: 10);
+    }
+
+    Label #Notice {
+      Anchor: (Height: 20, Bottom: 6);
+      Style: $M.@BodyStyle;
+      Visible: false;
+    }
+
+    // ----- General ------------------------------------------------------------
+    $M.@Panel #GeneralPanel {
+      @Padding = 14;
+
+      FlexWeight: 1;
+      Visible: false;
+
+      $M.@FieldLabel { @Text = "Display name"; }
+      $C.@TextField #NameInput {
+        @Anchor = (Bottom: 4);
+        PlaceholderText: "What players see; MysticText colours allowed";
+      }
+
+      Label #NamePreview {
+        Anchor: (Height: 22, Bottom: 12);
+        Style: $M.@BodyStyle;
+      }
+
+      $M.@FieldLabel { @Text = "Description"; }
+      $C.@TextField #DescriptionInput {
+        @Anchor = (Bottom: 14);
+        PlaceholderText: "One line under the name";
+      }
+
+      $M.@FieldLabel { @Text = "Icon"; }
+      Group {
+        LayoutMode: Left;
+        Anchor: (Height: 44, Bottom: 14);
+
+        $M.@IconWell {
+          @Size = 44;
+          @Anchor = (Right: 12);
+
+          ItemSlot #IconSlot {
+            Anchor: (Width: 36, Height: 36);
+            ShowQualityBackground: true;
+            ShowQuantity: false;
+          }
+        }
+
+        Label #IconName {
+          FlexWeight: 1;
+          Style: $M.@ValueStyle;
+        }
+
+        $C.@SecondaryTextButton #IconButton {
+          @Text = "Choose Icon";
+          @Anchor = (Width: 160, Left: 8);
+        }
+
+        $C.@TertiaryTextButton #IconClearButton {
+          @Text = "Clear";
+          @Anchor = (Width: 100, Left: 6);
+        }
+      }
+
+      $M.@FieldLabel { @Text = "Odds mode"; }
+      Group {
+        LayoutMode: Left;
+        Anchor: (Height: 32);
+
+        $C.@DropdownBox #ModeInput {
+          Anchor: (Width: 260, Height: 32);
+        }
+
+        Label #ModeHint {
+          FlexWeight: 1;
+          Anchor: (Left: 12);
+          Style: $M.@CaptionStyle;
+        }
+      }
+    }
+
+    // ----- Rewards (read-only until the rewards editor) ----------------------
+    $M.@Panel #RewardsPanel {
+      @Padding = 14;
+
+      FlexWeight: 1;
+      Visible: false;
+
+      Label #RewardsHint {
+        Anchor: (Height: 20, Bottom: 8);
+        Style: $M.@CaptionStyle;
+      }
+
+      $M.@Well {
+        FlexWeight: 1;
+
+        Group #RewardList {
+          FlexWeight: 1;
+          LayoutMode: TopScrolling;
+          Padding: (Right: 6);
+          ScrollbarStyle: $C.@DefaultScrollbarStyle;
+        }
+      }
+    }
+
+    // ----- Keys & Rules -----------------------------------------------------------
+    $M.@Panel #RulesPanel {
+      @Padding = 14;
+
+      FlexWeight: 1;
+      Visible: false;
+
+      $M.@Section {
+        @Text = "Keys that open this pool";
+        @Anchor = (Bottom: 6);
+      }
+
+      Label #KeysHint {
+        Anchor: (Height: 18, Bottom: 6);
+        Style: $M.@CaptionStyle;
+      }
+
+      $M.@Well {
+        FlexWeight: 1;
+
+        Group #KeyList {
+          FlexWeight: 1;
+          LayoutMode: TopScrolling;
+          Padding: (Right: 6);
+          ScrollbarStyle: $C.@DefaultScrollbarStyle;
+        }
+      }
+
+      Group {
+        LayoutMode: Left;
+        Anchor: (Height: 58, Top: 12);
+
+        Group {
+          LayoutMode: Top;
+          Anchor: (Width: 240, Right: 16);
+
+          $M.@FieldLabel { @Text = "Cooldown (seconds)"; }
+          $C.@TextField #CooldownInput {
+            PlaceholderText: "0 = none";
+          }
+        }
+
+        Group {
+          LayoutMode: Top;
+          FlexWeight: 1;
+
+          $M.@FieldLabel { @Text = "Extra permission node"; }
+          $C.@TextField #PermissionInput {
+            PlaceholderText: "blank = anyone with lootbox.use";
+          }
+        }
+      }
+
+      Label #RulesNote {
+        Anchor: (Height: 18, Top: 6);
+        Style: $M.@CaptionStyle;
+      }
+    }
+
+    // ----- Publish ----------------------------------------------------------------
+    $M.@Panel #PublishPanel {
+      @Padding = 14;
+
+      FlexWeight: 1;
+      Visible: false;
+
+      $M.@Section {
+        @Text = "Problems";
+        @Anchor = (Bottom: 6);
+      }
+
+      $M.@Well {
+        Anchor: (Height: 150, Bottom: 12);
+
+        Group #ProblemList {
+          FlexWeight: 1;
+          LayoutMode: TopScrolling;
+          Padding: (Right: 6);
+          ScrollbarStyle: $C.@DefaultScrollbarStyle;
+        }
+      }
+
+      $M.@Section {
+        @Text = "Changes from the live revision";
+        @Anchor = (Bottom: 6);
+      }
+
+      $M.@Well {
+        FlexWeight: 1;
+
+        Group #DiffList {
+          FlexWeight: 1;
+          LayoutMode: TopScrolling;
+          Padding: (Right: 6);
+          ScrollbarStyle: $C.@DefaultScrollbarStyle;
+        }
+      }
+    }
+
+    // ----- Footer -----------------------------------------------------------------
+    $M.@ActionBar {
+      @Anchor = (Height: 44, Top: 10);
+
+      $C.@TextButton #SaveButton {
+        @Text = "Save Draft";
+        @Anchor = (Width: 160);
+      }
+
+      $C.@SecondaryTextButton #RevertButton {
+        @Text = "Revert";
+        @Anchor = (Width: 120, Left: 6);
+      }
+
+      $C.@SecondaryTextButton #ReloadDiskButton {
+        @Text = "Load From Disk";
+        @Anchor = (Width: 170, Left: 6);
+      }
+
+      $C.@CancelTextButton #OverwriteButton {
+        @Text = "Overwrite";
+        @Anchor = (Width: 140, Left: 6);
+      }
+
+      $M.@Spacer {}
+
+      $C.@SecondaryTextButton #PublishButton {
+        @Text = "Publish";
+        @Anchor = (Width: 140, Right: 6);
+      }
+
+      $C.@TertiaryTextButton #CloseButton {
+        @Text = "Close";
+        @Anchor = (Width: 130);
+      }
+    }
+  }
+}

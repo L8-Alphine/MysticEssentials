@@ -75,6 +75,11 @@ public final class LootBoxManagerPage extends MysticPage {
             return new State("", "ALL", null, null, null);
         }
 
+        /** The Manager with {@code id} selected and an optional notice; where an editor returns to. */
+        public static State selecting(String id, String notice) {
+            return new State("", "ALL", id, null, notice);
+        }
+
         State withSelected(String id) {
             return new State(query, filter, id, form, notice);
         }
@@ -212,8 +217,10 @@ public final class LootBoxManagerPage extends MysticPage {
         cmd.set("#ClosePoolButton.Visible", published && !selected.disabled() && admin);
         cmd.set("#ReopenPoolButton.Visible", published && selected.disabled() && admin);
         boolean editable = selected.draft() != null && player.hasPermission(Permissions.LOOTBOX_EDIT);
+        cmd.set("#EditButton.Visible", editable);
         cmd.set("#CloneButton.Visible", editable && state.form() == null);
         cmd.set("#ArchiveButton.Visible", editable);
+        bind(event, "#EditButton", "edit", selected.id());
         bind(event, "#PublishButton", "publish", selected.id());
         bind(event, "#SimulateButton", "simulate", selected.id());
         bind(event, "#ClosePoolButton", "closePool", selected.id());
@@ -249,6 +256,12 @@ public final class LootBoxManagerPage extends MysticPage {
             case "clone" -> {
                 if (allowed(Permissions.LOOTBOX_EDIT)) {
                     reopen(ref, store, page(next.withSelected(id).withForm(new Form(id, copyId(id), ""))));
+                }
+            }
+            case "edit" -> {
+                if (allowed(Permissions.LOOTBOX_EDIT)) {
+                    reopen(ref, store, page(next.withSelected(id).withNotice("&7Opening &f" + id + "&7...")));
+                    module.ui().openPoolEditor(player, id, null);
                 }
             }
             case "formCancel" -> reopen(ref, store, page(next.withForm(null)));
@@ -323,10 +336,14 @@ public final class LootBoxManagerPage extends MysticPage {
                 openLater(next.withNotice("&cCould not create &f" + newId + "&c: " + reason + "."));
                 return;
             }
-            openLater(next.withForm(null).withSelected(newId).withNotice(form.cloneOf() != null
-                    ? "&aCloned &f" + form.cloneOf() + " &aas &f" + newId + "&a. Nothing is published yet."
-                    : "&aCreated &f" + newId + "&a. Add its rewards in &f" + draftFile(newId)
-                            + "&a, then publish it."));
+            if (form.cloneOf() != null) {
+                openLater(next.withForm(null).withSelected(newId).withNotice(
+                        "&aCloned &f" + form.cloneOf() + " &aas &f" + newId + "&a. Nothing is published yet."));
+            } else {
+                // A new pool goes straight into the editor; Close there comes back here.
+                module.ui().openPoolEditor(player, newId, "&aCreated &f" + newId
+                        + "&a. Link a key on Keys & Rules; add rewards in &f" + draftFile(newId) + "&a.");
+            }
         });
     }
 

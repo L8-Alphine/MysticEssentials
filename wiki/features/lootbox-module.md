@@ -56,7 +56,8 @@ reward, chance and delivery status.
 | `/lootbox crate remove [crateId]` / `enable <crateId>` | Unbind or reactivate a crate | `mysticessentials.lootbox.crates.manage` |
 | `/lootbox reconcile <openingId> <regrant\|dismiss>` | Resolve a delivery held for review | `mysticessentials.lootbox.restore` |
 | `/lootbox admin` | Open the Manager: every pool with its status (Draft, Invalid, Ready, Published, Disabled), search and a status filter | `mysticessentials.lootbox.admin` |
-| Manager: New Pool, Clone, Archive | Write an empty draft, copy a draft under a new id, or move a draft to `lootboxes/_archive/` (asks first; nothing is deleted). Editing a pool's contents in game comes in a later update | `mysticessentials.lootbox.edit` |
+| Manager: New Pool, Clone, Archive | Write an empty draft (it opens in the editor), copy a draft under a new id, or move a draft to `lootboxes/_archive/` (asks first; nothing is deleted) | `mysticessentials.lootbox.edit` |
+| Manager: Edit | The pool editor. **General**: name (with a coloured preview), description, icon from the item picker, and odds mode; switching between weights and exact percentages converts the numbers and says if anything had to be rounded. **Keys & Rules**: link published keys, cooldown, extra permission. **Rewards**: every reward with its live chance (rewards themselves are still edited in the draft file). **Publish**: the problems that block publishing, and every change from the live revision, chances shown old % → new %. Save Draft writes the file; if someone else changed it meanwhile, the save is refused and you choose Load From Disk or Overwrite | `mysticessentials.lootbox.edit`; Publish also needs `publish` |
 | Manager: Publish, Simulate, Close/Reopen | Publish asks first and only appears when the draft is valid and differs from the live revision | `publish`, `simulate`, `admin` |
 | `/lootbox reload` | Reload drafts and settings | `mysticessentials.lootbox.admin` |
 

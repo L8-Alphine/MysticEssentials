@@ -20,10 +20,13 @@ import org.hyzionstudios.mysticessentials.modules.lootbox.odds.OddsTable;
 import org.hyzionstudios.mysticessentials.modules.lootbox.odds.SecureDraw;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.KeyMarker;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.RecoveryPolicy;
+import org.hyzionstudios.mysticessentials.modules.lootbox.service.DraftLifecycle;
+import org.hyzionstudios.mysticessentials.modules.lootbox.ui.editor.DraftDiff;
 import org.hyzionstudios.mysticessentials.modules.lootbox.ui.editor.EditorSession;
 import org.hyzionstudios.mysticessentials.modules.lootbox.ui.editor.EditorSessions;
 import org.hyzionstudios.mysticessentials.modules.lootbox.ui.editor.EditorTabs;
 import org.hyzionstudios.mysticessentials.modules.lootbox.ui.editor.FormFields;
+import org.hyzionstudios.mysticessentials.modules.lootbox.ui.editor.OddsConverter;
 import org.hyzionstudios.mysticessentials.modules.lootbox.validate.CommandTemplate;
 import org.hyzionstudios.mysticessentials.modules.lootbox.validate.DraftValidator;
 import org.hyzionstudios.mysticessentials.platform.ui.ItemCatalog;
@@ -66,6 +69,9 @@ public final class LootBoxEngineTest {
         editorSessionsKeepOneEditorPerPlayer();
         editorSessionTracksEditsAndReturns();
         tabsAndCategoriesResolve();
+        oddsConverterKeepsChances();
+        oddsConverterRoundsAndRefuses();
+        draftDiffListsChanges();
         System.out.println("LootBoxEngineTest: all checks passed.");
     }
 
@@ -492,6 +498,98 @@ public final class LootBoxEngineTest {
     private static void requireKind(FormFields.Result<?> result, FormFields.Kind kind, String what) {
         require(!result.ok() && result.problem().kind() == kind,
                 what + " should fail with " + kind + " but gave " + result);
+    }
+
+    // ----- Pool editor: odds conversion and the publish diff --------------------
+
+    private static void oddsConverterKeepsChances() {
+        LootBoxDraft draft = bibleDraft();
+        OddsConverter.Result toPercent = OddsConverter.switchTo(draft, OddsConverter.EXACT_PERCENT);
+        require(toPercent.ok() && toPercent.exact() && toPercent.notes().isEmpty(),
+                "weights 4500/3000/1500/900/100 did not convert exactly: " + toPercent);
+        require("EXACT_PERCENT".equals(draft.mode), "mode did not switch to EXACT_PERCENT");
+        List<String> percents = draft.rewards.stream().map(r -> r.percent).toList();
+        require(percents.equals(List.of("45", "30", "15", "9", "1")), "percents: " + percents);
+        require(OddsEngine.resolveWeights(draft).stream().mapToLong(Long::longValue).sum() == OddsEngine.PERCENT_TOTAL,
+                "converted percents do not resolve to exactly 100%");
+
+        OddsConverter.Result back = OddsConverter.switchTo(draft, OddsConverter.WEIGHTED);
+        require(back.ok() && back.exact(), "percent to weights was not exact: " + back);
+        List<Long> weights = draft.rewards.stream().map(r -> r.weight).toList();
+        require(weights.equals(List.of(45L, 30L, 15L, 9L, 1L)), "weights were not reduced by their GCD: " + weights);
+        require(draft.rewards.stream().allMatch(r -> r.percent == null), "percents were left behind on weights");
+
+        OddsConverter.Result same = OddsConverter.switchTo(draft, OddsConverter.WEIGHTED);
+        require(same.ok() && same.exact() && weights.equals(draft.rewards.stream().map(r -> r.weight).toList()),
+                "switching to the current mode changed the draft");
+
+        LootBoxDraft tiny = percentDraft("99.999999", "0.000001");
+        require(OddsConverter.toWeights(tiny).ok(), "a 0.000001% reward did not convert to weights");
+        require(tiny.rewards.get(0).weight == 99_999_999L && tiny.rewards.get(1).weight == 1L,
+                "0.000001% did not become weight 1 of 100000000: " + tiny.rewards.get(1).weight);
+    }
+
+    private static void oddsConverterRoundsAndRefuses() {
+        LootBoxDraft thirds = bibleDraft();
+        thirds.rewards.subList(3, 5).clear();
+        thirds.rewards.forEach(r -> r.weight = 1);
+        OddsConverter.Result rounded = OddsConverter.toPercent(thirds);
+        require(rounded.ok() && !rounded.exact() && !rounded.notes().isEmpty(),
+                "1/3 each was not reported as rounded: " + rounded);
+        require(OddsEngine.resolveWeights(thirds).stream().mapToLong(Long::longValue).sum() == OddsEngine.PERCENT_TOTAL,
+                "rounded thirds do not total exactly 100%");
+        require(thirds.rewards.stream().map(r -> r.percent).toList().equals(List.of("33.333334", "33.333333", "33.333333")),
+                "thirds: " + thirds.rewards.stream().map(r -> r.percent).toList());
+
+        LootBoxDraft zero = bibleDraft();
+        zero.rewards.get(2).weight = 0;
+        OddsConverter.Result refused = OddsConverter.toPercent(zero);
+        require(!refused.ok() && "WEIGHTED".equals(zero.mode) && zero.rewards.get(0).percent == null,
+                "a zero weight was converted, or the draft changed: " + refused);
+
+        LootBoxDraft rare = bibleDraft();
+        rare.rewards.subList(2, 5).clear();
+        rare.rewards.get(0).weight = 1;
+        rare.rewards.get(1).weight = 1_000_000_000_000L;
+        require(!OddsConverter.toPercent(rare).ok() && rare.rewards.get(0).percent == null,
+                "a reward rarer than 0.000001% was rounded to nothing");
+
+        LootBoxDraft broken = percentDraft("60", "30");
+        require(!OddsConverter.toWeights(broken).ok() && "EXACT_PERCENT".equals(broken.mode),
+                "percents summing to 90% were converted to weights");
+    }
+
+    private static void draftDiffListsChanges() {
+        LootBoxDraft live = bibleDraft();
+        DraftDiff.Diff none = DraftDiff.between(DraftLifecycle.freeze(live, LootBoxDraft.class), live, FORMAT);
+        require(!none.changed() && !none.oddsChange() && none.lines().size() == 1,
+                "an identical draft reported changes: " + none.lines());
+
+        LootBoxDraft converted = DraftLifecycle.freeze(live, LootBoxDraft.class);
+        OddsConverter.toPercent(converted);
+        DraftDiff.Diff modeOnly = DraftDiff.between(converted, live, FORMAT);
+        require(modeOnly.changed() && !modeOnly.oddsChange(),
+                "an exact mode switch reported an odds change: " + modeOnly.lines());
+
+        LootBoxDraft edited = DraftLifecycle.freeze(live, LootBoxDraft.class);
+        edited.displayName = "Avalon Supply Crate II";
+        edited.rewards.get(0).weight = 4400;
+        edited.rewards.remove(4);
+        edited.rewards.add(item("bonus", "Bonus", 100));
+        edited.keys = new ArrayList<>(List.of("mystic:royal", "mystic:event"));
+        DraftDiff.Diff diff = DraftDiff.between(edited, live, FORMAT);
+        String all = String.join(" | ", diff.lines());
+        require(diff.changed() && diff.oddsChange(), "edits were not reported as an odds change");
+        require(all.contains("~ Name") && all.contains("Avalon Supply Crate II"), "the name change is missing: " + all);
+        require(all.contains("+ &fBonus"), "the added reward is missing: " + all);
+        require(all.contains("- &fGuardian Companion"), "the removed reward is missing: " + all);
+        require(all.contains("Iron Sword") && all.contains("45.00%") && all.contains("44.4"),
+                "the Iron Sword 45% -> 44.4% move is missing: " + all);
+        require(all.contains("+ key &fmystic:event"), "the added key is missing: " + all);
+
+        DraftDiff.Diff first = DraftDiff.between(live, null, FORMAT);
+        require(first.changed() && first.oddsChange() && first.lines().get(0).contains("First revision"),
+                "a never-published pool was not reported as its first revision");
     }
 
     // ----- Fixtures -----------------------------------------------------------

@@ -2,8 +2,8 @@
 
 ## Unreleased — LootBox Creator, part 1
 
-The first pieces of the in-game LootBox creator. Pool contents are still edited in
-the draft files.
+The first pieces of the in-game LootBox creator: the Manager and the pool editor.
+Rewards are still edited in the draft files.
 
 ### LootBox
 
@@ -18,15 +18,32 @@ the draft files.
 - Draft files are read and written through a draft store that refuses to save
   over a file changed since it was loaded, and audits every create, save, clone
   and archive.
-- New permission `mysticessentials.lootbox.edit` for New Pool, Clone and Archive.
+- **Pool editor** (Manager → Edit; New Pool opens it too). One working copy across
+  four tabs:
+  - General: name with a coloured preview, description, icon from a searchable
+    item picker (or the held item), and odds mode. Switching between weights and
+    exact percentages converts the numbers exactly where it can and lists every
+    reward it had to round.
+  - Keys & Rules: link published keys, cooldown, extra permission node.
+  - Rewards: every reward with its live chance and "1 in N" (read-only for now).
+  - Publish: what blocks publishing, and every change from the live revision with
+    chances as old % → new %. Publish asks first and saves unsaved changes before
+    publishing.
+- Saving is explicit and never silent about conflicts: if the draft file changed
+  since it was opened, Save is refused and offers Load From Disk or an audited
+  Overwrite. Closing with unsaved changes asks first.
+- New permission `mysticessentials.lootbox.edit` for New Pool, Clone, Archive and
+  the editor.
 
 ### Verification
 
+- `verifyLootBox` covers the editor's odds conversion (exact both ways where
+  possible, reported rounding, refusals) and the publish diff.
 - New `verifyLootBoxDrafts` check: save/load round trips, conflict detection,
   clone and archive, and the Draft → Invalid → Ready → Published lifecycle.
 - On a 0.7.2 dev server, republishing an existing pool and key still answers
-  "unchanged" after the draft store change. The Manager itself still needs an
-  in-game test.
+  "unchanged" after the draft store change. The Manager and the editor still
+  need an in-game test.
 
 ## 1.0.6 — LootBox Module
 

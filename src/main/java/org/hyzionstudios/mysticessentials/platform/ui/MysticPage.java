@@ -172,6 +172,12 @@ public abstract class MysticPage extends CustomUIPage {
             Map.entry("FormTitle", TEXT_HI),
             Map.entry("FormHint", TEXT_FAINT),
             Map.entry("SelectedMeta", TEXT_MUTED),
+            // LootBox pool editor.
+            Map.entry("NamePreview", TEXT_HI),
+            Map.entry("ModeHint", TEXT_FAINT),
+            Map.entry("RewardsHint", TEXT_FAINT),
+            Map.entry("KeysHint", TEXT_FAINT),
+            Map.entry("RulesNote", TEXT_FAINT),
             Map.entry("Unread", "#FFD97A"),
             Map.entry("Secondary", "#D46A6A"));
 

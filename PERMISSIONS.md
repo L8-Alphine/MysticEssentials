@@ -308,7 +308,7 @@ itself, so every other node also needs it. No node implies another.
 | `mysticessentials.lootbox.keys.give` | `/lootbox key give <player> <keyId> [count] [virtual] [source=…]` |
 | `mysticessentials.lootbox.keys.revoke` | `/lootbox key revoke <serial>` |
 | `mysticessentials.lootbox.publish` | `/lootbox publish <pool>`, `/lootbox rollback <pool> <revision>`, `/lootbox key publish <keyId>`, Publish in the manager |
-| `mysticessentials.lootbox.edit` | Manager: New Pool, Clone and Archive pool drafts. Editing a draft's contents in game comes in a later update. Publishing still needs `publish`, and editing COMMAND rewards will also need `rewards.command` |
+| `mysticessentials.lootbox.edit` | Manager: New Pool, Clone and Archive pool drafts, and the pool editor (General, Keys & Rules, Save Draft). Publishing from the editor still needs `publish`, and editing COMMAND rewards will also need `rewards.command` |
 | `mysticessentials.lootbox.rewards.command` | Publish pools that contain COMMAND rewards (checked together with `publish`) |
 | `mysticessentials.lootbox.simulate` | `/lootbox simulate <pool> [draws]`, Simulate in the manager |
 | `mysticessentials.lootbox.crates.place` | `/lootbox crate select`, `/lootbox crate convert <pool> [crateId]`; binding hint on an unbound Mystic Crate |

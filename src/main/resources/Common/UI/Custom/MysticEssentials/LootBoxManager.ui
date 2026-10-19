@@ -145,9 +145,14 @@ $C.@Container {
         }
       }
 
+      $C.@TextButton #EditButton {
+        @Text = "Edit";
+        @Anchor = (Width: 90, Left: 8);
+      }
+
       $C.@SecondaryTextButton #PublishButton {
         @Text = "Publish";
-        @Anchor = (Width: 110, Left: 8);
+        @Anchor = (Width: 110, Left: 6);
       }
 
       $C.@SecondaryTextButton #SimulateButton {
