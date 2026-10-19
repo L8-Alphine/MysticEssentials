@@ -1,6 +1,6 @@
 # Mystic Essentials Changelog
 
-## Unreleased — LootBox Module
+## 1.0.6 — LootBox Module
 
 Adds LootBox, a free module for reward pools that show their exact odds before
 anything is spent, opened with signed keys from crates or a menu. It ships
@@ -61,6 +61,12 @@ disabled.
 - New `verifyLootBox` check: odds resolution, formatting, pick boundaries, a
   chi-square test over a million draws, key markers, command templates, the
   recovery decision table and the draft validator.
+- New `verifyLootBoxSaga` check, run over an in-memory store:
+  - a confirmation is refused if the odds were republished after the preview;
+  - a doubled confirmation produces a single opening;
+  - multi-use keys spend one use per opening;
+  - virtual balances never go below zero under concurrent openings;
+  - after a crash at each saga step, recovery delivers exactly once.
 - Every new UI document passes `validateUiDocuments`.
 - On a 0.7.2 dev server, from the console: publishing, simulating, rolling back,
   closing and reopening pools, publishing keys, and reloading after a restart.
