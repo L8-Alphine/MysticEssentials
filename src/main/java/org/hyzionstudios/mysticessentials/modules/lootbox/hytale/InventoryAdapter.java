@@ -1,0 +1,144 @@
+package org.hyzionstudios.mysticessentials.modules.lootbox.hytale;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+
+import org.bson.BsonDocument;
+import org.hyzionstudios.mysticessentials.modules.lootbox.service.KeyMarker;
+
+import com.hypixel.hytale.component.ComponentType;
+import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.inventory.InventoryComponent;
+import com.hypixel.hytale.server.core.inventory.ItemStack;
+import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+
+/**
+ * The player's key-holding containers (hotbar, storage, backpack; the same set
+ * Mail draws from). Every method MUST run on the player's world thread.
+ */
+public final class InventoryAdapter {
+
+    /** Which container a stack sits in, so a later hop can find the same slot again. */
+    public enum Section {
+        HOTBAR,
+        STORAGE,
+        BACKPACK
+    }
+
+    /** A valid-looking key stack: its marker verified against the server secret. */
+    public record KeyStack(Section section, short slot, KeyMarker marker, int quantity) {
+    }
+
+    private InventoryAdapter() {
+    }
+
+    /** Key stacks for {@code keyIds} whose marker verifies against {@code secret}. */
+    public static List<KeyStack> findKeys(Store<EntityStore> store, Ref<EntityStore> entity, Set<String> keyIds,
+            byte[] secret) {
+        List<KeyStack> found = new ArrayList<>();
+        for (Section section : Section.values()) {
+            ItemContainer container = container(store, entity, section);
+            if (container == null) {
+                continue;
+            }
+            for (short slot = 0; slot < container.getCapacity(); slot++) {
+                KeyMarker marker = KeyItemFactory.read(container.getItemStack(slot));
+                if (marker != null && keyIds.contains(marker.keyId()) && marker.verify(secret)) {
+                    found.add(new KeyStack(section, slot, marker, container.getItemStack(slot).getQuantity()));
+                }
+            }
+        }
+        return found;
+    }
+
+    /** Every stack carrying a marker with this serial (after a dupe there may be several). */
+    public static List<KeyStack> findSerial(Store<EntityStore> store, Ref<EntityStore> entity, String serial) {
+        List<KeyStack> found = new ArrayList<>();
+        for (Section section : Section.values()) {
+            ItemContainer container = container(store, entity, section);
+            if (container == null) {
+                continue;
+            }
+            for (short slot = 0; slot < container.getCapacity(); slot++) {
+                KeyMarker marker = KeyItemFactory.read(container.getItemStack(slot));
+                if (marker != null && serial.equals(marker.serial())) {
+                    found.add(new KeyStack(section, slot, marker, container.getItemStack(slot).getQuantity()));
+                }
+            }
+        }
+        return found;
+    }
+
+    /**
+     * Removes one key with {@code serial}, preferring {@code expected}'s slot and
+     * searching again if the player moved it.
+     *
+     * @return {@code false} when no stack with that serial is left
+     */
+    public static boolean removeOne(Store<EntityStore> store, Ref<EntityStore> entity, KeyStack expected) {
+        if (takeOne(store, entity, expected.section(), expected.slot(), expected.marker().serial())) {
+            return true;
+        }
+        for (KeyStack stack : findSerial(store, entity, expected.marker().serial())) {
+            if (takeOne(store, entity, stack.section(), stack.slot(), stack.marker().serial())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Removes every stack carrying {@code serial} (a spent key that came back). @return stacks removed. */
+    public static int removeAll(Store<EntityStore> store, Ref<EntityStore> entity, String serial) {
+        int removed = 0;
+        for (KeyStack stack : findSerial(store, entity, serial)) {
+            ItemContainer container = container(store, entity, stack.section());
+            if (container != null) {
+                container.setItemStackForSlot(stack.slot(), ItemStack.EMPTY);
+                removed++;
+            }
+        }
+        return removed;
+    }
+
+    /** Gives {@code stack}. @return what did not fit, or {@code null} when everything fit. */
+    public static ItemStack give(Store<EntityStore> store, Ref<EntityStore> entity, ItemStack stack) {
+        ItemStack remainder = Player.giveItem(stack, entity, store).getRemainder();
+        return ItemStack.isEmpty(remainder) ? null : remainder;
+    }
+
+    /** Builds a stack from stored parts; {@code metadataJson} may be null. */
+    public static ItemStack stack(String itemId, int quantity, String metadataJson) {
+        BsonDocument metadata = metadataJson == null || metadataJson.isBlank() ? null : BsonDocument.parse(metadataJson);
+        return new ItemStack(itemId, Math.max(1, quantity), metadata);
+    }
+
+    private static boolean takeOne(Store<EntityStore> store, Ref<EntityStore> entity, Section section, short slot,
+            String serial) {
+        ItemContainer container = container(store, entity, section);
+        if (container == null || slot < 0 || slot >= container.getCapacity()) {
+            return false;
+        }
+        ItemStack stack = container.getItemStack(slot);
+        KeyMarker marker = KeyItemFactory.read(stack);
+        if (marker == null || !serial.equals(marker.serial())) {
+            return false;
+        }
+        int left = stack.getQuantity() - 1;
+        container.setItemStackForSlot(slot, left <= 0 ? ItemStack.EMPTY : stack.withQuantity(left));
+        return true;
+    }
+
+    private static ItemContainer container(Store<EntityStore> store, Ref<EntityStore> entity, Section section) {
+        ComponentType<EntityStore, ? extends InventoryComponent> type = switch (section) {
+            case HOTBAR -> InventoryComponent.Hotbar.getComponentType();
+            case STORAGE -> InventoryComponent.Storage.getComponentType();
+            case BACKPACK -> InventoryComponent.Backpack.getComponentType();
+        };
+        InventoryComponent component = store.getComponent(entity, type);
+        return component == null ? null : component.getInventory();
+    }
+}

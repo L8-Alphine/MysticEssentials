@@ -42,6 +42,8 @@ public final class MainConfig {
         map.put("playervaults", false);
         // CustomGUIs & CustomDialogs ships disabled.
         map.put("customcontent", false);
+        // LootBox ships disabled: enable here AND in modules/lootbox/config.json.
+        map.put("lootbox", false);
         return map;
     }
 

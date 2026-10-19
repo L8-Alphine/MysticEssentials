@@ -1,0 +1,65 @@
+// LootBox Manager — rows appended into #PoolList per entry.
+$C = "../Common.ui";
+$M = "MysticTheme.ui";
+
+$C.@PageOverlay {}
+
+$C.@Container {
+  Anchor: (Width: 820, Height: 620);
+
+  #Title {
+    Group {
+      $C.@Title {
+        @Text = "LootBox Manager";
+      }
+    }
+  }
+
+  #Content {
+    LayoutMode: Top;
+
+    Label #HeaderInfo {
+      Anchor: (Height: 20, Bottom: 8);
+      Style: $M.@MetaStyle;
+    }
+
+    $M.@Section {
+      @Text = "Pools";
+      @Anchor = (Bottom: 8);
+    }
+
+    $M.@Well {
+      FlexWeight: 1;
+
+      Label #ListEmpty {
+        Anchor: (Height: 64);
+        Style: $M.@EmptyStyle;
+        Text: "No pools yet. Add a draft in modules/lootbox/lootboxes and run /lootbox reload.";
+        Visible: false;
+      }
+
+      Group #PoolList {
+        FlexWeight: 1;
+        LayoutMode: TopScrolling;
+        Padding: (Right: 6);
+        ScrollbarStyle: $C.@DefaultScrollbarStyle;
+      }
+    }
+
+    $M.@ActionBar {
+      @Anchor = (Height: 44, Top: 12);
+
+      $C.@SecondaryTextButton #ReloadButton {
+        @Text = "Reload Drafts";
+        @Anchor = (Width: 170);
+      }
+
+      $M.@Spacer {}
+
+      $C.@TextButton #CloseButton {
+        @Text = "Close";
+        @Anchor = (Width: 150);
+      }
+    }
+  }
+}

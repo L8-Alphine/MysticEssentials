@@ -1,0 +1,65 @@
+// Pending Rewards — rows appended into #PendingList per entry.
+$C = "../Common.ui";
+$M = "MysticTheme.ui";
+
+$C.@PageOverlay {}
+
+$C.@Container {
+  Anchor: (Width: 820, Height: 620);
+
+  #Title {
+    Group {
+      $C.@Title {
+        @Text = "Pending Rewards";
+      }
+    }
+  }
+
+  #Content {
+    LayoutMode: Top;
+
+    Label #HeaderInfo {
+      Anchor: (Height: 20, Bottom: 8);
+      Style: $M.@MetaStyle;
+    }
+
+    $M.@Section {
+      @Text = "Waiting for you";
+      @Anchor = (Bottom: 8);
+    }
+
+    $M.@Well {
+      FlexWeight: 1;
+
+      Label #ListEmpty {
+        Anchor: (Height: 64);
+        Style: $M.@EmptyStyle;
+        Text: "Nothing is waiting. Rewards that do not fit your inventory land here.";
+        Visible: false;
+      }
+
+      Group #PendingList {
+        FlexWeight: 1;
+        LayoutMode: TopScrolling;
+        Padding: (Right: 6);
+        ScrollbarStyle: $C.@DefaultScrollbarStyle;
+      }
+    }
+
+    $M.@ActionBar {
+      @Anchor = (Height: 44, Top: 12);
+
+      $C.@SecondaryTextButton #BackButton {
+        @Text = "Back";
+        @Anchor = (Width: 140);
+      }
+
+      $M.@Spacer {}
+
+      $C.@TextButton #ClaimAllButton {
+        @Text = "Claim All";
+        @Anchor = (Width: 170);
+      }
+    }
+  }
+}

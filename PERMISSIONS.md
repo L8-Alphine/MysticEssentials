@@ -294,6 +294,41 @@ Disabled by default. `mysticessentials.vaults.admin` grants **every**
 (see **Dynamic limits**); `vaults.vault.*` / `vaults.rows.*` grant the config
 maximum.
 
+## LootBox
+
+Disabled by default. `mysticessentials.lootbox.use` gates `/lootbox` (alias `/lb`)
+itself, so every other node also needs it. No node implies another.
+
+| Node | Grants |
+|---|---|
+| `mysticessentials.lootbox.use` | `/lootbox` catalog, `/lootbox preview <pool>`, opening with a key, `/lootbox pending`, using crates |
+| `mysticessentials.lootbox.history` | `/lootbox history` (own receipts) |
+| `mysticessentials.lootbox.audit` | `/lootbox history <player>` |
+| `mysticessentials.lootbox.keys` | `/lootbox key list`, `/lootbox key info <serial>` |
+| `mysticessentials.lootbox.keys.give` | `/lootbox key give <player> <keyId> [count] [virtual] [source=…]` |
+| `mysticessentials.lootbox.keys.revoke` | `/lootbox key revoke <serial>` |
+| `mysticessentials.lootbox.publish` | `/lootbox publish <pool>`, `/lootbox rollback <pool> <revision>`, `/lootbox key publish <keyId>`, Publish in the manager |
+| `mysticessentials.lootbox.rewards.command` | Publish pools that contain COMMAND rewards (checked together with `publish`) |
+| `mysticessentials.lootbox.simulate` | `/lootbox simulate <pool> [draws]`, Simulate in the manager |
+| `mysticessentials.lootbox.crates.place` | `/lootbox crate select`, `/lootbox crate convert <pool> [crateId]`; binding hint on an unbound Mystic Crate |
+| `mysticessentials.lootbox.crates.manage` | `/lootbox crate info\|list\|verify\|remove\|enable`; alerts when a crate is destroyed |
+| `mysticessentials.lootbox.restore` | `/lootbox reconcile <openingId> <regrant\|dismiss>` |
+| `mysticessentials.lootbox.admin` | `/lootbox admin` (manager screen), `/lootbox reload`, `/lootbox disable\|enable <pool>` |
+
+A pool draft may also name its own `permission` node, required to open that pool.
+
+Suggested groups:
+
+| Group | Nodes |
+|---|---|
+| Players | `use`, `history` |
+| Builders | `crates.place` |
+| Moderators | `audit`, `keys`, `crates.manage`, `restore` |
+| Admins | `mysticessentials.lootbox.*` |
+
+`keys.give`, `publish` and `rewards.command` decide what players can win; keep them
+with admins.
+
 ## Dynamic limits
 
 Numeric limits (`home.limit`, `playerwarp.limit`, `vaults.vault`, `vaults.rows`)

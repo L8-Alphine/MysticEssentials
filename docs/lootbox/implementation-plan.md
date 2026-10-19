@@ -5,7 +5,7 @@
 | Spec | *MysticEssentials LootBox Master Design Bible v1.0* (18 Oct 2026) — referred to below as "the bible", sections as §NN |
 | Engine baseline | **Hytale release 0.7.2.** Engine facts were checked against the 0.7.2 source with Hytale Workshop on 18 Oct 2026; each one names the class it came from |
 | Repo baseline | `update/hytale-0.7.0` @ `b8c9ea0` (still compiles against 0.7.0 — see Phase 0) |
-| Status | Plan only. No code written |
+| Status | Phase 0 done (server side). Phase 1 built on `feature/lootbox-module` and checked from the console; in-game pass pending (see §6, "Phase 1 status") |
 | Sizing | S ≈ up to 1 day · M ≈ 2–4 days · L ≈ 1–2 weeks of focused work. Rough, for ordering the work only |
 
 ## Contents
@@ -503,6 +503,15 @@ Events are dispatched like the ones in `playervaults/event/*`, and their payload
 - Validator: every gate in §4.1, one failing case each.
 
 **Exit criteria:** LB-002, LB-004, LB-007 (interactive and shipped blocks), LB-008, LB-009, LB-010, LB-011, LB-012, LB-013 (for built-in types), LB-014 (grant-source path) and LB-015 pass. LB-001 passes through JSON and commands; the in-game-only version arrives in Phase 2. The build runs clean, including `validateUiDocuments`, and the in-client markup check is clean.
+
+**Phase 1 status (19 Oct 2026):**
+
+- **Built:** WP1–WP12. Package layout follows §3.2 with small merges: recovery lives in `OpeningService` (`recover`, `reconcile`) and reward delivery in `service/RewardService`; the crate systems are nested classes of `hytale/CrateSystems`.
+- **Checked on a 0.7.2 dev server, from the console:** key and pool publishing, the "unchanged" republish, simulate (200,000 draws within 0.15 points of each expected rate), rollback, disable/enable, `key list`, `crate list`, reload from storage after a restart, and the shipped crate block loading with a resolvable `Use` root.
+- **Shipped crate block:** one, `MysticEssentials_LootBox_Crate` (`Parent: Furniture_Ancient_Crate`), plus `Server/Languages/en-US/server.lang` for its name. Breaking an unbound one drops itself rather than the parent's barrel loot.
+- **Config differences from the block above:** `opening.revealFramesPerSecond` and `opening.historySize` were added; `crates.zeroDamage` is `crates.preventDamage`; `keys.defaultMode`, `opening.reducedMotionDefault` and `crates.onEnvironmentBreak` aren't there (keys are always serialized in Phase 1, there is no reduced-motion setting yet, and an environment break always disables and alerts). `keys.consumeOrder`, `keys.maxGrantPerCommand`, `crates.selectReach`, `rewards.announceTemplate` and `display.locale` are extra.
+- **Tests:** `LootBoxEngineTest` (`verifyLootBox`) covers odds, the formatter, pick boundaries, the hash, chi-square on 10⁶ draws, ids, command templates, key markers, the recovery table and the validator. The saga-level cases (stale snapshot, double commit, multi-use decrement) need storage and are left for the in-game pass.
+- **Still open:** the in-game LB pass and the client markup check (`phase0-spike-results.md` §7), and the reduced-motion setting.
 
 ---
 

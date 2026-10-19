@@ -1,5 +1,71 @@
 # Mystic Essentials Changelog
 
+## Unreleased — LootBox Module
+
+Adds LootBox, a free module for reward pools that show their exact odds before
+anything is spent, opened with signed keys from crates or a menu. It ships
+disabled.
+
+### Compatibility
+
+- Built and verified against Hytale Server `0.7.2`; the supported range stays
+  `>=0.7.0 <0.8.0`.
+- The module is off by default. Enable it with `"lootbox": true` in the main
+  config's `modules` map and `enabled: true` in `modules/lootbox/config.json`.
+
+### LootBox
+
+- Pools are authored as draft files in `modules/lootbox/lootboxes/` and frozen
+  into immutable, numbered revisions with `/lootbox publish`. Publishing validates
+  the whole draft and refuses it with a list of problems. `/lootbox rollback`
+  republishes an older revision as a new one.
+- Odds are `WEIGHTED` or `EXACT_PERCENT` (summing to exactly 100%). Previews,
+  confirmations and receipts show each reward's exact chance, "1 in N" and the
+  revision's odds id. A non-zero chance is never displayed as 0%.
+- Keys are defined in `modules/lootbox/keys/`. Physical keys are any item carrying
+  an HMAC-signed, serial-numbered marker; virtual keys are a per-player balance.
+  Staff issue keys with `/lootbox key give` and can revoke a serial.
+- Opening: the player confirms, then the key is spent and the result drawn with
+  `SecureRandom` in a single write. A skippable reveal follows, then the reward is
+  delivered. Interrupted openings finish on join and every 5 minutes, item
+  deliveries that cannot be confirmed are held for `/lootbox reconcile` instead
+  of being given twice, and repeated confirms are deduplicated.
+- Rewards: items, economy deposits, LuckPerms permission nodes (optionally
+  timed), and console commands that must match an allowlisted pattern. Items that
+  do not fit go to a pending inbox (`/lootbox pending`).
+- Crates: bind any block that has a Use interaction (chests, doors, benches) with
+  `/lootbox crate select` and `/lootbox crate convert`. Crates are protected from
+  breaking, damage and explosions. If a crate's block is replaced or destroyed,
+  the crate disables itself, and staff are alerted when it is destroyed.
+- New **Mystic Crate** block (`MysticEssentials_LootBox_Crate`) in the bundled
+  asset pack, for builders who want a dedicated crate. The module logs at startup
+  whether it loaded.
+- Player screens: catalog, preview, confirmation, reveal, history and pending
+  inbox. Staff get a manager screen with Publish, Close/Reopen and Simulate.
+- `/lootbox simulate` draws up to a million times without awarding anything and
+  compares expected with observed rates.
+- The `FREE_GAMEPLAY_ONLY` policy profile (the default) refuses key grants marked
+  `PAID`.
+- Hourly audit counters are kept for `audit.retentionDays` (400).
+- `LootBoxApi` (`getModule("lootbox")`) and `MysticEvent`s for addons.
+- New permissions under `mysticessentials.lootbox.*`; see `PERMISSIONS.md`.
+
+### Core API
+
+- `PermissionService` gains `canGrant()` and `grant(player, node, duration)`,
+  backed by LuckPerms. The LuckPerms node classes load only when LuckPerms is
+  present, so servers without it are unaffected.
+
+### Verification
+
+- New `verifyLootBox` check: odds resolution, formatting, pick boundaries, a
+  chi-square test over a million draws, key markers, command templates, the
+  recovery decision table and the draft validator.
+- Every new UI document passes `validateUiDocuments`.
+- On a 0.7.2 dev server, from the console: publishing, simulating, rolling back,
+  closing and reopening pools, publishing keys, and reloading after a restart.
+  Player flows (screens, keys, crates) still need an in-game test.
+
 ## 1.0.5 — Hytale 0.7.0
 
 Mystic Essentials 1.0.5 moves to Hytale Server 0.7.0, whose chunk and spawn APIs

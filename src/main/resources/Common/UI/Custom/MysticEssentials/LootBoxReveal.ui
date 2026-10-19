@@ -1,0 +1,75 @@
+// LootBox reveal. The server moves the #Hl highlight down the reward list with
+// live updates and lands on the outcome it already committed; the odds stay on
+// screen the whole time, and Skip only jumps to the end.
+$C = "../Common.ui";
+$M = "MysticTheme.ui";
+
+$C.@PageOverlay {}
+
+$C.@Container {
+  Anchor: (Width: 760, Height: 640);
+
+  #Title {
+    Group {
+      $C.@Title {
+        @Text = "Opening";
+      }
+    }
+  }
+
+  #Content {
+    LayoutMode: Top;
+
+    Label #PreviewTitle {
+      Anchor: (Height: 30, Bottom: 8);
+      Style: $M.@DisplayStyle;
+    }
+
+    $M.@Well {
+      FlexWeight: 1;
+
+      Group #RevealList {
+        FlexWeight: 1;
+        LayoutMode: TopScrolling;
+        Padding: (Right: 6);
+        ScrollbarStyle: $C.@DefaultScrollbarStyle;
+      }
+    }
+
+    $M.@Panel {
+      @Padding = 14;
+      Anchor: (Top: 12);
+
+      Label #ResultName {
+        Anchor: (Height: 26, Bottom: 4);
+        Style: $M.@DisplaySmallStyle;
+      }
+
+      Label #ResultMeta {
+        Anchor: (Height: 18, Bottom: 2);
+        Style: $M.@MetaStyle;
+      }
+
+      Label #Status {
+        Anchor: (Height: 18);
+        Style: $M.@MetaGoldStyle;
+      }
+    }
+
+    $M.@ActionBar {
+      @Anchor = (Height: 44, Top: 8);
+
+      $C.@SecondaryTextButton #SkipButton {
+        @Text = "Skip";
+        @Anchor = (Width: 140);
+      }
+
+      $M.@Spacer {}
+
+      $C.@TextButton #CloseButton {
+        @Text = "Close";
+        @Anchor = (Width: 160);
+      }
+    }
+  }
+}

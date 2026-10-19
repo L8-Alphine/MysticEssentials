@@ -33,6 +33,7 @@ Developers should start with [Developer API](developer-api). Mystic Essentials e
 | Inventory | Clear self/others/all, protected players, automatic snapshots, snapshot restore UI |
 | Nicknames | Nickname UI, color-gated nicks, blocked names, staff-visible nickname marker |
 | Player Vaults | Per-rank personal storage, customizable metadata, item blacklists, cross-server locking, admin tooling |
+| LootBox | Reward pools with exact, always-visible odds, signed physical and virtual keys, block crates, crash-safe openings, receipts, and a pending-reward inbox |
 | Patch Notes | In-game changelog viewer, categories and filters, join notices and auto-open |
 | Tutorial | Scripted first-join tutorial with scenes and pages |
 | Custom Commands | Config-defined commands with actions, cooldowns, and permission gates |

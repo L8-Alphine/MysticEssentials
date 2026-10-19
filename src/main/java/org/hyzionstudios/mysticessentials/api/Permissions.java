@@ -326,6 +326,35 @@ public final class Permissions {
     /** View/recover storage beyond the owner's current row/vault limits (overflow). */
     public static final String VAULTS_ADMIN_BYPASSLIMIT = "mysticessentials.vaults.admin.bypasslimit";
 
+    // ----- LootBox ---------------------------------------------------------------------
+
+    /** {@code /lootbox}: browse pools, preview odds, open with a key, claim pending rewards. */
+    public static final String LOOTBOX_USE = "mysticessentials.lootbox.use";
+    /** {@code /lootbox history}: your own opening receipts. */
+    public static final String LOOTBOX_HISTORY = "mysticessentials.lootbox.history";
+    /** Another player's receipts, audit records and statistics. */
+    public static final String LOOTBOX_AUDIT = "mysticessentials.lootbox.audit";
+    /** {@code /lootbox key list|info}. */
+    public static final String LOOTBOX_KEYS = "mysticessentials.lootbox.keys";
+    /** {@code /lootbox key give}: issue physical or virtual keys (audited). */
+    public static final String LOOTBOX_KEYS_GIVE = "mysticessentials.lootbox.keys.give";
+    /** {@code /lootbox key revoke}: kill an issued key serial. */
+    public static final String LOOTBOX_KEYS_REVOKE = "mysticessentials.lootbox.keys.revoke";
+    /** {@code /lootbox publish|rollback} and {@code key publish}: freeze drafts into revisions. */
+    public static final String LOOTBOX_PUBLISH = "mysticessentials.lootbox.publish";
+    /** {@code /lootbox crate select|convert}: turn a block (or a placed Mystic Crate) into a crate. */
+    public static final String LOOTBOX_CRATES_PLACE = "mysticessentials.lootbox.crates.place";
+    /** {@code /lootbox crate info|list|verify|remove|enable}, and alerts when a crate is destroyed. */
+    public static final String LOOTBOX_CRATES_MANAGE = "mysticessentials.lootbox.crates.manage";
+    /** {@code /lootbox simulate}: non-awarding distribution test. */
+    public static final String LOOTBOX_SIMULATE = "mysticessentials.lootbox.simulate";
+    /** {@code /lootbox reconcile}: resolve deliveries left in review. */
+    public static final String LOOTBOX_RESTORE = "mysticessentials.lootbox.restore";
+    /** Publish pools containing COMMAND rewards. */
+    public static final String LOOTBOX_REWARDS_COMMAND = "mysticessentials.lootbox.rewards.command";
+    /** {@code /lootbox admin|reload|disable|enable}. */
+    public static final String LOOTBOX_ADMIN = "mysticessentials.lootbox.admin";
+
     // ----- Dynamic node builders ------------------------------------------------------
 
     /** {@code mysticessentials.home.limit.<n>} — numeric home limit. */

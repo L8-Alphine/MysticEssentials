@@ -518,6 +518,25 @@ public final class DefaultMessages {
         o.addProperty("patchnotes-list-header", "&d&lPatch Notes &7({count})");
         o.addProperty("patchnotes-list-entry", "{pin}&f{title} &7v{version} &8- &7{date}");
 
+        // ----- LootBox -----
+        o.addProperty("lootbox-usage", "&7Usage: &f{usage}");
+        o.addProperty("lootbox-unknown-pool", "&cThere is no loot box called &f{pool}&c.");
+        o.addProperty("lootbox-opened", "&aYou opened &f{pool}&a: &f{reward} &7({chance}, receipt {receipt})");
+        o.addProperty("lootbox-reward-pending", "&e{reward} didn't fit in your inventory. Claim it with &f/lootbox pending&e.");
+        o.addProperty("lootbox-pending-claimed", "&aClaimed {count} reward(s); {remaining} still waiting.");
+        o.addProperty("lootbox-key-given", "&aGave &f{count}x {key} &ato &f{player}&a.");
+        o.addProperty("lootbox-key-received", "&aYou received &f{count}x {key}&a.");
+        o.addProperty("lootbox-published", "&aPublished &f{pool} &arevision &f{revision}&a (odds id {hash}).");
+        o.addProperty("lootbox-publish-unchanged", "&7{pool} is unchanged; revision {revision} stays live.");
+        o.addProperty("lootbox-publish-failed", "&cCould not publish &f{pool}&c: {reason}");
+        o.addProperty("lootbox-reloaded", "&aLootBox drafts and settings reloaded ({pools} pools, {keys} keys).");
+        o.addProperty("lootbox-crate-incompatible", "&cThat block can't be a crate: {reason}");
+        o.addProperty("lootbox-crate-converted", "&aCrate &f{crate} &anow opens &f{pool}&a.");
+        o.addProperty("lootbox-crate-inactive", "&cThis crate is inactive.");
+        o.addProperty("lootbox-crate-protected", "&cCrates can't be broken. Staff use &f/lootbox crate remove&c.");
+        o.addProperty("lootbox-crate-broken-alert", "&cCrate &f{crate} &cat &f{position} &cwas destroyed and is now disabled.");
+        o.addProperty("lootbox-crate-unbound", "&7This crate isn't set up yet.");
+        o.addProperty("lootbox-crate-unbound-admin", "&eUnbound crate block. Look at it and run &f/lootbox crate convert <pool>&e.");
         return o;
     }
 }

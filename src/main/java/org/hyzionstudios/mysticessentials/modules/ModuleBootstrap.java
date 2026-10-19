@@ -10,6 +10,7 @@ import org.hyzionstudios.mysticessentials.modules.flight.FlightModule;
 import org.hyzionstudios.mysticessentials.modules.greetings.GreetingsModule;
 import org.hyzionstudios.mysticessentials.modules.inventory.InventoryModule;
 import org.hyzionstudios.mysticessentials.modules.kits.KitModule;
+import org.hyzionstudios.mysticessentials.modules.lootbox.LootBoxModule;
 import org.hyzionstudios.mysticessentials.modules.mail.MailModule;
 import org.hyzionstudios.mysticessentials.modules.nick.NickModule;
 import org.hyzionstudios.mysticessentials.modules.patchnotes.PatchNotesModule;
@@ -52,5 +53,6 @@ public final class ModuleBootstrap {
         manager.register(new PortalsModule());
         manager.register(new CraftBlockModule());
         manager.register(new CustomContentModule());
+        manager.register(new LootBoxModule());
     }
 }

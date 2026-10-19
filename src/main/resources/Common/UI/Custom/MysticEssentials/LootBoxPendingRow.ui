@@ -1,0 +1,45 @@
+// One pending reward with its own Claim button.
+$C = "../Common.ui";
+$M = "MysticTheme.ui";
+
+Group #Row {
+  Anchor: (Height: 56, Bottom: 4);
+  LayoutMode: Left;
+  Padding: (Left: 12, Right: 12, Top: 10, Bottom: 10);
+  Background: #0a0f16(0.38);
+
+  $M.@IconWell {
+    @Anchor = (Right: 12);
+
+    ItemSlot #Icon {
+      Anchor: (Width: 32, Height: 32);
+      ShowQualityBackground: true;
+      ShowQuantity: false;
+    }
+  }
+
+  Group {
+    LayoutMode: Top;
+    FlexWeight: 1;
+
+    Label #Name {
+      Anchor: (Height: 20, Bottom: 2);
+      Style: $M.@RowNameStyle;
+    }
+
+    Label #Meta {
+      Anchor: (Height: 14);
+      Style: $M.@RowMetaStyle;
+    }
+  }
+
+  Label #Status {
+    Anchor: (Width: 170, Left: 8);
+    Style: $M.@RowSideStyle;
+  }
+
+  $C.@SmallSecondaryTextButton #ClaimButton {
+    @Text = "Claim";
+    @Anchor = (Width: 100, Left: 8, Vertical: 2);
+  }
+}

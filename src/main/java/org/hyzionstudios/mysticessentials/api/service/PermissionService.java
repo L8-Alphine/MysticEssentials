@@ -1,7 +1,9 @@
 package org.hyzionstudios.mysticessentials.api.service;
 
+import java.time.Duration;
 import java.util.OptionalInt;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
 /**
@@ -54,4 +56,21 @@ public interface PermissionService {
      * @param unlimitedIsMax if {@code true}, an {@code .unlimited} node yields {@link Integer#MAX_VALUE}.
      */
     OptionalInt limit(UUID player, String basePermission, boolean unlimitedIsMax);
+
+    /** @return {@code true} when {@link #grant} can actually add nodes (LuckPerms is present). */
+    default boolean canGrant() {
+        return false;
+    }
+
+    /**
+     * Adds a permission node to a player, online or offline. Setting a node the
+     * player already has is harmless, so a grant may be replayed.
+     *
+     * @param duration how long it lasts; {@code null} or zero for permanent
+     * @return a future completing with {@code true} once stored, {@code false} when
+     *         granting is unavailable or failed
+     */
+    default CompletableFuture<Boolean> grant(UUID player, String node, Duration duration) {
+        return CompletableFuture.completedFuture(false);
+    }
 }

@@ -527,6 +527,14 @@ tasks.register<JavaExec>("verifyShadedJar") {
     })
 }
 
+tasks.register<JavaExec>("verifyLootBox") {
+    group = "verification"
+    description = "Checks the LootBox odds, draw, templates, key markers, recovery table and publish gates."
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets.test.get().runtimeClasspath + configurations.compileClasspath.get()
+    mainClass.set("org.hyzionstudios.mysticessentials.modules.lootbox.LootBoxEngineTest")
+}
+
 tasks.register<JavaExec>("verifyMessageParamOrder") {
     group = "verification"
     description = "Checks message params are filled after placeholders, so they never expand one."
@@ -561,6 +569,7 @@ tasks.named("check") {
         "verifyIntegrationContracts",
         "verifyShadedJar",
         "verifyMessageParamOrder",
-        "verifyChatDelivery"
+        "verifyChatDelivery",
+        "verifyLootBox"
     )
 }

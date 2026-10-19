@@ -1,0 +1,65 @@
+// Opening History — rows appended into #ReceiptList per entry.
+$C = "../Common.ui";
+$M = "MysticTheme.ui";
+
+$C.@PageOverlay {}
+
+$C.@Container {
+  Anchor: (Width: 820, Height: 620);
+
+  #Title {
+    Group {
+      $C.@Title {
+        @Text = "Opening History";
+      }
+    }
+  }
+
+  #Content {
+    LayoutMode: Top;
+
+    Label #HeaderInfo {
+      Anchor: (Height: 20, Bottom: 8);
+      Style: $M.@MetaStyle;
+    }
+
+    $M.@Section {
+      @Text = "Receipts";
+      @Anchor = (Bottom: 8);
+    }
+
+    $M.@Well {
+      FlexWeight: 1;
+
+      Label #ListEmpty {
+        Anchor: (Height: 64);
+        Style: $M.@EmptyStyle;
+        Text: "No openings yet.";
+        Visible: false;
+      }
+
+      Group #ReceiptList {
+        FlexWeight: 1;
+        LayoutMode: TopScrolling;
+        Padding: (Right: 6);
+        ScrollbarStyle: $C.@DefaultScrollbarStyle;
+      }
+    }
+
+    $M.@ActionBar {
+      @Anchor = (Height: 44, Top: 12);
+
+      $C.@SecondaryTextButton #BackButton {
+        @Text = "Back";
+        @Anchor = (Width: 140);
+      }
+
+      $M.@Spacer {}
+
+      $C.@TextButton #CloseButton {
+        @Text = "Close";
+        @Anchor = (Width: 150);
+      }
+    }
+  }
+}

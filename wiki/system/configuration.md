@@ -50,7 +50,7 @@ Important sections:
 | `playerList.refreshSeconds` | `5` | How often names are recomputed |
 | `playerList.rebuildEntries` | `true` | Remove-then-add each replaced row |
 
-The `modules` object controls module startup. Mail, spawn, teleportation, warps, announcements, AFK, chat, greetings, kits, flight, inventory, nicknames, patch notes, portals, and craft blocking default to `true`. Tutorial, Custom Commands, Player Vaults, and licensed CustomContent default to `false`; Tutorial, Custom Commands, and Player Vaults also require `enabled: true` in their own module config.
+The `modules` object controls module startup. Mail, spawn, teleportation, warps, announcements, AFK, chat, greetings, kits, flight, inventory, nicknames, patch notes, portals, and craft blocking default to `true`. Tutorial, Custom Commands, Player Vaults, LootBox, and licensed CustomContent default to `false`; Tutorial, Custom Commands, Player Vaults, and LootBox also require `enabled: true` in their own module config.
 
 ### Server Players list
 
@@ -570,6 +570,35 @@ Grouped blocks control more behavior:
 | `admin` | `logAdminOpens`, `logAdminEdits`, `notifyOnlinePlayerWhenAdminOpensVault`, `defaultAdminMode`, `maxLogEntriesPerPlayer` |
 
 See the [Player Vaults](playervaults-module) page for the full breakdown.
+
+## LootBox
+
+File:
+
+```text
+modules/lootbox/config.json
+```
+
+The module is disabled by default: set `enabled: true` here **and** `"lootbox": true` in the main config's `modules` map. Pools and keys are not configured in this file: they are draft files under `modules/lootbox/lootboxes/` and `modules/lootbox/keys/`, published with `/lootbox publish`.
+
+| Setting | Default | Description |
+| --- | --- | --- |
+| `enabled` | `false` | Master switch |
+| `policyProfile` | `FREE_GAMEPLAY_ONLY` | `FREE_GAMEPLAY_ONLY`, `PAID_RANDOM_RESTRICTED` (needs `allowPaidRandomProfile`) or `DISABLED` |
+| `allowPaidRandomProfile` | `false` | Never enable on an All Ages server |
+
+| Block | Controls |
+| --- | --- |
+| `command` | `name`, `aliases` |
+| `opening` | `minIntervalMs`, `requestDedupeMinutes`, `revealDurationMs`, `revealFramesPerSecond`, `allowSkip`, `historySize` |
+| `keys` | `consumeOrder`, `offlineGrant`, `consoleGrantSource`, `maxGrantPerCommand` |
+| `crates` | `preventPlayerBreak`, `preventDamage`, `selectReach` |
+| `rewards` | `itemOverflow`, `pendingExpiryDays`, `commandAllowlist`, `announceTemplate` |
+| `simulation` | `maxTrials` |
+| `display` | `minDecimals`, `maxDecimals`, `locale` |
+| `audit` | `retentionDays` |
+
+See the [LootBox](lootbox-module) page for the full breakdown.
 
 ## Notifications
 
