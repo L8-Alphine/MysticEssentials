@@ -181,7 +181,9 @@ checks every crate in your world.
   joins, and every 5 minutes for players who stay online.
 - An item delivery whose outcome cannot be confirmed is held for review rather
   than given twice. Staff resolve it with
-  `/lootbox reconcile <openingId> regrant|dismiss`.
+  `/lootbox reconcile <openingId> regrant|dismiss`. If two staff members resolve
+  the same opening at once, only the first goes through; the other is refused
+  (already being delivered, or no longer under review).
 - Repeated confirm presses and rapid openings are deduplicated
   (`opening.requestDedupeMinutes`, `opening.minIntervalMs`).
 - Draws use `SecureRandom`; `/lootbox simulate` shows expected against observed

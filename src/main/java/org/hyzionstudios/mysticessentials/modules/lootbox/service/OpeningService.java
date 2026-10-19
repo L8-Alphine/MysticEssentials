@@ -628,14 +628,31 @@ public final class OpeningService {
         return chain;
     }
 
-    /** {@code /lootbox reconcile <openingId> regrant|dismiss}. */
+    /**
+     * {@code /lootbox reconcile <openingId> regrant|dismiss}. A staff command is no
+     * player's request, so it is decided in the opening's player lane: two staff
+     * members reconciling one opening take turns, and the second finds the first
+     * regrant running ({@link DeliveryRules#reconcileProblem}). The lane does not
+     * wait for the regrant's delivery, as with {@link #finishCommit}.
+     */
     public CompletableFuture<String> reconcile(String openingId, boolean regrant, String actor) {
-        return storage.loadOpening(openingId).thenCompose(opening -> {
-            if (opening == null) {
+        return storage.loadOpening(openingId).thenCompose(found -> {
+            if (found == null) {
                 return CompletableFuture.completedFuture("unknown opening");
             }
-            if (!Opening.REVIEW.equals(opening.state)) {
-                return CompletableFuture.completedFuture("not under review (" + opening.state + ")");
+            return lanes.run(UUID.fromString(found.player), () -> reconcileInLane(openingId, regrant, actor))
+                    .thenCompose(reply -> reply);
+        });
+    }
+
+    /** Decides and starts the reconcile; the inner future completes once a regrant settled. */
+    private CompletableFuture<CompletableFuture<String>> reconcileInLane(String openingId, boolean regrant,
+            String actor) {
+        Long runningSince = rewards.deliveringSince(openingId);
+        return storage.loadOpening(openingId).thenCompose(opening -> {
+            String problem = DeliveryRules.reconcileProblem(opening, runningSince);
+            if (problem != null) {
+                return reply(problem);
             }
             audit.record(actor, regrant ? "RECONCILE_REGRANT" : "RECONCILE_DISMISS", openingId, "");
             if (!regrant) {
@@ -650,9 +667,9 @@ public final class OpeningService {
                         UUID.fromString(opening.player), state -> {
                             state.openDeliveries.remove(openingId);
                             return state;
-                        })).thenApply(state -> "dismissed");
+                        })).thenApply(state -> CompletableFuture.completedFuture("dismissed"));
             }
-            return revisionOf(opening).thenCompose(revision -> {
+            return revisionOf(opening).thenApply(revision -> {
                 LootBoxDraft.RewardSpec reward = rewardOf(revision, opening.outcomeId).orElse(null);
                 if (reward == null) {
                     return CompletableFuture.completedFuture("its revision or reward is gone");
@@ -660,6 +677,10 @@ public final class OpeningService {
                 return rewards.deliver(opening, reward, true).thenApply(status -> status.label());
             });
         });
+    }
+
+    private static CompletableFuture<CompletableFuture<String>> reply(String text) {
+        return CompletableFuture.completedFuture(CompletableFuture.completedFuture(text));
     }
 
     private CompletableFuture<LootBoxRevision> revisionOf(Opening opening) {
