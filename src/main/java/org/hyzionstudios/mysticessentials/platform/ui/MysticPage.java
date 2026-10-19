@@ -49,6 +49,8 @@ public abstract class MysticPage extends CustomUIPage {
     private static final String TEXT_FAINT = "#5A6A7A";
     private static final String GOLD = "#E8A93B";
     private static final String GOLD_SOFT = "#E8C97A";
+    /** {@code @ColorButtonText} in the game's Common.ui. */
+    private static final String BUTTON_TEXT = "#BFCDD5";
     private static final Pattern TEXT_TARGET =
             Pattern.compile("#([A-Za-z0-9_]+)\\.TextSpans$");
     private static final Map<String, String> UI_TEXT_COLORS = Map.ofEntries(
@@ -158,6 +160,14 @@ public abstract class MysticPage extends CustomUIPage {
             Map.entry("ResultMeta", TEXT_MUTED),
             Map.entry("RosterCounts", GOLD_SOFT),
             Map.entry("State", GOLD_SOFT),
+            // LootBox editor kit: picker, confirmation, tab bar. A server-written
+            // button label takes the game's button text colour so it matches a
+            // static one.
+            Map.entry("PickerTarget", GOLD),
+            Map.entry("CurrentItem", TEXT_MUTED),
+            Map.entry("TabLabel", TEXT_BODY),
+            Map.entry("ConfirmButton", BUTTON_TEXT),
+            Map.entry("DangerButton", BUTTON_TEXT),
             Map.entry("Unread", "#FFD97A"),
             Map.entry("Secondary", "#D46A6A"));
 

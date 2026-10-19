@@ -32,8 +32,10 @@ import org.hyzionstudios.mysticessentials.modules.lootbox.service.PlayerLanes;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.RewardService;
 import org.hyzionstudios.mysticessentials.modules.lootbox.storage.LootBoxStorage;
 import org.hyzionstudios.mysticessentials.modules.lootbox.ui.LootBoxUi;
+import org.hyzionstudios.mysticessentials.modules.lootbox.ui.editor.EditorSessions;
 
 import com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent;
+import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 
 /**
@@ -66,6 +68,8 @@ public final class LootBoxModule extends AbstractMysticModule implements LootBox
     private OpeningService opening;
     private CrateService crates;
     private LootBoxUi ui;
+    /** Open in-game editors, one per player; the working copies never outlive a disconnect or a disable. */
+    private final EditorSessions editors = new EditorSessions();
     private ScheduledFuture<?> sweepTask;
     private ScheduledFuture<?> recoveryTask;
 
@@ -131,6 +135,12 @@ public final class LootBoxModule extends AbstractMysticModule implements LootBox
                 opening.recover(player);
             }
         });
+        registerEvent(PlayerDisconnectEvent.class, (PlayerDisconnectEvent event) -> {
+            PlayerRef player = event.getPlayerRef();
+            if (player != null) {
+                editors.end(player.getUuid());
+            }
+        });
         // Openings left mid-saga by a crash or disconnect are finished on join; this
         // also retries stuck deliveries for players who stay online.
         recoveryTask = core.scheduler().runRepeating(() -> {
@@ -170,6 +180,7 @@ public final class LootBoxModule extends AbstractMysticModule implements LootBox
     @Override
     public void onDisable() {
         active = null;
+        editors.clear();
         if (recoveryTask != null) {
             recoveryTask.cancel(false);
             recoveryTask = null;
@@ -250,6 +261,10 @@ public final class LootBoxModule extends AbstractMysticModule implements LootBox
 
     public LootBoxUi ui() {
         return ui;
+    }
+
+    public EditorSessions editors() {
+        return editors;
     }
 
     // ----- LootBoxApi ---------------------------------------------------------

@@ -1,0 +1,20 @@
+// One tab in a LootBox editor's tab bar. Appended per tab into a Group with
+// LayoutMode: Left on the page:
+//   cmd.append("#Tabs", "MysticEssentials/LootBoxEditorTab.ui")
+// then #TabLabel.TextSpans is set, #Selected.Visible marks the active tab, and
+// the tab is bound (see EditorTabs.java). Tabs are a button row until the S3
+// widget check clears TabNavigation.
+$M = "MysticTheme.ui";
+
+Button #Tab {
+  Anchor: (Width: 106, Height: 34, Right: 4);
+  Style: $M.@TabStyle;
+  LayoutMode: Full;
+
+  $M.@TabSelection #Selected {}
+
+  Label #TabLabel {
+    Anchor: (Full: 0);
+    Style: $M.@TabLabelStyle;
+  }
+}
