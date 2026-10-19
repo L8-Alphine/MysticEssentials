@@ -79,11 +79,6 @@ public final class OpeningService {
         }
     }
 
-    private record Confirm(String lootboxId, String hash, String requestId, String crateId, long issuedAt) {
-    }
-
-    private static final long CONFIRM_TTL_MS = TimeUnit.MINUTES.toMillis(10);
-
     private final MysticCore core;
     private final LootBoxStorage storage;
     private final LootBoxRegistry registry;
@@ -94,7 +89,7 @@ public final class OpeningService {
     private final SecureDraw draw;
     private volatile LootBoxConfig config;
     private volatile OddsFormatter formatter;
-    private final Map<UUID, Confirm> confirms = new ConcurrentHashMap<>();
+    private final Map<UUID, OpeningRules.Confirm> confirms = new ConcurrentHashMap<>();
 
     public OpeningService(MysticCore core, LootBoxStorage storage, LootBoxRegistry registry, KeyService keys,
             RewardService rewards, AuditService audit, PlayerLanes lanes, SecureDraw draw, LootBoxConfig config) {
@@ -145,7 +140,7 @@ public final class OpeningService {
             }
             List<String> blockers = blockers(player, revision, state, virtual + held);
             String requestId = draw.id();
-            confirms.put(player.getUuid(), new Confirm(lootboxId, table.hash(), requestId, crateId,
+            confirms.put(player.getUuid(), new OpeningRules.Confirm(lootboxId, table.hash(), requestId, crateId,
                     System.currentTimeMillis()));
             audit.counter("PREVIEW").incrementAndGet();
             return new Preview(revision, table, virtual, held, requestId, crateId, blockers);
@@ -197,14 +192,12 @@ public final class OpeningService {
             String requestId) {
         UUID uuid = player.getUuid();
         return storage.loadPlayer(uuid).thenCompose(state -> {
-            String earlier = requestId == null ? null : state.openingForRequest(requestId);
+            String earlier = OpeningRules.earlierOpening(state, requestId);
             if (earlier != null) {
                 return storage.loadOpening(earlier).thenCompose(opening -> existingResult(opening));
             }
-            Confirm confirm = confirms.get(uuid);
-            if (confirm == null || requestId == null || !requestId.equals(confirm.requestId())
-                    || !lootboxId.equals(confirm.lootboxId())
-                    || System.currentTimeMillis() - confirm.issuedAt() > CONFIRM_TTL_MS) {
+            OpeningRules.Confirm confirm = confirms.get(uuid);
+            if (!OpeningRules.confirmCurrent(confirm, lootboxId, requestId, System.currentTimeMillis())) {
                 return done(Status.STALE, "Please review the odds again and confirm.");
             }
             if (state.activeOpening != null) {
@@ -229,7 +222,7 @@ public final class OpeningService {
                         + TimeUnit.MILLISECONDS.toSeconds(wait + 999) + "s.");
             }
             OddsTable table = OddsEngine.table(revision, policyProfile());
-            if (snapshotHash == null || !snapshotHash.equals(table.hash())) {
+            if (!OpeningRules.snapshotCurrent(snapshotHash, table)) {
                 audit.counter("STALE").incrementAndGet();
                 return done(Status.STALE, "The odds changed while you were looking. Check them and confirm again.");
             }
@@ -246,17 +239,11 @@ public final class OpeningService {
 
     private CompletableFuture<OpenResult> chooseKeyAndOpen(PlayerRef player, PlayerLootState state,
             LootBoxRevision revision, OddsTable table, String requestId, String crateId) {
-        String virtualKey = null;
-        for (String keyId : revision.spec.keys) {
-            if (state.virtualKeys.getOrDefault(keyId, 0) > 0) {
-                virtualKey = keyId;
-                break;
-            }
-        }
+        String virtualKey = OpeningRules.firstVirtualKey(revision.spec.keys, state);
         boolean physicalFirst = "PHYSICAL_FIRST".equalsIgnoreCase(config.keys.consumeOrder);
         if (virtualKey != null && !physicalFirst) {
             return prepare(player, revision, table, requestId, crateId)
-                    .thenCompose(opening -> commitVirtual(player, opening, revision, table, virtualKeyOf(revision, state)));
+                    .thenCompose(opening -> commitVirtual(player, opening, revision, table, virtualKey));
         }
         String fallbackVirtual = virtualKey;
         Set<String> keyIds = new LinkedHashSet<>(revision.spec.keys);
@@ -272,15 +259,6 @@ public final class OpeningService {
             }
             return done(Status.NO_KEY, "You need a key to open this.");
         });
-    }
-
-    private static String virtualKeyOf(LootBoxRevision revision, PlayerLootState state) {
-        for (String keyId : revision.spec.keys) {
-            if (state.virtualKeys.getOrDefault(keyId, 0) > 0) {
-                return keyId;
-            }
-        }
-        return null;
     }
 
     /** Draws the outcome and records the opening as PREPARED before any key is touched. */
@@ -312,17 +290,7 @@ public final class OpeningService {
         audit.record(player.getUuid().toString(), "OPEN_REQUEST", opening.openingId,
                 revision.lootboxId + "@" + revision.revision + " odds " + table.oddsId());
         return storage.saveOpening(opening).thenCompose(saved -> storage.updatePlayer(player.getUuid(), state -> {
-            state.activeOpening = opening.openingId;
-            PlayerLootState.RequestRecord request = new PlayerLootState.RequestRecord();
-            request.requestId = requestId;
-            request.openingId = opening.openingId;
-            request.at = opening.createdAt;
-            state.requests.add(request);
-            long horizon = opening.createdAt - TimeUnit.MINUTES.toMillis(config.opening.requestDedupeMinutes);
-            state.requests.removeIf(r -> r.at < horizon);
-            while (state.requests.size() > PlayerLootState.MAX_REQUESTS) {
-                state.requests.remove(0);
-            }
+            OpeningRules.recordPrepared(state, opening, config.opening.requestDedupeMinutes);
             return state;
         })).thenApply(state -> opening);
     }
@@ -333,25 +301,10 @@ public final class OpeningService {
         opening.keyId = keyId;
         AtomicBoolean committed = new AtomicBoolean();
         return storage.updatePlayer(player.getUuid(), state -> {
-            if (state.hasCommit(opening.openingId)) {
-                committed.set(true);
-                return null;
-            }
-            int balance = state.virtualKeys.getOrDefault(keyId, 0);
-            if (balance < 1) {
-                if (opening.openingId.equals(state.activeOpening)) {
-                    state.activeOpening = null;
-                }
-                return state;
-            }
-            if (balance == 1) {
-                state.virtualKeys.remove(keyId);
-            } else {
-                state.virtualKeys.put(keyId, balance - 1);
-            }
-            recordCommit(state, opening, revision);
-            committed.set(true);
-            return state;
+            OpeningRules.Debit debit = OpeningRules.spendVirtual(state, keyId, opening, revision.spec.displayName,
+                    config.opening.historySize, System.currentTimeMillis());
+            committed.set(debit != OpeningRules.Debit.NO_KEY);
+            return debit == OpeningRules.Debit.ALREADY_COMMITTED ? null : state;
         }).thenCompose(state -> committed.get()
                 ? finishCommit(player, opening, revision, table)
                 : abort(opening, Status.NO_KEY, "no virtual key left"));
@@ -371,7 +324,7 @@ public final class OpeningService {
             opening.keyId = stack.marker().keyId();
             opening.keySerial = stack.marker().serial();
             opening.state = Opening.RESERVED;
-            boolean lastUse = reserved.serial().usesLeft <= 1;
+            boolean lastUse = OpeningRules.lastUse(reserved.serial());
             return storage.saveOpening(opening)
                     .thenCompose(saved -> takeKey(player, stack, lastUse))
                     .thenCompose(taken -> {
@@ -413,15 +366,9 @@ public final class OpeningService {
         long now = System.currentTimeMillis();
         AtomicReference<String> problem = new AtomicReference<>();
         return storage.updateSerial(stack.marker().serial(), serial -> {
-            String why = KeyService.spendProblem(serial, stack.marker().keyId(), now);
-            if (why != null) {
-                problem.set(why);
-                return null;
-            }
-            serial.state = KeySerial.RESERVED;
-            serial.reservedBy = opening.openingId;
-            serial.reservedAt = now;
-            return serial;
+            String why = OpeningRules.reserve(serial, stack.marker().keyId(), opening.openingId, now);
+            problem.set(why);
+            return why == null ? serial : null;
         }).thenCompose(serial -> {
             if (problem.get() == null && serial != null && opening.openingId.equals(serial.reservedBy)) {
                 return CompletableFuture.completedFuture(new Reserved(stack, serial));
@@ -465,75 +412,20 @@ public final class OpeningService {
     private CompletableFuture<Boolean> redeem(Opening opening) {
         AtomicBoolean redeemed = new AtomicBoolean();
         return storage.updateSerial(opening.keySerial, serial -> {
-            if (serial == null || !KeySerial.RESERVED.equals(serial.state)
-                    || !opening.openingId.equals(serial.reservedBy)) {
-                return null;
-            }
-            serial.usesLeft = Math.max(0, serial.usesLeft - 1);
-            serial.state = serial.usesLeft == 0 ? KeySerial.REDEEMED : KeySerial.ISSUED;
-            serial.reservedBy = null;
-            serial.redeemedBy = opening.openingId;
-            serial.redeemedOutcome = opening.outcomeId;
-            redeemed.set(true);
-            return serial;
+            redeemed.set(OpeningRules.redeem(serial, opening.openingId, opening.outcomeId));
+            return redeemed.get() ? serial : null;
         }).thenApply(serial -> redeemed.get());
     }
 
     private CompletableFuture<Void> releaseReservation(String serialId, String openingId) {
-        return storage.updateSerial(serialId, serial -> {
-            if (serial == null || !KeySerial.RESERVED.equals(serial.state) || !openingId.equals(serial.reservedBy)) {
-                return null;
-            }
-            serial.state = KeySerial.ISSUED;
-            serial.reservedBy = null;
-            return serial;
-        }).thenApply(serial -> null);
+        return storage.updateSerial(serialId, serial -> OpeningRules.release(serial, openingId) ? serial : null)
+                .thenApply(serial -> null);
     }
 
     /** Appends the commit record, receipt and bookkeeping to the player document (caller holds the update). */
     private void recordCommit(PlayerLootState state, Opening opening, LootBoxRevision revision) {
-        long now = System.currentTimeMillis();
-        PlayerLootState.CommitRecord commit = new PlayerLootState.CommitRecord();
-        commit.openingId = opening.openingId;
-        commit.lootboxId = opening.lootboxId;
-        commit.revision = opening.revision;
-        commit.outcomeId = opening.outcomeId;
-        commit.snapshotHash = opening.snapshotHash;
-        commit.keyId = opening.keyId;
-        commit.keyKind = opening.keyKind;
-        commit.at = now;
-        state.commits.add(commit);
-        while (state.commits.size() > PlayerLootState.MAX_COMMITS) {
-            state.commits.remove(0);
-        }
-        PlayerLootState.PoolState pool = state.pools.computeIfAbsent(opening.lootboxId,
-                id -> new PlayerLootState.PoolState());
-        pool.lastOpenAt = now;
-        pool.opens++;
-        state.lastOpenAt = now;
-        if (opening.openingId.equals(state.activeOpening)) {
-            state.activeOpening = null;
-        }
-        if (!state.openDeliveries.contains(opening.openingId)) {
-            state.openDeliveries.add(opening.openingId);
-        }
-        PlayerLootState.Receipt receipt = new PlayerLootState.Receipt();
-        receipt.openingId = opening.openingId;
-        receipt.at = now;
-        receipt.lootboxId = opening.lootboxId;
-        receipt.poolName = revision.spec.displayName;
-        receipt.revision = opening.revision;
-        receipt.rewardId = opening.outcomeId;
-        receipt.rewardName = opening.outcomeName;
-        receipt.keyLabel = opening.keyId + (Opening.KEY_PHYSICAL.equals(opening.keyKind) ? " (item)" : " (virtual)");
-        receipt.probability = opening.probability;
-        receipt.oddsId = opening.snapshotHash.substring(0, Math.min(8, opening.snapshotHash.length()));
-        receipt.status = "Delivering";
-        state.receipts.add(0, receipt);
-        int keep = Math.max(1, config.opening.historySize);
-        while (state.receipts.size() > keep) {
-            state.receipts.remove(state.receipts.size() - 1);
-        }
+        OpeningRules.recordCommit(state, opening, revision.spec.displayName, config.opening.historySize,
+                System.currentTimeMillis());
     }
 
     private CompletableFuture<OpenResult> finishCommit(PlayerRef player, Opening opening, LootBoxRevision revision,
@@ -717,7 +609,7 @@ public final class OpeningService {
         CompletableFuture<Void> chain = CompletableFuture.completedFuture(null);
         for (String openingId : List.copyOf(state.openDeliveries)) {
             chain = chain.thenCompose(ignored -> storage.loadOpening(openingId).thenCompose(opening -> {
-                if (opening == null || opening.isTerminal()) {
+                if (!DeliveryRules.resumes(opening)) {
                     return CompletableFuture.completedFuture(null);
                 }
                 return revisionOf(opening).thenCompose(revision -> {

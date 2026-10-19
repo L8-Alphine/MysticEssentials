@@ -3,6 +3,7 @@ package org.hyzionstudios.mysticessentials.modules.lootbox.storage;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 
 import org.hyzionstudios.mysticessentials.api.service.StorageService;
@@ -42,14 +43,19 @@ public final class LootBoxStorage {
     static final String CRATE_NS = "lootbox_crate";
     static final String AUDIT_NS = "lootbox_audit";
 
-    private final MysticCore core;
+    private final Supplier<StorageService> storage;
 
     public LootBoxStorage(MysticCore core) {
-        this.core = core;
+        this(core::getStorageService);
+    }
+
+    /** Over any {@link StorageService}, looked up on every call; the saga checks pass an in-memory one. */
+    public LootBoxStorage(Supplier<StorageService> storage) {
+        this.storage = storage;
     }
 
     private StorageService storage() {
-        return core.getStorageService();
+        return storage.get();
     }
 
     /** {@code mystic:royal_key} → {@code mystic.royal_key}. */

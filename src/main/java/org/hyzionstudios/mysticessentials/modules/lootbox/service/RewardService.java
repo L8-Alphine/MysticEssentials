@@ -81,14 +81,15 @@ public final class RewardService {
     private CompletableFuture<Status> deliverOne(Opening opening, int index, LootBoxDraft.RewardSpec reward,
             UUID player, boolean force) {
         Opening.Fulfillment action = opening.fulfillments.get(index);
-        if (action.isSettled()) {
+        DeliveryRules.Step step = DeliveryRules.step(action, DeliveryRules.replaySafe(reward), force);
+        if (step == DeliveryRules.Step.SETTLED) {
             return CompletableFuture.completedFuture(Opening.Fulfillment.PENDING_INBOX.equals(action.state)
                     ? Status.PENDING_INBOX : Status.DELIVERED);
         }
-        boolean wasAttempted = Opening.Fulfillment.ATTEMPTED.equals(action.state);
-        if ((wasAttempted || Opening.Fulfillment.REVIEW.equals(action.state)) && !force && !replaySafe(reward)) {
+        if (step == DeliveryRules.Step.REVIEW) {
             return mark(opening, index, Opening.Fulfillment.REVIEW,
-                    wasAttempted ? "interrupted after it started; outcome unknown" : action.detail)
+                    Opening.Fulfillment.ATTEMPTED.equals(action.state)
+                            ? "interrupted after it started; outcome unknown" : action.detail)
                     .thenApply(ignored -> Status.REVIEW);
         }
         String type = reward.type == null ? "" : reward.type.toUpperCase(Locale.ROOT);
@@ -210,12 +211,6 @@ public final class RewardService {
                         .thenApply(done -> Status.REVIEW));
     }
 
-    /** Replaying is harmless: inbox entries are keyed, nodes are idempotent, some commands are declared so. */
-    private static boolean replaySafe(LootBoxDraft.RewardSpec reward) {
-        String type = reward.type == null ? "" : reward.type.toUpperCase(Locale.ROOT);
-        return "PERMISSION".equals(type) || ("COMMAND".equals(type) && reward.commandIdempotent);
-    }
-
     private CompletableFuture<Void> mark(Opening opening, int index, String state, String detail) {
         Opening.Fulfillment local = opening.fulfillments.get(index);
         local.state = state;
@@ -260,12 +255,7 @@ public final class RewardService {
             stored.state = finalState;
             return stored;
         }).thenCompose(stored -> storage.updatePlayer(player, state -> {
-            state.openDeliveries.remove(opening.openingId);
-            for (var receipt : state.receipts) {
-                if (opening.openingId.equals(receipt.openingId)) {
-                    receipt.status = status.label();
-                }
-            }
+            DeliveryRules.settle(state, opening.openingId, status.label());
             return state;
         })).thenApply(state -> status);
     }

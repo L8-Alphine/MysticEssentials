@@ -237,24 +237,4 @@ public final class KeyService {
     public CompletableFuture<KeySerial> serial(String serial) {
         return storage.loadSerial(serial);
     }
-
-    /** {@code null} when the serial may be spent now; otherwise why not. */
-    public static String spendProblem(KeySerial serial, String keyId, long now) {
-        if (serial == null) {
-            return "unknown key";
-        }
-        if (!keyId.equals(serial.keyId)) {
-            return "wrong key";
-        }
-        if (!KeySerial.ISSUED.equals(serial.state)) {
-            return KeySerial.REVOKED.equals(serial.state) ? "revoked key" : "already used";
-        }
-        if (serial.usesLeft < 1) {
-            return "no uses left";
-        }
-        if (serial.expiresAt > 0 && now >= serial.expiresAt) {
-            return "expired";
-        }
-        return null;
-    }
 }
