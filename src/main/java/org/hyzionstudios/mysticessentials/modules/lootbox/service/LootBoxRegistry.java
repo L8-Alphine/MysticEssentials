@@ -5,15 +5,16 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
-import java.util.stream.Stream;
 
 import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.core.util.Json;
@@ -35,7 +36,9 @@ import com.hypixel.hytale.server.core.asset.type.item.config.Item;
  * pointing at the revision they drew from.
  *
  * <p>The active revisions and key definitions are cached in memory: openings and
- * previews read them on world threads and must not wait for storage.</p>
+ * previews read them on world threads and must not wait for storage. So are the
+ * drafts, read and written through a {@link DraftStore} per folder; a save,
+ * create, clone or archive updates the cached draft as it reaches the disk.</p>
  */
 public final class LootBoxRegistry {
 
@@ -61,13 +64,51 @@ public final class LootBoxRegistry {
     private final Map<String, KeyDraft.Published> keys = new ConcurrentHashMap<>();
     private volatile Map<String, LootBoxDraft> drafts = Map.of();
     private volatile Map<String, KeyDraft> keyDrafts = Map.of();
-    private volatile List<String> draftErrors = List.of();
+    private volatile List<String> poolErrors = List.of();
+    private volatile List<String> keyErrors = List.of();
+    private final DraftStore<LootBoxDraft> poolStore;
+    private final DraftStore<KeyDraft> keyStore;
 
     public LootBoxRegistry(MysticCore core, LootBoxStorage storage, AuditService audit, LootBoxConfig config) {
         this.core = core;
         this.storage = storage;
         this.audit = audit;
         this.config = config;
+        DraftLifecycle<LootBoxDraft> pools = DraftLifecycle.pools(() -> environment(true), id -> {
+            LootBoxRevision revision = active.get(id);
+            return revision == null ? null : revision.contentHash;
+        }, this::isDisabled);
+        DraftLifecycle<KeyDraft> keyLifecycle = DraftLifecycle.keys(LootBoxRegistry::itemExists, id -> {
+            KeyDraft.Published published = keys.get(id);
+            return published == null ? null : published.spec;
+        });
+        // The listeners run under each store's lock, so the cached maps follow the disk in order.
+        this.poolStore = new DraftStore<>(DraftStore.POOLS, draftsDir(), pools, audit::record,
+                new DraftStore.Listener<>() {
+                    @Override
+                    public void changed(String id, LootBoxDraft draft) {
+                        drafts = withDraft(drafts, id, draft);
+                    }
+
+                    @Override
+                    public void listed(DraftStore.Listing<LootBoxDraft> listing) {
+                        drafts = draftsOf(listing);
+                        poolErrors = listing.errors();
+                    }
+                }, ForkJoinPool.commonPool());
+        this.keyStore = new DraftStore<>(DraftStore.KEYS, keysDir(), keyLifecycle, audit::record,
+                new DraftStore.Listener<>() {
+                    @Override
+                    public void changed(String id, KeyDraft draft) {
+                        keyDrafts = withDraft(keyDrafts, id, draft);
+                    }
+
+                    @Override
+                    public void listed(DraftStore.Listing<KeyDraft> listing) {
+                        keyDrafts = draftsOf(listing);
+                        keyErrors = listing.errors();
+                    }
+                }, ForkJoinPool.commonPool());
     }
 
     public void updateConfig(LootBoxConfig config) {
@@ -100,42 +141,25 @@ public final class LootBoxRegistry {
         }
     }
 
-    /** Re-reads every draft file. Never touches published revisions. */
+    /**
+     * Re-reads every draft file and waits for it, so callers can report the counts
+     * straight after. Never touches published revisions. Code on a world thread uses
+     * {@link #refreshDrafts()} instead.
+     */
     public void reloadDrafts() {
-        List<String> errors = new ArrayList<>();
-        Map<String, LootBoxDraft> pools = new LinkedHashMap<>();
-        for (Path file : jsonFiles(draftsDir(), errors)) {
-            try {
-                LootBoxDraft draft = Json.readFile(file, LootBoxDraft.class);
-                if (draft == null || draft.id == null) {
-                    errors.add(file.getFileName() + ": no id");
-                } else if (pools.putIfAbsent(draft.id, draft) != null) {
-                    errors.add(file.getFileName() + ": duplicate pool id '" + draft.id + "'");
-                }
-            } catch (IOException | RuntimeException e) {
-                errors.add(file.getFileName() + ": " + e.getMessage());
-            }
+        try {
+            refreshDrafts().join();
+        } catch (RuntimeException e) {
+            core.log(Level.WARNING, "[lootbox] could not re-read the drafts: " + e);
         }
-        Map<String, KeyDraft> keyMap = new LinkedHashMap<>();
-        for (Path file : jsonFiles(keysDir(), errors)) {
-            try {
-                KeyDraft key = Json.readFile(file, KeyDraft.class);
-                if (key == null || key.id == null) {
-                    errors.add(file.getFileName() + ": no id");
-                } else {
-                    key.id = DraftValidator.normaliseKeyId(key.id);
-                    if (keyMap.putIfAbsent(key.id, key) != null) {
-                        errors.add(file.getFileName() + ": duplicate key id '" + key.id + "'");
-                    }
-                }
-            } catch (IOException | RuntimeException e) {
-                errors.add(file.getFileName() + ": " + e.getMessage());
-            }
-        }
-        drafts = Map.copyOf(pools);
-        keyDrafts = Map.copyOf(keyMap);
-        draftErrors = List.copyOf(errors);
-        errors.forEach(error -> core.log(Level.WARNING, "[lootbox] draft " + error));
+    }
+
+    /** Re-reads every draft file off the calling thread and logs the files that could not be used. */
+    public CompletableFuture<Void> refreshDrafts() {
+        return poolStore.list().thenAcceptBoth(keyStore.list(), (pools, keyFiles) -> {
+            pools.errors().forEach(error -> core.log(Level.WARNING, "[lootbox] draft " + error));
+            keyFiles.errors().forEach(error -> core.log(Level.WARNING, "[lootbox] draft " + error));
+        });
     }
 
     /** Loads every published pool and key into memory. */
@@ -188,8 +212,27 @@ public final class LootBoxRegistry {
         return keyDrafts;
     }
 
+    /** Draft files the last full read could not use. */
     public List<String> draftErrors() {
-        return draftErrors;
+        List<String> errors = new ArrayList<>(poolErrors);
+        errors.addAll(keyErrors);
+        return errors;
+    }
+
+    /** Pool drafts on disk: load, save, create, clone and archive (the Phase 2 editor). */
+    public DraftStore<LootBoxDraft> poolStore() {
+        return poolStore;
+    }
+
+    /** Key drafts on disk. */
+    public DraftStore<KeyDraft> keyStore() {
+        return keyStore;
+    }
+
+    /** A pool draft's lifecycle state, from the cached draft with no file work; empty when it has no draft. */
+    public Optional<DraftLifecycle.Status> status(String lootboxId) {
+        LootBoxDraft draft = lootboxId == null ? null : drafts.get(lootboxId);
+        return Optional.ofNullable(draft == null ? null : poolStore.status(draft));
     }
 
     public Optional<LootBoxRevision> active(String lootboxId) {
@@ -197,7 +240,7 @@ public final class LootBoxRegistry {
     }
 
     public boolean isDisabled(String lootboxId) {
-        LootBoxRevision.State state = states.get(lootboxId);
+        LootBoxRevision.State state = lootboxId == null ? null : states.get(lootboxId);
         return state != null && state.disabled;
     }
 
@@ -236,13 +279,13 @@ public final class LootBoxRegistry {
             return CompletableFuture.completedFuture(PublishResult.failed(
                     "no draft named '" + lootboxId + "' in " + draftsDir().getFileName()));
         }
-        LootBoxDraft frozen = Json.gson().fromJson(Json.toTree(draft), LootBoxDraft.class);
+        LootBoxDraft frozen = DraftLifecycle.freeze(draft, LootBoxDraft.class);
         List<String> problems = DraftValidator.validate(frozen, environment(mayPublishCommands));
         if (!problems.isEmpty()) {
             return CompletableFuture.completedFuture(PublishResult.failed(problems));
         }
         List<Long> weights = OddsEngine.resolveWeights(frozen);
-        String contentHash = OddsEngine.sha256(Json.toString(frozen) + "|" + weights);
+        String contentHash = DraftLifecycle.poolContentHash(frozen, weights);
         LootBoxRevision current = active.get(lootboxId);
         if (current != null && contentHash.equals(current.contentHash)) {
             return CompletableFuture.completedFuture(
@@ -334,9 +377,9 @@ public final class LootBoxRegistry {
         if (!problems.isEmpty()) {
             return CompletableFuture.completedFuture(PublishResult.failed(problems));
         }
-        KeyDraft frozen = Json.gson().fromJson(Json.toTree(draft), KeyDraft.class);
+        KeyDraft frozen = DraftLifecycle.freeze(draft, KeyDraft.class);
         KeyDraft.Published current = keys.get(keyId);
-        if (current != null && Json.toString(current.spec).equals(Json.toString(frozen))) {
+        if (current != null && DraftLifecycle.keySpecHash(current.spec).equals(DraftLifecycle.keySpecHash(frozen))) {
             return CompletableFuture.completedFuture(new PublishResult(true, current.version, "", List.of(), true));
         }
         return storage.updateKeyDefinition(keyId, old -> {
@@ -373,15 +416,19 @@ public final class LootBoxRegistry {
                 economy, grants, mayPublishCommands);
     }
 
-    private static List<Path> jsonFiles(Path dir, List<String> errors) {
-        if (!Files.isDirectory(dir)) {
-            return List.of();
+    private static <T> Map<String, T> withDraft(Map<String, T> current, String id, T draft) {
+        Map<String, T> next = new HashMap<>(current);
+        if (draft == null) {
+            next.remove(id);
+        } else {
+            next.put(id, draft);
         }
-        try (Stream<Path> files = Files.list(dir)) {
-            return files.filter(file -> file.getFileName().toString().endsWith(".json")).sorted().toList();
-        } catch (IOException e) {
-            errors.add(dir.getFileName() + ": " + e.getMessage());
-            return List.of();
-        }
+        return Map.copyOf(next);
+    }
+
+    private static <T> Map<String, T> draftsOf(DraftStore.Listing<T> listing) {
+        Map<String, T> next = new LinkedHashMap<>();
+        listing.drafts().forEach((id, loaded) -> next.put(id, loaded.draft()));
+        return Map.copyOf(next);
     }
 }

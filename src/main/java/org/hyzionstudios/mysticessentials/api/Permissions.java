@@ -342,6 +342,12 @@ public final class Permissions {
     public static final String LOOTBOX_KEYS_REVOKE = "mysticessentials.lootbox.keys.revoke";
     /** {@code /lootbox publish|rollback} and {@code key publish}: freeze drafts into revisions. */
     public static final String LOOTBOX_PUBLISH = "mysticessentials.lootbox.publish";
+    /**
+     * The in-game draft editor (Phase 2, decision P2-D3): create, clone, edit and archive
+     * pool and key drafts. Publishing still needs {@link #LOOTBOX_PUBLISH}, and editing
+     * COMMAND rewards also needs {@link #LOOTBOX_REWARDS_COMMAND}.
+     */
+    public static final String LOOTBOX_EDIT = "mysticessentials.lootbox.edit";
     /** {@code /lootbox crate select|convert}: turn a block (or a placed Mystic Crate) into a crate. */
     public static final String LOOTBOX_CRATES_PLACE = "mysticessentials.lootbox.crates.place";
     /** {@code /lootbox crate info|list|verify|remove|enable}, and alerts when a crate is destroyed. */

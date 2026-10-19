@@ -543,6 +543,14 @@ tasks.register<JavaExec>("verifyLootBoxSaga") {
     mainClass.set("org.hyzionstudios.mysticessentials.modules.lootbox.LootBoxSagaTest")
 }
 
+tasks.register<JavaExec>("verifyLootBoxDrafts") {
+    group = "verification"
+    description = "Checks the LootBox draft store: optimistic saves, refused ids, archive and the draft lifecycle."
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets.test.get().runtimeClasspath + configurations.compileClasspath.get()
+    mainClass.set("org.hyzionstudios.mysticessentials.modules.lootbox.LootBoxDraftStoreTest")
+}
+
 tasks.register<JavaExec>("verifyMessageParamOrder") {
     group = "verification"
     description = "Checks message params are filled after placeholders, so they never expand one."
@@ -579,6 +587,7 @@ tasks.named("check") {
         "verifyMessageParamOrder",
         "verifyChatDelivery",
         "verifyLootBox",
-        "verifyLootBoxSaga"
+        "verifyLootBoxSaga",
+        "verifyLootBoxDrafts"
     )
 }
