@@ -4,7 +4,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import org.hyzionstudios.mysticessentials.api.Permissions;
 import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.core.message.MysticText;
 import org.hyzionstudios.mysticessentials.modules.lootbox.LootBoxModule;
@@ -56,7 +55,7 @@ public final class LootBoxUi {
     }
 
     public void openManager(PlayerRef player) {
-        core.platform().openPage(player, new LootBoxPages.ManagerPage(core, player, module));
+        core.platform().openPage(player, new LootBoxManagerPage(core, player, module, LootBoxManagerPage.State.initial()));
     }
 
     /** What happens after a confirmation comes back from the opening saga. */
@@ -92,14 +91,6 @@ public final class LootBoxUi {
         });
     }
 
-    public void publish(PlayerRef player, String lootboxId) {
-        module.registry().publish(lootboxId, player.getUsername(), player.hasPermission(Permissions.LOOTBOX_REWARDS_COMMAND))
-                .thenAccept(result -> {
-                    sendPublishResult(player, lootboxId, result);
-                    openManager(player);
-                });
-    }
-
     public void sendPublishResult(PlayerRef player, String lootboxId,
             org.hyzionstudios.mysticessentials.modules.lootbox.service.LootBoxRegistry.PublishResult result) {
         if (result.ok()) {
@@ -109,16 +100,6 @@ public final class LootBoxUi {
             core.getMessageService().sendKey(player, "lootbox-publish-failed",
                     Map.of("pool", lootboxId, "reason", String.join("; ", result.problems())));
         }
-    }
-
-    public void toggle(PlayerRef player, String lootboxId) {
-        boolean disable = !module.registry().isDisabled(lootboxId);
-        module.registry().setDisabled(lootboxId, disable, player.getUsername()).thenAccept(changed -> {
-            core.getMessageService().send(player, changed
-                    ? (disable ? "&e" + lootboxId + " is now closed." : "&a" + lootboxId + " is open again.")
-                    : "&c" + lootboxId + " has never been published.");
-            openManager(player);
-        });
     }
 
     public void simulate(PlayerRef player, String lootboxId, long trials) {
@@ -159,13 +140,5 @@ public final class LootBoxUi {
             lines.add("&eToo few draws to say anything about the rarest outcome; run more.");
         }
         return lines;
-    }
-
-    public void reload(PlayerRef player) {
-        module.onReload();
-        core.getMessageService().sendKey(player, "lootbox-reloaded", Map.of(
-                "pools", Integer.toString(module.registry().drafts().size()),
-                "keys", Integer.toString(module.registry().keyDrafts().size())));
-        openManager(player);
     }
 }

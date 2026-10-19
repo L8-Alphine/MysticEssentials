@@ -519,6 +519,8 @@ Events are dispatched like the ones in `playervaults/event/*`, and their payload
 
 **Goal:** builders and designers do everything in-game (§05 wizard, §08 key wizard, §09 placement workflow).
 
+The breakdown into buildable packages, with the first batch in detail, is in [phase2-work-packages.md](phase2-work-packages.md).
+
 | WP | Work | Size |
 |---|---|---|
 | P2-WP1 | **Admin shell:** Manager (search, filter by status, Create, Clone, Archive, Logs, Keys, Crates) and LootBoxEditor (TabNavigation: General, Rewards, Keys, Crates, Rules, Visuals, Publish). It edits draft files, so publishing stays the only way into storage. Every action is checked again on the server; destructive actions and bulk grants ask for confirmation and are audited. Adds permission `edit` | L |

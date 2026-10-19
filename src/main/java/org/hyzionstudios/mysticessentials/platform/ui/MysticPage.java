@@ -168,6 +168,10 @@ public abstract class MysticPage extends CustomUIPage {
             Map.entry("TabLabel", TEXT_BODY),
             Map.entry("ConfirmButton", BUTTON_TEXT),
             Map.entry("DangerButton", BUTTON_TEXT),
+            // LootBox Manager: the New Pool / Clone form and the selection bar.
+            Map.entry("FormTitle", TEXT_HI),
+            Map.entry("FormHint", TEXT_FAINT),
+            Map.entry("SelectedMeta", TEXT_MUTED),
             Map.entry("Unread", "#FFD97A"),
             Map.entry("Secondary", "#D46A6A"));
 

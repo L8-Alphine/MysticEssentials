@@ -55,8 +55,9 @@ reward, chance and delivery status.
 | `/lootbox crate info` / `list` / `verify` | Inspect crates | `mysticessentials.lootbox.crates.manage` |
 | `/lootbox crate remove [crateId]` / `enable <crateId>` | Unbind or reactivate a crate | `mysticessentials.lootbox.crates.manage` |
 | `/lootbox reconcile <openingId> <regrant\|dismiss>` | Resolve a delivery held for review | `mysticessentials.lootbox.restore` |
-| `/lootbox admin` | Open the manager screen | `mysticessentials.lootbox.admin` |
-| Manager: Create, Edit, Clone, Archive | Edit drafts in game (coming in a later update) | `mysticessentials.lootbox.edit` |
+| `/lootbox admin` | Open the Manager: every pool with its status (Draft, Invalid, Ready, Published, Disabled), search and a status filter | `mysticessentials.lootbox.admin` |
+| Manager: New Pool, Clone, Archive | Write an empty draft, copy a draft under a new id, or move a draft to `lootboxes/_archive/` (asks first; nothing is deleted). Editing a pool's contents in game comes in a later update | `mysticessentials.lootbox.edit` |
+| Manager: Publish, Simulate, Close/Reopen | Publish asks first and only appears when the draft is valid and differs from the live revision | `publish`, `simulate`, `admin` |
 | `/lootbox reload` | Reload drafts and settings | `mysticessentials.lootbox.admin` |
 
 Every subcommand also needs `mysticessentials.lootbox.use`, which gates the

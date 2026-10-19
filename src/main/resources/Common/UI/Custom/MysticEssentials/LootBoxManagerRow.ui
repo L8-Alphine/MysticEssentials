@@ -1,55 +1,49 @@
-// One pool in the manager: draft and published state, with staff actions.
-$C = "../Common.ui";
+// One pool in the manager: name, draft and published state, and its lifecycle
+// status. Selecting the row shows its actions under the list; #Selected marks it.
 $M = "MysticTheme.ui";
 
-Group #Row {
+Button #Row {
   Anchor: (Height: 56, Bottom: 4);
-  LayoutMode: Left;
-  Padding: (Left: 12, Right: 12, Top: 10, Bottom: 10);
-  Background: #0a0f16(0.38);
+  Style: $M.@RowStyle;
+  LayoutMode: Full;
 
-  $M.@IconWell {
-    @Anchor = (Right: 12);
-
-    ItemSlot #Icon {
-      Anchor: (Width: 32, Height: 32);
-      ShowQualityBackground: true;
-      ShowQuantity: false;
-    }
+  $M.@RowSelection #Selected {
+    @Height = 56;
   }
 
   Group {
-    LayoutMode: Top;
-    FlexWeight: 1;
+    Anchor: (Full: 0);
+    LayoutMode: Left;
+    Padding: (Left: 12, Right: 12, Top: 10, Bottom: 10);
 
-    Label #Name {
-      Anchor: (Height: 20, Bottom: 2);
-      Style: $M.@RowNameStyle;
+    $M.@IconWell {
+      @Anchor = (Right: 12);
+
+      ItemSlot #Icon {
+        Anchor: (Width: 32, Height: 32);
+        ShowQualityBackground: true;
+        ShowQuantity: false;
+      }
     }
 
-    Label #Meta {
-      Anchor: (Height: 14);
-      Style: $M.@RowMetaStyle;
+    Group {
+      LayoutMode: Top;
+      FlexWeight: 1;
+
+      Label #Name {
+        Anchor: (Height: 20, Bottom: 2);
+        Style: $M.@RowNameStyle;
+      }
+
+      Label #Meta {
+        Anchor: (Height: 14);
+        Style: $M.@RowMetaStyle;
+      }
     }
-  }
 
-  Label #Status {
-    Anchor: (Width: 170, Left: 8);
-    Style: $M.@RowSideStyle;
-  }
-
-  $C.@SmallSecondaryTextButton #PublishButton {
-    @Text = "Publish";
-    @Anchor = (Width: 100, Left: 8, Vertical: 2);
-  }
-
-  $C.@SmallSecondaryTextButton #ToggleButton {
-    @Text = "Disable";
-    @Anchor = (Width: 100, Left: 6, Vertical: 2);
-  }
-
-  $C.@SmallSecondaryTextButton #SimulateButton {
-    @Text = "Simulate";
-    @Anchor = (Width: 100, Left: 6, Vertical: 2);
+    Label #Status {
+      Anchor: (Width: 200, Left: 8);
+      Style: $M.@RowSideStyle;
+    }
   }
 }

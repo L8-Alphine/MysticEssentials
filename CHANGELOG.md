@@ -1,5 +1,33 @@
 # Mystic Essentials Changelog
 
+## Unreleased — LootBox Creator, part 1
+
+The first pieces of the in-game LootBox creator. Pool contents are still edited in
+the draft files.
+
+### LootBox
+
+- The `/lootbox admin` Manager lists every pool with its draft status: Draft,
+  Invalid (with the first problem), Ready to publish, Published or Disabled. It
+  has a search box, a status filter, and one action bar for the selected pool.
+- **New Pool** writes an empty draft, **Clone** copies a draft under a new id,
+  and **Archive** moves a draft file to `lootboxes/_archive/` after asking. Nothing
+  is ever deleted, and a published revision stays live until the pool is closed.
+- **Publish** in the Manager now asks first, and only appears when the draft is
+  valid and differs from the live revision.
+- Draft files are read and written through a draft store that refuses to save
+  over a file changed since it was loaded, and audits every create, save, clone
+  and archive.
+- New permission `mysticessentials.lootbox.edit` for New Pool, Clone and Archive.
+
+### Verification
+
+- New `verifyLootBoxDrafts` check: save/load round trips, conflict detection,
+  clone and archive, and the Draft → Invalid → Ready → Published lifecycle.
+- On a 0.7.2 dev server, republishing an existing pool and key still answers
+  "unchanged" after the draft store change. The Manager itself still needs an
+  in-game test.
+
 ## 1.0.6 — LootBox Module
 
 Adds LootBox, a free module for reward pools that show their exact odds before

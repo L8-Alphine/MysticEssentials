@@ -237,7 +237,7 @@ another; grant `mysticessentials.lootbox.*` for full access.
 | `mysticessentials.lootbox.keys.give` | `/lootbox key give` |
 | `mysticessentials.lootbox.keys.revoke` | `/lootbox key revoke` |
 | `mysticessentials.lootbox.publish` | `/lootbox publish\|rollback`, `/lootbox key publish`, Publish in the manager |
-| `mysticessentials.lootbox.edit` | In-game draft editor (coming in a later update): create, clone, edit and archive drafts; publishing still needs `publish` |
+| `mysticessentials.lootbox.edit` | Manager: New Pool, Clone and Archive drafts (editing a pool's contents in game comes in a later update); publishing still needs `publish` |
 | `mysticessentials.lootbox.rewards.command` | Publish pools that contain COMMAND rewards |
 | `mysticessentials.lootbox.simulate` | `/lootbox simulate`, Simulate in the manager |
 | `mysticessentials.lootbox.crates.place` | `/lootbox crate select\|convert`; binding hint on an unbound Mystic Crate |

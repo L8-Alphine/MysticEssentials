@@ -13,7 +13,6 @@ import java.util.Set;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-import org.hyzionstudios.mysticessentials.api.Permissions;
 import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.modules.lootbox.LootBoxModule;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.LootBoxDraft;
@@ -57,8 +56,6 @@ public final class LootBoxPages {
     static final String HISTORY_ROW_UI = "MysticEssentials/LootBoxHistoryRow.ui";
     static final String PENDING_UI = "MysticEssentials/LootBoxPending.ui";
     static final String PENDING_ROW_UI = "MysticEssentials/LootBoxPendingRow.ui";
-    static final String MANAGER_UI = "MysticEssentials/LootBoxManager.ui";
-    static final String MANAGER_ROW_UI = "MysticEssentials/LootBoxManagerRow.ui";
 
     private static final DateTimeFormatter WHEN = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
             .withZone(ZoneId.systemDefault());
@@ -552,94 +549,6 @@ public final class LootBoxPages {
     }
 
     // ----- Manager (staff) ----------------------------------------------------
-
-    static final class ManagerPage extends MysticPage {
-
-        private final LootBoxModule module;
-
-        ManagerPage(MysticCore core, PlayerRef player, LootBoxModule module) {
-            super(core, player, CustomPageLifetime.CanDismiss);
-            this.module = module;
-        }
-
-        @Override
-        public void build(Ref<EntityStore> ref, UICommandBuilder cmd, UIEventBuilder event, Store<EntityStore> store) {
-            cmd.append(MANAGER_UI);
-            Set<String> ids = new java.util.TreeSet<>(module.registry().drafts().keySet());
-            module.registry().publishedPools().forEach(revision -> ids.add(revision.lootboxId));
-            int errors = module.registry().draftErrors().size();
-            cmd.set("#HeaderInfo.TextSpans", uiText("#HeaderInfo.TextSpans", ids.size() + " pools · "
-                    + module.registry().keys().size() + " published keys · " + module.crates().list().size()
-                    + " crates" + (errors > 0 ? " · " + errors + " draft file problem(s), see the server log" : "")));
-            cmd.set("#ListEmpty.Visible", ids.isEmpty());
-            int i = 0;
-            for (String id : ids) {
-                String row = "#PoolList[" + i + "]";
-                cmd.append("#PoolList", MANAGER_ROW_UI);
-                LootBoxDraft draft = module.registry().drafts().get(id);
-                LootBoxRevision live = module.registry().active(id).orElse(null);
-                boolean disabled = module.registry().isDisabled(id);
-                long crates = module.crates().list().stream().filter(c -> id.equals(c.lootboxId)).count();
-                String name = live != null ? live.spec.displayName : draft != null ? draft.displayName : id;
-                cmd.set(row + " #Name.TextSpans", uiText(row + " #Name.TextSpans", name + " &8(" + id + ")"));
-                cmd.set(row + " #Meta.TextSpans", uiText(row + " #Meta.TextSpans", (draft == null ? "no draft file"
-                        : draft.rewards.size() + " rewards in draft") + " · " + (live == null ? "never published"
-                        : "live revision " + live.revision) + " · " + crates + " crate(s)"));
-                cmd.set(row + " #Status.TextSpans", uiText(row + " #Status.TextSpans",
-                        live == null ? "Draft only" : disabled ? "Disabled" : "Live"));
-                event.addEventBinding(CustomUIEventBindingType.Activating, row + " #PublishButton",
-                        new EventData().put("action", "publish").put("id", id));
-                event.addEventBinding(CustomUIEventBindingType.Activating, row + " #ToggleButton",
-                        new EventData().put("action", "toggle").put("id", id));
-                event.addEventBinding(CustomUIEventBindingType.Activating, row + " #SimulateButton",
-                        new EventData().put("action", "simulate").put("id", id));
-                i++;
-            }
-            event.addEventBinding(CustomUIEventBindingType.Activating, "#ReloadButton",
-                    new EventData().put("action", "reload"));
-            event.addEventBinding(CustomUIEventBindingType.Activating, "#CloseButton",
-                    new EventData().put("action", "close"));
-        }
-
-        @Override
-        public void handleDataEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
-            JsonObject payload = parse(data);
-            String id = field(payload, "id");
-            switch (string(payload, "action")) {
-                case "publish" -> {
-                    if (requirePermission(Permissions.LOOTBOX_PUBLISH)) {
-                        module.ui().publish(player, id);
-                    }
-                }
-                case "toggle" -> {
-                    if (requirePermission(Permissions.LOOTBOX_ADMIN)) {
-                        module.ui().toggle(player, id);
-                    }
-                }
-                case "simulate" -> {
-                    if (requirePermission(Permissions.LOOTBOX_SIMULATE)) {
-                        module.ui().simulate(player, id, 100_000);
-                    }
-                }
-                case "reload" -> {
-                    if (requirePermission(Permissions.LOOTBOX_ADMIN)) {
-                        module.ui().reload(player);
-                    }
-                }
-                default -> close(ref, store);
-            }
-        }
-
-        /** Re-checked on every press; the button being visible is not permission. */
-        private boolean requirePermission(String node) {
-            if (player.hasPermission(node)) {
-                return true;
-            }
-            core.getMessageService().sendKey(player, "no-permission");
-            return false;
-        }
-    }
-
     /** Status shown after a delivery chain settles, for messages outside the reveal. */
     static String statusLabel(RewardService.Status status) {
         return status == null ? "" : status.label();
