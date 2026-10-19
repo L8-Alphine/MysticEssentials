@@ -1,0 +1,15 @@
+// One detail line on the LootBox confirmation page. Appended per line:
+//   cmd.append("#BodyList", "MysticEssentials/LootBoxConfirmActionLine.ui")
+//   cmd.set("#BodyList[i] #Line.TextSpans", ...)   (MysticText markup allowed)
+$M = "MysticTheme.ui";
+
+Group #Row {
+  LayoutMode: Left;
+  Anchor: (Height: 24);
+  Padding: (Left: 12, Right: 12);
+
+  Label #Line {
+    FlexWeight: 1;
+    Style: (FontSize: 14, TextColor: #dee2ef, VerticalAlignment: Center);
+  }
+}

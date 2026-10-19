@@ -1,11 +1,13 @@
 package org.hyzionstudios.mysticessentials.modules.lootbox;
 
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.SplittableRandom;
+import java.util.UUID;
 
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.KeyDraft;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.KeySerial;
@@ -18,13 +20,23 @@ import org.hyzionstudios.mysticessentials.modules.lootbox.odds.OddsTable;
 import org.hyzionstudios.mysticessentials.modules.lootbox.odds.SecureDraw;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.KeyMarker;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.RecoveryPolicy;
+import org.hyzionstudios.mysticessentials.modules.lootbox.ui.editor.EditorSession;
+import org.hyzionstudios.mysticessentials.modules.lootbox.ui.editor.EditorSessions;
+import org.hyzionstudios.mysticessentials.modules.lootbox.ui.editor.EditorTabs;
+import org.hyzionstudios.mysticessentials.modules.lootbox.ui.editor.FormFields;
 import org.hyzionstudios.mysticessentials.modules.lootbox.validate.CommandTemplate;
 import org.hyzionstudios.mysticessentials.modules.lootbox.validate.DraftValidator;
+import org.hyzionstudios.mysticessentials.platform.ui.ItemCatalog;
+
+import com.google.gson.JsonObject;
+import com.hypixel.hytale.server.core.ui.builder.EventData;
 
 /**
  * Dependency-free checks of the LootBox engine: exact odds, display rules, the
  * draw, the snapshot hash, command templates, key markers, the recovery table and
  * the publish gates. These are the parts where a bug costs players something.
+ * Also the editor kit's engine-free parts: form parsing, editor sessions, tabs
+ * and the item category filter.
  */
 public final class LootBoxEngineTest {
 
@@ -48,6 +60,12 @@ public final class LootBoxEngineTest {
         keyMarkersRejectTampering();
         recoveryTableMatchesPlan();
         validatorGatesPublishing();
+        formFieldsParseNumbers();
+        formFieldsParseText();
+        formFieldsCarryInput();
+        editorSessionsKeepOneEditorPerPlayer();
+        editorSessionTracksEditsAndReturns();
+        tabsAndCategoriesResolve();
         System.out.println("LootBoxEngineTest: all checks passed.");
     }
 
@@ -275,6 +293,205 @@ public final class LootBoxEngineTest {
         key.uses = 0;
         require(!DraftValidator.validateKey(key, item -> true).isEmpty(), "a zero-use key passed");
         require("mystic:royal".equals(DraftValidator.normaliseKeyId("Royal")), "namespace default not applied");
+    }
+
+    // ----- Editor kit ---------------------------------------------------------
+
+    private static final FormFields.Field WEIGHT = FormFields.Field.text("weight", "WeightInput", "Weight");
+    private static final FormFields.Field PERCENT = FormFields.Field.text("percent", "PercentInput", "Chance");
+    private static final FormFields.Field POOL_ID = FormFields.Field.text("id", "IdInput", "Pool id");
+    private static final FormFields.Field NAME = FormFields.Field.text("name", "NameInput", "Display name");
+
+    private static void formFieldsParseNumbers() {
+        require(FormFields.intInRange(WEIGHT, " 250 ", 1, 1000).value() == 250, "a padded weight was refused");
+        require(FormFields.intInRange(WEIGHT, "1", 1, 1000).ok() && FormFields.intInRange(WEIGHT, "1000", 1, 1000).ok(),
+                "a weight on the range boundary was refused");
+        requireKind(FormFields.intInRange(WEIGHT, "", 1, 1000), FormFields.Kind.BLANK, "blank weight");
+        requireKind(FormFields.intInRange(WEIGHT, "12a", 1, 1000), FormFields.Kind.NOT_A_NUMBER, "12a");
+        requireKind(FormFields.intInRange(WEIGHT, "2.5", 1, 1000), FormFields.Kind.NOT_A_NUMBER, "2.5 as a weight");
+        requireKind(FormFields.intInRange(WEIGHT, "0", 1, 1000), FormFields.Kind.OUT_OF_RANGE, "weight 0");
+        requireKind(FormFields.intInRange(WEIGHT, "1001", 1, 1000), FormFields.Kind.OUT_OF_RANGE, "weight 1001");
+        requireKind(FormFields.intInRange(WEIGHT, "99999999999999999999", 1, 1000), FormFields.Kind.OUT_OF_RANGE,
+                "a weight past Long.MAX_VALUE");
+        require(FormFields.longInRange(WEIGHT, "86400", 0, 31_536_000L).value() == 86_400L, "a cooldown was refused");
+
+        BigDecimal hundred = BigDecimal.valueOf(100);
+        FormFields.Result<BigDecimal> exact = FormFields.decimal(PERCENT, "0.012500", 6, BigDecimal.ZERO, hundred);
+        require(exact.ok() && "0.0125".equals(exact.value().toPlainString()),
+                "trailing zeros should not count as places: " + exact);
+        require("45".equals(FormFields.decimal(PERCENT, "45.000", 6, BigDecimal.ZERO, hundred).value().toPlainString()),
+                "45.000 should store as 45");
+        require("100".equals(FormFields.decimal(PERCENT, "100.0", 6, BigDecimal.ZERO, hundred).value().toPlainString()),
+                "100.0 should store as 100, not 1E+2");
+        require(FormFields.decimal(PERCENT, "0.000001", 6, BigDecimal.ZERO, hundred).ok(), "6 places was refused");
+        requireKind(FormFields.decimal(PERCENT, "0.0000001", 6, BigDecimal.ZERO, hundred),
+                FormFields.Kind.TOO_MANY_PLACES, "7 places");
+        requireKind(FormFields.decimal(PERCENT, "1e2", 6, BigDecimal.ZERO, hundred), FormFields.Kind.NOT_A_NUMBER,
+                "an exponent");
+        requireKind(FormFields.decimal(PERCENT, "12,5", 6, BigDecimal.ZERO, hundred), FormFields.Kind.NOT_A_NUMBER,
+                "a decimal comma");
+        requireKind(FormFields.decimal(PERCENT, "100.5", 6, BigDecimal.ZERO, hundred), FormFields.Kind.OUT_OF_RANGE,
+                "100.5%");
+        requireKind(FormFields.decimal(PERCENT, "-1", 6, BigDecimal.ZERO, null), FormFields.Kind.OUT_OF_RANGE,
+                "a negative chance");
+        requireKind(FormFields.decimal(PERCENT, "  ", 6, null, null), FormFields.Kind.BLANK, "a blank chance");
+        // What the parser accepts, the odds engine accepts.
+        LootBoxDraft draft = percentDraft(
+                FormFields.decimal(PERCENT, "99.9875000", 6, BigDecimal.ZERO, hundred).value().toPlainString(),
+                FormFields.decimal(PERCENT, ".0125", 6, BigDecimal.ZERO, hundred).value().toPlainString());
+        require(OddsEngine.resolveWeights(draft).stream().mapToLong(Long::longValue).sum() == OddsEngine.PERCENT_TOTAL,
+                "parsed percents did not resolve to exactly 100%");
+    }
+
+    private static void formFieldsParseText() {
+        require("avalon_supply".equals(FormFields.id(POOL_ID, " avalon_supply ", DraftValidator.LOOTBOX_ID,
+                "3-48 of a-z, 0-9 and _").value()), "a valid pool id was refused");
+        FormFields.Result<String> spaced = FormFields.id(POOL_ID, "Bad Id", DraftValidator.LOOTBOX_ID,
+                "3-48 of a-z, 0-9 and _");
+        requireKind(spaced, FormFields.Kind.BAD_FORMAT, "a pool id with a space");
+        require(spaced.problem().message().startsWith("Pool id must be 3-48"), "id message: " + spaced.problem());
+        requireKind(FormFields.id(POOL_ID, "ab", DraftValidator.LOOTBOX_ID, "an id"), FormFields.Kind.BAD_FORMAT,
+                "a 2-character pool id");
+        requireKind(FormFields.id(POOL_ID, "royal", DraftValidator.KEY_ID, "namespace:name"),
+                FormFields.Kind.BAD_FORMAT, "a key id without a namespace");
+        require(FormFields.id(POOL_ID, "mystic:royal", DraftValidator.KEY_ID, "namespace:name").ok(),
+                "a valid key id was refused");
+        requireKind(FormFields.id(POOL_ID, null, DraftValidator.KEY_ID, "namespace:name"), FormFields.Kind.BLANK,
+                "a missing id");
+
+        require("Avalon".equals(FormFields.nonBlank(NAME, "  Avalon ", 64).value()), "a name was not trimmed");
+        requireKind(FormFields.nonBlank(NAME, " \t", 64), FormFields.Kind.BLANK, "a blank name");
+        requireKind(FormFields.nonBlank(NAME, "x".repeat(65), 64), FormFields.Kind.TOO_LONG, "a 65-character name");
+
+        List<FormFields.Problem> problems = new ArrayList<>();
+        Integer weight = FormFields.intInRange(WEIGHT, "abc", 1, 1000).collect(problems);
+        String name = FormFields.nonBlank(NAME, "Crate", 64).collect(problems);
+        FormFields.nonBlank(NAME, "", 64).collect(problems);
+        require(weight == null && "Crate".equals(name) && problems.size() == 2
+                && problems.get(0).field().equals("weight") && problems.get(1).kind() == FormFields.Kind.BLANK,
+                "collect should gather every problem by field: " + problems);
+    }
+
+    private static void formFieldsCarryInput() {
+        FormFields form = FormFields.of(NAME, WEIGHT, FormFields.Field.color("color", "ColorInput", "Colour"));
+        EventData event = form.event("tab").put("tab", "rewards");
+        require("#NameInput.Value".equals(event.events().get("@name"))
+                && "#WeightInput.Value".equals(event.events().get("@weight"))
+                && "#ColorInput.Color".equals(event.events().get("@color"))
+                && "tab".equals(event.events().get("action")) && "rewards".equals(event.events().get("tab")),
+                "an event did not carry every field: " + event.events());
+
+        JsonObject payload = new JsonObject();
+        payload.addProperty("action", "tab");
+        payload.addProperty("@name", "Half-typed");
+        payload.addProperty("@weight", "");
+        Map<String, String> read = form.read(payload);
+        require(read.equals(Map.of("name", "Half-typed", "weight", "")),
+                "read should keep emptied fields and skip absent ones: " + read);
+        require(FormFields.submitted(payload, "color") == null, "an absent field read as present");
+
+        EditorSession<LootBoxDraft> session = new EditorSessions().start(UUID.randomUUID(), "avalon_supply",
+                LootBoxDraft.class, bibleDraft(), "hash");
+        form.remember(payload, session);
+        payload.addProperty("@weight", "12a");
+        form.remember(payload, session);
+        require("Half-typed".equals(session.input("name")) && "12a".equals(session.input("weight"))
+                && session.input("color") == null, "unsaved input was not remembered: " + session.inputs());
+    }
+
+    private static void editorSessionsKeepOneEditorPerPlayer() {
+        EditorSessions sessions = new EditorSessions();
+        UUID alice = UUID.randomUUID();
+        UUID bob = UUID.randomUUID();
+        EditorSession<LootBoxDraft> first = sessions.start(alice, "avalon_supply", LootBoxDraft.class, bibleDraft(),
+                "h1");
+        EditorSession<KeyDraft> second = sessions.start(alice, "mystic:royal", KeyDraft.class, new KeyDraft(), null);
+        require(!first.active() && second.active() && sessions.size() == 1,
+                "starting a second editor did not end the first");
+        require(sessions.get(alice, KeyDraft.class).isPresent() && sessions.get(alice, LootBoxDraft.class).isEmpty(),
+                "a typed lookup returned the wrong draft type");
+        require(second.isNew() && !first.isNew(), "a null hash should mean a new draft");
+
+        EditorSession<LootBoxDraft> bobs = sessions.start(bob, "avalon_supply", LootBoxDraft.class, bibleDraft(), "h1");
+        require(sessions.editing(LootBoxDraft.class, "avalon_supply", alice).equals(List.of(bob)),
+                "the other editor of a draft was not found");
+        require(!sessions.end(first), "ending a stale session reported success");
+        require(sessions.get(alice).isPresent(), "a stale end removed Alice's session");
+
+        sessions.end(bob);
+        require(!bobs.active() && sessions.get(bob).isEmpty(), "disconnect did not end the session");
+        bobs.awaitReturn(id -> {
+            throw new AssertionError("an ended session ran a picker return");
+        });
+        require(!bobs.completeReturn("Rock_Stone"), "an ended session accepted a picker return");
+
+        sessions.clear();
+        require(!second.active() && sessions.size() == 0, "disable did not end every session");
+    }
+
+    private static void editorSessionTracksEditsAndReturns() {
+        EditorSession<LootBoxDraft> session = new EditorSessions().start(UUID.randomUUID(), "avalon_supply",
+                LootBoxDraft.class, bibleDraft(), "h1");
+        require(!session.dirty() && session.selectedRow() == -1 && session.tab() == null,
+                "a fresh session should be clean with nothing selected");
+
+        session.awaitReturn(id -> session.working().icon = id);
+        require(session.awaitingReturn(), "the picker return was not armed");
+        require(session.completeReturn("Rock_Stone") && "Rock_Stone".equals(session.working().icon),
+                "the picker return did not reach the working copy");
+        require(session.dirty(), "a picker return did not mark the draft dirty");
+        require(!session.completeReturn("Rock_Marble") && "Rock_Stone".equals(session.working().icon),
+                "a picker return ran twice");
+        session.awaitReturn(id -> session.working().icon = id);
+        require(session.cancelReturn() && !session.completeReturn("Rock_Marble"),
+                "a cancelled picker still applied its choice");
+
+        long atSave = session.changes();
+        session.markDirty();
+        session.markSaved("h2", atSave);
+        require(session.dirty() && "h2".equals(session.loadedHash()),
+                "an edit made during the save was hidden by it");
+        session.markSaved("h3", session.changes());
+        require(!session.dirty() && "h3".equals(session.loadedHash()), "a save did not clean the session");
+
+        session.tab("rewards");
+        session.selectRow(3);
+        session.rememberInputs(Map.of("name", "typed"));
+        session.awaitReturn(id -> session.working().icon = id);
+        session.markDirty();
+        LootBoxDraft fresh = bibleDraft();
+        session.reload(fresh, "h4");
+        require(session.working() == fresh && !session.dirty() && "h4".equals(session.loadedHash())
+                && session.inputs().isEmpty() && !session.awaitingReturn(),
+                "reload should replace the copy and drop unsaved input");
+        require("rewards".equals(session.tab()) && session.selectedRow() == 3, "reload should keep the tab and row");
+        session.selectRow(-7);
+        require(session.selectedRow() == -1, "a negative row should mean no selection");
+    }
+
+    private static void tabsAndCategoriesResolve() {
+        List<EditorTabs.Tab> tabs = List.of(new EditorTabs.Tab("general", "General"),
+                new EditorTabs.Tab("rewards", "Rewards"));
+        require("rewards".equals(EditorTabs.resolve(tabs, "rewards")), "a known tab did not resolve");
+        require("general".equals(EditorTabs.resolve(tabs, null)) && "general".equals(EditorTabs.resolve(tabs, "gone")),
+                "an unknown tab should fall back to the first");
+        require(EditorTabs.resolve(List.of(), "x") == null, "no tabs should resolve to null");
+
+        require(ItemCatalog.inCategory(List.of("Furniture.Beds"), "Furniture")
+                && ItemCatalog.inCategory(List.of("Furniture.Beds"), "furniture.")
+                && ItemCatalog.inCategory(List.of("Items.Weapons"), "Items.Weapons"),
+                "an item in the category was filtered out");
+        require(!ItemCatalog.inCategory(List.of("FurnitureSet.Beds"), "Furniture")
+                && !ItemCatalog.inCategory(List.of("Items.Weapons"), "Items.Weapon")
+                && !ItemCatalog.inCategory(List.of(), "Blocks"),
+                "an item outside the category passed the filter");
+        require(ItemCatalog.inCategory(List.of(), "") && ItemCatalog.inCategory(List.of(), null),
+                "a blank category should keep every item");
+    }
+
+    private static void requireKind(FormFields.Result<?> result, FormFields.Kind kind, String what) {
+        require(!result.ok() && result.problem().kind() == kind,
+                what + " should fail with " + kind + " but gave " + result);
     }
 
     // ----- Fixtures -----------------------------------------------------------

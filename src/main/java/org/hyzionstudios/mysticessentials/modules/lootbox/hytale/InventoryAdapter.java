@@ -110,6 +110,18 @@ public final class InventoryAdapter {
         return ItemStack.isEmpty(remainder) ? null : remainder;
     }
 
+    /**
+     * The id of the item in the player's hand, for the editors' "Use held item".
+     * {@code getItemInHand} prefers an active builder tool over the hotbar slot,
+     * which is what the player sees in their hand.
+     *
+     * @return the item id, or {@code null} when the hand is empty
+     */
+    public static String heldItemId(Store<EntityStore> store, Ref<EntityStore> entity) {
+        ItemStack held = InventoryComponent.getItemInHand(store, entity);
+        return ItemStack.isEmpty(held) ? null : held.getItemId();
+    }
+
     /** Builds a stack from stored parts; {@code metadataJson} may be null. */
     public static ItemStack stack(String itemId, int quantity, String metadataJson) {
         BsonDocument metadata = metadataJson == null || metadataJson.isBlank() ? null : BsonDocument.parse(metadataJson);

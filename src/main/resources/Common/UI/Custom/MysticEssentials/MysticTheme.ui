@@ -277,6 +277,20 @@ $C = "../Common.ui";
   }
 };
 
+// The same overlay for a tab: gold tint with a gold rule along the bottom.
+// Hidden until the server sets #Selected.Visible on the active tab. Sits FIRST
+// inside a LayoutMode: Full tab button so the label draws over it.
+@TabSelection = Group {
+  Anchor: (Full: 0);
+  Background: #E8A93B(0.10);
+  Visible: false;
+
+  Group {
+    Anchor: (Left: 0, Right: 0, Bottom: 0, Height: 2);
+    Background: @Gold;
+  }
+};
+
 // Square well that holds a category swatch or an item icon.
 @IconWell = Group {
   @Size = 36;

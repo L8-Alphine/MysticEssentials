@@ -361,7 +361,9 @@ one without a seam; everything inside the window is built from the theme:
   absolutely positioned so the selection overlay (gold spine + tint) draws
   behind the body. Master/detail pages set `#Selected.Visible` on the resolved
   selection. `#Swatch` / `#Accent` / `#TagChip` stay plain-colour Groups because
-  the server recolours them through `.Background`.
+  the server recolours them through `.Background`. Tabs that are buttons use
+  `$M.@TabSelection #Selected {}` the same way (gold tint and a bottom rule),
+  as in `LootBoxEditorTab.ui`.
 - **Helpers**: `@Section` (eyebrow + rule), `@FieldLabel`, `@KvRow` + `@Key`,
   `@Hairline`, `@IconWell`, `@Pill`, `@Tab`, `@SettingRow`, `@ActionBar` +
   `@Spacer` (put the destructive button after the spacer), `@HeaderMeta`,
