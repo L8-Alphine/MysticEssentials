@@ -529,7 +529,8 @@ public final class OpeningService {
     /**
      * Finishes whatever this player left unfinished: an opening between draw and
      * commit (decided by {@link RecoveryPolicy}), and deliveries that never settled.
-     * Runs in the player's lane, so it never races a new opening.
+     * Runs in the player's lane, so it never races a new opening. A delivery this
+     * server is still running is left to finish ({@link DeliveryRules#resumes}).
      */
     public CompletableFuture<Void> recover(PlayerRef player) {
         UUID uuid = player.getUuid();
@@ -608,18 +609,21 @@ public final class OpeningService {
     private CompletableFuture<Void> resumeDeliveries(PlayerLootState state) {
         CompletableFuture<Void> chain = CompletableFuture.completedFuture(null);
         for (String openingId : List.copyOf(state.openDeliveries)) {
-            chain = chain.thenCompose(ignored -> storage.loadOpening(openingId).thenCompose(opening -> {
-                if (!DeliveryRules.resumes(opening)) {
-                    return CompletableFuture.completedFuture(null);
-                }
-                return revisionOf(opening).thenCompose(revision -> {
-                    LootBoxDraft.RewardSpec reward = rewardOf(revision, opening.outcomeId).orElse(null);
-                    if (reward == null) {
+            chain = chain.thenCompose(ignored -> {
+                Long runningSince = rewards.deliveringSince(openingId);
+                return storage.loadOpening(openingId).thenCompose(opening -> {
+                    if (!DeliveryRules.resumes(opening, runningSince, System.currentTimeMillis())) {
                         return CompletableFuture.completedFuture(null);
                     }
-                    return rewards.deliver(opening, reward, false).thenApply(status -> (Void) null);
+                    return revisionOf(opening).thenCompose(revision -> {
+                        LootBoxDraft.RewardSpec reward = rewardOf(revision, opening.outcomeId).orElse(null);
+                        if (reward == null) {
+                            return CompletableFuture.completedFuture(null);
+                        }
+                        return rewards.deliver(opening, reward, false).thenApply(status -> (Void) null);
+                    });
                 });
-            }));
+            });
         }
         return chain;
     }
