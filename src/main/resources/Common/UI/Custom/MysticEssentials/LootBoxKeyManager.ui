@@ -161,6 +161,11 @@ $C.@Container {
         @Anchor = (Width: 100, Left: 6);
       }
 
+      $C.@SecondaryTextButton #GrantsButton {
+        @Text = "Grants";
+        @Anchor = (Width: 110, Left: 6);
+      }
+
       $C.@CancelTextButton #ArchiveButton {
         @Text = "Archive";
         @Anchor = (Width: 110, Left: 6);

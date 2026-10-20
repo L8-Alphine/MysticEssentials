@@ -1,0 +1,233 @@
+// LootBox key grants (P2-F2): give one published key to a typed player or to
+// picked online players, look a serial up and revoke it, and the key's recent
+// grants and revocations. Rows in #PlayerList are LootBoxEditorToggleRow.ui;
+// lines in #SerialLines and #HistoryList are LootBoxConfirmActionLine.ui.
+$C = "../Common.ui";
+$M = "MysticTheme.ui";
+
+$C.@PageOverlay {}
+
+$C.@Container {
+  Anchor: (Width: 960, Height: 700);
+
+  #Title {
+    Group {
+      $C.@Title #HeaderTitle {
+        @Text = "Key Grants";
+      }
+
+      $M.@HeaderMeta #HeaderInfo {
+        @Width = 360;
+      }
+    }
+  }
+
+  #Content {
+    LayoutMode: Top;
+
+    Label #Notice {
+      Anchor: (Height: 20, Bottom: 6);
+      Style: $M.@BodyStyle;
+      Visible: false;
+    }
+
+    Group {
+      LayoutMode: Left;
+      FlexWeight: 1;
+
+      // ----- Give -------------------------------------------------------------
+      $M.@Panel {
+        @Padding = 14;
+
+        Anchor: (Width: 460, Right: 14);
+
+        $M.@FieldLabel { @Text = "Player name (online or offline)"; }
+        $C.@TextField #PlayerInput {
+          @Anchor = (Bottom: 8);
+          PlaceholderText: "Exact player name";
+        }
+
+        $M.@FieldLabel { @Text = "Or pick online players"; }
+        $M.@Well {
+          FlexWeight: 1;
+
+          Label #PlayersEmpty {
+            Anchor: (Height: 48);
+            Style: $M.@EmptyStyle;
+            Text: "Nobody else is online. Type a name above instead.";
+            Visible: false;
+          }
+
+          Group #PlayerList {
+            FlexWeight: 1;
+            LayoutMode: TopScrolling;
+            Padding: (Right: 6);
+            ScrollbarStyle: $C.@DefaultScrollbarStyle;
+          }
+        }
+
+        Label #PlayersNote {
+          Anchor: (Height: 16, Top: 4, Bottom: 6);
+          Style: $M.@CaptionStyle;
+        }
+
+        Group {
+          LayoutMode: Left;
+          Anchor: (Height: 58);
+
+          Group {
+            LayoutMode: Top;
+            Anchor: (Width: 130, Right: 12);
+
+            $M.@FieldLabel { @Text = "Count each"; }
+            $C.@TextField #CountInput {
+              PlaceholderText: "1";
+            }
+          }
+
+          Group {
+            LayoutMode: Top;
+            FlexWeight: 1;
+
+            $M.@FieldLabel { @Text = "Source"; }
+            $C.@DropdownBox #SourceInput {
+              Anchor: (Height: 32);
+            }
+          }
+        }
+
+        Group {
+          LayoutMode: Left;
+          Anchor: (Height: 44, Top: 6);
+
+          $C.@SecondaryTextButton #VirtualOnButton {
+            @Text = "Kind: Key Item";
+            @Anchor = (Width: 190);
+          }
+
+          $C.@SecondaryTextButton #VirtualOffButton {
+            @Text = "Kind: Virtual";
+            @Anchor = (Width: 190);
+          }
+
+          Label #KindHint {
+            FlexWeight: 1;
+            Anchor: (Left: 10);
+            Style: $M.@CaptionStyle;
+          }
+        }
+
+        Group {
+          LayoutMode: Left;
+          Anchor: (Height: 44, Top: 8);
+
+          Label #GiveSummary {
+            FlexWeight: 1;
+            Style: $M.@MetaStyle;
+          }
+
+          $C.@TextButton #GiveButton {
+            @Text = "Give Keys";
+            @Anchor = (Width: 160, Left: 8);
+          }
+        }
+      }
+
+      // ----- Revoke and history ------------------------------------------------
+      Group {
+        LayoutMode: Top;
+        FlexWeight: 1;
+
+        $M.@Section {
+          @Text = "Look up or revoke a serial";
+          @Anchor = (Bottom: 6);
+        }
+
+        $M.@Panel {
+          @Padding = 12;
+
+          Anchor: (Bottom: 12);
+
+          Group {
+            LayoutMode: Left;
+            Anchor: (Height: 44);
+
+            $C.@TextField #SerialInput {
+              FlexWeight: 1;
+              @Anchor = (Vertical: 3);
+              PlaceholderText: "Serial, from /lootbox key info";
+            }
+
+            $C.@SecondaryTextButton #LookupButton {
+              @Text = "Look Up";
+              @Anchor = (Width: 120, Left: 8);
+            }
+          }
+
+          Group #SerialLines {
+            LayoutMode: Top;
+            Anchor: (Top: 6);
+          }
+
+          Group #RevokeRow {
+            LayoutMode: Left;
+            Anchor: (Height: 44, Top: 6);
+            Visible: false;
+
+            $M.@Spacer {}
+
+            $C.@CancelTextButton #RevokeButton {
+              @Text = "Revoke Serial";
+              @Anchor = (Width: 170);
+            }
+          }
+        }
+
+        $M.@Section {
+          @Text = "Recent grants and revocations";
+          @Anchor = (Bottom: 6);
+        }
+
+        $M.@Well {
+          FlexWeight: 1;
+
+          Label #HistoryEmpty {
+            Anchor: (Height: 48);
+            Style: $M.@EmptyStyle;
+            Text: "Nothing given or revoked yet.";
+            Visible: false;
+          }
+
+          Group #HistoryList {
+            FlexWeight: 1;
+            LayoutMode: TopScrolling;
+            Padding: (Right: 6);
+            ScrollbarStyle: $C.@DefaultScrollbarStyle;
+          }
+        }
+      }
+    }
+
+    // ----- Footer ---------------------------------------------------------------
+    $M.@ActionBar {
+      @Anchor = (Height: 44, Top: 10);
+
+      $C.@SecondaryTextButton #BackButton {
+        @Text = "Key Manager";
+        @Anchor = (Width: 170);
+      }
+
+      $C.@SecondaryTextButton #RefreshButton {
+        @Text = "Refresh";
+        @Anchor = (Width: 130, Left: 6);
+      }
+
+      $M.@Spacer {}
+
+      $C.@TertiaryTextButton #CloseButton {
+        @Text = "Close";
+        @Anchor = (Width: 130);
+      }
+    }
+  }
+}

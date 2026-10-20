@@ -160,7 +160,23 @@ public final class LootBoxCommand extends MysticCommand {
                                 : "&aPublished key &f" + keyId + " &aversion &f" + result.revision() + "&a.")
                         : "&cCould not publish key &f" + keyId + "&c: " + String.join("; ", result.problems())));
             }
-            default -> usage(sender, "/lootbox key <give|revoke|info|list|publish> …");
+            case "grants" -> {
+                if (!allowed(sender, Permissions.LOOTBOX_KEYS)) {
+                    return;
+                }
+                if (args.length < 3) {
+                    usage(sender, "/lootbox key grants <keyId>");
+                    return;
+                }
+                String keyId = DraftValidator.normaliseKeyId(args[2]);
+                if (module.registry().key(keyId).isEmpty()) {
+                    sender.reply("&c" + keyId + " is not a published key.");
+                    return;
+                }
+                player(sender).ifPresent(player -> org.hyzionstudios.mysticessentials.modules.lootbox.ui.KeyGrantsPage
+                        .openLater(core, player, module, keyId));
+            }
+            default -> usage(sender, "/lootbox key <give|revoke|info|list|publish|grants> …");
         }
     }
 
@@ -197,7 +213,7 @@ public final class LootBoxCommand extends MysticCommand {
         GrantSource finalSource = source;
         int finalCount = count;
         resolve(sender, args[2], (uuid, name) -> module.keys()
-                .grant(uuid, keyId, finalCount, asVirtual, finalSource, sender.name())
+                .grant(uuid, name, keyId, finalCount, asVirtual, finalSource, sender.name())
                 .thenAccept(result -> {
                     if (!result.ok()) {
                         sender.reply("&cCould not give keys: " + result.problem());

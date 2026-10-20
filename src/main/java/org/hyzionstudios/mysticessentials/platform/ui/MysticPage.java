@@ -186,6 +186,10 @@ public abstract class MysticPage extends CustomUIPage {
             Map.entry("PreviewName", TEXT_HI),
             Map.entry("PreviewMeta", TEXT_MUTED),
             Map.entry("OpensLine", TEXT_MUTED),
+            // LootBox keys track.
+            Map.entry("PlayersNote", TEXT_FAINT),
+            Map.entry("KindHint", TEXT_FAINT),
+            Map.entry("GiveSummary", TEXT_MUTED),
             Map.entry("KeysHint", TEXT_FAINT),
             Map.entry("RulesNote", TEXT_FAINT),
             Map.entry("Unread", "#FFD97A"),

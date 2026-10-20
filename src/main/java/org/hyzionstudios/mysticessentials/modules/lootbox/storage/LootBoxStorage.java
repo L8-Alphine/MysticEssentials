@@ -213,4 +213,28 @@ public final class LootBoxStorage {
             return next == null ? null : Json.toTree(next);
         }).thenApply(stored -> stored == null || stored.isJsonNull() ? null : Json.gson().fromJson(stored, type));
     }
+
+    // ----- Keys track (P2-F2, P2-F3, P2-K) --------------------------------------
+    // Added at the end so the parallel tracks' edits to this file do not meet;
+    // the model types are spelled out for the same reason.
+
+    static final String KEYLOG_NS = "lootbox_keylog";
+
+    /** The key's recent grants and revocations; an empty log when it has none. */
+    public CompletableFuture<org.hyzionstudios.mysticessentials.modules.lootbox.model.KeyLog> loadKeyLog(
+            String keyId) {
+        return load(KEYLOG_NS, keyIdKey(keyId), org.hyzionstudios.mysticessentials.modules.lootbox.model.KeyLog.class)
+                .thenApply(log -> log == null ? new org.hyzionstudios.mysticessentials.modules.lootbox.model.KeyLog() : log);
+    }
+
+    /** Appends one entry, keeping the newest {@code max}. */
+    public CompletableFuture<org.hyzionstudios.mysticessentials.modules.lootbox.model.KeyLog> appendKeyLog(
+            String keyId, org.hyzionstudios.mysticessentials.modules.lootbox.model.KeyLog.Entry entry, int max) {
+        return update(KEYLOG_NS, keyIdKey(keyId), org.hyzionstudios.mysticessentials.modules.lootbox.model.KeyLog.class,
+                log -> {
+                    var next = log == null ? new org.hyzionstudios.mysticessentials.modules.lootbox.model.KeyLog() : log;
+                    next.add(entry, max);
+                    return next;
+                });
+    }
 }

@@ -23,6 +23,7 @@ import org.hyzionstudios.mysticessentials.modules.lootbox.config.LootBoxConfig;
 import org.hyzionstudios.mysticessentials.modules.lootbox.hytale.InventoryAdapter;
 import org.hyzionstudios.mysticessentials.modules.lootbox.hytale.KeyItemFactory;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.KeyDraft;
+import org.hyzionstudios.mysticessentials.modules.lootbox.model.KeyLog;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.KeySerial;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.PendingInbox;
 import org.hyzionstudios.mysticessentials.modules.lootbox.odds.SecureDraw;
@@ -111,17 +112,34 @@ public final class KeyService {
      */
     public CompletableFuture<GrantResult> grant(UUID owner, String keyId, int count, boolean virtual,
             GrantSource source, String actor) {
+        return grant(owner, null, keyId, count, virtual, source, actor);
+    }
+
+    /**
+     * {@link #grant(UUID, String, int, boolean, GrantSource, String)} with the
+     * owner's name for the key's history, when the caller knows it (an offline
+     * player's name is not otherwise at hand). The result completes once the
+     * history entry is written, so a page that reloads the history sees it.
+     */
+    public CompletableFuture<GrantResult> grant(UUID owner, String ownerName, String keyId, int count, boolean virtual,
+            GrantSource source, String actor) {
         KeyDraft.Published definition = registry.key(keyId).orElse(null);
         if (definition == null) {
             return CompletableFuture.completedFuture(GrantResult.failed("key '" + keyId + "' is not published"));
         }
+        PlayerRef online = core.platform().findPlayer(owner).orElse(null);
+        String name = ownerName != null ? ownerName : online != null ? online.getUsername() : null;
         String policy = policyProblem(source);
         if (policy != null) {
             audit.record(actor, "KEY_GRANT_REFUSED", owner.toString(), keyId + " x" + count + " source " + source);
-            return CompletableFuture.completedFuture(GrantResult.failed(policy));
+            KeyLog.Entry refused = logEntry(KeyLog.REFUSED, actor, owner.toString(), name);
+            refused.count = count;
+            refused.virtual = virtual;
+            refused.source = source.name();
+            refused.detail = policy;
+            return log(keyId, refused).thenApply(ignored -> GrantResult.failed(policy));
         }
         int amount = Math.max(1, Math.min(count, Math.max(1, config.keys.maxGrantPerCommand)));
-        PlayerRef online = core.platform().findPlayer(owner).orElse(null);
         boolean asVirtual = virtual || (online == null && "VIRTUAL_CREDIT".equalsIgnoreCase(config.keys.offlineGrant));
         CompletableFuture<GrantResult> result = lanes.run(owner, () -> asVirtual
                 ? grantVirtual(owner, keyId, amount)
@@ -133,6 +151,16 @@ public final class KeyService {
                 core.getEventBus().publish(new KeyGrantedEvent(owner, keyId, amount, asVirtual, source.name(), actor));
             }
             return granted;
+        }).thenCompose(granted -> {
+            if (!granted.ok()) {
+                return CompletableFuture.completedFuture(granted);
+            }
+            KeyLog.Entry entry = logEntry(KeyLog.GRANT, actor, owner.toString(), name);
+            entry.count = amount;
+            entry.virtual = asVirtual;
+            entry.source = source.name();
+            entry.pending = granted.pending();
+            return log(keyId, entry).thenApply(ignored -> granted);
         });
     }
 
@@ -225,16 +253,58 @@ public final class KeyService {
             entry.state = KeySerial.REVOKED;
             changed.set(true);
             return entry;
-        }).thenApply(entry -> {
-            if (changed.get()) {
-                audit.record(actor, "KEY_REVOKE", serial, entry.keyId);
-                core.getEventBus().publish(new KeyRevokedEvent(serial, entry.keyId, actor));
+        }).thenCompose(entry -> {
+            if (!changed.get()) {
+                return CompletableFuture.completedFuture(false);
             }
-            return changed.get();
+            audit.record(actor, "KEY_REVOKE", serial, entry.keyId);
+            core.getEventBus().publish(new KeyRevokedEvent(serial, entry.keyId, actor));
+            KeyLog.Entry revoked = logEntry(KeyLog.REVOKE, actor, entry.owner, ownerName(entry.owner));
+            revoked.count = 1;
+            revoked.serial = serial;
+            revoked.source = entry.source;
+            return log(entry.keyId, revoked).thenApply(ignored -> true);
         });
     }
 
     public CompletableFuture<KeySerial> serial(String serial) {
         return storage.loadSerial(serial);
+    }
+
+    // ----- History (P2-F2) ----------------------------------------------------
+
+    /** The key's recent grants, refusals, revocations and conversions. */
+    public CompletableFuture<KeyLog> history(String keyId) {
+        return storage.loadKeyLog(keyId);
+    }
+
+    static KeyLog.Entry logEntry(String action, String actor, String owner, String ownerName) {
+        KeyLog.Entry entry = new KeyLog.Entry();
+        entry.at = System.currentTimeMillis();
+        entry.action = action;
+        entry.actor = actor;
+        entry.owner = owner;
+        entry.ownerName = ownerName;
+        return entry;
+    }
+
+    /** Appends to the key's history. Never fails the caller; a failed write is logged. */
+    CompletableFuture<Void> log(String keyId, KeyLog.Entry entry) {
+        return storage.appendKeyLog(keyId, entry, Math.max(1, config.keys.grantLogSize)).handle((log, error) -> {
+            if (error != null) {
+                core.log(Level.WARNING, "[lootbox] key history write failed for " + keyId + " " + entry.action + ": "
+                        + error);
+            }
+            return null;
+        });
+    }
+
+    private String ownerName(String owner) {
+        try {
+            return owner == null ? null
+                    : core.platform().findPlayer(UUID.fromString(owner)).map(PlayerRef::getUsername).orElse(null);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 }
