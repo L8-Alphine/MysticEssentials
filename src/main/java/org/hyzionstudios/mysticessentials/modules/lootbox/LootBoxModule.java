@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -30,6 +31,7 @@ import org.hyzionstudios.mysticessentials.modules.lootbox.service.OpeningService
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.PendingRewardService;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.PlayerLanes;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.RewardService;
+import org.hyzionstudios.mysticessentials.modules.lootbox.service.TemplateLibrary;
 import org.hyzionstudios.mysticessentials.modules.lootbox.storage.LootBoxStorage;
 import org.hyzionstudios.mysticessentials.modules.lootbox.ui.LootBoxUi;
 import org.hyzionstudios.mysticessentials.modules.lootbox.ui.editor.EditorSessions;
@@ -61,6 +63,8 @@ public final class LootBoxModule extends AbstractMysticModule implements LootBox
     private LootBoxConfig config = new LootBoxConfig();
     private LootBoxStorage storage;
     private AuditService audit;
+    /** Saved key looks and reward sets (P2-H); created on first use, see {@link #templates()}. */
+    private TemplateLibrary templates;
     private LootBoxRegistry registry;
     private KeyService keys;
     private RewardService rewards;
@@ -237,6 +241,27 @@ public final class LootBoxModule extends AbstractMysticModule implements LootBox
 
     public LootBoxConfig config() {
         return config;
+    }
+
+    public AuditService audit() {
+        return audit;
+    }
+
+    /**
+     * The Template Library's files in {@code templates/}. One store for the
+     * plugin's lifetime, so its saves stay serialised across a disable; its audit
+     * entries go to whichever audit service is current.
+     */
+    public synchronized TemplateLibrary templates() {
+        if (templates == null) {
+            templates = new TemplateLibrary(core.paths().moduleConfigDir(id()).resolve(TemplateLibrary.FOLDER),
+                    (actor, action, target, detail) -> {
+                        if (audit != null) {
+                            audit.record(actor, action, target, detail);
+                        }
+                    }, ForkJoinPool.commonPool());
+        }
+        return templates;
     }
 
     public LootBoxRegistry registry() {

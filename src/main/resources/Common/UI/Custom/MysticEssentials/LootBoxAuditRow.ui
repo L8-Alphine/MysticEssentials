@@ -1,0 +1,50 @@
+// One audit record: when, what, its target and detail, and who did it.
+// Selecting the row shows the full record under the list; #Selected marks it.
+$M = "MysticTheme.ui";
+
+Button #Row {
+  Anchor: (Height: 48, Bottom: 4);
+  Style: $M.@RowStyle;
+  LayoutMode: Full;
+
+  $M.@RowSelection #Selected {
+    @Height = 48;
+  }
+
+  Group {
+    Anchor: (Full: 0);
+    LayoutMode: Left;
+    Padding: (Left: 12, Right: 12, Top: 6, Bottom: 6);
+
+    Label #AuditWhen {
+      Anchor: (Width: 140);
+      Style: $M.@RowMetaStyle;
+    }
+
+    Label #AuditAction {
+      Anchor: (Width: 170, Left: 6);
+      Style: $M.@RowMetaStyle;
+    }
+
+    Group {
+      LayoutMode: Top;
+      FlexWeight: 1;
+      Anchor: (Left: 6);
+
+      Label #AuditTarget {
+        Anchor: (Height: 18);
+        Style: $M.@RowNameStyle;
+      }
+
+      Label #AuditDetail {
+        Anchor: (Height: 14);
+        Style: $M.@RowMetaStyle;
+      }
+    }
+
+    Label #AuditWho {
+      Anchor: (Width: 180, Left: 8);
+      Style: $M.@RowSideStyle;
+    }
+  }
+}
