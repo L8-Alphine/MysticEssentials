@@ -56,7 +56,11 @@ P2-A and P2-B don't share files and can run at the same time. P2-C needs both. P
 | P2-B | Done; build, UI and code-ref sweeps clean | `b39b3d6`, merged in `6cac06f` |
 | P2-C | Done; build, UI and code-ref sweeps clean, dev server boots. **Not yet tried in game** | `ef84a15` |
 | P2-D | Done; build, UI and code-ref sweeps clean, dev server boots. **Not yet tried in game** | `b01048d` |
-| P2-E | Built (not committed yet). Build, UI and code-ref sweeps clean, dev server boots. **Not yet tried in game** | `ui/editor/RewardsTab.java`, the Rewards panel in `LootBoxEditor.ui`, `LootBoxEditorRewardRow.ui` |
+| P2-E | Done; build, UI and code-ref sweeps clean, dev server boots. **Not yet tried in game** | `6f7aa72` |
+| P2-F1 | Built (not committed yet): Key Manager and key editor. Build, UI and code-ref sweeps clean, dev server boots. **Not yet tried in game** | `ui/KeyManagerPage.java`, `ui/editor/KeyEditorPage.java`, `KeyText.java`, `KeyDiff.java`, `LootBoxKeyManager.ui`, `LootBoxKeyEditor.ui` |
+| P2-F2 | Not started: grant, revoke and bulk grant screens with history | |
+| P2-F3 | Not started: physical ↔ virtual conversion (`/lootbox key deposit` / `withdraw`) and its saga check | |
+| P2-G … P2-L | Not started | |
 
 ### P2-A — Draft store and lifecycle (engine-free) · M · part of P2-WP1
 
@@ -117,7 +121,7 @@ P2-A and P2-B don't share files and can run at the same time. P2-C needs both. P
 
 | Batch | Packages | Needs |
 |---|---|---|
-| **2: Keys and crates** | **P2-F KeyEditor + KeyManager** (P2-WP3): base item picker or held item; identity `METADATA_TAG` only; name and lore editor per segment with `ColorPickerDropdownBox` (already used in the vault editor) and bold/italic toggles; a tooltip preview as a rendered label (`ItemPreviewComponent` after G2); uses, expiry and compatible pools; grant, revoke and bulk grant (confirm, capped by `maxGrantPerCommand`) with history. Then the **physical ↔ virtual conversion** saga (`/lootbox key deposit` / `withdraw`), with its own saga check<br>**P2-G CrateEditor + placement** (P2-WP4): the bible's §09 seven steps from the Manager, covering selection status, the compatibility report, binding a pool and keys, `PREVIEW_THEN_CONFIRM` / `DIRECT_CONFIRM`, protection settings, "test in world", rebind, and a repair wizard for disabled crates | P2-A, P2-B |
+| **2: Keys and crates** (P2-F split as built into F1 Key Manager + editor, F2 grants, F3 conversion) | **P2-F KeyEditor + KeyManager** (P2-WP3): base item picker or held item; identity `METADATA_TAG` only; name and lore editor per segment with `ColorPickerDropdownBox` (already used in the vault editor) and bold/italic toggles; a tooltip preview as a rendered label (`ItemPreviewComponent` after G2); uses, expiry and compatible pools; grant, revoke and bulk grant (confirm, capped by `maxGrantPerCommand`) with history. Then the **physical ↔ virtual conversion** saga (`/lootbox key deposit` / `withdraw`), with its own saga check<br>**P2-G CrateEditor + placement** (P2-WP4): the bible's §09 seven steps from the Manager, covering selection status, the compatibility report, binding a pool and keys, `PREVIEW_THEN_CONFIRM` / `DIRECT_CONFIRM`, protection settings, "test in world", rebind, and a repair wizard for disabled crates | P2-A, P2-B |
 | **3: Polish and engine features** | **P2-H** Simulation, AuditHistory and TemplateLibrary screens (P2-WP7; `ProgressBar` after G2, text bars before) · **P2-I** crate visuals (P2-WP5) · **P2-J** generated block variants (P2-WP6, using the RAW design in spike results §3) · **P2-K** stackable keys (P2-WP8) · **P2-L** accessibility pass (P2-WP9: reduced motion per player, focus order, contrast, wrapping, narrow screens) | P2-I needs G3; P2-J needs G4; the rest need batch 1 |
 
 Phase 2 exit criteria (implementation plan §7) are met at the end of batch 3. Batch 1 alone meets LB-001 for pools.

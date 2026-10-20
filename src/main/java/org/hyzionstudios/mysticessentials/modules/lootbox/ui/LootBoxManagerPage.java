@@ -151,6 +151,9 @@ public final class LootBoxManagerPage extends MysticPage {
         boolean canEdit = player.hasPermission(Permissions.LOOTBOX_EDIT);
         cmd.set("#CreateButton.Visible", canEdit && state.form() == null);
         event.addEventBinding(CustomUIEventBindingType.Activating, "#CreateButton", INPUTS.event("newPool"));
+        cmd.set("#KeysButton.Visible", canEdit || player.hasPermission(Permissions.LOOTBOX_KEYS)
+                || player.hasPermission(Permissions.LOOTBOX_PUBLISH));
+        event.addEventBinding(CustomUIEventBindingType.Activating, "#KeysButton", INPUTS.event("keys"));
         buildForm(cmd, event);
 
         boolean hasNotice = state.notice() != null && !state.notice().isBlank();
@@ -262,6 +265,14 @@ public final class LootBoxManagerPage extends MysticPage {
                 if (allowed(Permissions.LOOTBOX_EDIT)) {
                     reopen(ref, store, page(next.withSelected(id).withNotice("&7Opening &f" + id + "&7...")));
                     module.ui().openPoolEditor(player, id, null);
+                }
+            }
+            case "keys" -> {
+                if (player.hasPermission(Permissions.LOOTBOX_EDIT) || player.hasPermission(Permissions.LOOTBOX_KEYS)
+                        || player.hasPermission(Permissions.LOOTBOX_PUBLISH)) {
+                    reopen(ref, store, new KeyManagerPage(core, player, module, KeyManagerPage.State.initial()));
+                } else {
+                    allowed(Permissions.LOOTBOX_KEYS);
                 }
             }
             case "formCancel" -> reopen(ref, store, page(next.withForm(null)));

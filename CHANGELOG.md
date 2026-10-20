@@ -41,14 +41,22 @@ with which a pool can be built and published without touching its file.
 - Saving is explicit and never silent about conflicts: if the draft file changed
   since it was opened, Save is refused and offers Load From Disk or an audited
   Overwrite. Closing with unsaved changes asks first.
+- **Key Manager** (Manager → Keys): every key definition with its status and the
+  pools it opens, search, a status filter, New Key, Clone, Archive and Publish
+  (both ask first; keys already given out keep their current look).
+- **Key editor**: base item from the item picker, name with a colour picker and
+  Bold/Italic switches, five lore lines, uses and expiry, a live preview of the
+  key item, the pools it opens, and its problems and changes. Saving, conflicts
+  and Publish work like the pool editor.
 - New permission `mysticessentials.lootbox.edit` for New Pool, Clone, Archive and
-  the editor.
+  the editors; `mysticessentials.lootbox.keys` also opens the Key Manager.
 
 ### Verification
 
 - `verifyLootBox` covers the editor's odds conversion (exact both ways where
   possible, reported rounding, refusals), the publish diff, the reward list
-  operations, and that the editor's chances equal the player preview's.
+  operations, that the editor's chances equal the player preview's, key name
+  styling (colour, bold, italic) and the key diff.
 - New `verifyLootBoxDrafts` check: save/load round trips, conflict detection,
   clone and archive, and the Draft → Invalid → Ready → Published lifecycle.
 - On a 0.7.2 dev server, republishing an existing pool and key still answers

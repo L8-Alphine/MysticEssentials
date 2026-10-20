@@ -35,9 +35,14 @@ $C.@Container {
         Anchor: (Width: 200, Height: 32, Left: 8);
       }
 
+      $C.@SecondaryTextButton #KeysButton {
+        @Text = "Keys";
+        @Anchor = (Width: 110, Left: 8);
+      }
+
       $C.@SecondaryTextButton #CreateButton {
         @Text = "New Pool";
-        @Anchor = (Width: 150, Left: 8);
+        @Anchor = (Width: 150, Left: 6);
       }
     }
 

@@ -182,6 +182,10 @@ public abstract class MysticPage extends CustomUIPage {
             Map.entry("PermissionNote", TEXT_FAINT),
             Map.entry("CommandNote", TEXT_FAINT),
             Map.entry("RewardLock", "#FFCA3A"),
+            // LootBox key editor.
+            Map.entry("PreviewName", TEXT_HI),
+            Map.entry("PreviewMeta", TEXT_MUTED),
+            Map.entry("OpensLine", TEXT_MUTED),
             Map.entry("KeysHint", TEXT_FAINT),
             Map.entry("RulesNote", TEXT_FAINT),
             Map.entry("Unread", "#FFD97A"),

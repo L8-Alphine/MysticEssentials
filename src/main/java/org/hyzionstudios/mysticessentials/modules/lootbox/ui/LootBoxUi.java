@@ -8,11 +8,13 @@ import java.util.logging.Level;
 import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.core.message.MysticText;
 import org.hyzionstudios.mysticessentials.modules.lootbox.LootBoxModule;
+import org.hyzionstudios.mysticessentials.modules.lootbox.model.KeyDraft;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.LootBoxDraft;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.LootBoxRevision;
 import org.hyzionstudios.mysticessentials.modules.lootbox.odds.OddsTable;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.OpeningService;
 import org.hyzionstudios.mysticessentials.modules.lootbox.ui.editor.EditorSession;
+import org.hyzionstudios.mysticessentials.modules.lootbox.ui.editor.KeyEditorPage;
 import org.hyzionstudios.mysticessentials.modules.lootbox.ui.editor.PoolEditorPage;
 
 import com.hypixel.hytale.server.core.universe.PlayerRef;
@@ -59,6 +61,36 @@ public final class LootBoxUi {
 
     public void openManager(PlayerRef player) {
         core.platform().openPage(player, new LootBoxManagerPage(core, player, module, LootBoxManagerPage.State.initial()));
+    }
+
+    /**
+     * Loads key draft {@code keyId} off the world thread and opens it in the key
+     * editor, ending any editor the player had open. Warns once about fields the
+     * editor would drop on save (P2-D4).
+     *
+     * @param notice shown at the top of the editor, or {@code null}
+     */
+    public void openKeyEditor(PlayerRef player, String keyId, String notice) {
+        module.registry().keyStore().load(keyId).whenComplete((loaded, error) -> {
+            if (error != null || loaded == null || loaded.isEmpty()) {
+                if (error != null) {
+                    core.log(Level.WARNING, "[lootbox] opening key draft " + keyId + " failed: " + error);
+                }
+                core.platform().openPage(player, new KeyManagerPage(core, player, module,
+                        KeyManagerPage.State.selecting(keyId, "&cCould not open &f" + keyId
+                                + "&c: its key file is missing or unreadable.")));
+                return;
+            }
+            var draft = loaded.get();
+            EditorSession<KeyDraft> session = module.editors().start(player.getUuid(), keyId, KeyDraft.class,
+                    draft.draft(), draft.hash());
+            String warning = draft.hadUnknownFields()
+                    ? "&eThis file has fields the editor doesn't know (" + String.join(", ", draft.unknownFields())
+                            + "); saving here drops them."
+                    : null;
+            core.platform().openPage(player, new KeyEditorPage(core, player, module, session,
+                    PoolEditorPage.View.of(notice != null ? notice : warning)));
+        });
     }
 
     /**

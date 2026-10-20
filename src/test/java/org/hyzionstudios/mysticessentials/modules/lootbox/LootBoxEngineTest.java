@@ -26,6 +26,8 @@ import org.hyzionstudios.mysticessentials.modules.lootbox.ui.editor.EditorSessio
 import org.hyzionstudios.mysticessentials.modules.lootbox.ui.editor.EditorSessions;
 import org.hyzionstudios.mysticessentials.modules.lootbox.ui.editor.EditorTabs;
 import org.hyzionstudios.mysticessentials.modules.lootbox.ui.editor.FormFields;
+import org.hyzionstudios.mysticessentials.modules.lootbox.ui.editor.KeyDiff;
+import org.hyzionstudios.mysticessentials.modules.lootbox.ui.editor.KeyText;
 import org.hyzionstudios.mysticessentials.modules.lootbox.ui.editor.OddsConverter;
 import org.hyzionstudios.mysticessentials.modules.lootbox.ui.editor.RewardsTab;
 import org.hyzionstudios.mysticessentials.modules.lootbox.validate.CommandTemplate;
@@ -75,6 +77,8 @@ public final class LootBoxEngineTest {
         draftDiffListsChanges();
         editorChancesMatchThePreview();
         rewardListOperations();
+        keyNamesSplitAndJoin();
+        keyDiffListsChanges();
         System.out.println("LootBoxEngineTest: all checks passed.");
     }
 
@@ -653,6 +657,50 @@ public final class LootBoxEngineTest {
         RewardsTab.add(percent);
         require("10".equals(percent.rewards.get(2).percent), "a new percent reward should take the 10% left");
         require(RewardsTab.sumLine(percent).contains("exactly 100%"), "after adding, the pool should be exactly 100%");
+    }
+
+    // ----- Key editor -----------------------------------------------------------
+
+    private static void keyNamesSplitAndJoin() {
+        KeyText.Style royal = KeyText.parse("<#E7B84D>&lAvalon Royal Key");
+        require("#E7B84D".equals(royal.color()) && royal.bold() && !royal.italic() && "Avalon Royal Key".equals(royal.text()),
+                "parse: " + royal);
+        require(KeyText.compose(royal).equals("<#E7B84D>&lAvalon Royal Key"), "compose did not round-trip");
+        KeyText.Style plain = KeyText.parse("Plain Key");
+        require(plain.color() == null && !plain.bold() && "Plain Key".equals(plain.text()), "plain: " + plain);
+        require(KeyText.compose(plain.withColor("#00FF00").withItalic(true)).equals("<#00FF00>&oPlain Key"),
+                "compose with colour and italic: " + KeyText.compose(plain.withColor("#00FF00").withItalic(true)));
+        KeyText.Style inner = KeyText.parse("&oFancy &cRed");
+        require(inner.italic() && "Fancy &cRed".equals(inner.text()), "markup inside the text was not kept: " + inner);
+        require(KeyText.compose(royal.withColor(null).withBold(false)).equals("Avalon Royal Key"), "clearing style failed");
+        require("#A1B2C3".equals(KeyText.color("a1b2c3")) && "#A1B2C3".equals(KeyText.color("#a1b2c3ff"))
+                && KeyText.color("red") == null && KeyText.color(null) == null, "colour normalising failed");
+        require(KeyText.lore(java.util.Arrays.asList("One", "", "Three", " ", "")).equals(List.of("One", "", "Three")),
+                "lore trimming: " + KeyText.lore(java.util.Arrays.asList("One", "", "Three", " ", "")));
+        require(KeyText.lore(java.util.Arrays.asList("", null, "")).isEmpty(), "blank lore did not become empty");
+    }
+
+    private static void keyDiffListsChanges() {
+        KeyDraft published = new KeyDraft();
+        published.id = "mystic:royal";
+        published.baseItemId = "Ingredient_Bar_Gold";
+        published.name = "<#E7B84D>&lRoyal Key";
+        published.lore = new ArrayList<>(List.of("Opens the Royal crate"));
+        published.uses = 1;
+        KeyDraft same = DraftLifecycle.freeze(published, KeyDraft.class);
+        require(!KeyDiff.changed(same, published) && KeyDiff.lines(same, published).size() == 1,
+                "an identical key reported changes: " + KeyDiff.lines(same, published));
+        KeyDraft edited = DraftLifecycle.freeze(published, KeyDraft.class);
+        edited.name = "<#FF0000>&lRoyal Key";
+        edited.uses = 3;
+        edited.expiresAfterDays = 7;
+        edited.lore.add("Second line");
+        String all = String.join(" | ", KeyDiff.lines(edited, published));
+        require(KeyDiff.changed(edited, published), "edits were not reported");
+        require(all.contains("Name colour or style") && all.contains("1 use") && all.contains("3 uses")
+                && all.contains("expires after 7 days") && all.contains("1 line(s)") && all.contains("2 line(s)"),
+                "key diff is missing a change: " + all);
+        require(KeyDiff.lines(edited, null).get(0).contains("New key"), "an unpublished key was not reported as new");
     }
 
     // ----- Fixtures -----------------------------------------------------------
