@@ -11,6 +11,7 @@ import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.modules.lootbox.LootBoxModule;
 import org.hyzionstudios.mysticessentials.modules.lootbox.api.GrantSource;
 import org.hyzionstudios.mysticessentials.modules.lootbox.hytale.BlockTargets;
+import org.hyzionstudios.mysticessentials.modules.lootbox.hytale.CrateVisuals;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.CrateInstance;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.KeySerial;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.LootBoxRevision;
@@ -352,7 +353,7 @@ public final class LootBoxCommand extends MysticCommand {
                 player(sender).ifPresent(player -> onWorld(sender, player, (store, entity) -> {
                     CrateService.ConvertResult result = module.crates().convert(
                             BlockTargets.target(entity, store, module.config().crates.selectReach), lootboxId, crateId,
-                            sender.name());
+                            CrateVisuals.defaults(module.config().crates), sender.name());
                     if (result.problem() != null) {
                         sender.replyKey("lootbox-crate-incompatible", Map.of("reason", result.problem()));
                         return;
@@ -452,7 +453,26 @@ public final class LootBoxCommand extends MysticCommand {
                     core.platform().openPage(player, CrateEditorPage.forCrate(core, player, module, crate.get(), null));
                 }));
             }
-            default -> usage(sender, "/lootbox crate <select|convert|edit|rebind|remove|enable|verify|list|info> …");
+            case "effects" -> {
+                if (!allowed(sender, Permissions.LOOTBOX_USE)) {
+                    return;
+                }
+                player(sender).ifPresent(player -> {
+                    boolean on = module.visuals().effectsOn(player.getUuid());
+                    if (args.length < 3) {
+                        sender.replyKey("lootbox-crate-effects-status", Map.of("state", on ? "on" : "off"));
+                        return;
+                    }
+                    String choice = args[2].toLowerCase(Locale.ROOT);
+                    if (!choice.equals("on") && !choice.equals("off")) {
+                        usage(sender, "/lootbox crate effects <on|off>");
+                        return;
+                    }
+                    module.visuals().setEffects(player.getUuid(), choice.equals("on"));
+                    sender.replyKey(choice.equals("on") ? "lootbox-crate-effects-on" : "lootbox-crate-effects-off");
+                });
+            }
+            default -> usage(sender, "/lootbox crate <select|convert|edit|rebind|remove|enable|verify|list|info|effects> …");
         }
     }
 

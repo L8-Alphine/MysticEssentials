@@ -11,6 +11,7 @@ import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.core.message.MysticText;
 import org.hyzionstudios.mysticessentials.modules.lootbox.LootBoxModule;
 import org.hyzionstudios.mysticessentials.modules.lootbox.hytale.BlockTargets;
+import org.hyzionstudios.mysticessentials.modules.lootbox.hytale.CrateVisuals;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.CrateInstance;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.LootBoxRevision;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.CrateRules;
@@ -43,6 +44,8 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
  *   <li><b>Pool</b> (04): a published pool; its keys come with it.</li>
  *   <li><b>Use</b> (05): {@code PREVIEW_THEN_CONFIRM} or {@code DIRECT_CONFIRM}.</li>
  *   <li><b>Protect</b>: per-crate protection that can only add to the server's.</li>
+ *   <li><b>Visuals</b> (06): idle and opening particles, the opening sound and
+ *       the floating name ({@link CrateVisuals}), with Preview Effects.</li>
  *   <li><b>Finish</b> (07): the summary, Create or Save, and Test in World.</li>
  * </ol>
  *
@@ -71,7 +74,13 @@ public final class CrateEditorPage extends MysticPage {
     static final FormFields.Field CRATE_ID = FormFields.Field.text("crateId", "CrateIdInput", "Crate id");
     static final FormFields.Field NAME = FormFields.Field.text("crateName", "NameInput", "Name");
     static final FormFields.Field POOL = FormFields.Field.text("pool", "PoolDropdown", "Pool");
-    static final FormFields INPUTS = FormFields.of(CRATE_ID, NAME, POOL);
+    static final FormFields.Field IDLE = FormFields.Field.text("idleParticle", "IdleDropdown", "Idle particles");
+    static final FormFields.Field OPEN_FX = FormFields.Field.text("openParticle", "OpenParticleDropdown",
+            "Opening particles");
+    static final FormFields.Field SOUND = FormFields.Field.text("openSound", "OpenSoundDropdown", "Opening sound");
+    static final FormFields INPUTS = FormFields.of(CRATE_ID, NAME, POOL, IDLE, OPEN_FX, SOUND);
+    /** The dropdown value meaning "no effect". */
+    private static final String NONE = "none";
     private static final int MAX_NAME_LENGTH = 64;
 
     static final EditorTabs.Tab REPAIR = new EditorTabs.Tab("repair", "Repair");
@@ -80,11 +89,12 @@ public final class CrateEditorPage extends MysticPage {
     static final EditorTabs.Tab POOL_TAB = new EditorTabs.Tab("pool", "3 Pool");
     static final EditorTabs.Tab USE = new EditorTabs.Tab("use", "4 Use");
     static final EditorTabs.Tab PROTECT = new EditorTabs.Tab("protect", "5 Protect");
-    static final EditorTabs.Tab FINISH = new EditorTabs.Tab("finish", "6 Finish");
+    static final EditorTabs.Tab VISUALS = new EditorTabs.Tab("visuals", "6 Visuals");
+    static final EditorTabs.Tab FINISH = new EditorTabs.Tab("finish", "7 Finish");
 
     private static final Map<String, String> STEP_GROUPS = Map.of("repair", "#StepRepair", "block", "#StepBlock",
             "check", "#StepCheck", "pool", "#StepPool", "use", "#StepBehaviour", "protect", "#StepProtect",
-            "finish", "#StepFinish");
+            "visuals", "#StepVisuals", "finish", "#StepFinish");
 
     private final LootBoxModule module;
     private final EditorSession<CrateInstance> session;
@@ -121,6 +131,7 @@ public final class CrateEditorPage extends MysticPage {
             working.lootboxId = pools.get(0).lootboxId;
         }
         working.createdAt = System.currentTimeMillis();
+        working.visuals = CrateVisuals.defaults(module.config().crates);
         EditorSession<CrateInstance> session = module.editors().start(player.getUuid(), NEW_ID, CrateInstance.class,
                 working, null);
         CrateRules.Report report = module.crates().check(block, null);
@@ -194,6 +205,7 @@ public final class CrateEditorPage extends MysticPage {
         buildPool(cmd, event, crate);
         buildUse(cmd, event, crate);
         buildProtect(cmd, event, crate);
+        buildVisuals(cmd, event, crate);
         buildFinish(cmd, crate, live, spot);
         if (live != null) {
             buildRepair(cmd, event, live, spot);
@@ -324,6 +336,43 @@ public final class CrateEditorPage extends MysticPage {
         }
     }
 
+    private void buildVisuals(UICommandBuilder cmd, UIEventBuilder event, CrateInstance crate) {
+        effectDropdown(cmd, event, IDLE, CrateVisuals.IDLE_PARTICLES, crate.visuals.idleParticle, true);
+        effectDropdown(cmd, event, OPEN_FX, CrateVisuals.OPEN_PARTICLES, crate.visuals.openParticle, true);
+        effectDropdown(cmd, event, SOUND, CrateVisuals.OPEN_SOUNDS, crate.visuals.openSound, false);
+        boolean serverOn = module.config().crates.nameplates;
+        set(cmd, "#CrateNameplateState", !crate.visuals.nameplate ? "&7Off for this crate."
+                : serverOn ? "&aOn: shows &f" + module.visuals().nameplateText(crate) + " &aabove the crate."
+                : "&eOn for this crate, but crates.nameplates is off in the module config, so nothing floats yet.");
+        cmd.set("#NameplateOnButton.Visible", !crate.visuals.nameplate);
+        cmd.set("#NameplateOffButton.Visible", crate.visuals.nameplate);
+        for (String[] button : new String[][] {{"#NameplateOnButton", "nameplateOn"},
+                {"#NameplateOffButton", "nameplateOff"}, {"#PreviewEffectsButton", "previewEffects"}}) {
+            event.addEventBinding(CustomUIEventBindingType.Activating, button[0], INPUTS.event(button[1]));
+        }
+    }
+
+    /** "Off", the checked ids, and the crate's own id when it was hand-edited to something else. */
+    private void effectDropdown(UICommandBuilder cmd, UIEventBuilder event, FormFields.Field field,
+            List<String> choices, String current, boolean particle) {
+        List<DropdownEntryInfo> entries = new ArrayList<>();
+        entries.add(entry("Off", NONE));
+        for (String id : choices) {
+            entries.add(entry(id + (loaded(id, particle) ? "" : " (not loaded)"), id));
+        }
+        if (current != null && !current.isBlank() && !choices.contains(current)) {
+            entries.add(entry(current + (loaded(current, particle) ? " (custom)" : " (not loaded)"), current));
+        }
+        String selector = "#" + field.elementId();
+        cmd.set(selector + ".Entries", entries);
+        cmd.set(selector + ".Value", current == null || current.isBlank() ? NONE : current);
+        event.addEventBinding(CustomUIEventBindingType.ValueChanged, selector, INPUTS.event("visual"));
+    }
+
+    private static boolean loaded(String id, boolean particle) {
+        return particle ? CrateVisuals.particleExists(id) : CrateVisuals.soundExists(id);
+    }
+
     private void buildFinish(UICommandBuilder cmd, CrateInstance crate, CrateInstance live, Spot spot) {
         List<String> lines = new ArrayList<>();
         lines.add("&7Crate &f" + (isNew() ? blank(crate.crateId, "(id chosen on Create)") : crate.crateId)
@@ -333,6 +382,7 @@ public final class CrateEditorPage extends MysticPage {
         lines.add(pool == null ? "&cNo published pool chosen yet." : "&7Opens &f" + MysticText.stripMarkup(
                 pool.spec.displayName) + " &7(revision " + pool.revision + ", " + pool.spec.rewards.size() + " rewards)");
         lines.add("&7On Use: &f" + (crate.directConfirm() ? "straight to confirm" : "preview first"));
+        lines.add("&7Effects: &f" + effectsSummary(crate));
         lines.add("&7Protection: &fbreak " + onOff(CrateRules.preventsBreak(crate,
                 module.config().crates.preventPlayerBreak)) + "&7, damage &f" + onOff(CrateRules.preventsDamage(crate,
                 module.config().crates.preventDamage)));
@@ -380,7 +430,8 @@ public final class CrateEditorPage extends MysticPage {
         lines.add("&a[ok] &74 Use: &f" + (crate.directConfirm() ? "direct confirm" : "preview first"));
         lines.add("&a[ok] &75 Protect: &f" + (crate.protection.preventPlayerBreak || crate.protection.preventDamage
                 ? "tightened" : "server default"));
-        lines.add((isNew() ? "&8[ ]" : session.dirty() ? "&e[!]" : "&a[ok]") + " &76 Finish: &f"
+        lines.add("&a[ok] &76 Visuals: &f" + effectsSummary(crate));
+        lines.add((isNew() ? "&8[ ]" : session.dirty() ? "&e[!]" : "&a[ok]") + " &77 Finish: &f"
                 + (isNew() ? "not created yet" : session.dirty() ? "unsaved changes" : "saved"));
         appendLines(cmd, "#Checklist", lines);
     }
@@ -422,6 +473,9 @@ public final class CrateEditorPage extends MysticPage {
                     () -> crate.protection.preventPlayerBreak = "breakOn".equals(action));
             case "damageOn", "damageOff" -> edit(ref, store,
                     () -> crate.protection.preventDamage = "damageOn".equals(action));
+            case "nameplateOn", "nameplateOff" -> edit(ref, store,
+                    () -> crate.visuals.nameplate = "nameplateOn".equals(action));
+            case "previewEffects" -> previewEffects(ref, store);
             case "create" -> create(ref, store);
             case "save" -> save(ref, store, session.loadedHash());
             case "reload" -> reload(ref, store, "&7Loaded the crate as it is now; your unsaved changes were dropped.");
@@ -454,6 +508,9 @@ public final class CrateEditorPage extends MysticPage {
             }
             session.forgetInput(POOL.key());
         }
+        changed |= applyEffect(IDLE, value -> crate.visuals.idleParticle = value, crate.visuals.idleParticle);
+        changed |= applyEffect(OPEN_FX, value -> crate.visuals.openParticle = value, crate.visuals.openParticle);
+        changed |= applyEffect(SOUND, value -> crate.visuals.openSound = value, crate.visuals.openSound);
         String id = session.input(CRATE_ID.key());
         if (id != null && isNew()) {
             String next = id.trim().toLowerCase(Locale.ROOT);
@@ -464,6 +521,32 @@ public final class CrateEditorPage extends MysticPage {
         if (changed) {
             session.markDirty();
         }
+    }
+
+    /** Applies one effect dropdown; "Off" stores a blank id. @return whether it changed */
+    private boolean applyEffect(FormFields.Field field, java.util.function.Consumer<String> setter, String current) {
+        String value = session.input(field.key());
+        if (value == null) {
+            return false;
+        }
+        session.forgetInput(field.key());
+        String next = NONE.equals(value) ? "" : value.trim();
+        if (next.equals(current == null ? "" : current)) {
+            return false;
+        }
+        setter.accept(next);
+        return true;
+    }
+
+    /** Plays the working copy's effects to this player alone; the crate must be in their world. */
+    private void previewEffects(Ref<EntityStore> ref, Store<EntityStore> store) {
+        CrateInstance crate = session.working();
+        if (!CrateService.inWorld(crate, store.getExternalData().getWorld())) {
+            reopen(ref, store, page("&eGo to &f" + crate.worldName + " &eto preview the effects at the crate."));
+            return;
+        }
+        String played = module.visuals().preview(ref, store, crate);
+        reopen(ref, store, page("&7Played " + played + " at the crate, for you only."));
     }
 
     private void edit(Ref<EntityStore> ref, Store<EntityStore> store, Runnable change) {
@@ -686,7 +769,7 @@ public final class CrateEditorPage extends MysticPage {
         if (live != null && live.disabled && !disabledByStaff(live)) {
             tabs.add(REPAIR);
         }
-        tabs.addAll(List.of(BLOCK, CHECK, POOL_TAB, USE, PROTECT, FINISH));
+        tabs.addAll(List.of(BLOCK, CHECK, POOL_TAB, USE, PROTECT, VISUALS, FINISH));
         return tabs;
     }
 
@@ -715,6 +798,24 @@ public final class CrateEditorPage extends MysticPage {
             names.add(module.registry().key(keyId).map(key -> MysticText.stripMarkup(key.spec.name)).orElse(keyId));
         }
         return names.isEmpty() ? "none linked" : String.join(" or ", names);
+    }
+
+    private String effectsSummary(CrateInstance crate) {
+        CrateInstance.Visuals v = crate.visuals;
+        List<String> parts = new ArrayList<>();
+        if (!v.idleParticle.isBlank()) {
+            parts.add("idle " + v.idleParticle);
+        }
+        if (!v.openParticle.isBlank()) {
+            parts.add("opening " + v.openParticle);
+        }
+        if (!v.openSound.isBlank()) {
+            parts.add("sound " + v.openSound);
+        }
+        if (v.nameplate) {
+            parts.add(module.config().crates.nameplates ? "floating name" : "floating name (server switch off)");
+        }
+        return parts.isEmpty() ? "none" : String.join(", ", parts);
     }
 
     private static String protectionLabel(boolean server, boolean crate) {

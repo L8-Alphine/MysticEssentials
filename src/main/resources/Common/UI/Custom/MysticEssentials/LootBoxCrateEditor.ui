@@ -298,6 +298,95 @@ $C.@Container {
           }
         }
 
+        // 06: particles, sound and the floating name.
+        Group #StepVisuals {
+          LayoutMode: Top;
+          FlexWeight: 1;
+          Visible: false;
+
+          $M.@Section {
+            @Text = "Particles and sound";
+            @Anchor = (Bottom: 8);
+          }
+
+          Group {
+            LayoutMode: Left;
+            Anchor: (Height: 58, Bottom: 8);
+
+            Group {
+              LayoutMode: Top;
+              Anchor: (Width: 290, Right: 12);
+
+              $M.@FieldLabel { @Text = "Idle particles"; }
+              $C.@DropdownBox #IdleDropdown {
+                Anchor: (Width: 290, Height: 32);
+              }
+            }
+
+            Group {
+              LayoutMode: Top;
+              Anchor: (Width: 290);
+
+              $M.@FieldLabel { @Text = "When it opens"; }
+              $C.@DropdownBox #OpenParticleDropdown {
+                Anchor: (Width: 290, Height: 32);
+              }
+            }
+          }
+
+          $M.@FieldLabel { @Text = "Opening sound"; }
+          $C.@DropdownBox #OpenSoundDropdown {
+            Anchor: (Width: 290, Height: 32, Bottom: 8);
+          }
+
+          Group {
+            LayoutMode: Left;
+            Anchor: (Height: 44, Bottom: 6);
+
+            Label {
+              FlexWeight: 1;
+              Style: $M.@CaptionStyle;
+              Text: "Effects go only to players near the crate who haven't turned them off with /lootbox crate effects off.";
+            }
+
+            $C.@SecondaryTextButton #PreviewEffectsButton {
+              @Text = "Preview Effects";
+              @Anchor = (Width: 190, Left: 8);
+            }
+          }
+
+          $M.@Section {
+            @Text = "Floating name";
+            @Anchor = (Top: 6, Bottom: 8);
+          }
+
+          Group {
+            LayoutMode: Left;
+            Anchor: (Height: 44, Bottom: 6);
+
+            Label #CrateNameplateState {
+              FlexWeight: 1;
+              Style: $M.@BodyStyle;
+            }
+
+            $C.@SecondaryTextButton #NameplateOnButton {
+              @Text = "Show Floating Name";
+              @Anchor = (Width: 210, Left: 8);
+            }
+
+            $C.@SecondaryTextButton #NameplateOffButton {
+              @Text = "Hide Floating Name";
+              @Anchor = (Width: 210, Left: 8);
+            }
+          }
+
+          Label {
+            Anchor: (Height: 44);
+            Style: $M.@CaptionWarnStyle;
+            Text: "Not yet tested in game. Names are the same for everyone (they can't be shown per player) and need crates.nameplates on in the module config.";
+          }
+        }
+
         // 07: summary, then Create or Save, and Test in World.
         Group #StepFinish {
           LayoutMode: Top;

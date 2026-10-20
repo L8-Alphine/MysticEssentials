@@ -139,11 +139,16 @@ public final class CrateService {
         return CrateRules.check(block.facts(), taken);
     }
 
-    /** Turns {@code block} into a crate for {@code lootboxId}. MUST run on the world thread. */
-    public ConvertResult convert(BlockTargets.Block block, String lootboxId, String requestedId, String actor) {
+    /**
+     * Turns {@code block} into a crate for {@code lootboxId} with {@code visuals}
+     * (the server's defaults for a command conversion). MUST run on the world thread.
+     */
+    public ConvertResult convert(BlockTargets.Block block, String lootboxId, String requestedId,
+            CrateInstance.Visuals visuals, String actor) {
         CrateInstance template = new CrateInstance();
         template.crateId = requestedId;
         template.lootboxId = lootboxId;
+        template.visuals = visuals == null ? new CrateInstance.Visuals() : visuals;
         return create(block, template, actor);
     }
 
@@ -197,7 +202,7 @@ public final class CrateService {
     // ----- Editing ------------------------------------------------------------
 
     /**
-     * Applies the editor's settings (pool, name, behaviour, protection) to the
+     * Applies the editor's settings (pool, name, behaviour, protection, visuals) to the
      * live crate, unless another save changed them since the editor loaded
      * {@code expectedHash} ({@code null} overwrites). Position, block and status
      * are not editor settings and are left alone.
@@ -232,6 +237,14 @@ public final class CrateService {
                         + next.protection.preventDamage);
                 live.protection.preventPlayerBreak = next.protection.preventPlayerBreak;
                 live.protection.preventDamage = next.protection.preventDamage;
+            }
+            CrateInstance.Visuals was = live.visuals;
+            CrateInstance.Visuals now = next.visuals;
+            if (!was.idleParticle.equals(now.idleParticle) || !was.openParticle.equals(now.openParticle)
+                    || !was.openSound.equals(now.openSound) || was.nameplate != now.nameplate) {
+                changes.add("visuals idle=" + now.idleParticle + " open=" + now.openParticle + " sound="
+                        + now.openSound + " nameplate=" + now.nameplate);
+                live.visuals = now;
             }
             if (changes.isEmpty()) {
                 return new Saved(live.copy(), CrateRules.settingsHash(live));

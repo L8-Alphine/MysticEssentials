@@ -537,6 +537,10 @@ public final class DefaultMessages {
         o.addProperty("lootbox-crate-broken-alert", "&cCrate &f{crate} &cat &f{position} &cwas destroyed and is now disabled.");
         o.addProperty("lootbox-crate-unbound", "&7This crate isn't set up yet.");
         o.addProperty("lootbox-crate-unbound-admin", "&eUnbound crate block. Look at it and run &f/lootbox crate convert <pool>&e.");
+        // LootBox crates track (Phase 2): the per-player crate effects switch.
+        o.addProperty("lootbox-crate-effects-status", "&7Crate particles and sounds are &f{state}&7 for you. Change it with &f/lootbox crate effects <on|off>&7.");
+        o.addProperty("lootbox-crate-effects-on", "&aCrate particles and sounds are on for you.");
+        o.addProperty("lootbox-crate-effects-off", "&7Crate particles and sounds are off for you. Floating crate names still show; they're the same for everyone.");
         return o;
     }
 }

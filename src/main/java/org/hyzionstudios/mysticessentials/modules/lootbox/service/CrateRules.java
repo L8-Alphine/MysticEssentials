@@ -223,7 +223,7 @@ public final class CrateRules {
 
     /**
      * A hash of what the crate editor may change (pool, name, behaviour,
-     * protection), so a save can refuse when another editor saved since this
+     * protection, visuals), so a save can refuse when another editor saved since this
      * one loaded (the pool editor's P2-D2 rule). Status changes made by the
      * server (disable on a block change) are not part of it.
      */
@@ -231,7 +231,8 @@ public final class CrateRules {
         CrateInstance c = crate.copy();
         String text = String.join("\u0000", String.valueOf(c.lootboxId), String.valueOf(c.name),
                 String.valueOf(c.openBehavior), Boolean.toString(c.protection.preventPlayerBreak),
-                Boolean.toString(c.protection.preventDamage));
+                Boolean.toString(c.protection.preventDamage), c.visuals.idleParticle, c.visuals.openParticle,
+                c.visuals.openSound, Boolean.toString(c.visuals.nameplate));
         try {
             byte[] digest = MessageDigest.getInstance("SHA-256").digest(text.getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(digest, 0, 12);

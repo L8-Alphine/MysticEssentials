@@ -10,11 +10,12 @@ import org.hyzionstudios.mysticessentials.core.util.Json;
  * either. It may override its name, behaviour and protection, never the pool's
  * odds.
  *
- * <p><b>Schema.</b> Version 1 (Phase 1) had no behaviour or protection fields.
- * Gson keeps the field initialisers for anything a stored document lacks, and
- * {@link #normalise()} fills what an explicit {@code null} cleared, so a
- * version 1 document loads as a version 2 crate with the defaults: preview
- * first, and the server's protection.</p>
+ * <p><b>Schema.</b> Version 1 (Phase 1) had no behaviour or protection fields;
+ * version 2 had no visuals. Gson keeps the field initialisers for anything a
+ * stored document lacks, and {@link #normalise()} fills what an explicit
+ * {@code null} cleared, so an older document loads with the defaults: preview
+ * first, the server's protection, and no effects (an existing crate never
+ * starts sparkling after an update).</p>
  */
 public final class CrateInstance {
 
@@ -28,7 +29,7 @@ public final class CrateInstance {
     /** Use goes straight to the confirm screen, which still lists every reward with its odds. */
     public static final String OPEN_DIRECT_CONFIRM = "DIRECT_CONFIRM";
 
-    public static final int SCHEMA = 2;
+    public static final int SCHEMA = 3;
 
     public int schema = SCHEMA;
     public String crateId;
@@ -54,6 +55,8 @@ public final class CrateInstance {
     public Protection protection = new Protection();
     public String updatedBy;
     public long updatedAt;
+    /** Particles, sound and floating name. Schema 3. */
+    public Visuals visuals = new Visuals();
 
     /**
      * Protection a crate asks for beyond {@code crates.*} in the module config. A
@@ -65,6 +68,23 @@ public final class CrateInstance {
         public boolean preventPlayerBreak;
         /** Cancel damage (including unattributed explosions) even when the server allows it. */
         public boolean preventDamage;
+    }
+
+    /**
+     * What players near the crate see and hear. Ids are particle system and
+     * sound event asset ids; blank means none. Particles and sounds go only to
+     * nearby players who have not turned crate effects off. The floating name
+     * is global (the engine's nameplates have no per-player visibility) and
+     * also needs {@code crates.nameplates} in the module config.
+     */
+    public static final class Visuals {
+        /** Refreshed every {@code crates.idleEffectIntervalMs} while players are near. */
+        public String idleParticle = "";
+        /** Played at the crate when an opening from it commits. */
+        public String openParticle = "";
+        public String openSound = "";
+        /** Float the crate's name (or its pool's) above it. */
+        public boolean nameplate;
     }
 
     public String position() {
@@ -95,6 +115,12 @@ public final class CrateInstance {
         if (protection == null) {
             protection = new Protection();
         }
+        if (visuals == null) {
+            visuals = new Visuals();
+        }
+        visuals.idleParticle = visuals.idleParticle == null ? "" : visuals.idleParticle.trim();
+        visuals.openParticle = visuals.openParticle == null ? "" : visuals.openParticle.trim();
+        visuals.openSound = visuals.openSound == null ? "" : visuals.openSound.trim();
         if (lootboxId != null) {
             lootboxId = lootboxId.toLowerCase(Locale.ROOT);
         }

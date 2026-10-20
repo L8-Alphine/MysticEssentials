@@ -159,7 +159,9 @@ public final class LootBoxCratesTest {
         require(hash.equals(CrateRules.settingsHash(status)), "a status change counted as an editor conflict");
         for (java.util.function.Consumer<CrateInstance> change : List.<java.util.function.Consumer<CrateInstance>>of(
                 c -> c.lootboxId = "other_pool", c -> c.name = "Royal", c -> c.openBehavior = CrateInstance.OPEN_DIRECT_CONFIRM,
-                c -> c.protection.preventPlayerBreak = true, c -> c.protection.preventDamage = true)) {
+                c -> c.protection.preventPlayerBreak = true, c -> c.protection.preventDamage = true,
+                c -> c.visuals.idleParticle = "Dust_Sparkles", c -> c.visuals.openParticle = "Block_Break_Treasure",
+                c -> c.visuals.openSound = "SFX_Chest_Wooden_Open", c -> c.visuals.nameplate = true)) {
             CrateInstance edited = crate.copy();
             change.accept(edited);
             require(!hash.equals(CrateRules.settingsHash(edited)), "an editable change kept the same hash");
@@ -192,14 +194,20 @@ public final class LootBoxCratesTest {
         require(loaded.protection != null && !loaded.protection.preventPlayerBreak && !loaded.protection.preventDamage,
                 "a schema 1 crate did not get the server's protection");
         require(loaded.schema == CrateInstance.SCHEMA, "the schema was not upgraded");
+        require(loaded.visuals != null && loaded.visuals.idleParticle.isEmpty() && loaded.visuals.openParticle.isEmpty()
+                && loaded.visuals.openSound.isEmpty() && !loaded.visuals.nameplate,
+                "an old crate gained effects on load; existing crates must stay quiet after an update");
         require("example_supply".equals(loaded.lootboxId), "the pool id was not normalised");
         require("default 1,64,-3".equals(loaded.position()), "position changed: " + loaded.position());
 
         CrateInstance nulled = Json.gson().fromJson(Json.parse(
-                "{\"crateId\":\"x_crate\",\"openBehavior\":null,\"protection\":null,\"name\":null,\"kind\":null}"),
+                "{\"crateId\":\"x_crate\",\"openBehavior\":null,\"protection\":null,\"name\":null,\"kind\":null,"
+                        + "\"visuals\":{\"idleParticle\":null,\"openSound\":\" SFX_Chest_Wooden_Open \"}}"),
                 CrateInstance.class).normalise();
         require(nulled.protection != null && nulled.name != null && CrateInstance.KIND_INTERACTIVE.equals(nulled.kind)
                 && CrateInstance.OPEN_PREVIEW_THEN_CONFIRM.equals(nulled.openBehavior), "explicit nulls were kept");
+        require(nulled.visuals.idleParticle.isEmpty() && "SFX_Chest_Wooden_Open".equals(nulled.visuals.openSound),
+                "visual ids were not cleaned: " + nulled.visuals.openSound);
 
         CrateInstance direct = loaded.copy();
         direct.openBehavior = "direct_confirm";

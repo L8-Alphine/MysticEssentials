@@ -177,6 +177,7 @@ public abstract class MysticPage extends CustomUIPage {
             Map.entry("CrateDamageState", TEXT_BODY),
             Map.entry("CrateRepairReason", TEXT_HI),
             Map.entry("CrateRepairStatus", TEXT_BODY),
+            Map.entry("CrateNameplateState", TEXT_BODY),
             // LootBox editor kit: picker, confirmation, tab bar. A server-written
             // button label takes the game's button text colour so it matches a
             // static one.

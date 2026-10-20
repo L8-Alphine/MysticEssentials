@@ -18,6 +18,7 @@ import org.hyzionstudios.mysticessentials.modules.lootbox.command.LootBoxCommand
 import org.hyzionstudios.mysticessentials.modules.lootbox.config.LootBoxConfig;
 import org.hyzionstudios.mysticessentials.modules.lootbox.hytale.BlockTargets;
 import org.hyzionstudios.mysticessentials.modules.lootbox.hytale.CrateSystems;
+import org.hyzionstudios.mysticessentials.modules.lootbox.hytale.CrateVisuals;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.CrateInstance;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.LootBoxRevision;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.PlayerLootState;
@@ -67,6 +68,7 @@ public final class LootBoxModule extends AbstractMysticModule implements LootBox
     private PendingRewardService pending;
     private OpeningService opening;
     private CrateService crates;
+    private CrateVisuals visuals;
     private LootBoxUi ui;
     /** Open in-game editors, one per player; the working copies never outlive a disconnect or a disable. */
     private final EditorSessions editors = new EditorSessions();
@@ -105,6 +107,7 @@ public final class LootBoxModule extends AbstractMysticModule implements LootBox
         pending = new PendingRewardService(core, storage, audit, lanes);
         opening = new OpeningService(core, storage, registry, keys, rewards, audit, lanes, draw, config);
         crates = new CrateService(core, storage, audit);
+        visuals = new CrateVisuals(core, this, storage);
         ui = new LootBoxUi(core, this);
 
         registry.writeExamplesIfMissing();
@@ -151,6 +154,7 @@ public final class LootBoxModule extends AbstractMysticModule implements LootBox
         sweepTask = core.scheduler().runRepeating(audit::sweep, 1, 24, TimeUnit.HOURS);
 
         active = this;
+        visuals.start();
         boolean shippedCrate = BlockTargets.usableBlockLoaded(CrateService.SHIPPED_PREFIX);
         log("LootBox enabled: " + registry.publishedPools().size() + " published pool(s), " + registry.keys().size()
                 + " key(s), " + crates.list().size() + " crate(s), policy " + opening.policyProfile()
@@ -173,6 +177,7 @@ public final class LootBoxModule extends AbstractMysticModule implements LootBox
         keys.updateConfig(config);
         rewards.updateConfig(config);
         opening.updateConfig(config);
+        visuals.reschedule();
         registry.reloadDrafts();
         log("LootBox drafts and settings reloaded.");
     }
@@ -181,6 +186,9 @@ public final class LootBoxModule extends AbstractMysticModule implements LootBox
     public void onDisable() {
         active = null;
         editors.clear();
+        if (visuals != null) {
+            visuals.stop();
+        }
         if (recoveryTask != null) {
             recoveryTask.cancel(false);
             recoveryTask = null;
@@ -257,6 +265,10 @@ public final class LootBoxModule extends AbstractMysticModule implements LootBox
 
     public CrateService crates() {
         return crates;
+    }
+
+    public CrateVisuals visuals() {
+        return visuals;
     }
 
     public LootBoxUi ui() {
