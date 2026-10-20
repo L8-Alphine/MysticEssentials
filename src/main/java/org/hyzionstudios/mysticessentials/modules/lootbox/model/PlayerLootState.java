@@ -15,6 +15,7 @@ public final class PlayerLootState {
     /** Bounds on the lists kept in one document. */
     public static final int MAX_COMMITS = 200;
     public static final int MAX_REQUESTS = 200;
+    public static final int MAX_CONVERSIONS = 100;
 
     public int schema = 1;
     /** keyId → balance. */
@@ -32,6 +33,22 @@ public final class PlayerLootState {
     /** Committed openings whose delivery has not settled; recovery resumes them on join. */
     public List<String> openDeliveries = new ArrayList<>();
     public long lastOpenAt;
+    /**
+     * Physical ↔ virtual key conversions (P2-F3), newest last. A finished one is
+     * dropped beyond {@link #MAX_CONVERSIONS}; an unfinished one never is, because
+     * recovery finishes it from this record.
+     */
+    public List<Conversion> conversions = new ArrayList<>();
+
+    /** The conversion with {@code conversionId}, or {@code null}. */
+    public Conversion conversion(String conversionId) {
+        for (Conversion conversion : conversions) {
+            if (conversion.conversionId.equals(conversionId)) {
+                return conversion;
+            }
+        }
+        return null;
+    }
 
     public boolean hasCommit(String openingId) {
         for (CommitRecord commit : commits) {
@@ -61,6 +78,45 @@ public final class PlayerLootState {
         /** {@code VIRTUAL} or {@code PHYSICAL}. */
         public String keyKind;
         public long at;
+    }
+
+    /**
+     * One conversion. A deposit is recorded {@code PREPARED} before its serial is
+     * reserved and becomes {@code CREDITED} in the update that credits the
+     * balance. A withdrawal is recorded {@code DEBITED} in the update that debits
+     * the balance (with the serials it will issue) and becomes {@code DELIVERED}
+     * once every key is in the inventory or the pending inbox.
+     */
+    public static final class Conversion {
+        public static final String DEPOSIT = "DEPOSIT";
+        public static final String WITHDRAW = "WITHDRAW";
+
+        public static final String PREPARED = "PREPARED";
+        public static final String CREDITED = "CREDITED";
+        public static final String DEBITED = "DEBITED";
+        public static final String DELIVERED = "DELIVERED";
+        public static final String ABORTED = "ABORTED";
+
+        public String conversionId;
+        /** {@link #DEPOSIT} or {@link #WITHDRAW}. */
+        public String kind;
+        public String keyId;
+        /** Deposit: uses credited (set when credited). Withdrawal: keys debited. */
+        public int count;
+        /** Deposit: the serial being converted. */
+        public String serial;
+        /** Withdrawal: the serials it issues, chosen before the debit so a retry issues the same ones. */
+        public List<String> serials = new ArrayList<>();
+        /** The request that started it, for duplicate suppression; may be {@code null}. */
+        public String requestId;
+        public String state;
+        public String note;
+        public long at;
+
+        /** Whether recovery still has work to do on it. */
+        public boolean unfinished() {
+            return PREPARED.equals(state) || DEBITED.equals(state);
+        }
     }
 
     public static final class RequestRecord {

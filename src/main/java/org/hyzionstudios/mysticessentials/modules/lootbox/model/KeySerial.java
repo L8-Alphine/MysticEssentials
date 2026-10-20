@@ -11,6 +11,12 @@ public final class KeySerial {
     public static final String RESERVED = "RESERVED";
     public static final String REDEEMED = "REDEEMED";
     public static final String REVOKED = "REVOKED";
+    /**
+     * Deposited into the owner's virtual balance (P2-F3): {@link #redeemedBy}
+     * holds the conversion and {@link #usesLeft} the uses it credited. Any item
+     * still carrying this serial is dead.
+     */
+    public static final String CONVERTED = "CONVERTED";
 
     public int schema = 1;
     public String serial;
@@ -20,10 +26,10 @@ public final class KeySerial {
     public String owner;
     public String state = ISSUED;
     public int usesLeft = 1;
-    /** Opening holding the reservation while the item is removed from the inventory. */
+    /** Opening (or deposit conversion) holding the reservation while the item is removed from the inventory. */
     public String reservedBy;
     public long reservedAt;
-    /** Last opening that spent a use, and what it drew. */
+    /** Last opening that spent a use, and what it drew; for {@link #CONVERTED}, the conversion. */
     public String redeemedBy;
     public String redeemedOutcome;
     public String source;

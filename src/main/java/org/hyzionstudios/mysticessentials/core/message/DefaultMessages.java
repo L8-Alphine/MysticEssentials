@@ -526,6 +526,12 @@ public final class DefaultMessages {
         o.addProperty("lootbox-pending-claimed", "&aClaimed {count} reward(s); {remaining} still waiting.");
         o.addProperty("lootbox-key-given", "&aGave &f{count}x {key} &ato &f{player}&a.");
         o.addProperty("lootbox-key-received", "&aYou received &f{count}x {key}&a.");
+        // LootBox keys track: physical <-> virtual conversion.
+        o.addProperty("lootbox-key-deposited",
+                "&aDeposited your key: &f+{count} {key} &avirtual (you now have &f{balance}&a).");
+        o.addProperty("lootbox-key-withdrawn", "&aWithdrew &f{count}x {key}&a. &7{balance} virtual left.");
+        o.addProperty("lootbox-key-withdrawn-pending",
+                "&e{count} didn't fit in your inventory. Claim them with &f/lootbox pending&e.");
         o.addProperty("lootbox-published", "&aPublished &f{pool} &arevision &f{revision}&a (odds id {hash}).");
         o.addProperty("lootbox-publish-unchanged", "&7{pool} is unchanged; revision {revision} stays live.");
         o.addProperty("lootbox-publish-failed", "&cCould not publish &f{pool}&c: {reason}");

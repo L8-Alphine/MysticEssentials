@@ -27,7 +27,8 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
  *
  * <ul>
  *   <li>no args → catalog; {@code preview <id>}; {@code history [player]}; {@code pending};</li>
- *   <li>{@code key give|revoke|info|list|publish …};</li>
+ *   <li>{@code key give|revoke|info|list|publish|grants …}; players' {@code key deposit} and
+ *       {@code key withdraw <keyId> [count]};</li>
  *   <li>{@code publish|rollback|disable|enable …}; {@code simulate <id> [draws]};</li>
  *   <li>{@code crate select|convert|remove|info|verify|enable …};</li>
  *   <li>{@code reconcile <openingId> regrant|dismiss}; {@code admin}; {@code reload}.</li>
@@ -176,7 +177,14 @@ public final class LootBoxCommand extends MysticCommand {
                 player(sender).ifPresent(player -> org.hyzionstudios.mysticessentials.modules.lootbox.ui.KeyGrantsPage
                         .openLater(core, player, module, keyId));
             }
-            default -> usage(sender, "/lootbox key <give|revoke|info|list|publish|grants> …");
+            case "deposit" -> {
+                if (allowed(sender, Permissions.LOOTBOX_USE)) {
+                    player(sender).ifPresent(player -> module.keys().conversions().deposit(player, null)
+                            .thenAccept(result -> replyConversion(sender, result)));
+                }
+            }
+            case "withdraw" -> keyWithdraw(sender, args);
+            default -> usage(sender, "/lootbox key <give|revoke|info|list|publish|grants|deposit|withdraw> …");
         }
     }
 
@@ -227,6 +235,47 @@ public final class LootBoxCommand extends MysticCommand {
                     core.platform().findPlayer(uuid).ifPresent(online -> core.getMessageService().sendKey(online,
                             "lootbox-key-received", Map.of("count", Integer.toString(finalCount), "key", keyId)));
                 }));
+    }
+
+    /** {@code /lootbox key withdraw <keyId> [count]} */
+    private void keyWithdraw(MysticCommandSender sender, String[] args) {
+        if (!allowed(sender, Permissions.LOOTBOX_USE)) {
+            return;
+        }
+        if (args.length < 3) {
+            usage(sender, "/lootbox key withdraw <keyId> [count]");
+            return;
+        }
+        String keyId = DraftValidator.normaliseKeyId(args[2].toLowerCase(Locale.ROOT));
+        int count = 1;
+        if (args.length > 3) {
+            try {
+                count = Integer.parseInt(args[3]);
+            } catch (NumberFormatException e) {
+                usage(sender, "/lootbox key withdraw <keyId> [count]");
+                return;
+            }
+        }
+        int finalCount = count;
+        player(sender).ifPresent(player -> module.keys().conversions().withdraw(player, keyId, finalCount, null)
+                .thenAccept(result -> replyConversion(sender, result)));
+    }
+
+    private static void replyConversion(MysticCommandSender sender,
+            org.hyzionstudios.mysticessentials.modules.lootbox.service.ConversionService.Result result) {
+        switch (result.status()) {
+            case DEPOSITED -> sender.replyKey("lootbox-key-deposited", Map.of("count", Integer.toString(result.count()),
+                    "key", result.keyId(), "balance", Integer.toString(result.balance())));
+            case WITHDRAWN -> {
+                sender.replyKey("lootbox-key-withdrawn", Map.of("count", Integer.toString(result.count()),
+                        "key", result.keyId(), "balance", Integer.toString(result.balance())));
+                if (result.pending() > 0) {
+                    sender.replyKey("lootbox-key-withdrawn-pending", Map.of("count", Integer.toString(result.pending())));
+                }
+            }
+            case PENDING, BUSY, DUPLICATE -> sender.reply("&e" + result.message());
+            default -> sender.reply("&c" + result.message());
+        }
     }
 
     private static String describe(KeySerial serial, String id) {

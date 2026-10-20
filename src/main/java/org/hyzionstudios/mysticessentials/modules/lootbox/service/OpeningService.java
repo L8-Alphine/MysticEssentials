@@ -528,9 +528,10 @@ public final class OpeningService {
 
     /**
      * Finishes whatever this player left unfinished: an opening between draw and
-     * commit (decided by {@link RecoveryPolicy}), and deliveries that never settled.
-     * Runs in the player's lane, so it never races a new opening. A delivery this
-     * server is still running is left to finish ({@link DeliveryRules#resumes}).
+     * commit (decided by {@link RecoveryPolicy}), deliveries that never settled,
+     * and key conversions ({@link ConversionRules}). Runs in the player's lane, so
+     * it never races a new opening or conversion. A delivery this server is still
+     * running is left to finish ({@link DeliveryRules#resumes}).
      */
     public CompletableFuture<Void> recover(PlayerRef player) {
         UUID uuid = player.getUuid();
@@ -538,7 +539,8 @@ public final class OpeningService {
             CompletableFuture<Void> active = state.activeOpening == null ? CompletableFuture.completedFuture(null)
                     : storage.loadOpening(state.activeOpening).thenCompose(opening -> recoverActive(player, opening,
                             state.activeOpening));
-            return active.thenCompose(ignored -> storage.loadPlayer(uuid)).thenCompose(this::resumeDeliveries);
+            return active.thenCompose(ignored -> storage.loadPlayer(uuid)).thenCompose(this::resumeDeliveries)
+                    .thenCompose(ignored -> keys.conversions().recoverInLane(player));
         })).exceptionally(error -> {
             core.log(Level.WARNING, "[lootbox] recovery for " + player.getUsername() + " failed: " + error);
             return null;

@@ -59,6 +59,7 @@ public final class KeyService {
     private final SecureDraw draw;
     private volatile LootBoxConfig config;
     private byte[] secret;
+    private final ConversionService conversions;
 
     public KeyService(MysticCore core, LootBoxStorage storage, LootBoxRegistry registry, AuditService audit,
             PlayerLanes lanes, SecureDraw draw, LootBoxConfig config) {
@@ -69,10 +70,20 @@ public final class KeyService {
         this.lanes = lanes;
         this.draw = draw;
         this.config = config;
+        this.conversions = new ConversionService(core, storage, registry, audit, lanes, draw, this);
     }
 
     public void updateConfig(LootBoxConfig config) {
         this.config = config;
+    }
+
+    LootBoxConfig config() {
+        return config;
+    }
+
+    /** {@code /lootbox key deposit} and {@code withdraw} (P2-F3). */
+    public ConversionService conversions() {
+        return conversions;
     }
 
     /** Loads the signing secret, creating it on first enable. Kept out of config.json. */
@@ -218,7 +229,8 @@ public final class KeyService {
         return storage.saveSerial(serial).thenApply(saved -> KeyItemFactory.create(definition, marker));
     }
 
-    private CompletableFuture<Integer> toInbox(UUID owner, List<ItemStack> stacks) {
+    /** Files key items in the pending inbox, once per serial. @return how many were filed or already there */
+    CompletableFuture<Integer> toInbox(UUID owner, List<ItemStack> stacks) {
         if (stacks.isEmpty()) {
             return CompletableFuture.completedFuture(0);
         }
@@ -247,7 +259,8 @@ public final class KeyService {
     public CompletableFuture<Boolean> revoke(String serial, String actor) {
         AtomicBoolean changed = new AtomicBoolean();
         return storage.updateSerial(serial, entry -> {
-            if (entry == null || KeySerial.REVOKED.equals(entry.state) || KeySerial.REDEEMED.equals(entry.state)) {
+            if (entry == null || KeySerial.REVOKED.equals(entry.state) || KeySerial.REDEEMED.equals(entry.state)
+                    || KeySerial.CONVERTED.equals(entry.state)) {
                 return null;
             }
             entry.state = KeySerial.REVOKED;

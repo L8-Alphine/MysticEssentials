@@ -122,6 +122,28 @@ public final class InventoryAdapter {
         return ItemStack.isEmpty(held) ? null : held.getItemId();
     }
 
+    /**
+     * The stack in the active hotbar slot when it carries a key marker, for
+     * {@code /lootbox key deposit}. Its signature is NOT checked here. A builder
+     * tool in hand does not count: keys are never tools.
+     *
+     * @return the stack and its slot, or {@code null} for an empty hand or an ordinary item
+     */
+    public static KeyStack heldKey(Store<EntityStore> store, Ref<EntityStore> entity) {
+        InventoryComponent.Hotbar hotbar = store.getComponent(entity, InventoryComponent.Hotbar.getComponentType());
+        if (hotbar == null) {
+            return null;
+        }
+        short slot = hotbar.getActiveSlot();
+        ItemContainer container = hotbar.getInventory();
+        if (slot < 0 || slot >= container.getCapacity()) {
+            return null;
+        }
+        ItemStack stack = container.getItemStack(slot);
+        KeyMarker marker = KeyItemFactory.read(stack);
+        return marker == null ? null : new KeyStack(Section.HOTBAR, slot, marker, stack.getQuantity());
+    }
+
     /** Builds a stack from stored parts; {@code metadataJson} may be null. */
     public static ItemStack stack(String itemId, int quantity, String metadataJson) {
         BsonDocument metadata = metadataJson == null || metadataJson.isBlank() ? null : BsonDocument.parse(metadataJson);
