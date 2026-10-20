@@ -27,6 +27,7 @@ import org.hyzionstudios.mysticessentials.modules.lootbox.ui.editor.EditorSessio
 import org.hyzionstudios.mysticessentials.modules.lootbox.ui.editor.EditorTabs;
 import org.hyzionstudios.mysticessentials.modules.lootbox.ui.editor.FormFields;
 import org.hyzionstudios.mysticessentials.modules.lootbox.ui.editor.OddsConverter;
+import org.hyzionstudios.mysticessentials.modules.lootbox.ui.editor.RewardsTab;
 import org.hyzionstudios.mysticessentials.modules.lootbox.validate.CommandTemplate;
 import org.hyzionstudios.mysticessentials.modules.lootbox.validate.DraftValidator;
 import org.hyzionstudios.mysticessentials.platform.ui.ItemCatalog;
@@ -72,6 +73,8 @@ public final class LootBoxEngineTest {
         oddsConverterKeepsChances();
         oddsConverterRoundsAndRefuses();
         draftDiffListsChanges();
+        editorChancesMatchThePreview();
+        rewardListOperations();
         System.out.println("LootBoxEngineTest: all checks passed.");
     }
 
@@ -590,6 +593,66 @@ public final class LootBoxEngineTest {
         DraftDiff.Diff first = DraftDiff.between(live, null, FORMAT);
         require(first.changed() && first.oddsChange() && first.lines().get(0).contains("First revision"),
                 "a never-published pool was not reported as its first revision");
+    }
+
+    /** The Rewards tab's chances come from the same weights and formatter as the player's preview. */
+    private static void editorChancesMatchThePreview() {
+        for (LootBoxDraft draft : List.of(bibleDraft(), percentDraft("45", "30", "15", "9.9875", "0.0125"))) {
+            Map<String, String> editor = DraftDiff.chances(draft, FORMAT);
+            OddsTable table = OddsEngine.table(revision(draft), "FREE_GAMEPLAY_ONLY");
+            for (OddsTable.Entry entry : table.entries()) {
+                String preview = FORMAT.percent(entry.weight(), table.total());
+                require(preview.equals(editor.get(entry.rewardId())),
+                        "editor shows " + editor.get(entry.rewardId()) + " but the preview shows " + preview
+                                + " for " + entry.rewardId());
+            }
+        }
+    }
+
+    private static void rewardListOperations() {
+        LootBoxDraft draft = bibleDraft();
+        int added = RewardsTab.add(draft);
+        LootBoxDraft.RewardSpec fresh = draft.rewards.get(added);
+        require(added == 5 && "reward".equals(fresh.id) && "ITEM".equals(fresh.type) && fresh.item != null,
+                "add did not append a blank ITEM reward: " + fresh.id);
+        require(fresh.weight == 100, "a new reward should copy the rarest weight (100), got " + fresh.weight);
+        require("reward_2".equals(draft.rewards.get(RewardsTab.add(draft)).id), "the second new reward is not reward_2");
+
+        int copy = RewardsTab.duplicate(draft, 0);
+        LootBoxDraft.RewardSpec dup = draft.rewards.get(copy);
+        require(copy == 1 && "iron_sword_copy".equals(dup.id) && dup.name.endsWith("(copy)") && dup.weight == 4500,
+                "duplicate did not insert a renamed copy after the source: " + dup.id);
+        require(dup != draft.rewards.get(0) && dup.item != draft.rewards.get(0).item,
+                "duplicate shares objects with its source");
+        require("iron_sword_copy_2".equals(draft.rewards.get(RewardsTab.duplicate(draft, 0)).id),
+                "a second copy did not get a free id");
+
+        int last = draft.rewards.size() - 1;
+        require(RewardsTab.move(draft, 0, -1) == 0, "moving the first reward up should stay put");
+        require(RewardsTab.move(draft, last, 1) == last, "moving the last reward down should stay put");
+        String first = draft.rewards.get(0).id;
+        require(RewardsTab.move(draft, 0, 1) == 1 && first.equals(draft.rewards.get(1).id), "move down failed");
+
+        LootBoxDraft.RewardSpec command = item("cmd", "Command", 10);
+        command.command = "examplegrant {playerUuid} 1";
+        command.allowedPatternId = "examplegrant-v1";
+        command.commandIdempotent = true;
+        RewardsTab.setType(command, "COMMAND");
+        require(command.item == null && command.command != null, "switching to COMMAND kept the item or lost the command");
+        RewardsTab.setType(command, "ITEM");
+        require(command.command == null && command.allowedPatternId == null && !command.commandIdempotent
+                && command.item != null && command.item.quantity == 1,
+                "switching back to ITEM kept command fields or gave no item");
+
+        require(RewardsTab.nextId(draft, "Gold Coins!").equals("gold_coins_"), "nextId did not clean the base id");
+        require(RewardsTab.sumLine(bibleDraft()).equals("5 rewards · total weight 10000"),
+                "weights sum line: " + RewardsTab.sumLine(bibleDraft()));
+        String partial = RewardsTab.sumLine(percentDraft("60", "30"));
+        require(partial.contains("90% assigned") && partial.contains("10% left"), "percent sum line: " + partial);
+        LootBoxDraft percent = percentDraft("60", "30");
+        RewardsTab.add(percent);
+        require("10".equals(percent.rewards.get(2).percent), "a new percent reward should take the 10% left");
+        require(RewardsTab.sumLine(percent).contains("exactly 100%"), "after adding, the pool should be exactly 100%");
     }
 
     // ----- Fixtures -----------------------------------------------------------

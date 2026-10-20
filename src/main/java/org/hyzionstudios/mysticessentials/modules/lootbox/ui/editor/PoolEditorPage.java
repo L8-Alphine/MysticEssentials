@@ -3,8 +3,6 @@ package org.hyzionstudios.mysticessentials.modules.lootbox.ui.editor;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.logging.Level;
@@ -17,8 +15,6 @@ import org.hyzionstudios.mysticessentials.modules.lootbox.LootBoxModule;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.KeyDraft;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.LootBoxDraft;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.LootBoxRevision;
-import org.hyzionstudios.mysticessentials.modules.lootbox.odds.OddsEngine;
-import org.hyzionstudios.mysticessentials.modules.lootbox.odds.OddsFormatter;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.DraftLifecycle;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.DraftStore;
 import org.hyzionstudios.mysticessentials.modules.lootbox.ui.LootBoxManagerPage;
@@ -75,7 +71,13 @@ public final class PoolEditorPage extends MysticPage {
     static final FormFields.Field DESCRIPTION = FormFields.Field.text("description", "#DescriptionInput", "Description");
     static final FormFields.Field COOLDOWN = FormFields.Field.text("cooldown", "#CooldownInput", "Cooldown");
     static final FormFields.Field PERMISSION = FormFields.Field.text("permission", "#PermissionInput", "Permission");
-    static final FormFields INPUTS = FormFields.of(NAME, DESCRIPTION, COOLDOWN, PERMISSION);
+    static final FormFields INPUTS = FormFields.of(fields());
+
+    private static FormFields.Field[] fields() {
+        List<FormFields.Field> all = new ArrayList<>(List.of(NAME, DESCRIPTION, COOLDOWN, PERMISSION));
+        all.addAll(RewardsTab.FIELDS);
+        return all.toArray(FormFields.Field[]::new);
+    }
 
     private static final int MAX_NAME = 96;
     private static final int MAX_DESCRIPTION = 200;
@@ -136,9 +138,7 @@ public final class PoolEditorPage extends MysticPage {
         // The form's inputs exist on every tab (hidden ones too), so every event can carry them.
         buildGeneral(cmd, event, draft);
         buildRules(cmd, event, draft);
-        if (TAB_REWARDS.equals(tab)) {
-            buildRewards(cmd, draft);
-        }
+        RewardsTab.build(cmd, event, rewards(), INPUTS::event);
         if (TAB_PUBLISH.equals(tab)) {
             buildPublish(cmd, draft, problems);
         }
@@ -221,37 +221,6 @@ public final class PoolEditorPage extends MysticPage {
     private record KeyRow(String id, KeyDraft.Published published, boolean linked) {
     }
 
-    private void buildRewards(UICommandBuilder cmd, LootBoxDraft draft) {
-        OddsFormatter format = module.opening().formatter();
-        Map<String, String> chances = DraftDiff.chances(draft, format);
-        cmd.set("#RewardsHint.TextSpans", uiText("#RewardsHint.TextSpans", "Rewards are edited in "
-                + "lootboxes/" + session.draftId() + ".json for now. Use Load From Disk after changing the file."));
-        List<String> lines = new ArrayList<>();
-        if (draft.rewards.isEmpty()) {
-            lines.add("&8No rewards yet.");
-        }
-        List<Long> weights = null;
-        long total = 0;
-        try {
-            weights = OddsEngine.resolveWeights(draft);
-            for (long weight : weights) {
-                total += weight;
-            }
-        } catch (IllegalArgumentException e) {
-            lines.add("&c" + e.getMessage());
-        }
-        for (int i = 0; i < draft.rewards.size(); i++) {
-            LootBoxDraft.RewardSpec reward = draft.rewards.get(i);
-            String odds = weights == null
-                    ? (OddsConverter.EXACT_PERCENT.equalsIgnoreCase(draft.mode) ? reward.percent + "%" : "weight " + reward.weight)
-                    : "&6" + chances.get(reward.id) + " &8(" + format.oneIn(weights.get(i), total) + ")";
-            lines.add("&f" + MysticText.stripMarkup(blankTo(reward.name, reward.id)) + " &8· "
-                    + blankTo(reward.type, "?").toUpperCase(Locale.ROOT)
-                    + (reward.rarity == null || reward.rarity.isBlank() ? "" : " · " + reward.rarity) + " &8· " + odds);
-        }
-        lines(cmd, "#RewardList", lines);
-    }
-
     private void buildPublish(UICommandBuilder cmd, LootBoxDraft draft, List<String> problems) {
         List<String> problemLines = new ArrayList<>();
         if (problems.isEmpty()) {
@@ -318,7 +287,16 @@ public final class PoolEditorPage extends MysticPage {
         if (name != null) {
             FormFields.nonBlank(NAME, name, MAX_NAME).collect(problems);
         }
+        problems.addAll(RewardsTab.unparsed(rewards()));
         return problems;
+    }
+
+    /** What the Rewards tab needs: the session, the live reward ids, and what the server can deliver. */
+    private RewardsTab.Context rewards() {
+        Set<String> liveIds = new java.util.HashSet<>();
+        module.registry().active(session.draftId()).ifPresent(live -> live.spec.rewards.forEach(r -> liveIds.add(r.id)));
+        return new RewardsTab.Context(session, liveIds, player.hasPermission(Permissions.LOOTBOX_REWARDS_COMMAND),
+                module.registry().environment(true), module.opening().formatter());
     }
 
     // ----- Events -------------------------------------------------------------
@@ -355,6 +333,36 @@ public final class PoolEditorPage extends MysticPage {
                 toggleKey(field(payload, "key"));
                 reopen(ref, store, page(View.of(null)));
             }
+            case "selectReward" -> selectReward(ref, store, field(payload, "row"));
+            case "addReward" -> addReward(ref, store, false);
+            case "duplicateReward" -> addReward(ref, store, true);
+            case "moveRewardUp" -> moveReward(ref, store, -1);
+            case "moveRewardDown" -> moveReward(ref, store, 1);
+            case "deleteReward" -> confirmDeleteReward(ref, store);
+            case "rewardType" -> editReward(ref, store, reward -> {
+                String type = string(payload, "@rewardType");
+                if (RewardsTab.COMMAND_TYPE.equalsIgnoreCase(type)
+                        && !player.hasPermission(Permissions.LOOTBOX_REWARDS_COMMAND)) {
+                    return "&cConsole command rewards need mysticessentials.lootbox.rewards.command.";
+                }
+                RewardsTab.forgetInputs(session);
+                RewardsTab.setType(reward, type);
+                return null;
+            });
+            case "rewardPattern" -> editReward(ref, store, reward -> {
+                String pattern = string(payload, "@pattern");
+                reward.allowedPatternId = pattern == null || pattern.isBlank() ? null : pattern;
+                return null;
+            });
+            case "rewardItem" -> pickRewardItem(ref, store);
+            case "announceOn", "announceOff" -> editReward(ref, store, reward -> {
+                reward.announce = "announceOn".equals(action);
+                return null;
+            });
+            case "idempotentOn", "idempotentOff" -> editReward(ref, store, reward -> {
+                reward.commandIdempotent = "idempotentOn".equals(action);
+                return null;
+            });
             case "save" -> save(ref, store, null);
             case "revert" -> confirmRevert(ref, store);
             case "reloadDisk" -> loadFromDisk(ref, store, "&7Loaded the draft file; your unsaved changes were dropped.");
@@ -399,6 +407,9 @@ public final class PoolEditorPage extends MysticPage {
                 session.forgetInput(PERMISSION.key());
             }
         }
+        if (RewardsTab.apply(rewards())) {
+            session.markDirty();
+        }
     }
 
     private void change(boolean differs, Runnable apply) {
@@ -427,6 +438,146 @@ public final class PoolEditorPage extends MysticPage {
         ItemPickerPage.Spec spec = new ItemPickerPage.Spec("Choose an Icon",
                 "Icon for " + MysticText.stripMarkup(blankTo(draft.displayName, session.draftId())),
                 blankTo(draft.icon, ""), Permissions.LOOTBOX_EDIT, "");
+        reopen(ref, store, ItemPickerPage.create(core, player, session, spec,
+                (r, s) -> reopen(r, s, page(View.of(null)))));
+    }
+
+    // ----- Rewards ------------------------------------------------------------
+
+    /** Refuses to move the selection while the selected reward has text that did not parse. */
+    private boolean selectionBlocked(Ref<EntityStore> ref, Store<EntityStore> store) {
+        List<FormFields.Problem> problems = RewardsTab.unparsed(rewards());
+        if (problems.isEmpty()) {
+            return false;
+        }
+        session.tab(TAB_REWARDS);
+        reopen(ref, store, page(View.of("&cFix this reward first: " + problems.get(0).message())));
+        return true;
+    }
+
+    private void selectReward(Ref<EntityStore> ref, Store<EntityStore> store, String rawRow) {
+        int row;
+        try {
+            row = Integer.parseInt(rawRow == null ? "" : rawRow.trim());
+        } catch (NumberFormatException e) {
+            reopen(ref, store, page(view));
+            return;
+        }
+        if (row != session.selectedRow() && !selectionBlocked(ref, store)) {
+            RewardsTab.forgetInputs(session);
+            session.selectRow(row);
+            reopen(ref, store, page(View.of(null)));
+        } else if (row == session.selectedRow()) {
+            reopen(ref, store, page(View.of(null)));
+        }
+    }
+
+    private void addReward(Ref<EntityStore> ref, Store<EntityStore> store, boolean duplicate) {
+        if (selectionBlocked(ref, store)) {
+            return;
+        }
+        LootBoxDraft draft = session.working();
+        int selected = RewardsTab.selected(session);
+        if (duplicate && (selected < 0 || RewardsTab.locked(draft.rewards.get(selected),
+                player.hasPermission(Permissions.LOOTBOX_REWARDS_COMMAND)))) {
+            reopen(ref, store, page(View.of("&cYou can't duplicate that reward.")));
+            return;
+        }
+        int added = duplicate ? RewardsTab.duplicate(draft, selected) : RewardsTab.add(draft);
+        RewardsTab.forgetInputs(session);
+        session.selectRow(added);
+        session.tab(TAB_REWARDS);
+        session.markDirty();
+        reopen(ref, store, page(View.of(duplicate ? "&aDuplicated as &f" + draft.rewards.get(added).id + "&a."
+                : "&aAdded &f" + draft.rewards.get(added).id + "&a: choose its item, then set its odds.")));
+    }
+
+    private void moveReward(Ref<EntityStore> ref, Store<EntityStore> store, int delta) {
+        int selected = RewardsTab.selected(session);
+        if (selected >= 0) {
+            int moved = RewardsTab.move(session.working(), selected, delta);
+            if (moved != selected) {
+                session.selectRow(moved);
+                session.markDirty();
+            }
+        }
+        reopen(ref, store, page(View.of(null)));
+    }
+
+    private void confirmDeleteReward(Ref<EntityStore> ref, Store<EntityStore> store) {
+        int selected = RewardsTab.selected(session);
+        if (selected < 0) {
+            reopen(ref, store, page(view));
+            return;
+        }
+        LootBoxDraft.RewardSpec reward = session.working().rewards.get(selected);
+        boolean live = rewards().liveIds().contains(reward.id);
+        ConfirmActionPage.Spec spec = new ConfirmActionPage.Spec("Delete " + MysticText.stripMarkup(
+                blankTo(reward.name, reward.id)) + "?", List.of(
+                "&7Removes &f" + reward.id + " &7from this draft; the other rewards' chances grow to fill its share.",
+                live ? "&7The live revision keeps it until you publish." : "&7It was never published."),
+                "Delete", true, Permissions.LOOTBOX_EDIT);
+        String id = reward.id;
+        reopen(ref, store, new ConfirmActionPage(core, player, spec, (r, s) -> {
+            if (!current()) {
+                close(r, s);
+                return;
+            }
+            List<LootBoxDraft.RewardSpec> list = session.working().rewards;
+            for (int i = 0; i < list.size(); i++) {
+                if (id.equals(list.get(i).id)) {
+                    list.remove(i);
+                    RewardsTab.forgetInputs(session);
+                    session.selectRow(Math.min(i, list.size() - 1));
+                    session.markDirty();
+                    break;
+                }
+            }
+            reopen(r, s, page(View.of("&7Deleted &f" + id + "&7 from the draft.")));
+        }, (r, s) -> reopen(r, s, page(view))));
+    }
+
+    /** Runs {@code edit} on the selected reward unless it is locked; it returns a refusal notice or {@code null}. */
+    private void editReward(Ref<EntityStore> ref, Store<EntityStore> store,
+            java.util.function.Function<LootBoxDraft.RewardSpec, String> edit) {
+        int selected = RewardsTab.selected(session);
+        if (selected < 0) {
+            reopen(ref, store, page(view));
+            return;
+        }
+        LootBoxDraft.RewardSpec reward = session.working().rewards.get(selected);
+        if (RewardsTab.locked(reward, player.hasPermission(Permissions.LOOTBOX_REWARDS_COMMAND))) {
+            reopen(ref, store, page(View.of("&cYou need mysticessentials.lootbox.rewards.command to change this reward.")));
+            return;
+        }
+        String refused = edit.apply(reward);
+        if (refused == null) {
+            session.markDirty();
+        }
+        reopen(ref, store, page(View.of(refused)));
+    }
+
+    private void pickRewardItem(Ref<EntityStore> ref, Store<EntityStore> store) {
+        int selected = RewardsTab.selected(session);
+        if (selected < 0) {
+            reopen(ref, store, page(view));
+            return;
+        }
+        LootBoxDraft.RewardSpec reward = session.working().rewards.get(selected);
+        if (RewardsTab.locked(reward, player.hasPermission(Permissions.LOOTBOX_REWARDS_COMMAND))) {
+            reopen(ref, store, page(View.of("&cYou need mysticessentials.lootbox.rewards.command to change this reward.")));
+            return;
+        }
+        session.awaitReturn(itemId -> {
+            if (reward.item == null) {
+                reward.item = new LootBoxDraft.ItemSpec();
+                reward.item.quantity = 1;
+            }
+            reward.item.itemId = itemId;
+        });
+        String current = reward.item == null ? "" : blankTo(reward.item.itemId, "");
+        ItemPickerPage.Spec spec = new ItemPickerPage.Spec("Choose a Reward Item",
+                "Reward: " + MysticText.stripMarkup(blankTo(reward.name, reward.id)), current, Permissions.LOOTBOX_EDIT, "");
         reopen(ref, store, ItemPickerPage.create(core, player, session, spec,
                 (r, s) -> reopen(r, s, page(View.of(null)))));
     }

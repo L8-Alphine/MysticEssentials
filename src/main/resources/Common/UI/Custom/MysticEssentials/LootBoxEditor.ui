@@ -1,8 +1,8 @@
 // LootBox pool editor (P2-D): tabs General, Rewards, Keys & Rules and Publish
 // over one working copy. Tabs come from LootBoxEditorTab.ui (appended into
-// #Tabs); only the active tab's panel is visible. Lines in #RewardList,
-// #ProblemList and #DiffList are LootBoxConfirmActionLine.ui; key rows in
-// #KeyList are LootBoxEditorToggleRow.ui.
+// #Tabs); only the active tab's panel is visible. Lines in #ProblemList and
+// #DiffList are LootBoxConfirmActionLine.ui; rows in #RewardList are
+// LootBoxEditorRewardRow.ui and rows in #KeyList LootBoxEditorToggleRow.ui.
 $C = "../Common.ui";
 $M = "MysticTheme.ui";
 
@@ -110,26 +110,319 @@ $C.@Container {
       }
     }
 
-    // ----- Rewards (read-only until the rewards editor) ----------------------
+    // ----- Rewards: list on the left, the selected reward on the right ----------
     $M.@Panel #RewardsPanel {
       @Padding = 14;
 
       FlexWeight: 1;
       Visible: false;
 
-      Label #RewardsHint {
-        Anchor: (Height: 20, Bottom: 8);
-        Style: $M.@CaptionStyle;
-      }
-
-      $M.@Well {
+      Group {
+        LayoutMode: Left;
         FlexWeight: 1;
 
-        Group #RewardList {
+        Group {
+          LayoutMode: Top;
+          Anchor: (Width: 390, Right: 16);
+
+          Label #RewardsSum {
+            Anchor: (Height: 20, Bottom: 6);
+            Style: $M.@MetaStyle;
+          }
+
+          $M.@Well {
+            FlexWeight: 1;
+
+            Group #RewardList {
+              FlexWeight: 1;
+              LayoutMode: TopScrolling;
+              Padding: (Right: 6);
+              ScrollbarStyle: $C.@DefaultScrollbarStyle;
+            }
+          }
+
+          Group {
+            LayoutMode: Left;
+            Anchor: (Height: 40, Top: 8);
+
+            $C.@SecondaryTextButton #AddRewardButton {
+              @Text = "Add";
+              @Anchor = (Width: 86);
+            }
+
+            $C.@SecondaryTextButton #DuplicateRewardButton {
+              @Text = "Duplicate";
+              @Anchor = (Width: 116, Left: 6);
+            }
+
+            $C.@SecondaryTextButton #MoveUpButton {
+              @Text = "Up";
+              @Anchor = (Width: 80, Left: 6);
+            }
+
+            $C.@SecondaryTextButton #MoveDownButton {
+              @Text = "Down";
+              @Anchor = (Width: 90, Left: 6);
+            }
+          }
+        }
+
+        Group {
+          LayoutMode: Top;
           FlexWeight: 1;
-          LayoutMode: TopScrolling;
-          Padding: (Right: 6);
-          ScrollbarStyle: $C.@DefaultScrollbarStyle;
+
+          Label #RewardEmpty {
+            Anchor: (Height: 64);
+            Style: $M.@EmptyStyle;
+            Text: "Select a reward on the left, or press Add.";
+            Visible: false;
+          }
+
+          Group #RewardFields {
+            LayoutMode: Top;
+            FlexWeight: 1;
+
+            Group {
+              LayoutMode: Left;
+              Anchor: (Height: 58);
+
+              Group {
+                LayoutMode: Top;
+                Anchor: (Width: 170, Right: 12);
+
+                $M.@FieldLabel { @Text = "Reward id"; }
+                $C.@TextField #RewardIdInput {
+                  PlaceholderText: "a-z, 0-9 and _";
+                }
+
+                Label #RewardIdLabel {
+                  Anchor: (Height: 30);
+                  Style: $M.@ValueStyle;
+                }
+              }
+
+              Group {
+                LayoutMode: Top;
+                FlexWeight: 1;
+
+                $M.@FieldLabel { @Text = "Name"; }
+                $C.@TextField #RewardNameInput {
+                  PlaceholderText: "What players see";
+                }
+              }
+            }
+
+            Group {
+              LayoutMode: Left;
+              Anchor: (Height: 58, Top: 8);
+
+              Group {
+                LayoutMode: Top;
+                Anchor: (Width: 140, Right: 12);
+
+                $M.@FieldLabel { @Text = "Rarity"; }
+                $C.@TextField #RarityInput {
+                  PlaceholderText: "e.g. Rare";
+                }
+              }
+
+              Group {
+                LayoutMode: Top;
+                Anchor: (Width: 150, Right: 12);
+
+                Label #OddsFieldLabel {
+                  Anchor: (Height: 16, Bottom: 6);
+                  Style: $M.@EyebrowStyle;
+                }
+                $C.@TextField #OddsInput {
+                  PlaceholderText: "number";
+                }
+              }
+
+              Group {
+                LayoutMode: Top;
+                FlexWeight: 1;
+
+                $M.@FieldLabel { @Text = "Type"; }
+                $C.@DropdownBox #RewardTypeInput {
+                  Anchor: (Height: 32);
+                }
+              }
+            }
+
+            Label #RewardChance {
+              Anchor: (Height: 22, Top: 6, Bottom: 6);
+              Style: $M.@MetaGoldStyle;
+            }
+
+            Group #ItemSection {
+              LayoutMode: Top;
+
+              $M.@FieldLabel { @Text = "Item"; }
+              Group {
+                LayoutMode: Left;
+                Anchor: (Height: 44, Bottom: 8);
+
+                $M.@IconWell {
+                  @Size = 44;
+                  @Anchor = (Right: 12);
+
+                  ItemSlot #RewardItemSlot {
+                    Anchor: (Width: 36, Height: 36);
+                    ShowQualityBackground: true;
+                    ShowQuantity: false;
+                  }
+                }
+
+                Label #RewardItemName {
+                  FlexWeight: 1;
+                  Style: $M.@ValueStyle;
+                }
+
+                $C.@SecondaryTextButton #RewardItemButton {
+                  @Text = "Choose Item";
+                  @Anchor = (Width: 150, Left: 8);
+                }
+              }
+
+              Group {
+                LayoutMode: Top;
+                Anchor: (Width: 150, Height: 58);
+
+                $M.@FieldLabel { @Text = "Quantity"; }
+                $C.@TextField #QuantityInput {
+                  PlaceholderText: "1-9999";
+                }
+              }
+            }
+
+            Group #EconomySection {
+              LayoutMode: Top;
+
+              Group {
+                LayoutMode: Top;
+                Anchor: (Width: 200, Height: 58);
+
+                $M.@FieldLabel { @Text = "Amount"; }
+                $C.@TextField #AmountInput {
+                  PlaceholderText: "e.g. 250";
+                }
+              }
+
+              Label #EconomyNote {
+                Anchor: (Height: 18, Top: 4);
+                Style: $M.@CaptionStyle;
+              }
+            }
+
+            Group #PermissionSection {
+              LayoutMode: Top;
+
+              Group {
+                LayoutMode: Left;
+                Anchor: (Height: 58);
+
+                Group {
+                  LayoutMode: Top;
+                  FlexWeight: 1;
+
+                  $M.@FieldLabel { @Text = "Permission node"; }
+                  $C.@TextField #NodeInput {
+                    PlaceholderText: "e.g. myserver.vip";
+                  }
+                }
+
+                Group {
+                  LayoutMode: Top;
+                  Anchor: (Width: 170, Left: 12);
+
+                  $M.@FieldLabel { @Text = "Duration (s)"; }
+                  $C.@TextField #DurationInput {
+                    PlaceholderText: "0 = permanent";
+                  }
+                }
+              }
+
+              Label #PermissionNote {
+                Anchor: (Height: 18, Top: 4);
+                Style: $M.@CaptionStyle;
+              }
+            }
+
+            Group #CommandSection {
+              LayoutMode: Top;
+
+              $M.@FieldLabel { @Text = "Command template"; }
+              $C.@TextField #CommandInput {
+                @Anchor = (Bottom: 8);
+                PlaceholderText: "e.g. examplegrant {playerUuid} {quantity}";
+              }
+
+              Group {
+                LayoutMode: Left;
+                Anchor: (Height: 58);
+
+                Group {
+                  LayoutMode: Top;
+                  Anchor: (Width: 240, Right: 12);
+
+                  $M.@FieldLabel { @Text = "Allowlisted pattern"; }
+                  $C.@DropdownBox #PatternInput {
+                    Anchor: (Height: 32);
+                  }
+                }
+
+                Group {
+                  LayoutMode: Top;
+                  FlexWeight: 1;
+
+                  $M.@FieldLabel { @Text = "Safe to repeat"; }
+                  $C.@SecondaryTextButton #IdempotentOnButton {
+                    @Text = "No (press if harmless)";
+                    @Anchor = (Height: 32);
+                  }
+                  $C.@SecondaryTextButton #IdempotentOffButton {
+                    @Text = "Yes (press to undo)";
+                    @Anchor = (Height: 32);
+                  }
+                }
+              }
+
+              Label #CommandNote {
+                Anchor: (Height: 18, Top: 4);
+                Style: $M.@CaptionStyle;
+              }
+            }
+
+            Label #RewardLock {
+              Anchor: (Height: 20, Top: 4);
+              Style: $M.@CaptionWarnStyle;
+            }
+
+            $M.@Spacer {}
+
+            Group {
+              LayoutMode: Left;
+              Anchor: (Height: 40, Top: 8);
+
+              $C.@SecondaryTextButton #AnnounceOnButton {
+                @Text = "Announce: Off";
+                @Anchor = (Width: 170);
+              }
+
+              $C.@SecondaryTextButton #AnnounceOffButton {
+                @Text = "Announce: On";
+                @Anchor = (Width: 170);
+              }
+
+              $M.@Spacer {}
+
+              $C.@CancelTextButton #DeleteRewardButton {
+                @Text = "Delete Reward";
+                @Anchor = (Width: 160);
+              }
+            }
+          }
         }
       }
     }

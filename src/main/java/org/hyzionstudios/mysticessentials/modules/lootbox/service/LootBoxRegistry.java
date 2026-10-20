@@ -396,7 +396,8 @@ public final class LootBoxRegistry {
         });
     }
 
-    private DraftValidator.Environment environment(boolean mayPublishCommands) {
+    /** The publish gates' lookups; the editor also reads them to grey out reward types the server cannot deliver. */
+    public DraftValidator.Environment environment(boolean mayPublishCommands) {
         Map<String, String> patterns = new LinkedHashMap<>();
         if (config.rewards.commandAllowlist != null) {
             for (LootBoxConfig.CommandPattern pattern : config.rewards.commandAllowlist) {

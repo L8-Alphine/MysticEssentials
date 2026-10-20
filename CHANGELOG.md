@@ -2,8 +2,8 @@
 
 ## Unreleased — LootBox Creator, part 1
 
-The first pieces of the in-game LootBox creator: the Manager and the pool editor.
-Rewards are still edited in the draft files.
+The first part of the in-game LootBox creator: the Manager and the pool editor,
+with which a pool can be built and published without touching its file.
 
 ### LootBox
 
@@ -25,7 +25,16 @@ Rewards are still edited in the draft files.
     exact percentages converts the numbers exactly where it can and lists every
     reward it had to round.
   - Keys & Rules: link published keys, cooldown, extra permission node.
-  - Rewards: every reward with its live chance and "1 in N" (read-only for now).
+  - Rewards: the list with each reward's live chance and "1 in N", Add,
+    Duplicate, Up/Down and Delete (asks first). The selected reward has its id
+    (fixed once published), name, rarity, weight or percent, and type. Item
+    rewards take an item from the picker and a quantity; economy rewards an
+    amount; permission rewards a node and duration; console commands a
+    template, an allowlisted pattern and a "safe to repeat" switch. There is an
+    announce switch, and the total weight, or how much of 100% is assigned.
+    Typed text that does not parse stays as typed and blocks switching rewards,
+    so it is never applied to the wrong one. Changing COMMAND rewards needs
+    `rewards.command`.
   - Publish: what blocks publishing, and every change from the live revision with
     chances as old % → new %. Publish asks first and saves unsaved changes before
     publishing.
@@ -38,7 +47,8 @@ Rewards are still edited in the draft files.
 ### Verification
 
 - `verifyLootBox` covers the editor's odds conversion (exact both ways where
-  possible, reported rounding, refusals) and the publish diff.
+  possible, reported rounding, refusals), the publish diff, the reward list
+  operations, and that the editor's chances equal the player preview's.
 - New `verifyLootBoxDrafts` check: save/load round trips, conflict detection,
   clone and archive, and the Draft → Invalid → Ready → Published lifecycle.
 - On a 0.7.2 dev server, republishing an existing pool and key still answers
