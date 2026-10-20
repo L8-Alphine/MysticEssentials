@@ -7,6 +7,7 @@ import javax.annotation.Nonnull;
 
 import org.hyzionstudios.mysticessentials.modules.lootbox.LootBoxModule;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.CrateInstance;
+import org.hyzionstudios.mysticessentials.modules.lootbox.service.CrateRules;
 import org.joml.Vector3i;
 
 import com.hypixel.hytale.component.Archetype;
@@ -41,7 +42,9 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
  *       declares a Use interaction ({@code UseBlockInteraction#doInteraction}).
  *       On a crate it is cancelled, so the block's own behaviour (a chest
  *       opening) never runs, and the pool's preview opens instead.</li>
- *   <li>{@link Break} / {@link Damage}: player-caused, cancellable.</li>
+ *   <li>{@link Break} / {@link Damage}: player-caused, cancellable. The server's
+ *       {@code crates.*} protection applies to every crate, and a crate can
+ *       only add to it ({@link CrateRules}).</li>
  *   <li>{@link WorldDamage}: damage with no instigator (explosions) is invoked at
  *       world level and is cancellable before any damage lands.</li>
  *   <li>{@link EnvironmentBreak}: the final no-instigator break is not
@@ -64,6 +67,13 @@ public final class CrateSystems {
         }
         World world = store.getExternalData().getWorld();
         return module.crates().at(world, position.x, position.y, position.z).orElse(null);
+    }
+
+    /** A crate's own protection can only add to the server's ({@link CrateRules#preventsDamage}). */
+    private static boolean protectsFromDamage(Store<EntityStore> store, DamageBlockEvent event) {
+        LootBoxModule module = LootBoxModule.active();
+        CrateInstance crate = crateAt(store, event.getTargetBlock());
+        return module != null && crate != null && CrateRules.preventsDamage(crate, module.config().crates.preventDamage);
     }
 
     private static PlayerRef player(ArchetypeChunk<EntityStore> chunk, Store<EntityStore> store, int index) {
@@ -113,7 +123,8 @@ public final class CrateSystems {
                 @Nonnull CommandBuffer<EntityStore> commandBuffer, @Nonnull BreakBlockEvent event) {
             CrateInstance crate = crateAt(store, event.getTargetBlock());
             LootBoxModule module = LootBoxModule.active();
-            if (crate == null || module == null || !module.config().crates.preventPlayerBreak) {
+            if (crate == null || module == null
+                    || !CrateRules.preventsBreak(crate, module.config().crates.preventPlayerBreak)) {
                 return;
             }
             event.setCancelled(true);
@@ -142,8 +153,7 @@ public final class CrateSystems {
         @Override
         public void handle(int index, @Nonnull ArchetypeChunk<EntityStore> chunk, @Nonnull Store<EntityStore> store,
                 @Nonnull CommandBuffer<EntityStore> commandBuffer, @Nonnull DamageBlockEvent event) {
-            LootBoxModule module = LootBoxModule.active();
-            if (module != null && module.config().crates.preventDamage && crateAt(store, event.getTargetBlock()) != null) {
+            if (protectsFromDamage(store, event)) {
                 event.setCancelled(true);
             }
         }
@@ -163,8 +173,7 @@ public final class CrateSystems {
         @Override
         public void handle(@Nonnull Store<EntityStore> store, @Nonnull CommandBuffer<EntityStore> commandBuffer,
                 @Nonnull DamageBlockEvent event) {
-            LootBoxModule module = LootBoxModule.active();
-            if (module != null && module.config().crates.preventDamage && crateAt(store, event.getTargetBlock()) != null) {
+            if (protectsFromDamage(store, event)) {
                 event.setCancelled(true);
             }
         }

@@ -208,7 +208,7 @@ public final class LootBoxModule extends AbstractMysticModule implements LootBox
             core.getMessageService().sendKey(player, "no-permission");
             return;
         }
-        ui.openPreview(player, crate.lootboxId, crate.crateId);
+        ui.openPreview(player, crate.lootboxId, crate.crateId, crate.directConfirm());
     }
 
     public void onCrateProtected(PlayerRef player) {

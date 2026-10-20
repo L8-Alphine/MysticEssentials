@@ -15,6 +15,7 @@ import org.hyzionstudios.mysticessentials.modules.lootbox.model.CrateInstance;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.KeySerial;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.LootBoxRevision;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.CrateService;
+import org.hyzionstudios.mysticessentials.modules.lootbox.ui.editor.CrateEditorPage;
 import org.hyzionstudios.mysticessentials.modules.lootbox.validate.DraftValidator;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommand;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommandSender;
@@ -29,7 +30,7 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
  *   <li>no args → catalog; {@code preview <id>}; {@code history [player]}; {@code pending};</li>
  *   <li>{@code key give|revoke|info|list|publish …};</li>
  *   <li>{@code publish|rollback|disable|enable …}; {@code simulate <id> [draws]};</li>
- *   <li>{@code crate select|convert|remove|info|verify|enable …};</li>
+ *   <li>{@code crate select|convert|edit|rebind|remove|info|verify|enable …};</li>
  *   <li>{@code reconcile <openingId> regrant|dismiss}; {@code admin}; {@code reload}.</li>
  * </ul>
  *
@@ -324,10 +325,14 @@ public final class LootBoxCommand extends MysticCommand {
                         return;
                     }
                     Optional<CrateInstance> crate = module.crates().at(block.world(), block.x(), block.y(), block.z());
+                    var report = module.crates().check(block, crate.orElse(null));
                     sender.reply("&7Looking at &f" + block.key() + " &7at &f" + block.x() + "," + block.y() + ","
                             + block.z() + (crate.map(c -> " &d- crate " + c.crateId + " → " + c.lootboxId
                                     + (c.disabled ? " &c(disabled: " + c.disabledReason + ")" : "")).orElse(
-                                    block.hasUse() ? " &a- can become a crate" : " &c- no Use interaction")));
+                                    report.ok() ? " &a- can become a crate" : " &c- " + report.problem())));
+                    if (crate.isEmpty()) {
+                        report.warnings().forEach(warning -> sender.reply("&e! " + warning));
+                    }
                 }));
             }
             case "convert" -> {
@@ -395,9 +400,9 @@ public final class LootBoxCommand extends MysticCommand {
                     return;
                 }
                 player(sender).ifPresent(player -> onWorld(sender, player, (store, entity) -> {
-                    var lines = module.crates().verify(store.getExternalData().getWorld());
-                    sender.reply("&d&lCrates in this world &7(" + lines.size() + ")");
-                    lines.forEach(line -> sender.reply("&7- " + line));
+                    var verified = module.crates().verify(store.getExternalData().getWorld());
+                    sender.reply("&d&lCrates in this world &7(" + verified.checked() + ")");
+                    verified.lines().forEach(line -> sender.reply("&7- " + line));
                 }));
             }
             case "list" -> {
@@ -408,7 +413,46 @@ public final class LootBoxCommand extends MysticCommand {
                 module.crates().list().forEach(crate -> sender.reply("&7- &f" + crate.crateId + " &7→ &f"
                         + crate.lootboxId + " &7at " + crate.position() + (crate.disabled ? " &c(disabled)" : "")));
             }
-            default -> usage(sender, "/lootbox crate <select|convert|remove|enable|verify|list|info> …");
+            case "rebind" -> {
+                if (!allowed(sender, Permissions.LOOTBOX_CRATES_PLACE)) {
+                    return;
+                }
+                if (args.length < 4) {
+                    usage(sender, "/lootbox crate rebind <crateId> <pool>");
+                    return;
+                }
+                String lootboxId = args[3].toLowerCase(Locale.ROOT);
+                if (module.registry().active(lootboxId).isEmpty()) {
+                    sender.reply("&c" + lootboxId + " has no published revision; publish it first.");
+                    return;
+                }
+                sender.reply(module.crates().get(args[2]).map(crate -> {
+                    String previous = crate.lootboxId;
+                    module.crates().rebind(crate, lootboxId, sender.name());
+                    return "&aCrate &f" + crate.crateId + " &anow opens &f" + lootboxId + " &7(was " + previous + ").";
+                }).orElse("&cNo crate called &f" + args[2]));
+            }
+            case "edit" -> {
+                if (!allowed(sender, Permissions.LOOTBOX_CRATES_MANAGE)) {
+                    return;
+                }
+                player(sender).ifPresent(player -> onWorld(sender, player, (store, entity) -> {
+                    Optional<CrateInstance> crate;
+                    if (args.length > 2) {
+                        crate = module.crates().get(args[2]);
+                    } else {
+                        BlockTargets.Block block = BlockTargets.target(entity, store, module.config().crates.selectReach);
+                        crate = block == null ? Optional.empty()
+                                : module.crates().at(block.world(), block.x(), block.y(), block.z());
+                    }
+                    if (crate.isEmpty()) {
+                        sender.reply("&cLook at a crate, or name it: /lootbox crate edit <crateId>");
+                        return;
+                    }
+                    core.platform().openPage(player, CrateEditorPage.forCrate(core, player, module, crate.get(), null));
+                }));
+            }
+            default -> usage(sender, "/lootbox crate <select|convert|edit|rebind|remove|enable|verify|list|info> …");
         }
     }
 

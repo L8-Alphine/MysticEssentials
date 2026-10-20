@@ -1,7 +1,10 @@
 package org.hyzionstudios.mysticessentials.modules.lootbox.hytale;
 
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+
+import org.hyzionstudios.mysticessentials.modules.lootbox.service.CrateRules;
 
 import org.joml.Vector3i;
 
@@ -10,6 +13,7 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.protocol.InteractionType;
 import com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType;
+import com.hypixel.hytale.server.core.asset.type.blocktype.config.StateData;
 import com.hypixel.hytale.server.core.modules.interaction.interaction.config.RootInteraction;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.chunk.section.BlockSection;
@@ -25,20 +29,24 @@ import com.hypixel.hytale.server.core.util.TargetUtil;
  */
 public final class BlockTargets {
 
-    /** A block in a loaded chunk. */
-    public record Block(World world, String worldId, int x, int y, int z, BlockType type) {
+    /** A block in a loaded chunk, with its rotation and filler as the chunk stores them. */
+    public record Block(World world, String worldId, int x, int y, int z, BlockType type, int rotation, int filler) {
 
         public String key() {
             return type.getId();
         }
 
         public boolean hasUse() {
-            Map<InteractionType, String> interactions = type.getInteractions();
-            return interactions != null && interactions.get(InteractionType.Use) != null;
+            return useRoot(type) != null;
         }
 
         public boolean isEmpty() {
             return type == BlockType.EMPTY || "Empty".equalsIgnoreCase(type.getId());
+        }
+
+        /** What {@link CrateRules} needs to judge this block. */
+        public CrateRules.BlockFacts facts() {
+            return BlockTargets.facts(type, rotation, isEmpty());
         }
     }
 
@@ -59,8 +67,7 @@ public final class BlockTargets {
         if (type == null || type.isUnknown()) {
             return false;
         }
-        Map<InteractionType, String> interactions = type.getInteractions();
-        String root = interactions == null ? null : interactions.get(InteractionType.Use);
+        String root = useRoot(type);
         return root != null && RootInteraction.getAssetMap().getIndex(root) != AssetMapWithIndexes.NOT_FOUND;
     }
 
@@ -85,7 +92,27 @@ public final class BlockTargets {
             return null;
         }
         BlockType type = BlockType.getAssetMap().getAsset(blocks.get(x, y, z));
-        return type == null ? null : new Block(world, worldId(world), x, y, z, type);
+        return type == null ? null : new Block(world, worldId(world), x, y, z, type, blocks.getRotationIndex(x, y, z),
+                blocks.getFiller(x, y, z));
+    }
+
+    /** The Use root interaction id of {@code type}, or {@code null}. */
+    public static String useRoot(BlockType type) {
+        Map<InteractionType, String> interactions = type == null ? null : type.getInteractions();
+        String root = interactions == null ? null : interactions.get(InteractionType.Use);
+        return root == null || root.isBlank() ? null : root;
+    }
+
+    /** The facts {@link CrateRules#check} judges, read from the block's asset. */
+    @SuppressWarnings("deprecation") // IsDoor is the only door marker the asset has in 0.7.2.
+    public static CrateRules.BlockFacts facts(BlockType type, int rotation, boolean empty) {
+        StateData state = type.getState();
+        Set<String> states = state == null ? null : state.getStateNames();
+        return new CrateRules.BlockFacts(type.getId(), empty, type.isUnknown(), useRoot(type),
+                type.getBlockEntity() != null, type.isDoor(), type.getBench() != null,
+                type.getSeats() != null || type.getBeds() != null, type.getRailConfig(rotation) != null,
+                type.isTrigger(), type.isState() || (states != null && !states.isEmpty()),
+                type.getFallingBlockSettings() != null);
     }
 
     /** The world's UUID as text, falling back to its name (the portals convention). */

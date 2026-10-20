@@ -1,0 +1,135 @@
+// LootBox Crate Manager (P2-G): every crate with its world, position, pool and
+// status, a header search and a status filter. Rows are LootBoxManagerRow.ui
+// appended into #CrateList; selecting one shows its actions in #SelectionBar.
+// #ConvertButton raycasts the block the player looks at and opens the crate
+// editor on it.
+$C = "../Common.ui";
+$M = "MysticTheme.ui";
+
+$C.@PageOverlay {}
+
+$C.@Container {
+  Anchor: (Width: 900, Height: 660);
+
+  #Title {
+    Group {
+      $C.@Title {
+        @Text = "LootBox Crates";
+      }
+
+      $C.@HeaderSearch {}
+    }
+  }
+
+  #Content {
+    LayoutMode: Top;
+
+    Group {
+      LayoutMode: Left;
+      Anchor: (Height: 32, Bottom: 10);
+
+      Label #HeaderInfo {
+        FlexWeight: 1;
+        Style: $M.@MetaStyle;
+      }
+
+      $C.@DropdownBox #StatusFilter {
+        Anchor: (Width: 200, Height: 32, Left: 8);
+      }
+
+      $C.@SecondaryTextButton #ConvertButton {
+        @Text = "Convert Looked-At Block";
+        @Anchor = (Width: 250, Left: 8);
+      }
+    }
+
+    Label #Notice {
+      Anchor: (Height: 20, Bottom: 6);
+      Style: $M.@BodyStyle;
+      Visible: false;
+    }
+
+    $M.@Section {
+      @Text = "Crates";
+      @Anchor = (Bottom: 8);
+    }
+
+    $M.@Well {
+      FlexWeight: 1;
+
+      Label #ListEmpty {
+        Anchor: (Height: 64);
+        Style: $M.@EmptyStyle;
+        Text: "No crates match. Look at a block and press Convert Looked-At Block, or change the search or filter.";
+        Visible: false;
+      }
+
+      Group #CrateList {
+        FlexWeight: 1;
+        LayoutMode: TopScrolling;
+        Padding: (Right: 6);
+        ScrollbarStyle: $C.@DefaultScrollbarStyle;
+      }
+    }
+
+    $M.@ActionBar #SelectionBar {
+      @Anchor = (Height: 44, Top: 10);
+
+      Group {
+        LayoutMode: Top;
+        FlexWeight: 1;
+
+        Label #SelectedName {
+          Anchor: (Height: 22);
+          Style: $M.@SubheadingStyle;
+        }
+
+        Label #SelectedMeta {
+          Anchor: (Height: 16);
+          Style: $M.@MetaStyle;
+        }
+      }
+
+      $C.@TextButton #EditButton {
+        @Text = "Edit";
+        @Anchor = (Width: 90, Left: 8);
+      }
+
+      $C.@SecondaryTextButton #DisableButton {
+        @Text = "Disable";
+        @Anchor = (Width: 110, Left: 6);
+      }
+
+      $C.@SecondaryTextButton #EnableButton {
+        @Text = "Enable";
+        @Anchor = (Width: 110, Left: 6);
+      }
+
+      $C.@CancelTextButton #RemoveButton {
+        @Text = "Remove";
+        @Anchor = (Width: 110, Left: 6);
+      }
+    }
+
+    $M.@ActionBar {
+      @Anchor = (Height: 44, Top: 10);
+
+      $C.@SecondaryTextButton #PoolsButton {
+        @Text = "Pools";
+        @Anchor = (Width: 130);
+      }
+
+      $C.@SecondaryTextButton #VerifyButton {
+        @Text = "Verify This World";
+        @Anchor = (Width: 200, Left: 6);
+      }
+
+      $M.@Spacer {}
+
+      $C.@TextButton #CloseButton {
+        @Text = "Close";
+        @Anchor = (Width: 150);
+      }
+    }
+  }
+}
