@@ -370,17 +370,31 @@ public final class LootBoxCommand extends MysticCommand {
                     return;
                 }
                 if (args.length > 2) {
-                    sender.reply(module.crates().remove(args[2], sender.name()).map(c -> "&aRemoved crate &f" + c.crateId)
-                            .orElse("&cNo crate called &f" + args[2]));
+                    boolean force = args.length > 3 && args[3].equalsIgnoreCase("force");
+                    CrateInstance named = module.crates().get(args[2]).orElse(null);
+                    if (named == null) {
+                        sender.reply("&cNo crate called &f" + args[2]);
+                        return;
+                    }
+                    // A generated crate puts its original block back, which needs its world's thread.
+                    var world = CrateInstance.KIND_GENERATED.equals(named.kind)
+                            ? core.platform().world(named.worldId).or(() -> core.platform().world(named.worldName))
+                                    .orElse(null)
+                            : null;
+                    if (world == null) {
+                        sender.reply(removed(module.crates().remove(named.crateId, null, force, sender.name())));
+                    } else {
+                        world.execute(() -> sender.reply(removed(module.crates().remove(named.crateId, world, force,
+                                sender.name()))));
+                    }
                     return;
                 }
                 player(sender).ifPresent(player -> onWorld(sender, player, (store, entity) -> {
                     BlockTargets.Block block = BlockTargets.target(entity, store, module.config().crates.selectReach);
                     Optional<CrateInstance> crate = block == null ? Optional.empty()
                             : module.crates().at(block.world(), block.x(), block.y(), block.z());
-                    sender.reply(crate.flatMap(c -> module.crates().remove(c.crateId, sender.name()))
-                            .map(c -> "&aRemoved crate &f" + c.crateId)
-                            .orElse("&cLook at a crate, or name it: /lootbox crate remove <crateId>"));
+                    sender.reply(crate.map(c -> removed(module.crates().remove(c.crateId, block.world(), false,
+                            sender.name()))).orElse("&cLook at a crate, or name it: /lootbox crate remove <crateId>"));
                 }));
             }
             case "enable" -> {
@@ -474,6 +488,14 @@ public final class LootBoxCommand extends MysticCommand {
             }
             default -> usage(sender, "/lootbox crate <select|convert|edit|rebind|remove|enable|verify|list|info|effects> …");
         }
+    }
+
+    private static String removed(CrateService.RemoveResult result) {
+        return switch (result) {
+            case CrateService.Removed done -> "&aRemoved crate &f" + done.crate().crateId
+                    + (done.note() == null ? "" : " &7(" + done.note() + ")");
+            case CrateService.NotRemoved not -> "&cNot removed: " + not.reason() + ".";
+        };
     }
 
     private void reconcile(MysticCommandSender sender, String[] args) {

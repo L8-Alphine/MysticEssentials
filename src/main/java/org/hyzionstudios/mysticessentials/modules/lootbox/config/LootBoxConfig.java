@@ -95,6 +95,14 @@ public final class LootBoxConfig {
         public boolean nameplates = false;
         /** Height of the floating name above the crate block's base, in blocks. */
         public double nameplateHeight = 1.25;
+        /**
+         * Let plain blocks (no Use interaction) become crates by swapping them for a
+         * generated look-alike in mods/MysticEssentialsGenerated/. UNVERIFIED in game:
+         * the server side passed spike S2, but nobody has seen a swapped block in a
+         * client yet. Off: plain blocks are refused, as before. Existing generated
+         * crates keep working and still restore their block when this is off.
+         */
+        public boolean generatedVariants = false;
     }
 
     public static final class Rewards {

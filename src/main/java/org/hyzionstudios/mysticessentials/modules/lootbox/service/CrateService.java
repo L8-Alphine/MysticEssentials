@@ -1,5 +1,6 @@
 package org.hyzionstudios.mysticessentials.modules.lootbox.service;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -7,6 +8,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BooleanSupplier;
 import java.util.logging.Level;
 
 import org.hyzionstudios.mysticessentials.core.MysticCore;
@@ -14,9 +16,12 @@ import org.hyzionstudios.mysticessentials.modules.lootbox.api.event.CrateConvert
 import org.hyzionstudios.mysticessentials.modules.lootbox.api.event.CrateRemovedEvent;
 import org.hyzionstudios.mysticessentials.modules.lootbox.api.event.OpeningFlaggedEvent;
 import org.hyzionstudios.mysticessentials.modules.lootbox.hytale.BlockTargets;
+import org.hyzionstudios.mysticessentials.modules.lootbox.hytale.GeneratedAssetService;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.CrateInstance;
 import org.hyzionstudios.mysticessentials.modules.lootbox.storage.LootBoxStorage;
 
+import com.hypixel.hytale.assetstore.map.AssetMapWithIndexes;
+import com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType;
 import com.hypixel.hytale.server.core.universe.world.World;
 
 /**
@@ -59,6 +64,17 @@ public final class CrateService {
     public record Refused(String reason) implements SaveResult {
     }
 
+    /** Outcome of {@link #remove}. */
+    public sealed interface RemoveResult permits Removed, NotRemoved {
+    }
+
+    /** Removed; {@code note} says what happened to the block, or is {@code null}. */
+    public record Removed(CrateInstance crate, String note) implements RemoveResult {
+    }
+
+    public record NotRemoved(String reason) implements RemoveResult {
+    }
+
     /** What {@link #verify} found in one world. */
     public record Verified(List<String> lines, int checked, int ok, int newlyDisabled, int unloaded) {
     }
@@ -68,11 +84,21 @@ public final class CrateService {
     private final AuditService audit;
     private final Map<String, CrateInstance> crates = new ConcurrentHashMap<>();
     private final Map<String, Map<Long, String>> index = new ConcurrentHashMap<>();
+    private final GeneratedAssetService variants;
+    private final BooleanSupplier generatedVariants;
 
-    public CrateService(MysticCore core, LootBoxStorage storage, AuditService audit) {
+    /**
+     * @param variants          generated look-alikes for plain blocks (P2-J)
+     * @param generatedVariants {@code crates.generatedVariants}, read live; when it is off plain blocks are
+     *                          refused, but existing generated crates keep working and still restore their block
+     */
+    public CrateService(MysticCore core, LootBoxStorage storage, AuditService audit, GeneratedAssetService variants,
+            BooleanSupplier generatedVariants) {
         this.core = core;
         this.storage = storage;
         this.audit = audit;
+        this.variants = variants;
+        this.generatedVariants = generatedVariants;
     }
 
     public CompletableFuture<Void> load() {
@@ -131,12 +157,16 @@ public final class CrateService {
      * crate already on it, except {@code ignoring}.
      */
     public CrateRules.Report check(BlockTargets.Block block, CrateInstance ignoring) {
+        return check(block, ignoring, generatedVariants.getAsBoolean());
+    }
+
+    private CrateRules.Report check(BlockTargets.Block block, CrateInstance ignoring, boolean allowGenerated) {
         if (block == null) {
             return CrateRules.check(null, false);
         }
         CrateInstance existing = at(block.world(), block.x(), block.y(), block.z()).orElse(null);
         boolean taken = existing != null && (ignoring == null || !existing.crateId.equals(ignoring.crateId));
-        return CrateRules.check(block.facts(), taken);
+        return CrateRules.check(block.facts(), taken, allowGenerated);
     }
 
     /**
@@ -185,18 +215,59 @@ public final class CrateService {
         crate.updatedBy = actor;
         crate.updatedAt = crate.createdAt;
         crate.normalise();
+        crate.originalBlockKey = null;
+        if (CrateInstance.KIND_GENERATED.equals(report.kind())) {
+            String problem = generate(block, crate);
+            if (problem != null) {
+                return new ConvertResult(null, problem, List.of());
+            }
+        }
         synchronized (this) {
             if (crates.containsKey(crateId) || at(block.world(), block.x(), block.y(), block.z()).isPresent()) {
+                if (crate.originalBlockKey != null && !VariantRules.isVariant(block.key())) {
+                    GeneratedAssetService.swap(block.world(), block.x(), block.y(), block.z(), block.key(),
+                            block.rotation(), block.filler());
+                }
                 return new ConvertResult(null, "that block or crate id was taken a moment ago", List.of());
             }
             put(crate);
         }
         save(crate);
         audit.record(actor, "CRATE_CONVERT", crateId, crate.lootboxId + " at " + crate.position() + " block "
-                + crate.blockKey + " (" + crate.kind + ", " + crate.openBehavior + ")");
+                + crate.blockKey + " (" + crate.kind + ", " + crate.openBehavior + ")"
+                + (crate.originalBlockKey == null ? "" : " generated from " + crate.originalBlockKey));
         core.getEventBus().publish(new CrateConvertedEvent(crateId, crate.lootboxId, crate.worldId, crate.x, crate.y,
                 crate.z, crate.blockKey, actor));
         return new ConvertResult(crate, null, report.warnings());
+    }
+
+    /**
+     * Swaps a plain block for its generated look-alike (or adopts a look-alike
+     * left by an earlier crate) and records both keys on {@code crate}.
+     *
+     * @return {@code null} when done, else why not
+     */
+    private String generate(BlockTargets.Block block, CrateInstance crate) {
+        if (VariantRules.isVariant(block.key())) {
+            crate.originalBlockKey = VariantRules.originalOf(block.key());
+            return null;
+        }
+        String variantKey = VariantRules.variantKey(block.key());
+        try {
+            variants.ensureVariant(block.key());
+        } catch (IOException | RuntimeException e) {
+            core.log(Level.WARNING, "[lootbox] generating " + variantKey + " failed: " + e);
+            return "the look-alike block could not be generated (" + e.getMessage() + ")";
+        }
+        if (!GeneratedAssetService.swap(block.world(), block.x(), block.y(), block.z(), variantKey, block.rotation(),
+                block.filler())) {
+            GeneratedAssetService.swap(block.world(), block.x(), block.y(), block.z(), block.key(), block.rotation(),
+                    block.filler());
+            return "the block could not be swapped for its look-alike; it was left as it was";
+        }
+        crate.blockKey = variantKey;
+        crate.originalBlockKey = block.key();
+        return null;
     }
 
     // ----- Editing ------------------------------------------------------------
@@ -278,7 +349,7 @@ public final class CrateService {
         if (current == null) {
             return CrateRules.repair(crate, null, null);
         }
-        return CrateRules.repair(crate, current.facts(), check(current, crate));
+        return CrateRules.repair(crate, current.facts(), check(current, crate, false));
     }
 
     /**
@@ -296,12 +367,14 @@ public final class CrateService {
         switch (action) {
             case REENABLE -> enable(crate, actor);
             case REBIND_BLOCK -> {
-                CrateRules.Report report = check(current, crate);
+                CrateRules.Report report = check(current, crate, false);
                 String previous;
                 synchronized (this) {
                     previous = crate.blockKey;
                     crate.blockKey = current.key();
                     crate.kind = report.kind();
+                    crate.originalBlockKey = CrateInstance.KIND_GENERATED.equals(report.kind())
+                            ? VariantRules.originalOf(current.key()) : null;
                     crate.disabled = false;
                     crate.disabledReason = "";
                     crate.updatedBy = actor;
@@ -310,26 +383,103 @@ public final class CrateService {
                 save(crate);
                 audit.record(actor, "CRATE_REPAIR", crate.crateId, "block " + previous + " -> " + current.key());
             }
-            case REMOVE -> remove(crate.crateId, actor);
+            case REMOVE -> {
+                if (remove(crate.crateId, current == null ? null : current.world(), false,
+                        actor) instanceof NotRemoved not) {
+                    return not.reason();
+                }
+            }
         }
         return null;
     }
 
     // ----- Status -------------------------------------------------------------
 
-    public Optional<CrateInstance> remove(String crateId, String actor) {
-        CrateInstance crate = crates.remove(crateId);
+    /**
+     * Removes a crate. A generated crate first gets its original block back,
+     * which needs the crate's world thread and its chunk loaded: pass the world
+     * the caller runs on as {@code here}. With {@code force} a generated crate
+     * is removed anyway and its look-alike stays in the world (for a world that
+     * no longer exists). Look-alikes no crate uses any more are cleaned up.
+     */
+    public RemoveResult remove(String crateId, World here, boolean force, String actor) {
+        CrateInstance crate = crates.get(crateId);
         if (crate == null) {
-            return Optional.empty();
+            return new NotRemoved("there is no crate called " + crateId);
+        }
+        String note = null;
+        if (CrateInstance.KIND_GENERATED.equals(crate.kind)) {
+            String original = crate.originalBlockKey != null ? crate.originalBlockKey
+                    : VariantRules.originalOf(crate.blockKey);
+            if (!inWorld(crate, here)) {
+                if (!force) {
+                    return new NotRemoved("stand in " + crate.worldName + " near the crate so its original block ("
+                            + original + ") can be put back, or force it from the command line");
+                }
+                note = "its look-alike block was left in place";
+            } else {
+                BlockTargets.Block block = BlockTargets.at(here, crate.x, crate.y, crate.z);
+                if (block == null && !force) {
+                    return new NotRemoved("its chunk isn't loaded; go near it so its original block can be put back");
+                }
+                if (block != null && block.key().equals(crate.blockKey)) {
+                    if (original == null || GeneratedAssetService.usable(original) == null
+                            && BlockType.getAssetMap().getIndex(original) == AssetMapWithIndexes.NOT_FOUND) {
+                        if (!force) {
+                            return new NotRemoved("its original block (" + original + ") isn't loaded, so it can't "
+                                    + "be put back");
+                        }
+                        note = "its look-alike block was left in place";
+                    } else if (!GeneratedAssetService.swap(here, crate.x, crate.y, crate.z, original, block.rotation(),
+                            block.filler())) {
+                        if (!force) {
+                            return new NotRemoved("putting the original block back failed; the crate was kept");
+                        }
+                        note = "its look-alike block was left in place";
+                    } else {
+                        note = "put the original " + original + " back";
+                    }
+                } else if (block != null) {
+                    note = "the block had already changed, so nothing was put back";
+                }
+            }
+        }
+        if (!crates.remove(crateId, crate)) {
+            return new NotRemoved(crateId + " was removed a moment ago");
         }
         Map<Long, String> world = index.get(crate.worldId);
         if (world != null) {
             world.remove(pack(crate.x, crate.y, crate.z), crateId);
         }
         storage.deleteCrate(crateId);
-        audit.record(actor, "CRATE_REMOVE", crateId, crate.position());
+        audit.record(actor, "CRATE_REMOVE", crateId, crate.position() + (note == null ? "" : "; " + note));
         core.getEventBus().publish(new CrateRemovedEvent(crateId, crate.lootboxId, "removed", actor));
-        return Optional.of(crate);
+        if (CrateInstance.KIND_GENERATED.equals(crate.kind)) {
+            variants.cleanUp(list());
+        }
+        return new Removed(crate, note);
+    }
+
+    /** Startup for generated crates (P2-J): checks every look-alike loads, then cleans up unused ones. */
+    public void startVariants(boolean indexComplete) {
+        List<CrateInstance> all = list();
+        boolean any = all.stream().anyMatch(crate -> CrateInstance.KIND_GENERATED.equals(crate.kind));
+        if (!any && !generatedVariants.getAsBoolean() && !java.nio.file.Files.isDirectory(variants.packDir())) {
+            return;
+        }
+        if (any || generatedVariants.getAsBoolean()) {
+            try {
+                variants.ensurePack();
+            } catch (IOException | RuntimeException e) {
+                core.log(Level.WARNING, "[lootbox] the generated block pack is unavailable: " + e);
+            }
+        }
+        for (CrateInstance broken : variants.verify(all)) {
+            disable(broken, "generated block " + broken.blockKey + " didn't load", "server");
+        }
+        if (indexComplete) {
+            variants.cleanUp(all);
+        }
     }
 
     /** Disables a crate whose block changed or was destroyed. Keeps it in the index so it can be repaired. */

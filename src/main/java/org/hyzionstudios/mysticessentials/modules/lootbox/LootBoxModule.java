@@ -19,6 +19,7 @@ import org.hyzionstudios.mysticessentials.modules.lootbox.config.LootBoxConfig;
 import org.hyzionstudios.mysticessentials.modules.lootbox.hytale.BlockTargets;
 import org.hyzionstudios.mysticessentials.modules.lootbox.hytale.CrateSystems;
 import org.hyzionstudios.mysticessentials.modules.lootbox.hytale.CrateVisuals;
+import org.hyzionstudios.mysticessentials.modules.lootbox.hytale.GeneratedAssetService;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.CrateInstance;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.LootBoxRevision;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.PlayerLootState;
@@ -106,14 +107,17 @@ public final class LootBoxModule extends AbstractMysticModule implements LootBox
         rewards = new RewardService(core, storage, audit, config);
         pending = new PendingRewardService(core, storage, audit, lanes);
         opening = new OpeningService(core, storage, registry, keys, rewards, audit, lanes, draw, config);
-        crates = new CrateService(core, storage, audit);
+        crates = new CrateService(core, storage, audit, new GeneratedAssetService(core),
+                () -> this.config.crates.generatedVariants);
         visuals = new CrateVisuals(core, this, storage);
         ui = new LootBoxUi(core, this);
 
         registry.writeExamplesIfMissing();
         registry.reloadDrafts();
+        boolean cratesLoaded = false;
         try {
             CompletableFuture.allOf(registry.loadPublished(), crates.load()).get(LOAD_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            cratesLoaded = true;
         } catch (TimeoutException e) {
             core.log(Level.WARNING, "[lootbox] published pools or crates are still loading after "
                     + LOAD_TIMEOUT_SECONDS + "s; they will appear when storage answers.");
@@ -121,6 +125,9 @@ public final class LootBoxModule extends AbstractMysticModule implements LootBox
             core.log(Level.SEVERE, "[lootbox] failed to load published pools or crates: " + e);
         }
 
+        // Generated look-alikes must resolve before any crate is used; unused ones are only
+        // cleaned up when the whole crate index is known.
+        crates.startVariants(cratesLoaded);
         registerCommand(new LootBoxCommand(core, this, config.command.name, config.command.aliases));
         if (!systemsRegistered) {
             boolean all = true;

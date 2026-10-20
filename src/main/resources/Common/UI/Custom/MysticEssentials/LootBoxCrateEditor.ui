@@ -152,7 +152,7 @@ $C.@Container {
           Label {
             Anchor: (Height: 32, Top: 8);
             Style: $M.@CaptionStyle;
-            Text: "Air, missing blocks, blocks that fall and blocks without a Use interaction are refused. Warnings still convert.";
+            Text: "Air, missing blocks and blocks that fall are refused, and so are blocks without a Use interaction unless crates.generatedVariants is on. Warnings still convert.";
           }
         }
 

@@ -11,7 +11,7 @@ import org.hyzionstudios.mysticessentials.core.util.Json;
  * odds.
  *
  * <p><b>Schema.</b> Version 1 (Phase 1) had no behaviour or protection fields;
- * version 2 had no visuals. Gson keeps the field initialisers for anything a
+ * version 2 had no visuals; version 3 had no generated variants. Gson keeps the field initialisers for anything a
  * stored document lacks, and {@link #normalise()} fills what an explicit
  * {@code null} cleared, so an older document loads with the defaults: preview
  * first, the server's protection, and no effects (an existing crate never
@@ -23,13 +23,15 @@ public final class CrateInstance {
     public static final String KIND_INTERACTIVE = "INTERACTIVE";
     /** A crate block shipped in the Mystic Essentials asset pack. */
     public static final String KIND_SHIPPED = "SHIPPED_BLOCK";
+    /** A plain block swapped for a generated look-alike that carries a Use interaction (P2-J). */
+    public static final String KIND_GENERATED = "GENERATED_VARIANT";
 
     /** Use opens the preview; its Open button leads to the confirm screen (the default). */
     public static final String OPEN_PREVIEW_THEN_CONFIRM = "PREVIEW_THEN_CONFIRM";
     /** Use goes straight to the confirm screen, which still lists every reward with its odds. */
     public static final String OPEN_DIRECT_CONFIRM = "DIRECT_CONFIRM";
 
-    public static final int SCHEMA = 3;
+    public static final int SCHEMA = 4;
 
     public int schema = SCHEMA;
     public String crateId;
@@ -57,6 +59,11 @@ public final class CrateInstance {
     public long updatedAt;
     /** Particles, sound and floating name. Schema 3. */
     public Visuals visuals = new Visuals();
+    /**
+     * For {@link #KIND_GENERATED}: the block the look-alike replaced, put back
+     * when the crate is removed. {@code null} for every other kind. Schema 4.
+     */
+    public String originalBlockKey;
 
     /**
      * Protection a crate asks for beyond {@code crates.*} in the module config. A

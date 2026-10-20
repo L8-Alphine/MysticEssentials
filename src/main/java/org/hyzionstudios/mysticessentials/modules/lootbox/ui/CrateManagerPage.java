@@ -142,8 +142,9 @@ public final class CrateManagerPage extends MysticPage {
             String row = "#CrateList[" + i + "]";
             cmd.append("#CrateList", LootBoxManagerPage.MANAGER_ROW_UI);
             cmd.set(row + " #Selected.Visible", crate == selected);
-            if (crate.blockKey != null && ItemCatalog.exists(crate.blockKey)) {
-                cmd.set(row + " #Icon.ItemId", crate.blockKey);
+            String icon = crate.originalBlockKey != null ? crate.originalBlockKey : crate.blockKey;
+            if (icon != null && ItemCatalog.exists(icon)) {
+                cmd.set(row + " #Icon.ItemId", icon);
             }
             cmd.set(row + " #Name.TextSpans", uiText(row + " #Name.TextSpans", title(crate)));
             cmd.set(row + " #Meta.TextSpans", uiText(row + " #Meta.TextSpans", meta(crate)));
@@ -296,14 +297,18 @@ public final class CrateManagerPage extends MysticPage {
         }
         List<String> lines = new ArrayList<>();
         lines.add("&7Removes crate &f" + crate.crateId + " &7at &f" + crate.position() + "&7.");
-        lines.add("&7The block stays where it is and goes back to its normal behaviour. Players' keys and receipts "
-                + "are untouched.");
+        lines.add(CrateInstance.KIND_GENERATED.equals(crate.kind)
+                ? "&7Its original block (&f" + crate.originalBlockKey + "&7) is put back, so stand near it."
+                : "&7The block stays where it is and goes back to its normal behaviour.");
+        lines.add("&7Players' keys and receipts are untouched.");
         ConfirmActionPage.Spec spec = new ConfirmActionPage.Spec("Remove " + crate.crateId + "?", lines, "Remove",
                 true, Permissions.LOOTBOX_CRATES_MANAGE);
         reopen(ref, store, new ConfirmActionPage(core, player, spec, (r, s) -> reopen(r, s, page(
-                module.crates().remove(id, player.getUsername()).isPresent()
-                        ? next.withSelected(null).withNotice("&7Removed crate &f" + id + "&7.")
-                        : next.withNotice("&c" + id + " was already gone."))),
+                switch (module.crates().remove(id, s.getExternalData().getWorld(), false, player.getUsername())) {
+                    case CrateService.Removed done -> next.withSelected(null).withNotice("&7Removed crate &f" + id
+                            + (done.note() == null ? "" : " &8(" + done.note() + ")") + "&7.");
+                    case CrateService.NotRemoved not -> next.withNotice("&cNot removed: " + not.reason() + ".");
+                })),
                 (r, s) -> reopen(r, s, page(next))));
     }
 

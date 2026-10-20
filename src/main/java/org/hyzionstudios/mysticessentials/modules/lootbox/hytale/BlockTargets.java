@@ -19,6 +19,7 @@ import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.chunk.section.BlockSection;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.core.util.FillerBlockUtil;
 import com.hypixel.hytale.server.core.util.TargetUtil;
 
 /**
@@ -46,7 +47,7 @@ public final class BlockTargets {
 
         /** What {@link CrateRules} needs to judge this block. */
         public CrateRules.BlockFacts facts() {
-            return BlockTargets.facts(type, rotation, isEmpty());
+            return BlockTargets.facts(type, rotation, filler, isEmpty());
         }
     }
 
@@ -105,14 +106,17 @@ public final class BlockTargets {
 
     /** The facts {@link CrateRules#check} judges, read from the block's asset. */
     @SuppressWarnings("deprecation") // IsDoor is the only door marker the asset has in 0.7.2.
-    public static CrateRules.BlockFacts facts(BlockType type, int rotation, boolean empty) {
+    public static CrateRules.BlockFacts facts(BlockType type, int rotation, int filler, boolean empty) {
         StateData state = type.getState();
         Set<String> states = state == null ? null : state.getStateNames();
+        int id = BlockType.getAssetMap().getIndex(type.getId());
+        boolean multiCell = id != AssetMapWithIndexes.NOT_FOUND && FillerBlockUtil.multiCellFootprint(id, rotation) != null;
         return new CrateRules.BlockFacts(type.getId(), empty, type.isUnknown(), useRoot(type),
                 type.getBlockEntity() != null, type.isDoor(), type.getBench() != null,
                 type.getSeats() != null || type.getBeds() != null, type.getRailConfig(rotation) != null,
                 type.isTrigger(), type.isState() || (states != null && !states.isEmpty()),
-                type.getFallingBlockSettings() != null);
+                type.getFallingBlockSettings() != null, multiCell, filler != 0,
+                type.getConnectedBlockRuleSet() != null);
     }
 
     /** The world's UUID as text, falling back to its name (the portals convention). */

@@ -45,10 +45,13 @@ public final class CrateRules {
      * @param trigger       a trigger block
      * @param stateful      has block states that can swap its key (open, lit, …)
      * @param falls         becomes a falling block when unsupported
+     * @param multiCell     its hitbox spans more than one block
+     * @param fillerPart    this cell is a filler part of a multi-block
+     * @param connected     it has connected-block rules (fences, panes)
      */
     public record BlockFacts(String key, boolean empty, boolean unknown, String useRoot, boolean blockEntity,
             boolean door, boolean bench, boolean seat, boolean rail, boolean trigger, boolean stateful,
-            boolean falls) {
+            boolean falls, boolean multiCell, boolean fillerPart, boolean connected) {
 
         public boolean hasUse() {
             return useRoot != null && !useRoot.isBlank();
@@ -78,16 +81,23 @@ public final class CrateRules {
 
     // ----- Compatibility ------------------------------------------------------
 
+    /** {@link #check(BlockFacts, boolean, boolean)} with generated variants off. */
+    public static Report check(BlockFacts block, boolean alreadyCrate) {
+        return check(block, alreadyCrate, false);
+    }
+
     /**
      * Judges {@code block} (bible §09 step 03): refuses air, missing assets,
      * blocks that fall, existing crates and blocks players could not use;
      * warns about containers, doors, benches, seats, transport, triggers,
      * portals and blocks whose state changes their key.
      *
-     * @param block        the facts, or {@code null} when nothing is targeted or the chunk is not loaded
-     * @param alreadyCrate another crate already sits on this block
+     * @param block              the facts, or {@code null} when nothing is targeted or the chunk is not loaded
+     * @param alreadyCrate       another crate already sits on this block
+     * @param generatedVariants  {@code crates.generatedVariants}: a plain block without Use may be swapped
+     *                           for a generated look-alike ({@link VariantRules}) instead of being refused
      */
-    public static Report check(BlockFacts block, boolean alreadyCrate) {
+    public static Report check(BlockFacts block, boolean alreadyCrate, boolean generatedVariants) {
         if (block == null) {
             return refused("look at a block within reach");
         }
@@ -105,8 +115,22 @@ public final class CrateRules {
                     + "that stays put");
         }
         if (!block.hasUse()) {
-            return refused("this block has no Use interaction, so players couldn't open it. Use an interactive "
-                    + "block (chest, door, bench) or a Mystic Essentials crate block");
+            if (!generatedVariants) {
+                return refused("this block has no Use interaction, so players couldn't open it. Use an interactive "
+                        + "block (chest, door, bench) or a Mystic Essentials crate block");
+            }
+            String why = VariantRules.ineligible(block);
+            if (why != null) {
+                return refused("this plain block can't get a generated look-alike: " + why);
+            }
+            return new Report(CrateInstance.KIND_GENERATED, null, List.of(
+                    "This plain block is swapped for a generated look-alike that players can use; removing the "
+                            + "crate puts the original back.",
+                    "Generated look-alikes are not yet tested in game: check the block still looks the same."));
+        }
+        if (VariantRules.isVariant(block.key())) {
+            return new Report(CrateInstance.KIND_GENERATED, null, List.of(
+                    "This is a generated look-alike left by an earlier crate; it becomes a crate again."));
         }
         List<String> warnings = new ArrayList<>();
         if (block.shipped()) {

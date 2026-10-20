@@ -710,14 +710,23 @@ public final class CrateEditorPage extends MysticPage {
             return;
         }
         String id = session.draftId();
-        ConfirmActionPage.Spec spec = new ConfirmActionPage.Spec("Remove " + id + "?", List.of(
-                "&7Removes the crate. The block stays where it is and goes back to its normal behaviour.",
+        boolean generated = CrateInstance.KIND_GENERATED.equals(session.working().kind);
+        ConfirmActionPage.Spec spec = new ConfirmActionPage.Spec("Remove " + id + "?", List.of(generated
+                ? "&7Removes the crate and puts its original block (&f" + session.working().originalBlockKey
+                        + "&7) back, so stand near it."
+                : "&7Removes the crate. The block stays where it is and goes back to its normal behaviour.",
                 "&7Players' keys and receipts are untouched."), "Remove", true, Permissions.LOOTBOX_CRATES_MANAGE);
         reopen(ref, store, new ConfirmActionPage(core, player, spec, (r, s) -> {
-            boolean removed = module.crates().remove(id, player.getUsername()).isPresent();
+            CrateService.RemoveResult result = module.crates().remove(id, s.getExternalData().getWorld(), false,
+                    player.getUsername());
+            if (result instanceof CrateService.NotRemoved not) {
+                reopen(r, s, page("&cNot removed: " + not.reason() + "."));
+                return;
+            }
+            String note = ((CrateService.Removed) result).note();
             module.editors().end(session);
             reopen(r, s, new CrateManagerPage(core, player, module, CrateManagerPage.State.selecting(null,
-                    removed ? "&7Removed crate &f" + id + "&7." : "&c" + id + " was already gone.")));
+                    "&7Removed crate &f" + id + (note == null ? "" : " &8(" + note + ")") + "&7.")));
         }, (r, s) -> reopen(r, s, page(null))));
     }
 
@@ -823,7 +832,8 @@ public final class CrateEditorPage extends MysticPage {
     }
 
     private static String kindLabel(String kind) {
-        return CrateInstance.KIND_SHIPPED.equals(kind) ? "a Mystic crate block" : "an interactive block";
+        return CrateInstance.KIND_SHIPPED.equals(kind) ? "a Mystic crate block"
+                : CrateInstance.KIND_GENERATED.equals(kind) ? "a generated look-alike" : "an interactive block";
     }
 
     private static String rotationLabel(int rotation) {
