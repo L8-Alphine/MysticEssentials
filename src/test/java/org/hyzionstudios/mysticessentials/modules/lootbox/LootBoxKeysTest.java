@@ -20,16 +20,23 @@ import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 
 import org.hyzionstudios.mysticessentials.api.service.StorageService;
+import org.hyzionstudios.mysticessentials.modules.lootbox.model.KeyBatch;
+import org.hyzionstudios.mysticessentials.modules.lootbox.model.KeyDraft;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.KeyLog;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.KeySerial;
+import org.hyzionstudios.mysticessentials.modules.lootbox.model.Opening;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.PendingInbox;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.PlayerLootState;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.PlayerLootState.Conversion;
 import org.hyzionstudios.mysticessentials.modules.lootbox.odds.SecureDraw;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.ConversionRules;
+import org.hyzionstudios.mysticessentials.modules.lootbox.service.DraftLifecycle;
+import org.hyzionstudios.mysticessentials.modules.lootbox.service.KeyMarker;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.OpeningRules;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.PlayerLanes;
+import org.hyzionstudios.mysticessentials.modules.lootbox.service.StackRules;
 import org.hyzionstudios.mysticessentials.modules.lootbox.storage.LootBoxStorage;
+import org.hyzionstudios.mysticessentials.modules.lootbox.ui.editor.KeyDiff;
 
 import com.google.gson.JsonElement;
 
@@ -88,6 +95,13 @@ public final class LootBoxKeysTest {
             racingWithdrawalsNeverOverdraw();
             repeatedWithdrawalRequestDebitsOnce();
             recoveryLeavesARunningConversionAlone();
+            serializedMarkersAreUnchanged();
+            publishedKeysStayPublished();
+            stackDecisionTable();
+            racingSpendsNeverOverdrawABatch();
+            batchOpeningRecoveryPrefersAbort();
+            batchDepositCrashAtEveryStep();
+            batchWithdrawalRecoveryTopsUpOnce();
         } finally {
             IO.shutdownNow();
         }
@@ -544,6 +558,275 @@ public final class LootBoxKeysTest {
         require(balance(world, player) == 1, "the deposit credited " + balance(world, player));
     }
 
+    // ----- Stackable keys (P2-K) ------------------------------------------------------
+
+    /** The default path's marker is signed over exactly the Phase 1 fields; a batch id is part of what is signed. */
+    private static void serializedMarkersAreUnchanged() {
+        byte[] secret = new byte[32];
+        for (int i = 0; i < secret.length; i++) {
+            secret[i] = (byte) (i * 7 + 3);
+        }
+        KeyMarker serialized = KeyMarker.signed(KEY, 3, "serial1", 1, secret);
+        require(serialized.signature().equals(hmac(secret, KEY + "|3|serial1|1")),
+                "a serialized key's marker is no longer signed over keyId|version|serial|secretId");
+        KeyMarker batch = KeyMarker.signed(KEY, 3, KeyBatch.PREFIX + "abc", 1, secret);
+        require(batch.verify(secret), "a batch marker did not verify");
+        require(!new KeyMarker(KEY, 3, "abc", 1, batch.signature()).verify(secret),
+                "a batch marker's signature survived dropping the batch prefix");
+        require(!new KeyMarker(KEY, 3, KeyBatch.PREFIX + "abd", 1, batch.signature()).verify(secret),
+                "a batch marker's signature survived another batch id");
+        require(KeyBatch.isBatch(KeyBatch.PREFIX + "x") && !KeyBatch.isBatch(new SecureDraw().id()) && !KeyBatch.isBatch(null),
+                "a serial could be mistaken for a batch");
+    }
+
+    private static String hmac(byte[] secret, String payload) {
+        try {
+            javax.crypto.Mac mac = javax.crypto.Mac.getInstance("HmacSHA256");
+            mac.init(new javax.crypto.spec.SecretKeySpec(secret, "HmacSHA256"));
+            return java.util.Base64.getUrlEncoder().withoutPadding()
+                    .encodeToString(mac.doFinal(payload.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        } catch (java.security.GeneralSecurityException e) {
+            throw new AssertionError(e);
+        }
+    }
+
+    /** A key published before P2-K (no stackable field) still answers "unchanged" and shows no diff. */
+    private static void publishedKeysStayPublished() {
+        String before = "{\"id\":\"mystic:royal\",\"baseItemId\":\"Ingredient_Bar_Iron\",\"name\":\"Royal Key\","
+                + "\"lore\":[\"Opens royal crates\"],\"uses\":1,\"expiresAfterDays\":0}";
+        KeyDraft published = org.hyzionstudios.mysticessentials.core.util.Json.gson().fromJson(before, KeyDraft.class);
+        KeyDraft draft = DraftLifecycle.freeze(published, KeyDraft.class);
+        require(!published.stackable, "a key published before P2-K reads as stackable");
+        require(DraftLifecycle.keySpecHash(published).equals(DraftLifecycle.keySpecHash(draft)),
+                "an unchanged pre-P2-K key would publish again");
+        require(!KeyDiff.changed(draft, published), "an unchanged pre-P2-K key shows changes");
+        draft.stackable = true;
+        require(!DraftLifecycle.keySpecHash(published).equals(DraftLifecycle.keySpecHash(draft))
+                && KeyDiff.changed(draft, published), "switching stacking on is not a change");
+        require(String.join(" ", KeyDiff.lines(draft, published)).contains("stack"), "the diff does not say stacking changed");
+    }
+
+    private static void stackDecisionTable() {
+        KeyBatch batch = StackRules.newBatch(KeyBatch.PREFIX + "b", KEY, 1, "owner", 2, "ADMIN_GRANT", "staff", 0L, 0);
+        require(StackRules.spendProblem(batch, KEY, 1, 0L) == null, "a fresh batch can't be spent");
+        require("wrong key".equals(StackRules.spendProblem(batch, "mystic:other", 1, 0L)), "another key's batch passed");
+        require(StackRules.reserve(batch, KEY, "op1", 1, 2, 0L) == null && StackRules.reserve(batch, KEY, "op1", 1, 2, 0L) == null
+                && batch.reservations.size() == 1, "a repeated reserve held twice");
+        require(StackRules.reserve(batch, KEY, "op2", 1, 2, 0L) == null && batch.available() == 0, "two holds of two units");
+        require("reserved".equals(StackRules.spendProblem(batch, KEY, 1, 0L)), "a fully held batch reads as dead");
+        require(StackRules.redeem(batch, "op1") == 1 && StackRules.redeem(batch, "op1") == 0 && batch.remaining == 1,
+                "a redeem spent twice");
+        require(StackRules.release(batch, "op2") && !StackRules.release(batch, "op2") && batch.available() == 1,
+                "a release was not undone exactly once");
+        require(StackRules.redeem(batch, "op3") == 0, "a redeem without a hold spent");
+        require(StackRules.reserve(batch, KEY, "op4", 2, 1, 0L) != null, "a hold of more than is left passed");
+
+        KeyBatch held = StackRules.newBatch(KeyBatch.PREFIX + "h", KEY, 1, "owner", 3, "ADMIN_GRANT", "staff", 0L, 0);
+        StackRules.reserve(held, KEY, "op", 1, 3, 0L);
+        require(StackRules.decideOpening(Opening.RESERVED, held, "op", 3) == StackRules.Recovery.RELEASE,
+                "an untouched stack was not released");
+        require(StackRules.decideOpening(Opening.RESERVED, held, "op", 2) == StackRules.Recovery.RELEASE_REGIVE
+                && StackRules.regive(held.reservation("op"), 2) == 1, "a smaller stack was not given back one item");
+        require(StackRules.regive(held.reservation("op"), 0) == 1, "a regive returned more than the hold");
+        require(StackRules.decideOpening(Opening.RESERVED, held, "op", null) == StackRules.Recovery.RELEASE,
+                "an unreadable inventory did not abort");
+        require(StackRules.decideOpening(Opening.COMMITTED, held, "op", 3) == StackRules.Recovery.COMMITTED,
+                "a committed opening was rolled back");
+        require(StackRules.decideOpening(Opening.ABORTED, held, "op", 3) == StackRules.Recovery.NONE,
+                "an aborted opening was recovered");
+        require(StackRules.decideOpening(Opening.PREPARED, held, "other", 3) == StackRules.Recovery.ABORT,
+                "an opening without a hold was not aborted");
+        StackRules.redeem(held, "op");
+        require(StackRules.decideOpening(Opening.RESERVED, held, "op", 3) == StackRules.Recovery.COMMITTED,
+                "a spent hold was not committed");
+        StackRules.reserve(held, KEY, "dep", 2, 2, 0L);
+        require(StackRules.decideDeposit("dep", held, null) == StackRules.Recovery.WAIT, "a deposit guessed");
+        require(StackRules.decideDeposit("dep", held, 2) == StackRules.Recovery.RELEASE
+                && StackRules.decideDeposit("dep", held, 0) == StackRules.Recovery.RELEASE_REGIVE,
+                "a batch deposit's recovery is off");
+        held.revoked = true;
+        require(StackRules.decideDeposit("dep", held, 0) == StackRules.Recovery.RELEASE
+                && StackRules.decideOpening(Opening.RESERVED, held, "dep", 0) == StackRules.Recovery.RELEASE,
+                "a revoked batch was given back");
+        require("revoked key".equals(StackRules.spendProblem(held, KEY, 1, 0L)), "a revoked batch could be spent");
+        KeyBatch expiring = StackRules.newBatch(KeyBatch.PREFIX + "e", KEY, 1, "owner", 1, "ADMIN_GRANT", "staff", 0L, 50L);
+        require("expired".equals(StackRules.spendProblem(expiring, KEY, 1, 50L)), "an expired batch could be spent");
+        require("expiring".equals(ConversionRules.reserveBatch(expiring, KEY, "c", 1, 1, 10L)),
+                "an expiring batch could be deposited");
+        KeyBatch dupes = StackRules.newBatch(KeyBatch.PREFIX + "d", KEY, 1, "owner", 3, "ADMIN_GRANT", "staff", 0L, 0);
+        require("only 3 left".equals(ConversionRules.reserveBatch(dupes, KEY, "c", 5, 5, 0L)) && dupes.reservations.isEmpty(),
+                "a stack larger than its batch was deposited");
+        require(StackRules.missingWithdrawn(dupes, 1, 1) == 1 && StackRules.missingWithdrawn(dupes, null, 0) == -1
+                && StackRules.missingWithdrawn(dupes, 5, 0) == 0, "the withdrawal top-up is off");
+    }
+
+    private static void racingSpendsNeverOverdrawABatch() {
+        World world = new World();
+        String id = KeyBatch.PREFIX + "race";
+        await(world.storage.saveBatch(StackRules.newBatch(id, KEY, 1, "owner", 3, "ADMIN_GRANT", "staff", 0L, 0)));
+        CompletableFuture<Void> release = world.memory.hold("lootbox_batch", id);
+        List<CompletableFuture<Integer>> spends = new ArrayList<>();
+        for (int i = 0; i < 8; i++) {
+            String holder = "op" + i;
+            AtomicReference<String> problem = new AtomicReference<>();
+            // OpeningService.reserveBatch then redeem, from eight players at once.
+            spends.add(world.storage.updateBatch(id, batch -> {
+                problem.set(StackRules.reserve(batch, KEY, holder, 1, 1, 0L));
+                return problem.get() == null ? batch : null;
+            }).thenCompose(held -> {
+                AtomicInteger spent = new AtomicInteger();
+                return problem.get() != null ? CompletableFuture.completedFuture(0)
+                        : world.storage.updateBatch(id, batch -> {
+                            spent.set(StackRules.redeem(batch, holder));
+                            return spent.get() > 0 ? batch : null;
+                        }).thenApply(batch -> spent.get());
+            }));
+        }
+        release.complete(null);
+        int spent = spends.stream().mapToInt(LootBoxKeysTest::await).sum();
+        KeyBatch after = await(world.storage.loadBatch(id));
+        require(spent == 3 && after.remaining == 0 && after.reservations.isEmpty() && after.spentBy.size() == 3,
+                spent + " of 8 racing spends passed a batch of 3");
+    }
+
+    /** One opening of a batch item, crashed after each step, then recovered. */
+    private static void batchOpeningRecoveryPrefersAbort() {
+        for (Crash crash : List.of(Crash.AFTER_RESERVE, Crash.AFTER_TAKE, Crash.AFTER_CONVERT)) {
+            World world = new World();
+            UUID player = UUID.randomUUID();
+            String id = KeyBatch.PREFIX + "open";
+            await(world.storage.saveBatch(StackRules.newBatch(id, KEY, 1, player.toString(), 3, "ADMIN_GRANT", "staff", 0L, 0)));
+            world.stacks.put(player, 3);
+            String openingId = "op";
+            await(world.storage.updateBatch(id, batch -> {
+                StackRules.reserve(batch, KEY, openingId, 1, world.stacks.get(player), 0L);
+                return batch;
+            }));
+            String state = Opening.RESERVED;
+            if (crash != Crash.AFTER_RESERVE) {
+                world.stacks.merge(player, -1, Integer::sum); // InventoryAdapter.removeOne
+            }
+            if (crash == Crash.AFTER_CONVERT) {
+                await(world.storage.updateBatch(id, batch -> StackRules.redeem(batch, openingId) > 0 ? batch : null));
+            }
+            // OpeningService.recoverBatch
+            KeyBatch found = await(world.storage.loadBatch(id));
+            StackRules.Recovery action = StackRules.decideOpening(state, found, openingId, world.stacks.get(player));
+            int give = StackRules.regive(found.reservation(openingId), world.stacks.get(player));
+            if (action == StackRules.Recovery.RELEASE || action == StackRules.Recovery.RELEASE_REGIVE) {
+                await(world.storage.updateBatch(id, batch -> StackRules.release(batch, openingId) ? batch : null));
+            }
+            if (action == StackRules.Recovery.RELEASE_REGIVE) {
+                world.stacks.merge(player, give, Integer::sum); // KeyService.regive
+            }
+            KeyBatch after = await(world.storage.loadBatch(id));
+            boolean committed = crash == Crash.AFTER_CONVERT;
+            require(action == (committed ? StackRules.Recovery.COMMITTED
+                    : crash == Crash.AFTER_TAKE ? StackRules.Recovery.RELEASE_REGIVE : StackRules.Recovery.RELEASE),
+                    crash + ": recovery decided " + action);
+            require(after.reservations.isEmpty() && after.remaining == (committed ? 2 : 3),
+                    crash + ": the batch was left at " + after.remaining + " with " + after.reservations.size() + " holds");
+            require(world.stacks.get(player) == after.remaining,
+                    crash + ": the player holds " + world.stacks.get(player) + " items for " + after.remaining + " openings");
+        }
+    }
+
+    /** A deposit of a held stack of 4 batch items, crashed after each step, then recovered. */
+    private static void batchDepositCrashAtEveryStep() {
+        for (Crash crash : List.of(Crash.AFTER_PREPARE, Crash.AFTER_RESERVE, Crash.AFTER_TAKE, Crash.AFTER_CONVERT)) {
+            World world = new World();
+            UUID player = UUID.randomUUID();
+            String id = KeyBatch.PREFIX + "dep";
+            await(world.storage.saveBatch(StackRules.newBatch(id, KEY, 1, player.toString(), 4, "ADMIN_GRANT", "staff", 0L, 0)));
+            world.stacks.put(player, 4);
+            String conversionId = "conv";
+            // ConversionService.startDeposit, as far as the crash lets it go.
+            await(world.storage.updatePlayer(player, state -> {
+                ConversionRules.prepareDeposit(state, conversionId, null, KEY, id, 0L).count = 4;
+                return state;
+            }));
+            if (crash != Crash.AFTER_PREPARE) {
+                await(world.storage.updateBatch(id, batch -> ConversionRules.reserveBatch(batch, KEY, conversionId, 4,
+                        world.stacks.get(player), 0L) == null ? batch : null));
+            }
+            if (crash == Crash.AFTER_TAKE || crash == Crash.AFTER_CONVERT) {
+                world.stacks.put(player, 0); // InventoryAdapter.takeCount
+            }
+            if (crash == Crash.AFTER_CONVERT) {
+                await(world.storage.updateBatch(id, batch -> StackRules.redeem(batch, conversionId) > 0 ? batch : null));
+            }
+            // ConversionService.recoverBatchDeposit, twice: a second pass changes nothing.
+            for (int pass = 0; pass < 2; pass++) {
+                Conversion open = ConversionRules.unfinished(stateOf(world, player)).stream().findFirst().orElse(null);
+                if (open == null) {
+                    continue;
+                }
+                KeyBatch found = await(world.storage.loadBatch(id));
+                int heldNow = world.stacks.get(player);
+                StackRules.Recovery action = StackRules.decideDeposit(conversionId, found, heldNow);
+                int give = StackRules.regive(found.reservation(conversionId), heldNow);
+                if (action == StackRules.Recovery.RELEASE || action == StackRules.Recovery.RELEASE_REGIVE) {
+                    await(world.storage.updateBatch(id, batch -> StackRules.release(batch, conversionId) ? batch : null));
+                }
+                if (action == StackRules.Recovery.RELEASE_REGIVE) {
+                    world.stacks.merge(player, give, Integer::sum);
+                }
+                if (action == StackRules.Recovery.COMMITTED) {
+                    await(world.storage.updatePlayer(player, state -> ConversionRules.credit(state, conversionId, KEY,
+                            open.count, 0L) ? state : null));
+                } else {
+                    await(world.storage.updatePlayer(player, state -> ConversionRules.abort(state, conversionId, "test")
+                            ? state : null));
+                }
+            }
+            KeyBatch after = await(world.storage.loadBatch(id));
+            boolean credited = crash == Crash.AFTER_CONVERT;
+            require(balance(world, player) == (credited ? 4 : 0), crash + ": the deposit credited " + balance(world, player));
+            require(after.reservations.isEmpty() && after.remaining == (credited ? 0 : 4)
+                    && world.stacks.get(player) == after.remaining,
+                    crash + ": " + world.stacks.get(player) + " items for " + after.remaining + " openings left");
+            require(only(stateOf(world, player).conversions).state.equals(credited ? Conversion.CREDITED : Conversion.ABORTED),
+                    crash + ": the conversion is " + only(stateOf(world, player).conversions).state);
+        }
+    }
+
+    /** A withdrawn batch whose give was lost: recovery files the missing items once. */
+    private static void batchWithdrawalRecoveryTopsUpOnce() {
+        World world = new World();
+        UUID player = UUID.randomUUID();
+        grantVirtual(world, player, 5);
+        String id = KeyBatch.PREFIX + "w";
+        await(world.storage.updatePlayer(player, state -> ConversionRules.debit(state, "conv", null, KEY, 5, List.of(id),
+                0L) == ConversionRules.Debit.DEBITED ? state : null));
+        await(world.storage.updateBatch(id, existing -> existing == null
+                ? StackRules.newBatch(id, KEY, 1, player.toString(), 5, ConversionRules.SOURCE, "player", 0L, 0) : null));
+        world.stacks.put(player, 2); // only 2 of the 5 made it before the crash
+        for (int pass = 0; pass < 2; pass++) {
+            // ConversionService.recoverBatchWithdrawal
+            PendingInbox inbox = await(world.storage.loadPending(player));
+            int filed = inbox.items.stream().filter(item -> item.fulfillmentId.startsWith(ConversionRules.inboxId(id) + "#"))
+                    .mapToInt(item -> item.quantity).sum();
+            int missing = StackRules.missingWithdrawn(await(world.storage.loadBatch(id)), world.stacks.get(player), filed);
+            if (missing > 0) {
+                await(world.storage.updatePending(player, pending -> {
+                    String entryId = ConversionRules.inboxId(id) + "#conv#recovered";
+                    if (!pending.contains(entryId)) {
+                        PendingInbox.PendingReward entry = new PendingInbox.PendingReward();
+                        entry.fulfillmentId = entryId;
+                        entry.quantity = missing;
+                        pending.items.add(entry);
+                    }
+                    return pending;
+                }));
+            }
+            await(world.storage.updatePlayer(player, state -> ConversionRules.settle(state, "conv") ? state : null));
+        }
+        PendingInbox inbox = await(world.storage.loadPending(player));
+        require(inbox.items.size() == 1 && inbox.items.get(0).quantity == 3, "the lost items were not filed exactly once");
+        require(balance(world, player) == 0 && Conversion.DELIVERED.equals(only(stateOf(world, player).conversions).state),
+                "the withdrawal did not settle");
+    }
+
     // ----- The conversion, without the engine ---------------------------------------
 
     private enum Outcome {
@@ -581,6 +864,8 @@ public final class LootBoxKeysTest {
         final Map<UUID, Integer> capacity = new ConcurrentHashMap<>();
         /** Whether the world answers inventory reads ({@code false}: the player's world is busy). */
         volatile boolean readable = true;
+        /** Items of the one batch a stackable-key check uses, per player. */
+        final Map<UUID, Integer> stacks = new ConcurrentHashMap<>();
 
         List<String> items(UUID player) {
             return inventory.computeIfAbsent(player, uuid -> Collections.synchronizedList(new ArrayList<>()));

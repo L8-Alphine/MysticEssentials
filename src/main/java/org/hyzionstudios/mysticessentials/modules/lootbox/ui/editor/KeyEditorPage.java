@@ -9,6 +9,7 @@ import org.hyzionstudios.mysticessentials.api.Permissions;
 import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.core.message.MysticText;
 import org.hyzionstudios.mysticessentials.modules.lootbox.LootBoxModule;
+import org.hyzionstudios.mysticessentials.modules.lootbox.hytale.KeyItemFactory;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.KeyDraft;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.DraftLifecycle;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.DraftStore;
@@ -126,10 +127,16 @@ public final class KeyEditorPage extends MysticPage {
         }
         FormFields.fill(cmd, USES, session, Integer.toString(key.uses));
         FormFields.fill(cmd, EXPIRY, session, Long.toString(Math.max(0, key.expiresAfterDays)));
+        cmd.set("#StackableOnButton.Visible", !key.stackable);
+        cmd.set("#StackableOffButton.Visible", key.stackable);
+        cmd.set("#StackHint.TextSpans", uiText("#StackHint.TextSpans", stackHint(key)));
+        event.addEventBinding(CustomUIEventBindingType.Activating, "#StackableOnButton", INPUTS.event("stackOn"));
+        event.addEventBinding(CustomUIEventBindingType.Activating, "#StackableOffButton", INPUTS.event("stackOff"));
 
         cmd.set("#PreviewName.TextSpans", uiText("#PreviewName.TextSpans", blank(key.name, "&8(no name)")));
         cmd.set("#PreviewMeta.TextSpans", uiText("#PreviewMeta.TextSpans",
-                KeyDiff.uses(key.uses) + " · " + KeyDiff.expiry(key.expiresAfterDays)));
+                KeyDiff.uses(key.stackable ? 1 : key.uses) + " · " + KeyDiff.expiry(key.expiresAfterDays)
+                        + (key.stackable ? " · stacks" : "")));
         List<String> previewLore = new ArrayList<>();
         lore.forEach(line -> previewLore.add(line.isBlank() ? " " : line));
         if (previewLore.isEmpty()) {
@@ -194,7 +201,21 @@ public final class KeyEditorPage extends MysticPage {
         List<String> problems = new ArrayList<>();
         unparsed().forEach(problem -> problems.add(problem.message()));
         problems.addAll(module.registry().keyStore().status(key).problems());
+        if (key.stackable && key.uses != 1) {
+            problems.add("A stackable key opens once per item: set Uses to 1.");
+        }
         return problems;
+    }
+
+    /** What stacking means for this key, under its two buttons. */
+    private static String stackHint(KeyDraft key) {
+        if (!key.stackable) {
+            return "Each key item has its own serial: a copy is dead on sight. Items never stack.";
+        }
+        int maxStack = key.baseItemId == null ? 0 : KeyItemFactory.maxStack(key.baseItemId);
+        return (maxStack == 1 ? "&eThis base item does not stack (MaxStack 1). &r" : "")
+                + "Items of one grant share a batch and stack. Weaker against duplication: a copied item uses up "
+                + "the batch instead of being dead on sight.";
     }
 
     private List<FormFields.Problem> unparsed() {
@@ -246,6 +267,15 @@ public final class KeyEditorPage extends MysticPage {
             case "colorClear" -> {
                 session.forgetInput(COLOR.key());
                 restyle(ref, store, style -> style.withColor(null));
+            }
+            case "stackOn", "stackOff" -> {
+                KeyDraft key = session.working();
+                boolean stackable = "stackOn".equals(action);
+                if (key.stackable != stackable) {
+                    key.stackable = stackable;
+                    session.markDirty();
+                }
+                reopen(ref, store, page(PoolEditorPage.View.of(null)));
             }
             case "save" -> save(ref, store, null);
             case "revert" -> confirmRevert(ref, store);

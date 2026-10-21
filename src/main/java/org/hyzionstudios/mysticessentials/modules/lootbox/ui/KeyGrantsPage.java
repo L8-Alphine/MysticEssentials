@@ -22,6 +22,7 @@ import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.core.message.MysticText;
 import org.hyzionstudios.mysticessentials.modules.lootbox.LootBoxModule;
 import org.hyzionstudios.mysticessentials.modules.lootbox.api.GrantSource;
+import org.hyzionstudios.mysticessentials.modules.lootbox.model.KeyBatch;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.KeyDraft;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.KeyLog;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.KeySerial;
@@ -122,8 +123,24 @@ public final class KeyGrantsPage extends MysticPage {
         }
     }
 
-    /** A looked-up serial; {@code found} is {@code null} when no ledger entry has that id. */
-    public record Lookup(String serial, KeySerial found, String ownerName) {
+    /**
+     * A looked-up serial, or a batch of stackable keys (P2-K) when the id starts
+     * with {@code batch-}; {@code found} / {@code batch} are {@code null} when no
+     * ledger entry has that id.
+     */
+    public record Lookup(String serial, KeySerial found, KeyBatch batch, String ownerName) {
+
+        boolean missing() {
+            return found == null && batch == null;
+        }
+
+        String keyId() {
+            return found != null ? found.keyId : batch != null ? batch.keyId : null;
+        }
+
+        String owner() {
+            return found != null ? found.owner : batch != null ? batch.owner : null;
+        }
     }
 
     /** One player a grant goes to. */
@@ -268,9 +285,23 @@ public final class KeyGrantsPage extends MysticPage {
         Lookup lookup = state.lookup();
         boolean revocable = false;
         if (lookup == null) {
-            lines.add("&8Type a serial and press Look Up to see its state.");
-        } else if (lookup.found() == null) {
+            lines.add("&8Type a serial (or a batch-… id) and press Look Up to see its state.");
+        } else if (lookup.missing()) {
             lines.add("&cNo key has the serial &f" + lookup.serial() + "&c.");
+        } else if (lookup.batch() != null) {
+            KeyBatch batch = lookup.batch();
+            boolean thisKey = state.keyId().equals(batch.keyId);
+            lines.add("&7Batch &f" + batch.batch + (thisKey ? "" : " &e(a " + batch.keyId + " batch, not this one)"));
+            lines.add("&7" + (batch.revoked ? "&cRevoked" : "&fActive") + " &8· &f" + batch.remaining + " &7of &f"
+                    + batch.issued + " &7left" + (batch.reservations.isEmpty() ? "" : " &8· &7"
+                            + batch.reservations.size() + " in use now")
+                    + (batch.expiresAt > 0 ? " &8· &7expires &f" + WHEN.format(Instant.ofEpochMilli(batch.expiresAt)) : ""));
+            lines.add("&7Issued to &f" + who(batch.owner, lookup.ownerName()) + " &8· &7source &f" + batch.source
+                    + " &8· &7by &f" + batch.issuedBy + " &7on &f" + WHEN.format(Instant.ofEpochMilli(batch.issuedAt)));
+            revocable = thisKey && revocable(batch);
+            if (thisKey && !revocable) {
+                lines.add("&8Nothing left to revoke.");
+            }
         } else {
             KeySerial serial = lookup.found();
             boolean thisKey = state.keyId().equals(serial.keyId);
@@ -316,7 +347,8 @@ public final class KeyGrantsPage extends MysticPage {
                     + " &8· " + entry.source + (entry.pending > 0 ? " · " + entry.pending + " to inbox" : "");
             case KeyLog.REFUSED -> "&c" + entry.actor + "'s grant of " + entry.count + " to " + owner + " was refused: "
                     + entry.detail;
-            case KeyLog.REVOKE -> "&f" + entry.actor + " &7revoked &f" + shortId(entry.serial) + " &7(" + owner + "'s)";
+            case KeyLog.REVOKE -> "&f" + entry.actor + " &7revoked &f" + shortId(entry.serial) + " &7(" + owner + "'s)"
+                    + (entry.count > 1 ? " &8· " + entry.count + " unspent" : "");
             case KeyLog.DEPOSIT -> "&f" + owner + " &7deposited &f" + entry.count + " &7key item" + (entry.count == 1 ? "" : "s")
                     + " into their balance" + (entry.serial == null ? "" : " &8· " + shortId(entry.serial));
             case KeyLog.WITHDRAW -> "&f" + owner + " &7withdrew &f" + entry.count + " &7key item"
@@ -517,19 +549,23 @@ public final class KeyGrantsPage extends MysticPage {
         });
     }
 
-    /** Loads {@code serial} and its owner's name. */
+    /** Loads {@code serial} (or batch) and its owner's name. */
     private CompletableFuture<Lookup> find(String serial) {
-        return module.keys().serial(serial).thenCompose(found -> {
-            UUID owner = uuid(found == null ? null : found.owner);
+        CompletableFuture<Lookup> loaded = KeyBatch.isBatch(serial)
+                ? module.keys().batch(serial).thenApply(batch -> new Lookup(serial, null, batch, null))
+                : module.keys().serial(serial).thenApply(found -> new Lookup(serial, found, null, null));
+        return loaded.thenCompose(lookup -> {
+            UUID owner = uuid(lookup.owner());
             if (owner == null) {
-                return CompletableFuture.completedFuture(new Lookup(serial, found, null));
+                return CompletableFuture.completedFuture(lookup);
             }
             Optional<PlayerRef> online = core.platform().findPlayer(owner);
             if (online.isPresent()) {
-                return CompletableFuture.completedFuture(new Lookup(serial, found, online.get().getUsername()));
+                return CompletableFuture.completedFuture(new Lookup(serial, lookup.found(), lookup.batch(),
+                        online.get().getUsername()));
             }
-            return core.getPlayerProfileService().lastKnownName(owner)
-                    .handle((name, error) -> new Lookup(serial, found, name == null ? null : name.orElse(null)));
+            return core.getPlayerProfileService().lastKnownName(owner).handle((name, error) -> new Lookup(serial,
+                    lookup.found(), lookup.batch(), name == null ? null : name.orElse(null)));
         });
     }
 
@@ -539,39 +575,56 @@ public final class KeyGrantsPage extends MysticPage {
             return;
         }
         Lookup lookup = next.lookup();
-        if (lookup == null || lookup.found() == null || !next.keyId().equals(lookup.found().keyId)
-                || !revocable(lookup.found())) {
+        boolean spendable = lookup != null && !lookup.missing() && next.keyId().equals(lookup.keyId())
+                && (lookup.batch() != null ? revocable(lookup.batch()) : revocable(lookup.found()));
+        if (!spendable) {
             reopen(ref, store, page(next.withNotice("&cLook up a spendable serial of this key first.")));
             return;
         }
-        KeySerial serial = lookup.found();
+        String id = lookup.serial();
         List<String> lines = new ArrayList<>();
-        lines.add("&7Serial &f" + serial.serial + " &8· &7" + serial.state.toLowerCase(Locale.ROOT) + ", "
-                + serial.usesLeft + (serial.usesLeft == 1 ? " use" : " uses") + " left");
-        lines.add("&7Owner &f" + who(serial.owner, lookup.ownerName()));
-        lines.add("&7The key item stops opening anything, and so does any copy of it. This cannot be undone.");
-        lines.add("&7The item stays in their inventory until they next try to use it; then it is removed.");
-        if (KeySerial.RESERVED.equals(serial.state)) {
-            lines.add("&eIt is reserved by an opening in progress, which will then need staff review.");
+        if (lookup.batch() != null) {
+            KeyBatch batch = lookup.batch();
+            lines.add("&7Batch &f" + batch.batch + " &8· &f" + batch.remaining + " &7of &f" + batch.issued + " &7left");
+            lines.add("&7Issued to &f" + who(batch.owner, lookup.ownerName()));
+            lines.add("&7Every item of this batch stops opening anything, wherever it is now. This cannot be undone.");
+            if (!batch.reservations.isEmpty()) {
+                lines.add("&eSome of it is held by an opening in progress, which will then need staff review.");
+            }
+        } else {
+            KeySerial serial = lookup.found();
+            lines.add("&7Serial &f" + serial.serial + " &8· &7" + serial.state.toLowerCase(Locale.ROOT) + ", "
+                    + serial.usesLeft + (serial.usesLeft == 1 ? " use" : " uses") + " left");
+            lines.add("&7Owner &f" + who(serial.owner, lookup.ownerName()));
+            lines.add("&7The key item stops opening anything, and so does any copy of it. This cannot be undone.");
+            if (KeySerial.RESERVED.equals(serial.state)) {
+                lines.add("&eIt is reserved by an opening in progress, which will then need staff review.");
+            }
         }
+        lines.add("&7Items stay in inventories until someone next tries to use them; then they are removed.");
         ConfirmActionPage.Spec spec = new ConfirmActionPage.Spec("Revoke this key?", lines, "Revoke", true,
                 Permissions.LOOTBOX_KEYS_REVOKE);
         reopen(ref, store, new ConfirmActionPage(core, player, spec, (r, s) -> {
             reopen(r, s, page(next.withNotice("&7Revoking...")));
-            module.keys().revoke(serial.serial, player.getUsername()).whenComplete((revoked, error) -> {
+            module.keys().revoke(id, player.getUsername()).whenComplete((revoked, error) -> {
                 if (error != null) {
-                    core.log(Level.WARNING, "[lootbox] revoking " + serial.serial + " failed: " + error);
+                    core.log(Level.WARNING, "[lootbox] revoking " + id + " failed: " + error);
                 }
                 refreshLater(next.withNotice(error != null ? "&cRevoking failed; see the server log."
-                        : Boolean.TRUE.equals(revoked) ? "&aRevoked &f" + serial.serial + "&a."
-                        : "&eNothing revoked: the serial was already spent or revoked."));
+                        : Boolean.TRUE.equals(revoked) ? "&aRevoked &f" + id + "&a."
+                        : "&eNothing revoked: it was already spent or revoked."));
             });
         }, (r, s) -> reopen(r, s, page(next))));
     }
 
     /** Whether {@link KeyService#revoke} would change this serial. */
     static boolean revocable(KeySerial serial) {
-        return KeySerial.ISSUED.equals(serial.state) || KeySerial.RESERVED.equals(serial.state);
+        return serial != null && (KeySerial.ISSUED.equals(serial.state) || KeySerial.RESERVED.equals(serial.state));
+    }
+
+    /** Whether {@link KeyService#revoke} would change this batch. */
+    static boolean revocable(KeyBatch batch) {
+        return batch != null && !batch.revoked && batch.remaining > 0;
     }
 
     // ----- Helpers ------------------------------------------------------------

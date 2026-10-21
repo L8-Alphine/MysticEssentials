@@ -190,6 +190,7 @@ public abstract class MysticPage extends CustomUIPage {
             Map.entry("PlayersNote", TEXT_FAINT),
             Map.entry("KindHint", TEXT_FAINT),
             Map.entry("GiveSummary", TEXT_MUTED),
+            Map.entry("StackHint", TEXT_FAINT),
             Map.entry("KeysHint", TEXT_FAINT),
             Map.entry("RulesNote", TEXT_FAINT),
             Map.entry("Unread", "#FFD97A"),

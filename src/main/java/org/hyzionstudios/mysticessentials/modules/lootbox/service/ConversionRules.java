@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import org.hyzionstudios.mysticessentials.modules.lootbox.model.KeyBatch;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.KeySerial;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.PlayerLootState;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.PlayerLootState.Conversion;
@@ -155,6 +156,27 @@ public final class ConversionRules {
         serial.reservedBy = conversionId;
         serial.reservedAt = now;
         return null;
+    }
+
+    /**
+     * A held stack of batch items (P2-K) deposits as one hold of {@code count}
+     * units, inside one update of the batch. A batch with fewer units left than
+     * the stack holds is refused with {@code "only n left"} (its items are not
+     * all dead, so they are kept); an expiring batch is refused as above.
+     */
+    public static String reserveBatch(KeyBatch batch, String keyId, String conversionId, int count, int heldBefore,
+            long now) {
+        String why = StackRules.spendProblem(batch, keyId, count, now);
+        if ("already used".equals(why) && batch.remaining > 0) {
+            return "only " + batch.remaining + " left";
+        }
+        if (why != null) {
+            return why;
+        }
+        if (batch.expiresAt > 0) {
+            return "expiring";
+        }
+        return StackRules.reserve(batch, keyId, conversionId, count, heldBefore, now);
     }
 
     /**

@@ -137,6 +137,10 @@ public final class LootBoxCommand extends MysticCommand {
                     usage(sender, "/lootbox key info <serial>");
                     return;
                 }
+                if (org.hyzionstudios.mysticessentials.modules.lootbox.model.KeyBatch.isBatch(args[2])) {
+                    module.keys().batch(args[2]).thenAccept(batch -> sender.reply(describeBatch(batch, args[2])));
+                    return;
+                }
                 module.keys().serial(args[2]).thenAccept(serial -> sender.reply(describe(serial, args[2])));
             }
             case "list" -> {
@@ -276,6 +280,16 @@ public final class LootBoxCommand extends MysticCommand {
             case PENDING, BUSY, DUPLICATE -> sender.reply("&e" + result.message());
             default -> sender.reply("&c" + result.message());
         }
+    }
+
+    private static String describeBatch(org.hyzionstudios.mysticessentials.modules.lootbox.model.KeyBatch batch,
+            String id) {
+        if (batch == null) {
+            return "&cNo key batch &f" + id + "&c.";
+        }
+        return "&d" + batch.batch + " &7stackable key &f" + batch.keyId + " &8v" + batch.defVersion + " &7"
+                + (batch.revoked ? "&crevoked" : "&factive") + " &7left &f" + batch.remaining + "&7/&f" + batch.issued
+                + " &7in use &f" + batch.reservations.size() + " &7owner &f" + batch.owner + " &7source &f" + batch.source;
     }
 
     private static String describe(KeySerial serial, String id) {

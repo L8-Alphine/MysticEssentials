@@ -14,9 +14,11 @@ import java.util.logging.Level;
 import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.modules.lootbox.hytale.InventoryAdapter;
 import org.hyzionstudios.mysticessentials.modules.lootbox.hytale.KeyItemFactory;
+import org.hyzionstudios.mysticessentials.modules.lootbox.model.KeyBatch;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.KeyDraft;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.KeyLog;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.KeySerial;
+import org.hyzionstudios.mysticessentials.modules.lootbox.model.PendingInbox;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.PlayerLootState.Conversion;
 import org.hyzionstudios.mysticessentials.modules.lootbox.odds.SecureDraw;
 import org.hyzionstudios.mysticessentials.modules.lootbox.storage.LootBoxStorage;
@@ -104,10 +106,11 @@ public final class ConversionService {
                 return recoverInLane(player).thenApply(ignored -> Result.of(Status.BUSY,
                         "Your last opening or conversion was still finishing. Try again in a moment."));
             }
-            return heldKey(player).thenCompose(held -> {
-                if (held == null) {
+            return heldKey(player).thenCompose(hand -> {
+                if (hand == null) {
                     return done(Status.NO_KEY, "Hold the key you want to deposit.");
                 }
+                InventoryAdapter.KeyStack held = hand.stack();
                 if (!held.marker().verify(keys.secret())) {
                     return done(Status.REFUSED, "That key was not issued by this server.");
                 }
@@ -115,32 +118,46 @@ public final class ConversionService {
                 if (registry.key(keyId).isEmpty()) {
                     return done(Status.REFUSED, "That key is no longer in use.");
                 }
-                return startDeposit(player, requestId, held);
+                return startDeposit(player, requestId, hand);
             });
         });
     }
 
-    private CompletableFuture<Result> startDeposit(PlayerRef player, String requestId, InventoryAdapter.KeyStack held) {
+    /**
+     * A serialized key deposits one item. A stack of batch items (P2-K) deposits
+     * the whole held stack, as one hold of that many units on the batch.
+     */
+    private CompletableFuture<Result> startDeposit(PlayerRef player, String requestId, Hand hand) {
         UUID uuid = player.getUuid();
+        InventoryAdapter.KeyStack held = hand.stack();
         String conversionId = draw.id();
         String keyId = held.marker().keyId();
         String serialId = held.marker().serial();
+        boolean batch = KeyBatch.isBatch(serialId);
+        int units = batch ? Math.max(1, held.quantity()) : 1;
         long now = System.currentTimeMillis();
         AtomicReference<String> problem = new AtomicReference<>();
-        return storage.updatePlayer(uuid, state -> {
-            ConversionRules.prepareDeposit(state, conversionId, requestId, keyId, serialId, now);
+        CompletableFuture<?> prepared = storage.updatePlayer(uuid, state -> {
+            ConversionRules.prepareDeposit(state, conversionId, requestId, keyId, serialId, now).count = units;
             return state;
-        }).thenCompose(prepared -> storage.updateSerial(serialId, serial -> {
-            String why = ConversionRules.reserve(serial, keyId, conversionId, now);
-            problem.set(why);
-            return why == null ? serial : null;
-        })).thenCompose(reserved -> {
+        });
+        return prepared.thenCompose(ignored -> batch
+                ? storage.updateBatch(serialId, entry -> {
+                    String why = ConversionRules.reserveBatch(entry, keyId, conversionId, units, hand.total(), now);
+                    problem.set(why);
+                    return why == null ? entry : null;
+                }).thenApply(entry -> (Object) entry)
+                : storage.updateSerial(serialId, serial -> {
+                    String why = ConversionRules.reserve(serial, keyId, conversionId, now);
+                    problem.set(why);
+                    return why == null ? serial : null;
+                }).thenApply(serial -> (Object) serial)).thenCompose(reserved -> {
             if (problem.get() != null) {
                 rejectDead(player, serialId, problem.get());
                 return abort(uuid, conversionId, problem.get())
                         .thenApply(ignored -> Result.of(Status.REFUSED, refusal(problem.get())));
             }
-            return take(player, held).thenCompose(taken -> {
+            return take(player, held, batch ? units : 0).thenCompose(taken -> {
                 if (taken == null) {
                     audit.record(uuid.toString(), "KEY_CONVERT_PENDING", conversionId, "deposit " + serialId);
                     return done(Status.PENDING, "Your deposit is still finishing. It completes within a few "
@@ -156,10 +173,25 @@ public final class ConversionService {
         });
     }
 
-    /** The commit point (serial CONVERTED), then the keyed credit. Recovery repeats it safely. */
+    /**
+     * The commit point (serial CONVERTED, or the batch hold spent), then the
+     * keyed credit. Recovery repeats it safely.
+     */
     private CompletableFuture<Result> commitDeposit(UUID uuid, String name, String conversionId, String keyId,
             String serialId) {
         AtomicInteger uses = new AtomicInteger(-1);
+        if (KeyBatch.isBatch(serialId)) {
+            return storage.updateBatch(serialId, batch -> {
+                int spent = StackRules.redeem(batch, conversionId);
+                if (spent > 0) {
+                    uses.set(spent);
+                    return batch;
+                }
+                return null;
+            }).thenCompose(batch -> uses.get() < 0
+                    ? refusedCommit(uuid, conversionId, serialId)
+                    : credit(uuid, name, conversionId, keyId, serialId, uses.get()));
+        }
         return storage.updateSerial(serialId, serial -> {
             if (ConversionRules.convert(serial, conversionId)) {
                 uses.set(serial.usesLeft);
@@ -169,16 +201,18 @@ public final class ConversionService {
                 uses.set(serial.usesLeft);
             }
             return null;
-        }).thenCompose(serial -> {
-            if (uses.get() < 0) {
-                audit.record("server", "KEY_CONVERT_ANOMALY", conversionId, "deposit " + serialId
-                        + ": the key was taken but its serial refused the deposit (revoked?)");
-                return abort(uuid, conversionId, "the serial refused the deposit")
-                        .thenApply(ignored -> Result.of(Status.REFUSED,
-                                "That key was revoked while it was being deposited; nothing was credited."));
-            }
-            return credit(uuid, name, conversionId, keyId, serialId, uses.get());
-        });
+        }).thenCompose(serial -> uses.get() < 0
+                ? refusedCommit(uuid, conversionId, serialId)
+                : credit(uuid, name, conversionId, keyId, serialId, uses.get()));
+    }
+
+    /** The item was taken but the ledger refused the commit: a revoke in between wins. */
+    private CompletableFuture<Result> refusedCommit(UUID uuid, String conversionId, String serialId) {
+        audit.record("server", "KEY_CONVERT_ANOMALY", conversionId, "deposit " + serialId
+                + ": the key was taken but its ledger entry refused the deposit (revoked?)");
+        return abort(uuid, conversionId, "the ledger refused the deposit")
+                .thenApply(ignored -> Result.of(Status.REFUSED,
+                        "That key was revoked while it was being deposited; nothing was credited."));
     }
 
     private CompletableFuture<Result> credit(UUID uuid, String name, String conversionId, String keyId,
@@ -237,8 +271,13 @@ public final class ConversionService {
             }
             String conversionId = draw.id();
             List<String> serials = new ArrayList<>();
-            for (int i = 0; i < count; i++) {
-                serials.add(draw.id());
+            if (definition.spec.stackable) {
+                // One batch of `count` items (P2-K).
+                serials.add(KeyBatch.PREFIX + draw.id());
+            } else {
+                for (int i = 0; i < count; i++) {
+                    serials.add(draw.id());
+                }
             }
             AtomicReference<ConversionRules.Debit> debit = new AtomicReference<>();
             long now = System.currentTimeMillis();
@@ -285,17 +324,22 @@ public final class ConversionService {
                     audit.record(uuid.toString(), "KEY_CONVERT_PENDING", conversion.conversionId, "withdraw");
                     return CompletableFuture.completedFuture(-1);
                 }
-                return keys.toInbox(uuid, left).thenCompose(pending -> settle(uuid, conversion.conversionId)
-                        .thenApply(ignored -> pending));
+                return keys.toInbox(uuid, left, conversion.conversionId).thenCompose(pending -> settle(uuid,
+                        conversion.conversionId).thenApply(ignored -> pending));
             });
         });
+    }
+
+    /** Whether the withdrawal issues one batch of stackable keys (P2-K) rather than serials. */
+    private static boolean batchWithdrawal(Conversion conversion) {
+        return conversion.serials.size() == 1 && KeyBatch.isBatch(conversion.serials.get(0));
     }
 
     /**
      * Writes each serial of {@code conversion} unless it exists (a retry never
      * resets a key that was spent meanwhile) and builds its item from the stored
-     * entry. {@code null} when the key definition is gone, which leaves the
-     * conversion for a later pass.
+     * entry; for a batch, the batch and one stack of its items. {@code null} when
+     * the key definition is gone, which leaves the conversion for a later pass.
      */
     private CompletableFuture<List<ItemStack>> issue(UUID owner, String actor, Conversion conversion) {
         KeyDraft.Published definition = registry.key(conversion.keyId).orElse(null);
@@ -304,8 +348,17 @@ public final class ConversionService {
                     + conversion.keyId + " is not loaded");
             return CompletableFuture.completedFuture(null);
         }
-        List<CompletableFuture<ItemStack>> stacks = new ArrayList<>();
         long now = System.currentTimeMillis();
+        if (batchWithdrawal(conversion)) {
+            KeyBatch fresh = StackRules.newBatch(conversion.serials.get(0), conversion.keyId, definition.version,
+                    owner.toString(), conversion.count, ConversionRules.SOURCE, actor, now, 0);
+            return storage.updateBatch(fresh.batch, existing -> existing == null ? fresh : null).thenApply(stored -> {
+                KeyBatch batch = stored == null ? fresh : stored;
+                return List.of(KeyItemFactory.create(definition, KeyMarker.signed(batch.keyId, batch.defVersion,
+                        batch.batch, KeyService.SECRET_ID, keys.secret()), conversion.count));
+            });
+        }
+        List<CompletableFuture<ItemStack>> stacks = new ArrayList<>();
         for (String serialId : conversion.serials) {
             KeySerial fresh = ConversionRules.withdrawnSerial(serialId, conversion.keyId, definition.version,
                     owner.toString(), actor, now);
@@ -350,6 +403,9 @@ public final class ConversionService {
         if (conversion.serial == null) {
             return abort(uuid, id, "recovered: no serial recorded");
         }
+        if (KeyBatch.isBatch(conversion.serial)) {
+            return recoverBatchDeposit(player, conversion);
+        }
         return storage.loadSerial(conversion.serial).thenCompose(serial -> keyHeld(player, conversion.serial)
                 .thenCompose(held -> {
                     ConversionRules.DepositAction action = ConversionRules.decideDeposit(id, serial, held);
@@ -372,11 +428,43 @@ public final class ConversionService {
                 }));
     }
 
+    /**
+     * A deposit of batch items left unfinished (P2-K). Recovery prefers abort
+     * ({@link StackRules#decideDeposit}): a hold is released, and the items
+     * that may have been taken are given back; a spent hold is credited once.
+     */
+    private CompletableFuture<Void> recoverBatchDeposit(PlayerRef player, Conversion conversion) {
+        UUID uuid = player.getUuid();
+        String id = conversion.conversionId;
+        return storage.loadBatch(conversion.serial).thenCompose(batch -> countHeld(player, conversion.serial)
+                .thenCompose(held -> {
+                    StackRules.Recovery action = StackRules.decideDeposit(id, batch, held);
+                    if (action != StackRules.Recovery.WAIT) {
+                        audit.record("server", "KEY_CONVERT_RECOVER", id, "batch deposit " + action.name());
+                    }
+                    return switch (action) {
+                        case ABORT -> abort(uuid, id, "recovered: batch never held");
+                        case RELEASE -> releaseAndAbort(uuid, conversion.serial, id, "recovered: keys kept");
+                        case RELEASE_REGIVE -> {
+                            int give = StackRules.regive(batch.reservation(id), held);
+                            yield releaseAndAbort(uuid, conversion.serial, id, "recovered: keys given back")
+                                    .thenCompose(ignored -> keys.regive(player, batch, give, id));
+                        }
+                        case COMMITTED -> credit(uuid, player.getUsername(), id, conversion.keyId, conversion.serial,
+                                conversion.count).thenApply(result -> (Void) null);
+                        case WAIT, NONE -> CompletableFuture.completedFuture(null);
+                    };
+                }));
+    }
+
     private CompletableFuture<Void> recoverWithdrawal(PlayerRef player, Conversion conversion) {
         UUID uuid = player.getUuid();
         return issue(uuid, player.getUsername(), conversion).thenCompose(stacks -> {
             if (stacks == null) {
                 return CompletableFuture.completedFuture(null);
+            }
+            if (batchWithdrawal(conversion)) {
+                return recoverBatchWithdrawal(player, conversion);
             }
             return storage.loadPending(uuid).thenCompose(inbox -> {
                 List<CompletableFuture<ConversionRules.Delivery>> decisions = new ArrayList<>();
@@ -406,6 +494,40 @@ public final class ConversionService {
         });
     }
 
+    /**
+     * A withdrawn batch left unfinished (P2-K): files in the inbox the batch's
+     * unspent units that are neither in the inventory nor in the inbox
+     * ({@link StackRules#missingWithdrawn}), once, then settles.
+     */
+    private CompletableFuture<Void> recoverBatchWithdrawal(PlayerRef player, Conversion conversion) {
+        UUID uuid = player.getUuid();
+        String batchId = conversion.serials.get(0);
+        return storage.loadBatch(batchId).thenCompose(batch -> countHeld(player, batchId)
+                .thenCombine(storage.loadPending(uuid), (held, inbox) -> {
+                    int filed = 0;
+                    for (PendingInbox.PendingReward item : inbox.items) {
+                        if (item.fulfillmentId != null && item.fulfillmentId.startsWith(ConversionRules.inboxId(batchId) + "#")) {
+                            filed += item.quantity;
+                        }
+                    }
+                    return StackRules.missingWithdrawn(batch, held, filed);
+                }).thenCompose(missing -> {
+                    if (missing < 0) {
+                        return CompletableFuture.completedFuture(null);
+                    }
+                    audit.record("server", "KEY_CONVERT_RECOVER", conversion.conversionId, "batch withdraw "
+                            + missing + " to inbox");
+                    KeyDraft.Published definition = registry.key(conversion.keyId).orElse(null);
+                    if (missing == 0 || definition == null) {
+                        return settle(uuid, conversion.conversionId);
+                    }
+                    ItemStack stack = KeyItemFactory.create(definition, KeyMarker.signed(batch.keyId, batch.defVersion,
+                            batch.batch, KeyService.SECRET_ID, keys.secret()), missing);
+                    return keys.toInbox(uuid, List.of(stack), conversion.conversionId + "#recovered")
+                            .thenCompose(n -> settle(uuid, conversion.conversionId));
+                }));
+    }
+
     // ----- Documents and the world ----------------------------------------------
 
     private CompletableFuture<Void> abort(UUID uuid, String conversionId, String note) {
@@ -415,16 +537,40 @@ public final class ConversionService {
     }
 
     private CompletableFuture<Void> releaseAndAbort(UUID uuid, String serialId, String conversionId, String note) {
-        return storage.updateSerial(serialId, serial -> ConversionRules.release(serial, conversionId) ? serial : null)
-                .thenCompose(serial -> abort(uuid, conversionId, note));
+        CompletableFuture<?> released = KeyBatch.isBatch(serialId)
+                ? storage.updateBatch(serialId, batch -> StackRules.release(batch, conversionId) ? batch : null)
+                : storage.updateSerial(serialId, serial -> ConversionRules.release(serial, conversionId) ? serial : null);
+        return released.thenCompose(ignored -> abort(uuid, conversionId, note));
+    }
+
+    /** The held key stack and how many items with its serial (or batch) the player holds in all. */
+    private record Hand(InventoryAdapter.KeyStack stack, int total) {
     }
 
     /** The stack in the player's active hotbar slot if it carries a key marker, else {@code null}. */
-    private CompletableFuture<InventoryAdapter.KeyStack> heldKey(PlayerRef player) {
-        CompletableFuture<InventoryAdapter.KeyStack> held = new CompletableFuture<>();
+    private CompletableFuture<Hand> heldKey(PlayerRef player) {
+        CompletableFuture<Hand> held = new CompletableFuture<>();
         boolean dispatched = core.platform().runOnEntityThread(player, (store, entity, world) -> {
             try {
-                held.complete(InventoryAdapter.heldKey(store, entity));
+                InventoryAdapter.KeyStack stack = InventoryAdapter.heldKey(store, entity);
+                held.complete(stack == null ? null
+                        : new Hand(stack, InventoryAdapter.countSerial(store, entity, stack.marker().serial())));
+            } catch (Throwable t) {
+                held.complete(null);
+            }
+        });
+        if (!dispatched) {
+            held.complete(null);
+        }
+        return held.completeOnTimeout(null, ConversionRules.HOP_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+    }
+
+    /** The player's items of {@code batch}; {@code null} when the inventory could not be read. */
+    private CompletableFuture<Integer> countHeld(PlayerRef player, String batch) {
+        CompletableFuture<Integer> held = new CompletableFuture<>();
+        boolean dispatched = core.platform().runOnEntityThread(player, (store, entity, world) -> {
+            try {
+                held.complete(InventoryAdapter.countSerial(store, entity, batch));
             } catch (Throwable t) {
                 held.complete(null);
             }
@@ -436,16 +582,18 @@ public final class ConversionService {
     }
 
     /**
-     * Removes one stack with the held key's serial.
+     * Removes the held key: one item with its serial, or exactly {@code count}
+     * items of a held batch stack (P2-K) when {@code count > 0}.
      *
      * @return {@code true} when removed, {@code false} when it is gone (nothing
      *         happened), {@code null} when the world did not answer or failed midway
      */
-    private CompletableFuture<Boolean> take(PlayerRef player, InventoryAdapter.KeyStack held) {
+    private CompletableFuture<Boolean> take(PlayerRef player, InventoryAdapter.KeyStack held, int count) {
         CompletableFuture<Boolean> taken = new CompletableFuture<>();
         boolean dispatched = core.platform().runOnEntityThread(player, (store, entity, world) -> {
             try {
-                taken.complete(InventoryAdapter.removeOne(store, entity, held));
+                taken.complete(count > 0 ? InventoryAdapter.takeCount(store, entity, held, count)
+                        : InventoryAdapter.removeOne(store, entity, held));
             } catch (Throwable t) {
                 taken.complete(null);
             }
@@ -526,7 +674,11 @@ public final class ConversionService {
             case "expired" -> "That key has expired.";
             case "no uses left" -> "That key has no uses left.";
             case "already used", "revoked key", "unknown key" -> "That key no longer works, so it was removed.";
-            default -> "That key can't be deposited (" + problem.toLowerCase(Locale.ROOT) + ").";
+            case "reserved" -> "Some of these keys are being used right now. Try again in a moment.";
+            default -> problem.startsWith("only ")
+                    ? "Only " + problem.substring(5, problem.length() - 5).trim() + " of these keys still work: split the "
+                            + "stack and deposit that many."
+                    : "That key can't be deposited (" + problem.toLowerCase(Locale.ROOT) + ").";
         };
     }
 

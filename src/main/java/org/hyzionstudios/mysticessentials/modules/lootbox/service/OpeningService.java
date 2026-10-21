@@ -22,6 +22,7 @@ import org.hyzionstudios.mysticessentials.modules.lootbox.api.event.OpeningFlagg
 import org.hyzionstudios.mysticessentials.modules.lootbox.api.event.OpeningRequestedEvent;
 import org.hyzionstudios.mysticessentials.modules.lootbox.config.LootBoxConfig;
 import org.hyzionstudios.mysticessentials.modules.lootbox.hytale.InventoryAdapter;
+import org.hyzionstudios.mysticessentials.modules.lootbox.model.KeyBatch;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.KeySerial;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.LootBoxDraft;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.LootBoxRevision;
@@ -324,7 +325,8 @@ public final class OpeningService {
             opening.keyId = stack.marker().keyId();
             opening.keySerial = stack.marker().serial();
             opening.state = Opening.RESERVED;
-            boolean lastUse = OpeningRules.lastUse(reserved.serial());
+            // A batch item (P2-K) always has one use: one item leaves the stack.
+            boolean lastUse = reserved.serial() == null || OpeningRules.lastUse(reserved.serial());
             return storage.saveOpening(opening)
                     .thenCompose(saved -> takeKey(player, stack, lastUse))
                     .thenCompose(taken -> {
@@ -353,16 +355,20 @@ public final class OpeningService {
         });
     }
 
+    /** {@code serial} is {@code null} for a batch of stackable keys (P2-K). */
     private record Reserved(InventoryAdapter.KeyStack stack, KeySerial serial) {
     }
 
-    /** Reserves the first stack whose serial may be spent. */
+    /** Reserves the first stack whose serial (or batch) may be spent. */
     private CompletableFuture<Reserved> reserveFirst(PlayerRef player, Opening opening,
             List<InventoryAdapter.KeyStack> stacks, int index, String lastProblem) {
         if (index >= stacks.size()) {
             return CompletableFuture.completedFuture(null);
         }
         InventoryAdapter.KeyStack stack = stacks.get(index);
+        if (KeyBatch.isBatch(stack.marker().serial())) {
+            return reserveBatch(player, opening, stacks, index);
+        }
         long now = System.currentTimeMillis();
         AtomicReference<String> problem = new AtomicReference<>();
         return storage.updateSerial(stack.marker().serial(), serial -> {
@@ -378,9 +384,35 @@ public final class OpeningService {
         });
     }
 
+    /**
+     * Holds one unit of a batch (P2-K) for this opening, remembering how many of
+     * its items the player holds, which recovery compares against.
+     */
+    private CompletableFuture<Reserved> reserveBatch(PlayerRef player, Opening opening,
+            List<InventoryAdapter.KeyStack> stacks, int index) {
+        InventoryAdapter.KeyStack stack = stacks.get(index);
+        String batchId = stack.marker().serial();
+        int heldBefore = stacks.stream().filter(s -> batchId.equals(s.marker().serial()))
+                .mapToInt(InventoryAdapter.KeyStack::quantity).sum();
+        long now = System.currentTimeMillis();
+        AtomicReference<String> problem = new AtomicReference<>();
+        return storage.updateBatch(batchId, batch -> {
+            String why = StackRules.reserve(batch, stack.marker().keyId(), opening.openingId, 1, heldBefore, now);
+            problem.set(why);
+            return why == null ? batch : null;
+        }).thenCompose(batch -> {
+            if (problem.get() == null && batch != null && batch.reservation(opening.openingId) != null) {
+                return CompletableFuture.completedFuture(new Reserved(stack, null));
+            }
+            flagIfSuspicious(player, opening.lootboxId, stack, problem.get());
+            return reserveFirst(player, opening, stacks, index + 1, problem.get());
+        });
+    }
+
     /** A valid marker on an unspendable serial is a copied or recycled key. */
     private void flagIfSuspicious(PlayerRef player, String lootboxId, InventoryAdapter.KeyStack stack, String problem) {
-        if (problem == null || "expired".equals(problem) || "wrong key".equals(problem)) {
+        // "reserved": a batch's last units are held by another opening, so its items are not dead (P2-K).
+        if (problem == null || "expired".equals(problem) || "wrong key".equals(problem) || "reserved".equals(problem)) {
             return;
         }
         audit.record(player.getUuid().toString(), "KEY_REJECTED", stack.marker().serial(), problem);
@@ -408,9 +440,18 @@ public final class OpeningService {
         return taken;
     }
 
-    /** The physical-key commit point: RESERVED(this) → one use spent, outcome recorded. */
+    /**
+     * The physical-key commit point: RESERVED(this) → one use spent, outcome
+     * recorded. For a batch (P2-K): this opening's hold → one unit spent.
+     */
     private CompletableFuture<Boolean> redeem(Opening opening) {
         AtomicBoolean redeemed = new AtomicBoolean();
+        if (KeyBatch.isBatch(opening.keySerial)) {
+            return storage.updateBatch(opening.keySerial, batch -> {
+                redeemed.set(StackRules.redeem(batch, opening.openingId) > 0);
+                return redeemed.get() ? batch : null;
+            }).thenApply(batch -> redeemed.get());
+        }
         return storage.updateSerial(opening.keySerial, serial -> {
             redeemed.set(OpeningRules.redeem(serial, opening.openingId, opening.outcomeId));
             return redeemed.get() ? serial : null;
@@ -418,6 +459,10 @@ public final class OpeningService {
     }
 
     private CompletableFuture<Void> releaseReservation(String serialId, String openingId) {
+        if (KeyBatch.isBatch(serialId)) {
+            return storage.updateBatch(serialId, batch -> StackRules.release(batch, openingId) ? batch : null)
+                    .thenApply(batch -> null);
+        }
         return storage.updateSerial(serialId, serial -> OpeningRules.release(serial, openingId) ? serial : null)
                 .thenApply(serial -> null);
     }
@@ -557,6 +602,9 @@ public final class OpeningService {
                     ? ensureCommitted(opening)
                     : abort(opening, Status.ERROR, "recovered: virtual key was never spent").thenApply(r -> null));
         }
+        if (KeyBatch.isBatch(opening.keySerial)) {
+            return recoverBatch(player, opening);
+        }
         return storage.loadSerial(opening.keySerial).thenCompose(serial -> keyHeld(player, opening.keySerial)
                 .thenCompose(held -> {
                     RecoveryPolicy.Action action = RecoveryPolicy.decide(opening.state, serial, opening.openingId, held);
@@ -575,6 +623,53 @@ public final class OpeningService {
                         case NONE -> clearActive(uuid, opening.openingId);
                     };
                 }));
+    }
+
+    /**
+     * A stackable-key opening left unfinished (P2-K). Recovery prefers abort
+     * ({@link StackRules#decideOpening}): the hold is released, and when the
+     * player's count of the batch dropped, the item that may have been taken is
+     * given back. Spent units are committed as usual.
+     */
+    private CompletableFuture<Void> recoverBatch(PlayerRef player, Opening opening) {
+        UUID uuid = player.getUuid();
+        return storage.loadBatch(opening.keySerial).thenCompose(batch -> countHeld(player, opening.keySerial)
+                .thenCompose(held -> {
+                    StackRules.Recovery action = StackRules.decideOpening(opening.state, batch, opening.openingId, held);
+                    audit.record("server", "RECOVER", opening.openingId, "batch " + action.name());
+                    return switch (action) {
+                        case ABORT -> abort(opening, Status.ERROR, "recovered: batch never held")
+                                .thenApply(r -> (Void) null);
+                        case RELEASE -> releaseReservation(opening.keySerial, opening.openingId)
+                                .thenCompose(r -> abort(opening, Status.ERROR, "recovered: key kept"))
+                                .thenApply(r -> (Void) null);
+                        case RELEASE_REGIVE -> {
+                            int give = StackRules.regive(batch.reservation(opening.openingId), held);
+                            yield releaseReservation(opening.keySerial, opening.openingId)
+                                    .thenCompose(r -> keys.regive(player, batch, give, opening.openingId))
+                                    .thenCompose(r -> abort(opening, Status.ERROR, "recovered: key given back"))
+                                    .thenApply(r -> (Void) null);
+                        }
+                        case COMMITTED -> commitRecovered(uuid, opening);
+                        case WAIT, NONE -> clearActive(uuid, opening.openingId);
+                    };
+                }));
+    }
+
+    /** The player's items of {@code batch}; {@code null} when the inventory could not be read. */
+    private CompletableFuture<Integer> countHeld(PlayerRef player, String batch) {
+        CompletableFuture<Integer> held = new CompletableFuture<>();
+        boolean dispatched = core.platform().runOnEntityThread(player, (store, entity, world) -> {
+            try {
+                held.complete(InventoryAdapter.countSerial(store, entity, batch));
+            } catch (Throwable t) {
+                held.complete(null);
+            }
+        });
+        if (!dispatched) {
+            held.complete(null);
+        }
+        return held;
     }
 
     private CompletableFuture<Void> commitRecovered(UUID uuid, Opening opening) {

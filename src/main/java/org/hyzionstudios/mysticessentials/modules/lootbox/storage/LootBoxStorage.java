@@ -237,4 +237,20 @@ public final class LootBoxStorage {
                     return next;
                 });
     }
+
+    static final String BATCH_NS = "lootbox_batch";
+
+    public CompletableFuture<org.hyzionstudios.mysticessentials.modules.lootbox.model.KeyBatch> loadBatch(String batch) {
+        return load(BATCH_NS, batch, org.hyzionstudios.mysticessentials.modules.lootbox.model.KeyBatch.class);
+    }
+
+    public CompletableFuture<Void> saveBatch(org.hyzionstudios.mysticessentials.modules.lootbox.model.KeyBatch batch) {
+        return storage().save(BATCH_NS, batch.batch, Json.toTree(batch));
+    }
+
+    /** Atomic per batch: the commit point of stackable-key openings and deposits. */
+    public CompletableFuture<org.hyzionstudios.mysticessentials.modules.lootbox.model.KeyBatch> updateBatch(String batch,
+            UnaryOperator<org.hyzionstudios.mysticessentials.modules.lootbox.model.KeyBatch> change) {
+        return update(BATCH_NS, batch, org.hyzionstudios.mysticessentials.modules.lootbox.model.KeyBatch.class, change);
+    }
 }

@@ -24,7 +24,8 @@ public final class KeyDiff {
         List<String> lines = new ArrayList<>();
         if (published == null) {
             lines.add("&7New key &f" + MysticText.stripMarkup(blank(working.name)) + " &7on &f"
-                    + blank(working.baseItemId) + "&7, " + uses(working.uses) + ", " + expiry(working.expiresAfterDays) + ".");
+                    + blank(working.baseItemId) + "&7, " + uses(working.uses) + ", " + expiry(working.expiresAfterDays)
+                    + (working.stackable ? ", stackable" : "") + ".");
             return lines;
         }
         field(lines, "Base item", published.baseItemId, working.baseItemId);
@@ -40,6 +41,10 @@ public final class KeyDiff {
         }
         field(lines, "Uses", uses(published.uses), uses(working.uses));
         field(lines, "Expiry", expiry(published.expiresAfterDays), expiry(working.expiresAfterDays));
+        field(lines, "Items", stacking(published.stackable), stacking(working.stackable));
+        if (published.stackable != working.stackable) {
+            lines.add("&7Keys already given out keep how they were issued; only new grants change.");
+        }
         if (lines.isEmpty()) {
             lines.add("&7No changes from the published version.");
         }
@@ -61,6 +66,10 @@ public final class KeyDiff {
 
     static String uses(int uses) {
         return uses + (uses == 1 ? " use" : " uses");
+    }
+
+    static String stacking(boolean stackable) {
+        return stackable ? "stack (one batch per grant)" : "one serial each";
     }
 
     static String expiry(long days) {
