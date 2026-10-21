@@ -401,10 +401,63 @@ tasks.register("validateUiDocuments") {
         val problems = mutableListOf<String>()
         var checked = 0
 
+        // A @parameter may only be assigned before a block's first plain
+        // property. Once the parser has read a "Name:" line it takes a later
+        // "@X" for a child element and demands "{", so the document dies with
+        // "Expected {, found =" -- and that failure is not contained: the
+        // client stops resolving OTHER packs' documents and disconnects every
+        // player at world join. The game's own documents never order them the
+        // other way round.
+        val parameterAssignment = Regex("""@\w+\s*=""")
+        val plainProperty = Regex("""[A-Za-z]\w*\s*:""")
+        fun misorderedParameters(source: String): List<Int> {
+            val text = Regex("//[^\n]*").replace(source, "")
+                .let { Regex(""""[^"\n]*"""").replace(it, "\"\"") }
+            val found = mutableListOf<Int>()
+            val sawProperty = mutableMapOf<Int, Boolean>()
+            var depth = 0
+            var paren = 0
+            var line = 1
+            var i = 0
+            while (i < text.length) {
+                val c = text[i]
+                when {
+                    c == '\n' -> { line++; i++ }
+                    c == '(' -> { paren++; i++ }
+                    c == ')' -> { paren--; i++ }
+                    paren > 0 -> i++
+                    c == '{' -> { depth++; sawProperty[depth] = false; i++ }
+                    c == '}' -> { sawProperty.remove(depth); depth--; i++ }
+                    c == '@' && depth > 0 -> {
+                        if (sawProperty[depth] == true && parameterAssignment.matchAt(text, i) != null) {
+                            found += line
+                        }
+                        i++
+                    }
+                    else -> {
+                        val match = if (depth > 0) plainProperty.matchAt(text, i) else null
+                        val startsStatement = i == 0 || text[i - 1] in charArrayOf('\n', ' ', '\t', ';', '{', '}')
+                        if (match != null && startsStatement) {
+                            sawProperty[depth] = true
+                            i += match.value.length
+                        } else {
+                            i++
+                        }
+                    }
+                }
+            }
+            return found
+        }
+
         listOf(uiDir.asFile, spikeUiDir.asFile).filter { it.isDirectory }
             .flatMap { dir -> dir.walkTopDown().filter { it.isFile && it.extension == "ui" }.toList() }
             .forEach { file ->
             val text = file.readText()
+            misorderedParameters(text).forEach { lineNumber ->
+                problems += file.name + ":" + lineNumber +
+                    ": a @parameter is assigned after a plain property -- move it above the" +
+                    " block's first \"Name:\" line"
+            }
             header.findAll(text).forEach { use ->
                 val alias = use.groupValues[1]
                 val component = use.groupValues[2]
@@ -435,7 +488,7 @@ tasks.register("validateUiDocuments") {
 
         if (problems.isNotEmpty()) {
             throw GradleException(
-                "Shipped .ui documents omit required Common.ui parameters. These break OTHER mods' " +
+                "Shipped .ui documents are malformed. These break OTHER mods' " +
                     "documents on the client and disconnect players at world join:\n  " +
                     problems.joinToString("\n  ")
             )

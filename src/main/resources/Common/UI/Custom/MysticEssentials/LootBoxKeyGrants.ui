@@ -153,8 +153,8 @@ $C.@Container {
             Anchor: (Height: 44);
 
             $C.@TextField #SerialInput {
-              FlexWeight: 1;
               @Anchor = (Vertical: 3);
+              FlexWeight: 1;
               PlaceholderText: "Serial, from /lootbox key info";
             }
 
