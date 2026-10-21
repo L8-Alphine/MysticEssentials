@@ -1,0 +1,226 @@
+// LootBox Template Library (P2-H): saved key looks, reward sets and crate looks. Rows are
+// LootBoxTemplateRow.ui appended into #TemplateList; selecting one shows it in
+// #SelectionPanel with Apply / Insert into a chosen draft, Rename and Delete.
+// #FormPanel saves a new template from a draft or crate, or renames the selected one.
+$C = "../Common.ui";
+$M = "MysticTheme.ui";
+
+$C.@PageOverlay {}
+
+$C.@Container {
+  Anchor: (Width: 900, Height: 700);
+
+  #Title {
+    Group {
+      $C.@Title {
+        @Text = "Template Library";
+      }
+    }
+  }
+
+  #Content {
+    LayoutMode: Top;
+
+    Label #HeaderInfo {
+      Anchor: (Height: 20, Bottom: 6);
+      Style: $M.@MetaFitStyle;
+    }
+
+    Group {
+      LayoutMode: Left;
+      Anchor: (Height: 32, Bottom: 10);
+
+      $C.@DropdownBox #KindFilter {
+        Anchor: (Width: 180, Height: 32);
+      }
+
+      $M.@Spacer {}
+
+      $C.@SecondaryTextButton #SaveKeyLookButton {
+        @Text = "Save Key Look";
+        @Anchor = (Width: 170, Left: 8);
+      }
+
+      $C.@SecondaryTextButton #SaveRewardSetButton {
+        @Text = "Save Reward Set";
+        @Anchor = (Width: 180, Left: 6);
+      }
+
+      $C.@SecondaryTextButton #SaveCrateLookButton {
+        @Text = "Save Crate Look";
+        @Anchor = (Width: 180, Left: 6);
+      }
+    }
+
+    $M.@Panel #FormPanel {
+      @Padding = 12;
+
+      Anchor: (Bottom: 10);
+      Visible: false;
+
+      Label #FormTitle {
+        Anchor: (Height: 20, Bottom: 8);
+        Style: $M.@SubheadingStyle;
+      }
+
+      Group {
+        LayoutMode: Left;
+        Anchor: (Height: 58);
+
+        Group #FormSourceColumn {
+          LayoutMode: Top;
+          Anchor: (Width: 250, Right: 12);
+
+          $M.@FieldLabel { @Text = "From draft"; }
+          $C.@DropdownBox #FormSource {
+            Anchor: (Width: 250, Height: 32);
+          }
+        }
+
+        Group #FormIdColumn {
+          LayoutMode: Top;
+          Anchor: (Width: 250, Right: 12);
+
+          $M.@FieldLabel { @Text = "Template id"; }
+          $C.@TextField #FormIdInput {
+            PlaceholderText: "lowercase_with_underscores";
+          }
+        }
+
+        Group {
+          LayoutMode: Top;
+          FlexWeight: 1;
+
+          $M.@FieldLabel { @Text = "Name"; }
+          $C.@TextField #FormNameInput {
+            PlaceholderText: "What the library calls it";
+          }
+        }
+      }
+
+      Group {
+        LayoutMode: Left;
+        Anchor: (Height: 40, Top: 8);
+
+        Label #FormHint {
+          FlexWeight: 1;
+          Style: $M.@HintStyle;
+        }
+
+        $C.@SecondaryTextButton #FormCancelButton {
+          @Text = "Cancel";
+          @Anchor = (Width: 130, Left: 8);
+        }
+
+        $C.@TextButton #FormConfirmButton {
+          @Text = "Save Template";
+          @Anchor = (Width: 180, Left: 8);
+        }
+      }
+    }
+
+    Label #Notice {
+      Anchor: (Bottom: 6);
+      Style: $M.@BodyStyle;
+      Visible: false;
+    }
+
+    $M.@Section {
+      @Text = "Templates";
+      @Anchor = (Bottom: 8);
+    }
+
+    $M.@Well {
+      FlexWeight: 1;
+
+      Label #ListEmpty {
+        Anchor: (Height: 64);
+        Style: $M.@EmptyStyle;
+        Text: "No templates yet. Save a key look from a key draft, or a reward set from a pool draft.";
+        Visible: false;
+      }
+
+      Group #TemplateList {
+        FlexWeight: 1;
+        LayoutMode: TopScrolling;
+        Padding: (Right: 6);
+        ScrollbarStyle: $C.@DefaultScrollbarStyle;
+      }
+    }
+
+    $M.@Panel #SelectionPanel {
+      @Padding = 12;
+
+      Anchor: (Top: 10);
+      Visible: false;
+
+      Label #SelectedName {
+        Anchor: (Height: 20);
+        Style: $M.@SubheadingFitStyle;
+      }
+
+      Label #SelectedMeta {
+        Anchor: (Height: 16, Top: 2);
+        Style: $M.@MetaFitStyle;
+      }
+
+      Label #TplDetail {
+        Anchor: (Top: 4);
+        Style: $M.@BodyStyle;
+      }
+
+      Group {
+        LayoutMode: Left;
+        Anchor: (Height: 44, Top: 6);
+
+        $C.@DropdownBox #TargetPicker {
+          Anchor: (Width: 260, Height: 32, Top: 6);
+        }
+
+        Label #TplNoTarget {
+          FlexWeight: 1;
+          Style: $M.@HintStyle;
+          Visible: false;
+        }
+
+        $C.@TextButton #ApplyButton {
+          @Text = "Apply Look";
+          @Anchor = (Width: 150, Left: 8);
+        }
+
+        $C.@TextButton #InsertButton {
+          @Text = "Insert Rewards";
+          @Anchor = (Width: 170, Left: 8);
+        }
+
+        $M.@Spacer {}
+
+        $C.@SecondaryTextButton #RenameButton {
+          @Text = "Rename";
+          @Anchor = (Width: 110, Left: 6);
+        }
+
+        $C.@CancelTextButton #DeleteButton {
+          @Text = "Delete";
+          @Anchor = (Width: 110, Left: 6);
+        }
+      }
+    }
+
+    $M.@ActionBar {
+      @Anchor = (Height: 44, Top: 10);
+
+      $C.@SecondaryTextButton #BackButton {
+        @Text = "Back";
+        @Anchor = (Width: 150);
+      }
+
+      $M.@Spacer {}
+
+      $C.@TextButton #CloseButton {
+        @Text = "Close";
+        @Anchor = (Width: 150);
+      }
+    }
+  }
+}

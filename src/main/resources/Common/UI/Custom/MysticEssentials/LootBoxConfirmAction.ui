@@ -1,0 +1,76 @@
+// Confirmation for a LootBox editor action (publish, archive, delete a reward).
+// The server writes the title, one line per detail (LootBoxConfirmActionLine.ui,
+// appended into #BodyList) and the confirm button's label. A destructive action
+// shows #DangerBar and #DangerLabel, and the red #DangerButton in place of
+// #ConfirmButton. Cancel changes nothing.
+$C = "../Common.ui";
+$M = "MysticTheme.ui";
+
+$C.@PageOverlay {}
+
+$C.@Container {
+  Anchor: (Width: 680, Height: 520);
+
+  #Title {
+    Group {
+      $C.@Title #HeaderTitle {
+        @Text = "Confirm";
+      }
+    }
+  }
+
+  #Content {
+    LayoutMode: Top;
+
+    Group #DangerBar {
+      Anchor: (Height: 3, Bottom: 10);
+      Background: #d46a6a;
+      Visible: false;
+    }
+
+    Label #DangerLabel {
+      Anchor: (Height: 16, Bottom: 8);
+      Style: $M.@EyebrowDangerStyle;
+      Text: "Destructive action";
+      Visible: false;
+    }
+
+    $M.@Section {
+      @Text = "What will happen";
+      @Anchor = (Bottom: 8);
+    }
+
+    $M.@Well {
+      FlexWeight: 1;
+
+      Group #BodyList {
+        FlexWeight: 1;
+        LayoutMode: TopScrolling;
+        Padding: (Right: 6);
+        ScrollbarStyle: $C.@DefaultScrollbarStyle;
+      }
+    }
+
+    $M.@ActionBar {
+      @Anchor = (Height: 44, Top: 12);
+
+      $C.@SecondaryTextButton #CancelButton {
+        @Text = "Cancel";
+        @Anchor = (Width: 150);
+      }
+
+      $M.@Spacer {}
+
+      $C.@TextButton #ConfirmButton {
+        @Text = "Confirm";
+        @Anchor = (Width: 220);
+      }
+
+      $C.@CancelTextButton #DangerButton {
+        @Text = "Confirm";
+        @Anchor = (Width: 220);
+        Visible: false;
+      }
+    }
+  }
+}

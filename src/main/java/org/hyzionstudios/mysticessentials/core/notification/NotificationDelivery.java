@@ -13,6 +13,7 @@ import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.core.message.MysticText;
 
 import com.hypixel.hytale.protocol.SoundCategory;
+import com.hypixel.hytale.protocol.packets.interface_.EventTitleStyle;
 import com.hypixel.hytale.protocol.packets.interface_.NotificationStyle;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.asset.type.soundevent.config.SoundEvent;
@@ -147,7 +148,8 @@ final class NotificationDelivery {
                 secondary = null;
             }
             EventTitleUtil.showEventTitleToPlayer(player, primary, secondary,
-                    notification.priority().atLeast(NotificationPriority.IMPORTANT),
+                    notification.priority().atLeast(NotificationPriority.IMPORTANT)
+                            ? EventTitleStyle.Major : EventTitleStyle.Default,
                     notification.icon().orElse(EventTitleUtil.DEFAULT_ZONE),
                     profile.fadeInMillis / 1000f,
                     profile.stayMillis / 1000f,

@@ -1,0 +1,74 @@
+// LootBox confirmation: the same odds snapshot the server will draw from, and
+// exactly what the opening spends. Cancel spends nothing.
+$C = "../Common.ui";
+$M = "MysticTheme.ui";
+
+$C.@PageOverlay {}
+
+$C.@Container {
+  Anchor: (Width: 760, Height: 600);
+
+  #Title {
+    Group {
+      $C.@Title {
+        @Text = "Confirm Opening";
+      }
+    }
+  }
+
+  #Content {
+    LayoutMode: Top;
+
+    $M.@Panel {
+      @Padding = 14;
+      Anchor: (Bottom: 12);
+
+      Label #PreviewTitle {
+        Anchor: (Height: 30, Bottom: 4);
+        Style: $M.@DisplayStyle;
+      }
+
+      Label #Consumes {
+        Anchor: (Height: 20);
+        Style: $M.@HeadingGoldStyle;
+      }
+    }
+
+    $M.@Section {
+      @Text = "Odds for this opening";
+      @Anchor = (Bottom: 8);
+    }
+
+    $M.@Well {
+      FlexWeight: 1;
+
+      Group #RewardList {
+        FlexWeight: 1;
+        LayoutMode: TopScrolling;
+        Padding: (Right: 6);
+        ScrollbarStyle: $C.@DefaultScrollbarStyle;
+      }
+    }
+
+    Label #OddsFooter {
+      Anchor: (Top: 6);
+      Style: $M.@HintStyle;
+    }
+
+    $M.@ActionBar {
+      @Anchor = (Height: 44, Top: 8);
+
+      $C.@SecondaryTextButton #CancelButton {
+        @Text = "Cancel";
+        @Anchor = (Width: 140);
+      }
+
+      $M.@Spacer {}
+
+      $C.@TextButton #ConfirmButton {
+        @Text = "Confirm";
+        @Anchor = (Width: 200);
+      }
+    }
+  }
+}

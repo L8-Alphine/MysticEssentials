@@ -1,0 +1,92 @@
+// Loot Boxes — rows appended into #PoolList per entry.
+$C = "../Common.ui";
+$M = "MysticTheme.ui";
+
+$C.@PageOverlay {}
+
+$C.@Container {
+  Anchor: (Width: 820, Height: 620);
+
+  #Title {
+    Group {
+      $C.@Title {
+        @Text = "Loot Boxes";
+      }
+    }
+  }
+
+  #Content {
+    LayoutMode: Top;
+
+    Group {
+      LayoutMode: Left;
+      Anchor: (Height: 32, Bottom: 8);
+
+      Label #HeaderInfo {
+        FlexWeight: 1;
+        Style: $M.@MetaFitStyle;
+      }
+
+      // Reduced motion (P2-L): paired static buttons, one shown at a time. Each
+      // names the current setting; pressing it switches to the other.
+      $C.@SmallSecondaryTextButton #ReduceMotionButton {
+        @Text = "Motion: Full";
+        @Anchor = (Width: 170, Left: 8);
+      }
+
+      $C.@SmallSecondaryTextButton #FullMotionButton {
+        @Text = "Motion: Reduced";
+        @Anchor = (Width: 170, Left: 8);
+      }
+    }
+
+    $M.@Section {
+      @Text = "Available";
+      @Anchor = (Bottom: 8);
+    }
+
+    $M.@Well {
+      FlexWeight: 1;
+
+      Label #ListEmpty {
+        Anchor: (Height: 64);
+        Style: $M.@EmptyStyle;
+        Text: "No loot boxes are open right now.";
+        Visible: false;
+      }
+
+      Group #PoolList {
+        FlexWeight: 1;
+        LayoutMode: TopScrolling;
+        Padding: (Right: 6);
+        ScrollbarStyle: $C.@DefaultScrollbarStyle;
+      }
+    }
+
+    $M.@ActionBar {
+      @Anchor = (Height: 44, Top: 12);
+
+      $C.@SecondaryTextButton #HistoryButton {
+        @Text = "History";
+        @Anchor = (Width: 140);
+      }
+
+      $C.@SecondaryTextButton #PendingButton {
+        @Text = "Pending";
+        @Anchor = (Width: 160, Left: 8);
+      }
+
+      $C.@SecondaryTextButton #DepositButton {
+        @Text = "Deposit Held Key";
+        @Anchor = (Width: 190, Left: 8);
+      }
+
+      $M.@Spacer {}
+
+      $C.@TextButton #CloseButton {
+        @Text = "Close";
+        @Anchor = (Width: 150);
+      }
+    }
+  }
+}

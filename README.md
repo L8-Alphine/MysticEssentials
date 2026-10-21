@@ -569,6 +569,42 @@ cache or a slow peer can never overwrite newer data — a mismatch is rejected a
 kept as a conflict snapshot. With `crossServer.enabled` + `requireRedis` set but
 Redis unavailable, the module refuses to enable rather than risk duplication.
 
+### LootBox
+
+Reward pools with exact, always-visible odds, opened with signed physical or
+virtual keys from a menu or from crate blocks. **Disabled by default**: set
+`"lootbox": true` in the main config's modules map *and* `"enabled": true` in
+`modules/lootbox/config.json`. Pools and keys are draft files under
+`modules/lootbox/lootboxes/` and `modules/lootbox/keys/`, frozen into immutable
+revisions by `/lootbox publish`. They can also be built entirely in game from
+`/lootbox admin`: the Manager, pool and key editors, key grants, the Crate
+Manager and crate editor, Simulation, Audit History and a Template Library. Every
+subcommand also needs `mysticessentials.lootbox.use`.
+
+| Command | Description | Permission |
+|---|---|---|
+| `/lootbox` | Open the catalog (alias `/lb`) | `mysticessentials.lootbox.use` |
+| `/lootbox preview <pool>` | See a pool's rewards and exact odds | `mysticessentials.lootbox.use` |
+| `/lootbox pending` | Claim rewards that did not fit | `mysticessentials.lootbox.use` |
+| `/lootbox motion [reduced\|full\|default]` | Reduced motion for reveals | `mysticessentials.lootbox.use` |
+| `/lootbox key deposit` / `withdraw <keyId> [count]` | Turn key items into virtual balance and back | `mysticessentials.lootbox.use` |
+| `/lootbox history [player]` | Opening receipts | `…lootbox.history` / `…lootbox.audit` |
+| `/lootbox key give <player> <keyId> [count] [virtual]` | Issue keys | `mysticessentials.lootbox.keys.give` |
+| `/lootbox key revoke\|info\|list\|grants\|publish …` | Manage keys | `…keys.revoke` / `…keys` / `…publish` |
+| `/lootbox publish <pool>` / `rollback <pool> <rev>` | Publish a revision | `mysticessentials.lootbox.publish` |
+| `/lootbox simulate <pool> [draws]` | Test odds without awarding | `mysticessentials.lootbox.simulate` |
+| `/lootbox crate select\|convert <pool>\|rebind` | Bind the block you look at, or rebind a crate | `mysticessentials.lootbox.crates.place` |
+| `/lootbox crate info\|list\|verify\|remove\|enable\|edit` | Manage crates | `mysticessentials.lootbox.crates.manage` |
+| `/lootbox audit` | Audit History with JSON/CSV export | `mysticessentials.lootbox.audit` |
+| `/lootbox reconcile <openingId> <regrant\|dismiss>` | Resolve a held delivery | `mysticessentials.lootbox.restore` |
+| `/lootbox admin\|reload\|disable\|enable` | Manager screen and pool switches | `mysticessentials.lootbox.admin` |
+
+Spending the key and drawing the result happen in one server-side write, so a
+crash never spends a key without a result. Interrupted openings finish when the
+player rejoins. The bundled asset pack adds a **Mystic Crate** block
+(`MysticEssentials_LootBox_Crate`); chests, doors and benches can be crates too.
+See `wiki/features/lootbox-module.md`.
+
 ---
 
 ## Permissions reference

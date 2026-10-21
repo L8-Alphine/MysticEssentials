@@ -1,0 +1,90 @@
+// LootBox preview: every reward with its exact chance, the rules, and the key
+// balance. The odds column is part of the row, never a tooltip (Design Bible §07).
+$C = "../Common.ui";
+$M = "MysticTheme.ui";
+
+$C.@PageOverlay {}
+
+$C.@Container {
+  Anchor: (Width: 860, Height: 660);
+
+  #Title {
+    Group {
+      $C.@Title {
+        @Text = "Loot Box";
+      }
+    }
+  }
+
+  #Content {
+    LayoutMode: Top;
+
+    $M.@Panel {
+      @Padding = 14;
+      Anchor: (Bottom: 12);
+
+      Label #PreviewTitle {
+        Anchor: (Height: 30, Bottom: 4);
+        Style: $M.@DisplayStyle;
+      }
+
+      Label #PreviewDescription {
+        Anchor: (Bottom: 6);
+        Style: $M.@BodyMutedStyle;
+      }
+
+      Label #Rules {
+        Anchor: (Bottom: 4);
+        Style: $M.@MetaWrapStyle;
+      }
+
+      Label #KeyBalance {
+        Anchor: (Height: 18);
+        Style: $M.@MetaGoldStyle;
+      }
+    }
+
+    $M.@Section {
+      @Text = "Rewards and exact odds";
+      @Anchor = (Bottom: 8);
+    }
+
+    $M.@Well {
+      FlexWeight: 1;
+
+      Group #RewardList {
+        FlexWeight: 1;
+        LayoutMode: TopScrolling;
+        Padding: (Right: 6);
+        ScrollbarStyle: $C.@DefaultScrollbarStyle;
+      }
+    }
+
+    Label #OddsFooter {
+      Anchor: (Top: 6);
+      Style: $M.@HintStyle;
+    }
+
+    Label #Blocker {
+      Anchor: (Height: 18, Top: 2);
+      Style: $M.@CaptionWarnStyle;
+      Visible: false;
+    }
+
+    $M.@ActionBar {
+      @Anchor = (Height: 44, Top: 8);
+
+      $C.@SecondaryTextButton #CloseButton {
+        @Text = "Close";
+        @Anchor = (Width: 140);
+      }
+
+      $M.@Spacer {}
+
+      $C.@TextButton #OpenButton {
+        @Text = "Open";
+        @Anchor = (Width: 220);
+      }
+    }
+  }
+}

@@ -1,0 +1,49 @@
+// One template in the library: icon, name and id, what it holds, and who saved
+// it. Selecting the row shows it under the list; #Selected marks it.
+$M = "MysticTheme.ui";
+
+Button #Row {
+  Anchor: (Height: 52, Bottom: 4);
+  Style: $M.@RowStyle;
+  LayoutMode: Full;
+
+  $M.@RowSelection #Selected {
+    @Height = 52;
+  }
+
+  Group {
+    Anchor: (Full: 0);
+    LayoutMode: Left;
+    Padding: (Left: 12, Right: 12, Top: 8, Bottom: 8);
+
+    $M.@IconWell {
+      @Anchor = (Right: 12);
+
+      ItemSlot #Icon {
+        Anchor: (Width: 32, Height: 32);
+        ShowQualityBackground: true;
+        ShowQuantity: false;
+      }
+    }
+
+    Group {
+      LayoutMode: Top;
+      FlexWeight: 1;
+
+      Label #TplName {
+        Anchor: (Height: 20);
+        Style: $M.@RowNameFitStyle;
+      }
+
+      Label #TplMeta {
+        Anchor: (Height: 14);
+        Style: $M.@RowMetaFitStyle;
+      }
+    }
+
+    Label #TplSide {
+      Anchor: (Width: 220, Left: 8);
+      Style: $M.@RowSideStyle;
+    }
+  }
+}

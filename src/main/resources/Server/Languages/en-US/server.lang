@@ -1,0 +1,2 @@
+items.MysticEssentials_LootBox_Crate.name = Mystic Crate
+items.MysticEssentials_LootBox_Crate.description = A loot crate. Place it, then bind it to a pool with /lootbox crate select and /lootbox crate convert.

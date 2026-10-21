@@ -353,6 +353,13 @@ one without a seam; everything inside the window is built from the theme:
   `@Blue`, `@Success/Warn/Danger`) and one type scale (`@DisplayStyle` for the
   selected item, `@HeadingStyle`/`@RowNameStyle`, `@EyebrowStyle` for section
   labels, `@Body/Meta/CaptionStyle`, `@Key/ValueStyle` for key/value rows).
+  Text people read must reach 4.5:1 on the window (`#16212f`): every text token
+  but `@TextFaint` does, so keep faint for decoration and use `@HintStyle`
+  (caption size, muted colour) for hints and notes. Single-line text that can
+  run long uses the `*FitStyle` variants (`ShrinkTextToFit`); longer text wraps
+  in a label with no fixed height, which sizes to its lines. The runtime colours
+  in `MysticPage.UI_TEXT_COLORS` follow the same rule, and
+  `verifyLootBoxAccessibility` checks every LootBox label against it.
 - **Surfaces**: `@Panel` (the game's bordered header-tab frame) for the thing
   being viewed or edited; `@Well` (flat inset) for lists and empty states —
   put ONLY the list scroller inside a Well so appended rows keep their indices.
@@ -361,7 +368,9 @@ one without a seam; everything inside the window is built from the theme:
   absolutely positioned so the selection overlay (gold spine + tint) draws
   behind the body. Master/detail pages set `#Selected.Visible` on the resolved
   selection. `#Swatch` / `#Accent` / `#TagChip` stay plain-colour Groups because
-  the server recolours them through `.Background`.
+  the server recolours them through `.Background`. Tabs that are buttons use
+  `$M.@TabSelection #Selected {}` the same way (gold tint and a bottom rule),
+  as in `LootBoxEditorTab.ui`.
 - **Helpers**: `@Section` (eyebrow + rule), `@FieldLabel`, `@KvRow` + `@Key`,
   `@Hairline`, `@IconWell`, `@Pill`, `@Tab`, `@SettingRow`, `@ActionBar` +
   `@Spacer` (put the destructive button after the spacer), `@HeaderMeta`,

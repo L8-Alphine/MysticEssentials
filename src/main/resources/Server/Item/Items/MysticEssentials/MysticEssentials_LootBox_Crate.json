@@ -1,0 +1,25 @@
+{
+  "Parent": "Furniture_Ancient_Crate",
+  "TranslationProperties": {
+    "Name": "server.items.MysticEssentials_LootBox_Crate.name",
+    "Description": "server.items.MysticEssentials_LootBox_Crate.description"
+  },
+  "Categories": ["Furniture.Containers"],
+  "MaxStack": 16,
+  "BlockType": {
+    "Gathering": {
+      "Soft": {
+        "ItemId": "MysticEssentials_LootBox_Crate",
+        "IsWeaponBreakable": false
+      }
+    },
+    "InteractionHint": "server.interactionHints.open",
+    "Interactions": {
+      "Use": {
+        "Interactions": [
+          { "Type": "MysticCrate" }
+        ]
+      }
+    }
+  }
+}

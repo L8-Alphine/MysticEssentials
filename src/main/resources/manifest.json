@@ -1,9 +1,9 @@
 {
     "Group": "org.hyzionstudios",
     "Name": "MysticEssentials",
-    "Version": "1.0.4",
+    "Version": "1.0.6",
     "Main": "org.hyzionstudios.mysticessentials.MysticessentialsPlugin",
-    "ServerVersion": ">=0.6.8 <0.7.0",
+    "ServerVersion": ">=0.7.0 <0.8.0",
     "Description": "MysticEssentials is a modular essentials system for Hytale servers designed around one goal: Essentials done right.",
     "Authors": [
         {

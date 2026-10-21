@@ -1,0 +1,196 @@
+// LootBox Key Manager: every key definition with its status, a header search
+// and a status filter. Rows are LootBoxManagerRow.ui appended into #KeyList;
+// selecting one shows its actions in #SelectionBar. #CreatePanel is the
+// New Key / Clone form.
+$C = "../Common.ui";
+$M = "MysticTheme.ui";
+
+$C.@PageOverlay {}
+
+$C.@Container {
+  Anchor: (Width: 900, Height: 660);
+
+  #Title {
+    Group {
+      $C.@Title {
+        @Text = "LootBox Keys";
+      }
+
+      $C.@HeaderSearch {}
+    }
+  }
+
+  #Content {
+    LayoutMode: Top;
+
+    Group {
+      LayoutMode: Left;
+      Anchor: (Height: 32, Bottom: 10);
+
+      Label #HeaderInfo {
+        FlexWeight: 1;
+        Style: $M.@MetaStyle;
+      }
+
+      $C.@DropdownBox #StatusFilter {
+        Anchor: (Width: 200, Height: 32, Left: 8);
+      }
+
+      $C.@SecondaryTextButton #CreateButton {
+        @Text = "New Key";
+        @Anchor = (Width: 150, Left: 8);
+      }
+    }
+
+    $M.@Panel #CreatePanel {
+      @Padding = 12;
+
+      Anchor: (Bottom: 10);
+      Visible: false;
+
+      Label #FormTitle {
+        Anchor: (Height: 20, Bottom: 8);
+        Style: $M.@SubheadingStyle;
+      }
+
+      Group {
+        LayoutMode: Left;
+        Anchor: (Height: 58);
+
+        Group {
+          LayoutMode: Top;
+          Anchor: (Width: 300, Right: 12);
+
+          $M.@FieldLabel { @Text = "Key id"; }
+          $C.@TextField #NewIdInput {
+            PlaceholderText: "mystic:my_key";
+          }
+        }
+
+        Group #NewNameColumn {
+          LayoutMode: Top;
+          FlexWeight: 1;
+
+          $M.@FieldLabel { @Text = "Item name"; }
+          $C.@TextField #NewNameInput {
+            PlaceholderText: "What the key item is called";
+          }
+        }
+      }
+
+      Group {
+        LayoutMode: Left;
+        Anchor: (Height: 40, Top: 8);
+
+        Label #FormHint {
+          FlexWeight: 1;
+          Style: $M.@HintStyle;
+        }
+
+        $C.@SecondaryTextButton #FormCancelButton {
+          @Text = "Cancel";
+          @Anchor = (Width: 130, Left: 8);
+        }
+
+        $C.@TextButton #FormConfirmButton {
+          @Text = "Create Draft";
+          @Anchor = (Width: 170, Left: 8);
+        }
+      }
+    }
+
+    Label #Notice {
+      Anchor: (Bottom: 6);
+      Style: $M.@BodyStyle;
+      Visible: false;
+    }
+
+    $M.@Section {
+      @Text = "Keys";
+      @Anchor = (Bottom: 8);
+    }
+
+    $M.@Well {
+      FlexWeight: 1;
+
+      Label #ListEmpty {
+        Anchor: (Height: 64);
+        Style: $M.@EmptyStyle;
+        Text: "No keys match. Press New Key, or change the search or filter.";
+        Visible: false;
+      }
+
+      Group #KeyList {
+        FlexWeight: 1;
+        LayoutMode: TopScrolling;
+        Padding: (Right: 6);
+        ScrollbarStyle: $C.@DefaultScrollbarStyle;
+      }
+    }
+
+    $M.@ActionBar #SelectionBar {
+      @Anchor = (Height: 44, Top: 10);
+
+      Group {
+        LayoutMode: Top;
+        FlexWeight: 1;
+
+        Label #SelectedName {
+          Anchor: (Height: 22);
+          Style: $M.@SubheadingFitStyle;
+        }
+
+        Label #SelectedMeta {
+          Anchor: (Height: 16);
+          Style: $M.@MetaFitStyle;
+        }
+      }
+
+      $C.@TextButton #EditButton {
+        @Text = "Edit";
+        @Anchor = (Width: 90, Left: 8);
+      }
+
+      $C.@SecondaryTextButton #PublishButton {
+        @Text = "Publish";
+        @Anchor = (Width: 110, Left: 6);
+      }
+
+      $C.@SecondaryTextButton #CloneButton {
+        @Text = "Clone";
+        @Anchor = (Width: 100, Left: 6);
+      }
+
+      $C.@SecondaryTextButton #GrantsButton {
+        @Text = "Grants";
+        @Anchor = (Width: 110, Left: 6);
+      }
+
+      $C.@CancelTextButton #ArchiveButton {
+        @Text = "Archive";
+        @Anchor = (Width: 110, Left: 6);
+      }
+    }
+
+    $M.@ActionBar {
+      @Anchor = (Height: 44, Top: 10);
+
+      $C.@SecondaryTextButton #PoolsButton {
+        @Text = "Pools";
+        @Anchor = (Width: 130);
+      }
+
+      $C.@SecondaryTextButton #ReloadButton {
+        @Text = "Reload Drafts";
+        @Anchor = (Width: 170, Left: 6);
+      }
+
+      $M.@Spacer {}
+
+      $C.@TextButton #CloseButton {
+        @Text = "Close";
+        @Anchor = (Width: 150);
+      }
+    }
+  }
+}

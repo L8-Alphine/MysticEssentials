@@ -1,0 +1,51 @@
+// One reward in a LootBox preview or confirmation. Appended per reward:
+//   cmd.append("#RewardList", "MysticEssentials/LootBoxRewardRow.ui")
+// then set #Icon.ItemId, #Name, #Meta, #Odds and #OneIn TextSpans.
+$M = "MysticTheme.ui";
+
+Group #Row {
+  Anchor: (Height: 52, Bottom: 4);
+  LayoutMode: Left;
+  Padding: (Left: 12, Right: 12, Top: 8, Bottom: 8);
+  Background: #0a0f16(0.38);
+
+  $M.@IconWell {
+    @Anchor = (Right: 12);
+
+    ItemSlot #Icon {
+      Anchor: (Width: 32, Height: 32);
+      ShowQualityBackground: true;
+      ShowQuantity: false;
+    }
+  }
+
+  Group {
+    LayoutMode: Top;
+    FlexWeight: 1;
+
+    Label #Name {
+      Anchor: (Height: 20, Bottom: 2);
+      Style: $M.@RowNameFitStyle;
+    }
+
+    Label #Meta {
+      Anchor: (Height: 14);
+      Style: $M.@RowMetaFitStyle;
+    }
+  }
+
+  Group {
+    LayoutMode: Top;
+    Anchor: (Width: 150, Left: 8);
+
+    Label #Odds {
+      Anchor: (Height: 20, Bottom: 2);
+      Style: (...$M.@RowSideStyle, FontSize: 15, RenderBold: true);
+    }
+
+    Label #OneIn {
+      Anchor: (Height: 14);
+      Style: $M.@RowSideStyle;
+    }
+  }
+}

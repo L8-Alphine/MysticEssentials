@@ -1,0 +1,539 @@
+// LootBox crate editor (P2-G): the bible's §09 placement steps as a tab row
+// (#Tabs, LootBoxEditorTab.ui per step). Exactly one #Step* group is visible;
+// the server picks it. #Checklist and the step lists take
+// LootBoxConfirmActionLine.ui lines. #StepRepair only shows for a disabled crate.
+$C = "../Common.ui";
+$M = "MysticTheme.ui";
+
+$C.@PageOverlay {}
+
+$C.@Container {
+  Anchor: (Width: 960, Height: 700);
+
+  #Title {
+    Group {
+      $C.@Title #HeaderTitle {
+        @Text = "Crate";
+      }
+
+      $M.@HeaderMeta #HeaderInfo {
+        @Width = 360;
+      }
+    }
+  }
+
+  #Content {
+    LayoutMode: Top;
+
+    Label #Notice {
+      Anchor: (Bottom: 6);
+      Style: $M.@BodyStyle;
+      Visible: false;
+    }
+
+    Group #Tabs {
+      LayoutMode: Left;
+      Anchor: (Height: 34, Bottom: 8);
+    }
+
+    Group {
+      LayoutMode: Left;
+      FlexWeight: 1;
+
+      // ----- The current step -------------------------------------------------
+      $M.@Panel {
+        @Padding = 14;
+
+        FlexWeight: 1;
+        Anchor: (Right: 14);
+
+        // 01 + 02: what is selected, and the crate's id and name.
+        Group #StepBlock {
+          LayoutMode: Top;
+          FlexWeight: 1;
+          Visible: false;
+
+          $M.@Section {
+            @Text = "Selected block";
+            @Anchor = (Bottom: 8);
+          }
+
+          $M.@KvRow {
+            $M.@Key { @Text = "World"; }
+            Label #CrateWorld { FlexWeight: 1; Style: $M.@ValueStyle; }
+          }
+
+          $M.@KvRow {
+            $M.@Key { @Text = "Position"; }
+            Label #CratePosition { FlexWeight: 1; Style: $M.@ValueStyle; }
+          }
+
+          $M.@KvRow {
+            $M.@Key { @Text = "Block"; }
+            Label #CrateBlock { FlexWeight: 1; Style: $M.@ValueStyle; }
+          }
+
+          $M.@KvRow {
+            $M.@Key { @Text = "Rotation"; }
+            Label #CrateRotation { FlexWeight: 1; Style: $M.@ValueStyle; }
+          }
+
+          $M.@KvRow {
+            @Anchor = (Bottom: 6);
+
+            $M.@Key { @Text = "Status"; }
+            Label #CrateBlockStatus { FlexWeight: 1; Style: $M.@ValueFitStyle; }
+          }
+
+          Group {
+            LayoutMode: Left;
+            Anchor: (Height: 44, Bottom: 12);
+
+            Label #CrateSelectHint {
+              FlexWeight: 1;
+              Style: $M.@HintStyle;
+            }
+
+            $C.@SecondaryTextButton #ReselectButton {
+              @Text = "Use Looked-At Block";
+              @Anchor = (Width: 230, Left: 8);
+            }
+          }
+
+          $M.@FieldLabel { @Text = "Crate id"; }
+          Group {
+            LayoutMode: Left;
+            Anchor: (Height: 38, Bottom: 10);
+
+            $C.@TextField #CrateIdInput {
+              Anchor: (Width: 320, Height: 38);
+              PlaceholderText: "avalon_supply_1";
+            }
+
+            Label #CrateIdFixed {
+              FlexWeight: 1;
+              Style: $M.@ValueStyle;
+            }
+          }
+
+          $M.@FieldLabel { @Text = "Name (optional; shown instead of the pool's name)"; }
+          $C.@TextField #NameInput {
+            PlaceholderText: "Avalon Royal Crate";
+          }
+        }
+
+        // 03: the compatibility report.
+        Group #StepCheck {
+          LayoutMode: Top;
+          FlexWeight: 1;
+          Visible: false;
+
+          $M.@Section {
+            @Text = "Compatibility";
+            @Anchor = (Bottom: 8);
+          }
+
+          Label #CrateVerdict {
+            Anchor: (Bottom: 8);
+            Style: $M.@BodyStyle;
+          }
+
+          $M.@Well {
+            FlexWeight: 1;
+
+            Group #CheckList {
+              FlexWeight: 1;
+              LayoutMode: TopScrolling;
+              Padding: (Right: 6);
+              ScrollbarStyle: $C.@DefaultScrollbarStyle;
+            }
+          }
+
+          Label {
+            Anchor: (Height: 32, Top: 8);
+            Style: $M.@HintStyle;
+            Text: "Air, missing blocks and blocks that fall are refused, and so are blocks without a Use interaction unless crates.generatedVariants is on. Warnings still convert.";
+          }
+        }
+
+        // 04: bind a published pool; its keys come with it.
+        Group #StepPool {
+          LayoutMode: Top;
+          FlexWeight: 1;
+          Visible: false;
+
+          $M.@Section {
+            @Text = "Pool";
+            @Anchor = (Bottom: 8);
+          }
+
+          $M.@FieldLabel { @Text = "Opens this published pool"; }
+          $C.@DropdownBox #PoolDropdown {
+            Anchor: (Width: 420, Height: 32, Bottom: 12);
+          }
+
+          $M.@KvRow {
+            $M.@Key { @Text = "Revision"; }
+            Label #CratePoolRevision { FlexWeight: 1; Style: $M.@ValueStyle; }
+          }
+
+          $M.@KvRow {
+            $M.@Key { @Text = "Rewards"; }
+            Label #CratePoolRewards { FlexWeight: 1; Style: $M.@ValueStyle; }
+          }
+
+          $M.@KvRow {
+            @Anchor = (Bottom: 10);
+
+            $M.@Key { @Text = "Keys"; }
+            Label #CratePoolKeys { FlexWeight: 1; Style: $M.@ValueStyle; }
+          }
+
+          Label {
+            Anchor: (Height: 48);
+            Style: $M.@HintStyle;
+            Text: "The odds and the accepted keys come from the pool's published revision; a crate can never change them. Change the keys in the pool editor.";
+          }
+        }
+
+        // 05: what Use does.
+        Group #StepBehaviour {
+          LayoutMode: Top;
+          FlexWeight: 1;
+          Visible: false;
+
+          $M.@Section {
+            @Text = "When a player uses the crate";
+            @Anchor = (Bottom: 8);
+          }
+
+          Label #CrateBehaviour {
+            Anchor: (Height: 24, Bottom: 6);
+            Style: $M.@SubheadingStyle;
+          }
+
+          Label {
+            Anchor: (Height: 64, Bottom: 10);
+            Style: $M.@BodyMutedStyle;
+            Text: "Preview first shows every reward and its odds, then Open leads to the confirm screen. Straight to confirm skips the preview; the confirm screen still lists every reward with its exact odds, and Cancel spends nothing.";
+          }
+
+          Group {
+            LayoutMode: Left;
+            Anchor: (Height: 44);
+
+            $C.@SecondaryTextButton #DirectOnButton {
+              @Text = "Go Straight to Confirm";
+              @Anchor = (Width: 280);
+            }
+
+            $C.@SecondaryTextButton #DirectOffButton {
+              @Text = "Show the Preview First";
+              @Anchor = (Width: 280);
+            }
+          }
+        }
+
+        // Protection: the crate can add to the server's, never remove it.
+        Group #StepProtect {
+          LayoutMode: Top;
+          FlexWeight: 1;
+          Visible: false;
+
+          $M.@Section {
+            @Text = "Protection";
+            @Anchor = (Bottom: 8);
+          }
+
+          Label {
+            Anchor: (Height: 32, Bottom: 8);
+            Style: $M.@HintStyle;
+            Text: "The server's settings apply to every crate. A crate can add protection, never take it away.";
+          }
+
+          Group {
+            LayoutMode: Left;
+            Anchor: (Height: 44, Bottom: 8);
+
+            Label #CrateBreakState {
+              FlexWeight: 1;
+              Style: $M.@BodyStyle;
+            }
+
+            $C.@SecondaryTextButton #BreakOnButton {
+              @Text = "Always Protect";
+              @Anchor = (Width: 190, Left: 8);
+            }
+
+            $C.@SecondaryTextButton #BreakOffButton {
+              @Text = "Follow the Server";
+              @Anchor = (Width: 190, Left: 8);
+            }
+          }
+
+          Group {
+            LayoutMode: Left;
+            Anchor: (Height: 44, Bottom: 8);
+
+            Label #CrateDamageState {
+              FlexWeight: 1;
+              Style: $M.@BodyStyle;
+            }
+
+            $C.@SecondaryTextButton #DamageOnButton {
+              @Text = "Always Protect";
+              @Anchor = (Width: 190, Left: 8);
+            }
+
+            $C.@SecondaryTextButton #DamageOffButton {
+              @Text = "Follow the Server";
+              @Anchor = (Width: 190, Left: 8);
+            }
+          }
+
+          Label {
+            Anchor: (Height: 40);
+            Style: $M.@BodyMutedStyle;
+            Text: "If the world destroys the block anyway (decay, unprotected explosions), the crate turns off and online staff are told. That is always on.";
+          }
+        }
+
+        // 06: particles, sound and the floating name.
+        Group #StepVisuals {
+          LayoutMode: Top;
+          FlexWeight: 1;
+          Visible: false;
+
+          $M.@Section {
+            @Text = "Particles and sound";
+            @Anchor = (Bottom: 8);
+          }
+
+          Group {
+            LayoutMode: Left;
+            Anchor: (Height: 58, Bottom: 8);
+
+            Group {
+              LayoutMode: Top;
+              Anchor: (Width: 290, Right: 12);
+
+              $M.@FieldLabel { @Text = "Idle particles"; }
+              $C.@DropdownBox #IdleDropdown {
+                Anchor: (Width: 290, Height: 32);
+              }
+            }
+
+            Group {
+              LayoutMode: Top;
+              Anchor: (Width: 290);
+
+              $M.@FieldLabel { @Text = "When it opens"; }
+              $C.@DropdownBox #OpenParticleDropdown {
+                Anchor: (Width: 290, Height: 32);
+              }
+            }
+          }
+
+          $M.@FieldLabel { @Text = "Opening sound"; }
+          $C.@DropdownBox #OpenSoundDropdown {
+            Anchor: (Width: 290, Height: 32, Bottom: 8);
+          }
+
+          Group {
+            LayoutMode: Left;
+            Anchor: (Height: 44, Bottom: 6);
+
+            Label {
+              FlexWeight: 1;
+              Style: $M.@HintStyle;
+              Text: "Effects go only to players near the crate who haven't turned them off with /lootbox crate effects off.";
+            }
+
+            $C.@SecondaryTextButton #PreviewEffectsButton {
+              @Text = "Preview Effects";
+              @Anchor = (Width: 190, Left: 8);
+            }
+          }
+
+          $M.@Section {
+            @Text = "Floating name";
+            @Anchor = (Top: 6, Bottom: 8);
+          }
+
+          Group {
+            LayoutMode: Left;
+            Anchor: (Height: 44, Bottom: 6);
+
+            Label #CrateNameplateState {
+              FlexWeight: 1;
+              Style: $M.@BodyStyle;
+            }
+
+            $C.@SecondaryTextButton #NameplateOnButton {
+              @Text = "Show Floating Name";
+              @Anchor = (Width: 210, Left: 8);
+            }
+
+            $C.@SecondaryTextButton #NameplateOffButton {
+              @Text = "Hide Floating Name";
+              @Anchor = (Width: 210, Left: 8);
+            }
+          }
+
+          Label {
+            Anchor: (Height: 44);
+            Style: $M.@CaptionWarnStyle;
+            Text: "Not yet tested in game. Names are the same for everyone (they can't be shown per player) and need crates.nameplates on in the module config.";
+          }
+        }
+
+        // 07: summary, then Create or Save, and Test in World.
+        Group #StepFinish {
+          LayoutMode: Top;
+          FlexWeight: 1;
+          Visible: false;
+
+          $M.@Section {
+            @Text = "Summary";
+            @Anchor = (Bottom: 8);
+          }
+
+          $M.@Well {
+            FlexWeight: 1;
+
+            Group #SummaryList {
+              FlexWeight: 1;
+              LayoutMode: TopScrolling;
+              Padding: (Right: 6);
+              ScrollbarStyle: $C.@DefaultScrollbarStyle;
+            }
+          }
+
+          Label {
+            Anchor: (Height: 32, Top: 8);
+            Style: $M.@HintStyle;
+            Text: "Test in World opens the crate exactly as a player sees it. Confirming there is a real opening and spends a real key.";
+          }
+        }
+
+        // Repair wizard for a crate the server turned off.
+        Group #StepRepair {
+          LayoutMode: Top;
+          FlexWeight: 1;
+          Visible: false;
+
+          $M.@Section {
+            @Text = "Repair";
+            @Anchor = (Bottom: 8);
+          }
+
+          Label #CrateRepairReason {
+            Anchor: (Height: 44, Bottom: 6);
+            Style: $M.@SubheadingFitStyle;
+          }
+
+          Label #CrateRepairStatus {
+            Anchor: (Bottom: 10);
+            Style: $M.@BodyStyle;
+          }
+
+          Group {
+            LayoutMode: Left;
+            Anchor: (Height: 44);
+
+            $C.@TextButton #ReenableButton {
+              @Text = "Turn Back On";
+              @Anchor = (Width: 170, Right: 6);
+            }
+
+            $C.@TextButton #RebindBlockButton {
+              @Text = "Use This Block";
+              @Anchor = (Width: 170, Right: 6);
+            }
+
+            $C.@SecondaryTextButton #RecheckButton {
+              @Text = "Check Again";
+              @Anchor = (Width: 150);
+            }
+
+            $M.@Spacer {}
+
+            $C.@CancelTextButton #RepairRemoveButton {
+              @Text = "Remove Crate";
+              @Anchor = (Width: 170);
+            }
+          }
+        }
+      }
+
+      // ----- Checklist --------------------------------------------------------
+      Group {
+        LayoutMode: Top;
+        Anchor: (Width: 290);
+
+        $M.@Section {
+          @Text = "Steps";
+          @Anchor = (Bottom: 6);
+        }
+
+        $M.@Well {
+          FlexWeight: 1;
+
+          Group #Checklist {
+            FlexWeight: 1;
+            LayoutMode: TopScrolling;
+            Padding: (Right: 6);
+            ScrollbarStyle: $C.@DefaultScrollbarStyle;
+          }
+        }
+      }
+    }
+
+    // ----- Footer -------------------------------------------------------------
+    $M.@ActionBar {
+      @Anchor = (Height: 44, Top: 10);
+
+      $C.@SecondaryTextButton #BackButton {
+        @Text = "Back";
+        @Anchor = (Width: 110);
+      }
+
+      $C.@SecondaryTextButton #NextButton {
+        @Text = "Next";
+        @Anchor = (Width: 110, Left: 6);
+      }
+
+      $C.@SecondaryTextButton #ReloadButton {
+        @Text = "Load Current";
+        @Anchor = (Width: 160, Left: 6);
+      }
+
+      $C.@CancelTextButton #OverwriteButton {
+        @Text = "Overwrite";
+        @Anchor = (Width: 140, Left: 6);
+      }
+
+      $M.@Spacer {}
+
+      $C.@SecondaryTextButton #TestButton {
+        @Text = "Test in World";
+        @Anchor = (Width: 160, Right: 6);
+      }
+
+      $C.@TextButton #CreateButton {
+        @Text = "Create Crate";
+        @Anchor = (Width: 160, Right: 6);
+      }
+
+      $C.@TextButton #SaveButton {
+        @Text = "Save";
+        @Anchor = (Width: 130, Right: 6);
+      }
+
+      $C.@TertiaryTextButton #CloseButton {
+        @Text = "Close";
+        @Anchor = (Width: 120);
+      }
+    }
+  }
+}

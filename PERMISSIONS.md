@@ -294,6 +294,44 @@ Disabled by default. `mysticessentials.vaults.admin` grants **every**
 (see **Dynamic limits**); `vaults.vault.*` / `vaults.rows.*` grant the config
 maximum.
 
+## LootBox
+
+Disabled by default. `mysticessentials.lootbox.use` gates `/lootbox` (alias `/lb`)
+itself, so every other node also needs it. No node implies another.
+
+| Node | Grants |
+|---|---|
+| `mysticessentials.lootbox.use` | `/lootbox` catalog, `/lootbox preview <pool>`, opening with a key, `/lootbox pending`, using crates, `/lootbox motion` and the Catalog's Motion button, `/lootbox key deposit` / `withdraw` and Deposit Held Key, `/lootbox crate effects` |
+| `mysticessentials.lootbox.history` | `/lootbox history` (own receipts) |
+| `mysticessentials.lootbox.audit` | `/lootbox history <player>`, `/lootbox audit` and Audit in the manager (Audit History and its exports) |
+| `mysticessentials.lootbox.keys` | `/lootbox key list`, `/lootbox key info <serial\|batch-…>`, `/lootbox key grants <keyId>`, viewing the Key Manager and a key's Grants page |
+| `mysticessentials.lootbox.keys.give` | `/lootbox key give <player> <keyId> [count] [virtual] [source=…]`, Give on the Grants page |
+| `mysticessentials.lootbox.keys.revoke` | `/lootbox key revoke <serial\|batch-…>`, Revoke on the Grants page |
+| `mysticessentials.lootbox.publish` | `/lootbox publish <pool>`, `/lootbox rollback <pool> <revision>`, `/lootbox key publish <keyId>`, Publish in the manager |
+| `mysticessentials.lootbox.edit` | Manager: New Pool, Clone and Archive pool drafts, the pool editor (General, Rewards, Keys & Rules, Save Draft), and in the Key Manager New Key, Clone, Archive and the key editor; the Template Library. Publishing from the editor still needs `publish`, adding or changing COMMAND rewards (or inserting a reward set that has them) also needs `rewards.command`, and applying a crate look also needs `crates.manage` |
+| `mysticessentials.lootbox.rewards.command` | Publish pools that contain COMMAND rewards (checked together with `publish`) |
+| `mysticessentials.lootbox.simulate` | `/lootbox simulate <pool> [draws]`, Simulate in the manager (the Simulation screen) |
+| `mysticessentials.lootbox.crates.place` | `/lootbox crate select`, `/lootbox crate convert <pool> [crateId]`, `/lootbox crate rebind <crateId> <pool>`; Convert Looked-At Block in the Crate Manager and Create in the crate editor; binding hint on an unbound Mystic Crate |
+| `mysticessentials.lootbox.crates.manage` | `/lootbox crate info\|list\|verify\|remove\|enable\|edit`; the Crate Manager's Edit, Disable/Enable, Remove and Verify, and Save in the crate editor (binding an existing crate to another pool also needs `crates.place`); alerts when a crate is destroyed |
+| `mysticessentials.lootbox.restore` | `/lootbox reconcile <openingId> <regrant\|dismiss>` |
+| `mysticessentials.lootbox.admin` | `/lootbox admin` (manager screen), `/lootbox reload`, `/lootbox disable\|enable <pool>` |
+
+A pool draft may also name its own `permission` node, required to open that pool.
+Every button on a LootBox screen checks its node again when it is pressed; a button
+being visible grants nothing.
+
+Suggested groups:
+
+| Group | Nodes |
+|---|---|
+| Players | `use`, `history` |
+| Builders | `crates.place` |
+| Moderators | `audit`, `keys`, `crates.manage`, `restore` |
+| Admins | `mysticessentials.lootbox.*` |
+
+`keys.give`, `publish` and `rewards.command` decide what players can win; keep them
+with admins.
+
 ## Dynamic limits
 
 Numeric limits (`home.limit`, `playerwarp.limit`, `vaults.vault`, `vaults.rows`)

@@ -1,7 +1,10 @@
 package org.hyzionstudios.mysticessentials.core.permission;
 
+import java.time.Duration;
 import java.util.OptionalInt;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 
@@ -13,6 +16,8 @@ import net.luckperms.api.LuckPermsProvider;
 import net.luckperms.api.event.EventSubscription;
 import net.luckperms.api.event.user.UserDataRecalculateEvent;
 import net.luckperms.api.model.user.User;
+import net.luckperms.api.node.Node;
+import net.luckperms.api.node.NodeBuilder;
 
 /**
  * {@link PermissionService} backed by the verified Hytale permission check
@@ -152,5 +157,47 @@ public final class PermissionServiceImpl implements PermissionService {
             }
             return best >= 0 ? OptionalInt.of(best) : OptionalInt.empty();
         }).orElse(OptionalInt.empty());
+    }
+
+    @Override
+    public boolean canGrant() {
+        return luckPerms != null;
+    }
+
+    @Override
+    public CompletableFuture<Boolean> grant(UUID player, String node, Duration duration) {
+        LuckPerms resolved = luckPerms;
+        if (resolved == null || node == null || node.isBlank()) {
+            return CompletableFuture.completedFuture(false);
+        }
+        try {
+            return LuckPermsNodes.add(resolved, player, node, duration)
+                    .thenApply(ignored -> true)
+                    .exceptionally(t -> {
+                        core.log(Level.WARNING, "LuckPerms grant of " + node + " to " + player + " failed: " + t);
+                        return false;
+                    });
+        } catch (Throwable t) {
+            core.log(Level.WARNING, "LuckPerms grant of " + node + " to " + player + " failed: " + t);
+            return CompletableFuture.completedFuture(false);
+        }
+    }
+
+    /**
+     * The LuckPerms node API, kept in its own class: it is only loaded once
+     * LuckPerms is known to be present. Referencing {@code Node} directly in this
+     * class made class verification load it, which failed every server without
+     * LuckPerms (NoClassDefFoundError at startup).
+     */
+    private static final class LuckPermsNodes {
+
+        static CompletableFuture<Void> add(LuckPerms luckPerms, UUID player, String node, Duration duration) {
+            NodeBuilder<?, ?> builder = Node.builder(node);
+            if (duration != null && !duration.isZero() && !duration.isNegative()) {
+                builder.expiry(duration.getSeconds(), TimeUnit.SECONDS);
+            }
+            Node built = builder.build();
+            return luckPerms.getUserManager().modifyUser(player, user -> user.data().add(built));
+        }
     }
 }

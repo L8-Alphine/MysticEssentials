@@ -1,0 +1,30 @@
+// One reward in the reveal list. #Hl is the moving highlight; the odds stay visible.
+$M = "MysticTheme.ui";
+
+Group #Row {
+  Anchor: (Height: 34, Bottom: 4);
+  LayoutMode: Full;
+  Background: #0a0f16(0.38);
+
+  Group #Hl {
+    Anchor: (Full: 0);
+    Background: #E8A93B(0.40);
+    Visible: false;
+  }
+
+  Group {
+    Anchor: (Full: 0);
+    LayoutMode: Left;
+    Padding: (Left: 12, Right: 12);
+
+    Label #Name {
+      FlexWeight: 1;
+      Style: $M.@RowNameFitStyle;
+    }
+
+    Label #Odds {
+      Anchor: (Width: 140);
+      Style: (...$M.@RowSideStyle, FontSize: 14, RenderBold: true);
+    }
+  }
+}

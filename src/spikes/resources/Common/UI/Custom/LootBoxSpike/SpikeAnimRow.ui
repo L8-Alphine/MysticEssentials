@@ -1,0 +1,28 @@
+// DEV ONLY - one reward row for the S7 animation page. #Hl is the moving highlight.
+Group #Row {
+  Anchor: (Height: 30, Bottom: 4);
+  LayoutMode: Full;
+  Background: #0a0f16(0.38);
+
+  Group #Hl {
+    Anchor: (Full: 0);
+    Background: #e8a93b(0.45);
+    Visible: false;
+  }
+
+  Group {
+    Anchor: (Full: 0);
+    LayoutMode: Left;
+    Padding: (Left: 12, Right: 12);
+
+    Label #Name {
+      FlexWeight: 1;
+      Text: "";
+    }
+
+    Label #Odds {
+      Anchor: (Width: 120);
+      Text: "";
+    }
+  }
+}

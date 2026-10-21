@@ -1,0 +1,37 @@
+// DEV ONLY - LootBox spike S7: server-driven reveal animation. The server moves
+// the #Hl highlight between rows with sendUpdate at a chosen rate; the odds
+// column must stay readable the whole time.
+$C = "../Common.ui";
+
+$C.@PageOverlay {}
+
+$C.@Container {
+  Anchor: (Width: 640, Height: 600);
+
+  #Title {
+    Group {
+      $C.@Title {
+        @Text = "S7 - Reveal animation";
+      }
+    }
+  }
+
+  #Content {
+    LayoutMode: Top;
+
+    Label #Status {
+      Anchor: (Height: 24, Bottom: 10);
+      Text: "Starting...";
+    }
+
+    Group #Rows {
+      FlexWeight: 1;
+      LayoutMode: Top;
+    }
+
+    $C.@TextButton #CloseButton {
+      @Text = "Close";
+      @Anchor = (Width: 150, Top: 10);
+    }
+  }
+}

@@ -30,10 +30,15 @@ $C = "../Common.ui";
 @LineSoft = #ffffff(0.06);  // hairlines between rows / sections
 @LineStrong = #ffffff(0.12);
 
+// Every text colour that carries information reads at 4.5:1 or better on the
+// window (#16212f, ContainerFullPatch), and row text does under the row hover
+// tint too. TextDim is the game's section-title colour lifted 10% to get there.
+// TextFaint does not pass: keep it for decoration, never for hints, odds or
+// anything to act on. verifyLootBoxAccessibility checks this.
 @TextHi = #ffffff;
 @TextBody = #dee2ef;        // the game's value-text colour
 @TextMuted = #96a9be;       // the game's default label colour
-@TextDim = #778292;         // the game's section-title colour
+@TextDim = #858e9d;
 @TextFaint = #5a6a7a;
 
 @Gold = #E8A93B;            // the game's highlight gold
@@ -91,6 +96,10 @@ $C = "../Common.ui";
 @MetaGoldStyle = LabelStyle(...@MetaStyle, TextColor: @GoldSoft);
 @CaptionStyle = LabelStyle(FontSize: 11, TextColor: @TextFaint, VerticalAlignment: Center, Wrap: true);
 @CaptionWarnStyle = LabelStyle(...@CaptionStyle, TextColor: @Warn);
+// Captions people need to read (hints, notes, odds footers): caption size,
+// readable colour.
+@HintStyle = LabelStyle(FontSize: 12, TextColor: @TextMuted, VerticalAlignment: Center, Wrap: true);
+@MetaWrapStyle = LabelStyle(...@MetaStyle, Wrap: true);
 
 // Key / value rows inside a Panel.
 @KeyStyle = LabelStyle(FontSize: 13, TextColor: @TextDim, VerticalAlignment: Center);
@@ -124,6 +133,13 @@ $C = "../Common.ui";
 @RowMetaStyle = LabelStyle(FontSize: 12, TextColor: @TextMuted, VerticalAlignment: Center);
 @RowSideStyle = LabelStyle(FontSize: 12, TextColor: @TextMuted, HorizontalAlignment: End, VerticalAlignment: Center);
 @RowSideGoldStyle = LabelStyle(...@RowSideStyle, TextColor: @GoldSoft);
+// Single-line text that can run long (player-made and translated names, ids):
+// it shrinks to fit its box instead of running past it.
+@RowNameFitStyle = LabelStyle(...@RowNameStyle, ShrinkTextToFit: true, MinShrinkTextToFitFontSize: 11);
+@RowMetaFitStyle = LabelStyle(...@RowMetaStyle, ShrinkTextToFit: true, MinShrinkTextToFitFontSize: 10);
+@SubheadingFitStyle = LabelStyle(...@SubheadingStyle, ShrinkTextToFit: true, MinShrinkTextToFitFontSize: 11);
+@MetaFitStyle = LabelStyle(...@MetaStyle, ShrinkTextToFit: true, MinShrinkTextToFitFontSize: 10);
+@ValueFitStyle = LabelStyle(...@ValueStyle, ShrinkTextToFit: true, MinShrinkTextToFitFontSize: 10);
 
 // --------------------------------------------------------------- Surfaces --
 // Bordered card: the game's header-tab frame, which matches the window chrome.
@@ -273,6 +289,20 @@ $C = "../Common.ui";
 
   Group {
     Anchor: (Left: 0, Top: 0, Width: 3, Height: @Height);
+    Background: @Gold;
+  }
+};
+
+// The same overlay for a tab: gold tint with a gold rule along the bottom.
+// Hidden until the server sets #Selected.Visible on the active tab. Sits FIRST
+// inside a LayoutMode: Full tab button so the label draws over it.
+@TabSelection = Group {
+  Anchor: (Full: 0);
+  Background: #E8A93B(0.10);
+  Visible: false;
+
+  Group {
+    Anchor: (Left: 0, Right: 0, Bottom: 0, Height: 2);
     Background: @Gold;
   }
 };

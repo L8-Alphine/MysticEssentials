@@ -1,0 +1,49 @@
+// One reward in the pool editor's list: icon, name, type and rarity, and its
+// live chance. #Selected marks the reward whose fields are shown on the right.
+$M = "MysticTheme.ui";
+
+Button #Row {
+  Anchor: (Height: 48, Bottom: 4);
+  Style: $M.@RowStyle;
+  LayoutMode: Full;
+
+  $M.@RowSelection #Selected {
+    @Height = 48;
+  }
+
+  Group {
+    Anchor: (Full: 0);
+    LayoutMode: Left;
+    Padding: (Left: 10, Right: 10, Top: 6, Bottom: 6);
+
+    $M.@IconWell {
+      @Anchor = (Right: 10);
+
+      ItemSlot #Icon {
+        Anchor: (Width: 30, Height: 30);
+        ShowQualityBackground: true;
+        ShowQuantity: false;
+      }
+    }
+
+    Group {
+      LayoutMode: Top;
+      FlexWeight: 1;
+
+      Label #Name {
+        Anchor: (Height: 18);
+        Style: $M.@RowNameFitStyle;
+      }
+
+      Label #Meta {
+        Anchor: (Height: 14);
+        Style: $M.@RowMetaFitStyle;
+      }
+    }
+
+    Label #Odds {
+      Anchor: (Width: 110, Left: 6);
+      Style: $M.@RowSideGoldStyle;
+    }
+  }
+}

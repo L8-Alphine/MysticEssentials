@@ -222,6 +222,45 @@ config page); players without it cannot use that portal.
 | `mysticessentials.vaults.admin` | Every `mysticessentials.vaults.admin.*` node |
 | `mysticessentials.vaults.admin.open`, `.open.offline`, `.edit`, `.readonly`, `.unlock`, `.restore`, `.viewlogs`, `.bypasslimit` | Admin vault operations |
 
+## LootBox
+
+See the [LootBox](lootbox-module) page. Every node also needs
+`mysticessentials.lootbox.use`, which gates `/lootbox` itself. No node implies
+another; grant `mysticessentials.lootbox.*` for full access.
+
+| Node | Grants |
+| --- | --- |
+| `mysticessentials.lootbox.use` | `/lootbox`: catalog, previews, opening with a key, pending inbox, using crates, `/lootbox motion`, `/lootbox key deposit\|withdraw`, `/lootbox crate effects` |
+| `mysticessentials.lootbox.history` | `/lootbox history` (own receipts) |
+| `mysticessentials.lootbox.audit` | `/lootbox history <player>`, `/lootbox audit` (Audit History and exports) |
+| `mysticessentials.lootbox.keys` | `/lootbox key list\|info\|grants`, the Key Manager and Grants page |
+| `mysticessentials.lootbox.keys.give` | `/lootbox key give`, Give on the Grants page |
+| `mysticessentials.lootbox.keys.revoke` | `/lootbox key revoke`, Revoke on the Grants page |
+| `mysticessentials.lootbox.publish` | `/lootbox publish\|rollback`, `/lootbox key publish`, Publish in the manager |
+| `mysticessentials.lootbox.edit` | Manager: New Pool, Clone, Archive, the pool editor (General, Rewards, Keys & Rules, Save Draft), and the Key Manager's New Key, Clone, Archive and key editor; publishing still needs `publish`, and COMMAND rewards need `rewards.command` |
+| `mysticessentials.lootbox.rewards.command` | Publish pools that contain COMMAND rewards |
+| `mysticessentials.lootbox.simulate` | `/lootbox simulate`, the Simulation screen |
+| `mysticessentials.lootbox.crates.place` | `/lootbox crate select\|convert\|rebind`, Convert and Create in the Crate Manager and editor; binding hint on an unbound Mystic Crate |
+| `mysticessentials.lootbox.crates.manage` | `/lootbox crate info\|list\|verify\|remove\|enable\|edit`, the Crate Manager's Edit, Disable/Enable, Remove, Verify and Save, applying a crate look; broken-crate alerts |
+| `mysticessentials.lootbox.restore` | `/lootbox reconcile` |
+| `mysticessentials.lootbox.admin` | `/lootbox admin\|reload\|disable\|enable` |
+
+Suggested groups:
+
+```text
+lp group default   permission set mysticessentials.lootbox.use true
+lp group default   permission set mysticessentials.lootbox.history true
+lp group builder   permission set mysticessentials.lootbox.crates.place true
+lp group moderator permission set mysticessentials.lootbox.audit true
+lp group moderator permission set mysticessentials.lootbox.keys true
+lp group moderator permission set mysticessentials.lootbox.crates.manage true
+lp group moderator permission set mysticessentials.lootbox.restore true
+lp group admin     permission set mysticessentials.lootbox.* true
+```
+
+Keep `keys.give`, `publish` and `rewards.command` with the people who decide what
+players can win.
+
 ## Tutorial
 
 | Node | Grants |

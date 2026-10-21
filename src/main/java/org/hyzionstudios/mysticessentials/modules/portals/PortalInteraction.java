@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
@@ -191,17 +192,29 @@ public final class PortalInteraction extends SimpleInstantInteraction {
                     Map.of("world", targetName));
             return;
         }
-        Transform destination = portal.isUseLocation()
-                ? locationTransform(portal)
-                : spawnTransform(target, playerRef.getUuid());
-        if (destination == null) {
-            portals.core().getMessageService().sendKey(playerRef, "portal-world-unknown",
-                    Map.of("world", targetName));
+        if (portal.isUseLocation()) {
+            lockTeleport(playerRef.getUuid());
+            commandBuffer.putComponent(ref, Teleport.getComponentType(),
+                    Teleport.createForPlayer(target, locationTransform(portal)));
             return;
         }
+        // The spawn provider resolves asynchronously (it may load the spawn column
+        // first), so the teleport is applied on the player's world thread once the
+        // point is known. The lock is taken now so re-entering the portal while it
+        // resolves does not start a second teleport.
+        World playerWorld = commandBuffer.getExternalData().getWorld();
         lockTeleport(playerRef.getUuid());
-        commandBuffer.putComponent(ref, Teleport.getComponentType(),
-                Teleport.createForPlayer(target, destination));
+        spawnTransform(target, playerRef.getUuid()).thenAcceptAsync(destination -> {
+            if (destination == null) {
+                portals.core().getMessageService().sendKey(playerRef, "portal-world-unknown",
+                        Map.of("world", targetName));
+                return;
+            }
+            if (ref.isValid()) {
+                ref.getStore().putComponent(ref, Teleport.getComponentType(),
+                        Teleport.createForPlayer(target, destination));
+            }
+        }, playerWorld);
     }
 
     private static void enterServerPortal(PortalsModule portals, PlayerRef playerRef, Portal portal) {
@@ -320,13 +333,16 @@ public final class PortalInteraction extends SimpleInstantInteraction {
         return null;
     }
 
-    private static Transform spawnTransform(World world, UUID uuid) {
+    /** Completes with the world's spawn point for {@code uuid}, or {@code null} when it has none. */
+    private static CompletableFuture<Transform> spawnTransform(World world, UUID uuid) {
         try {
             var config = world.getWorldConfig();
             var provider = config == null ? null : config.getSpawnProvider();
-            return provider == null ? null : provider.getSpawnPoint(world, uuid);
+            return provider == null
+                    ? CompletableFuture.completedFuture(null)
+                    : provider.getSpawnPointAsync(world, uuid).exceptionally(t -> null);
         } catch (Throwable t) {
-            return null;
+            return CompletableFuture.completedFuture(null);
         }
     }
 

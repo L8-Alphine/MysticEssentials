@@ -1,0 +1,39 @@
+// One switchable entry in a LootBox editor list (a key that opens the pool).
+// Appended per entry; #Selected marks it switched on and #State says so in words.
+$M = "MysticTheme.ui";
+
+Button #Row {
+  Anchor: (Height: 44, Bottom: 4);
+  Style: $M.@RowStyle;
+  LayoutMode: Full;
+
+  $M.@RowSelection #Selected {
+    @Height = 44;
+  }
+
+  Group {
+    Anchor: (Full: 0);
+    LayoutMode: Left;
+    Padding: (Left: 12, Right: 12, Top: 6, Bottom: 6);
+
+    Group {
+      LayoutMode: Top;
+      FlexWeight: 1;
+
+      Label #Name {
+        Anchor: (Height: 18);
+        Style: $M.@RowNameFitStyle;
+      }
+
+      Label #Meta {
+        Anchor: (Height: 14);
+        Style: $M.@RowMetaFitStyle;
+      }
+    }
+
+    Label #State {
+      Anchor: (Width: 160, Left: 8);
+      Style: $M.@RowSideStyle;
+    }
+  }
+}

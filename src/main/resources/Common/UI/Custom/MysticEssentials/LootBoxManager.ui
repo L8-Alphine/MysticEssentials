@@ -1,0 +1,220 @@
+// LootBox Manager: every pool with its lifecycle status, a header search and a
+// status filter. Rows are appended into #PoolList; selecting one shows its
+// actions in #SelectionBar. #CreatePanel is the New Pool / Clone form.
+$C = "../Common.ui";
+$M = "MysticTheme.ui";
+
+$C.@PageOverlay {}
+
+$C.@Container {
+  Anchor: (Width: 900, Height: 660);
+
+  #Title {
+    Group {
+      $C.@Title {
+        @Text = "LootBox Manager";
+      }
+
+      $C.@HeaderSearch {}
+    }
+  }
+
+  #Content {
+    LayoutMode: Top;
+
+    Group {
+      LayoutMode: Left;
+      Anchor: (Height: 32, Bottom: 10);
+
+      Label #HeaderInfo {
+        FlexWeight: 1;
+        Style: $M.@MetaStyle;
+      }
+
+      $C.@DropdownBox #StatusFilter {
+        Anchor: (Width: 200, Height: 32, Left: 8);
+      }
+
+      $C.@SecondaryTextButton #KeysButton {
+        @Text = "Keys";
+        @Anchor = (Width: 110, Left: 8);
+      }
+
+      $C.@SecondaryTextButton #CratesButton {
+        @Text = "Crates";
+        @Anchor = (Width: 110, Left: 6);
+      }
+
+      $C.@SecondaryTextButton #CreateButton {
+        @Text = "New Pool";
+        @Anchor = (Width: 150, Left: 6);
+      }
+    }
+
+    $M.@Panel #CreatePanel {
+      @Padding = 12;
+
+      Anchor: (Bottom: 10);
+      Visible: false;
+
+      Label #FormTitle {
+        Anchor: (Height: 20, Bottom: 8);
+        Style: $M.@SubheadingStyle;
+      }
+
+      Group {
+        LayoutMode: Left;
+        Anchor: (Height: 58);
+
+        Group {
+          LayoutMode: Top;
+          Anchor: (Width: 280, Right: 12);
+
+          $M.@FieldLabel { @Text = "Pool id"; }
+          $C.@TextField #NewIdInput {
+            PlaceholderText: "lowercase_with_underscores";
+          }
+        }
+
+        Group #NewNameColumn {
+          LayoutMode: Top;
+          FlexWeight: 1;
+
+          $M.@FieldLabel { @Text = "Display name"; }
+          $C.@TextField #NewNameInput {
+            PlaceholderText: "What players see";
+          }
+        }
+      }
+
+      Group {
+        LayoutMode: Left;
+        Anchor: (Height: 40, Top: 8);
+
+        Label #FormHint {
+          FlexWeight: 1;
+          Style: $M.@HintStyle;
+        }
+
+        $C.@SecondaryTextButton #FormCancelButton {
+          @Text = "Cancel";
+          @Anchor = (Width: 130, Left: 8);
+        }
+
+        $C.@TextButton #FormConfirmButton {
+          @Text = "Create Draft";
+          @Anchor = (Width: 170, Left: 8);
+        }
+      }
+    }
+
+    Label #Notice {
+      Anchor: (Bottom: 6);
+      Style: $M.@BodyStyle;
+      Visible: false;
+    }
+
+    $M.@Section {
+      @Text = "Pools";
+      @Anchor = (Bottom: 8);
+    }
+
+    $M.@Well {
+      FlexWeight: 1;
+
+      Label #ListEmpty {
+        Anchor: (Height: 64);
+        Style: $M.@EmptyStyle;
+        Text: "No pools match. Press New Pool, or change the search or filter.";
+        Visible: false;
+      }
+
+      Group #PoolList {
+        FlexWeight: 1;
+        LayoutMode: TopScrolling;
+        Padding: (Right: 6);
+        ScrollbarStyle: $C.@DefaultScrollbarStyle;
+      }
+    }
+
+    $M.@ActionBar #SelectionBar {
+      @Anchor = (Height: 44, Top: 10);
+
+      Group {
+        LayoutMode: Top;
+        FlexWeight: 1;
+
+        Label #SelectedName {
+          Anchor: (Height: 22);
+          Style: $M.@SubheadingFitStyle;
+        }
+
+        Label #SelectedMeta {
+          Anchor: (Height: 16);
+          Style: $M.@MetaFitStyle;
+        }
+      }
+
+      $C.@TextButton #EditButton {
+        @Text = "Edit";
+        @Anchor = (Width: 90, Left: 8);
+      }
+
+      $C.@SecondaryTextButton #PublishButton {
+        @Text = "Publish";
+        @Anchor = (Width: 110, Left: 6);
+      }
+
+      $C.@SecondaryTextButton #SimulateButton {
+        @Text = "Simulate";
+        @Anchor = (Width: 110, Left: 6);
+      }
+
+      $C.@SecondaryTextButton #ClosePoolButton {
+        @Text = "Close Pool";
+        @Anchor = (Width: 120, Left: 6);
+      }
+
+      $C.@SecondaryTextButton #ReopenPoolButton {
+        @Text = "Reopen";
+        @Anchor = (Width: 120, Left: 6);
+      }
+
+      $C.@SecondaryTextButton #CloneButton {
+        @Text = "Clone";
+        @Anchor = (Width: 100, Left: 6);
+      }
+
+      $C.@CancelTextButton #ArchiveButton {
+        @Text = "Archive";
+        @Anchor = (Width: 110, Left: 6);
+      }
+    }
+
+    $M.@ActionBar {
+      @Anchor = (Height: 44, Top: 10);
+
+      $C.@SecondaryTextButton #ReloadButton {
+        @Text = "Reload Drafts";
+        @Anchor = (Width: 170);
+      }
+
+      $C.@SecondaryTextButton #TemplatesButton {
+        @Text = "Templates";
+        @Anchor = (Width: 140, Left: 6);
+      }
+
+      $C.@SecondaryTextButton #AuditButton {
+        @Text = "Audit Log";
+        @Anchor = (Width: 140, Left: 6);
+      }
+
+      $M.@Spacer {}
+
+      $C.@TextButton #CloseButton {
+        @Text = "Close";
+        @Anchor = (Width: 150);
+      }
+    }
+  }
+}

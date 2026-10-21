@@ -262,7 +262,7 @@ val mysticIdentity: SourceSet = sourceSets.create("mysticIdentity") {
 }
 
 dependencies {
-    "mysticIdentityCompileOnly"(files("../MysticIdentity/mysticidentity-api/build/libs/mysticidentity-api-0.1.0.jar"))
+    "mysticIdentityCompileOnly"(files("../MysticIdentity/mysticidentity-api/build/libs/mysticidentity-api-0.1.1.jar"))
 }
 
 tasks.shadowJar {
@@ -285,6 +285,22 @@ tasks.register<JavaExec>("verifyPortalAdapter") {
 }
 
 tasks.named("check") { dependsOn("verifyPortalAdapter") }
+
+// LootBox Phase 0 spikes (docs/lootbox/implementation-plan.md §10): a throwaway, dev-only plugin
+// that probes engine behaviour in a live server. It is its own jar with its own manifest and is
+// never packed into the mod jar — install it on a development server only.
+// Sources and resources use the source set's default src/spikes/{java,resources}.
+val spikes: SourceSet = sourceSets.create("spikes") {
+    compileClasspath += sourceSets.main.get().compileClasspath
+}
+
+tasks.register<Jar>("spikesJar") {
+    group = "build"
+    description = "Builds the dev-only LootBox spike plugin (MysticLootBoxSpikes.jar)."
+    archiveBaseName.set("MysticLootBoxSpikes")
+    archiveVersion.set("0.1.0")
+    from(spikes.output)
+}
 
 /**
  * Validates every `$C.@Component { ... }` instantiation in our shipped `.ui`
@@ -319,6 +335,8 @@ tasks.register("validateUiDocuments") {
     description = "Checks shipped .ui documents supply every required Common.ui parameter."
 
     val uiDir = layout.projectDirectory.dir("src/main/resources/Common/UI/Custom")
+    // The dev-only spike plugin's documents can break other mods' UI the same way, so they are checked too.
+    val spikeUiDir = layout.projectDirectory.dir("src/spikes/resources/Common/UI/Custom")
     inputs.dir(uiDir)
     outputs.upToDateWhen { false }
 
@@ -383,8 +401,63 @@ tasks.register("validateUiDocuments") {
         val problems = mutableListOf<String>()
         var checked = 0
 
-        uiDir.asFile.walkTopDown().filter { it.isFile && it.extension == "ui" }.forEach { file ->
+        // A @parameter may only be assigned before a block's first plain
+        // property. Once the parser has read a "Name:" line it takes a later
+        // "@X" for a child element and demands "{", so the document dies with
+        // "Expected {, found =" -- and that failure is not contained: the
+        // client stops resolving OTHER packs' documents and disconnects every
+        // player at world join. The game's own documents never order them the
+        // other way round.
+        val parameterAssignment = Regex("""@\w+\s*=""")
+        val plainProperty = Regex("""[A-Za-z]\w*\s*:""")
+        fun misorderedParameters(source: String): List<Int> {
+            val text = Regex("//[^\n]*").replace(source, "")
+                .let { Regex(""""[^"\n]*"""").replace(it, "\"\"") }
+            val found = mutableListOf<Int>()
+            val sawProperty = mutableMapOf<Int, Boolean>()
+            var depth = 0
+            var paren = 0
+            var line = 1
+            var i = 0
+            while (i < text.length) {
+                val c = text[i]
+                when {
+                    c == '\n' -> { line++; i++ }
+                    c == '(' -> { paren++; i++ }
+                    c == ')' -> { paren--; i++ }
+                    paren > 0 -> i++
+                    c == '{' -> { depth++; sawProperty[depth] = false; i++ }
+                    c == '}' -> { sawProperty.remove(depth); depth--; i++ }
+                    c == '@' && depth > 0 -> {
+                        if (sawProperty[depth] == true && parameterAssignment.matchAt(text, i) != null) {
+                            found += line
+                        }
+                        i++
+                    }
+                    else -> {
+                        val match = if (depth > 0) plainProperty.matchAt(text, i) else null
+                        val startsStatement = i == 0 || text[i - 1] in charArrayOf('\n', ' ', '\t', ';', '{', '}')
+                        if (match != null && startsStatement) {
+                            sawProperty[depth] = true
+                            i += match.value.length
+                        } else {
+                            i++
+                        }
+                    }
+                }
+            }
+            return found
+        }
+
+        listOf(uiDir.asFile, spikeUiDir.asFile).filter { it.isDirectory }
+            .flatMap { dir -> dir.walkTopDown().filter { it.isFile && it.extension == "ui" }.toList() }
+            .forEach { file ->
             val text = file.readText()
+            misorderedParameters(text).forEach { lineNumber ->
+                problems += file.name + ":" + lineNumber +
+                    ": a @parameter is assigned after a plain property -- move it above the" +
+                    " block's first \"Name:\" line"
+            }
             header.findAll(text).forEach { use ->
                 val alias = use.groupValues[1]
                 val component = use.groupValues[2]
@@ -415,7 +488,7 @@ tasks.register("validateUiDocuments") {
 
         if (problems.isNotEmpty()) {
             throw GradleException(
-                "Shipped .ui documents omit required Common.ui parameters. These break OTHER mods' " +
+                "Shipped .ui documents are malformed. These break OTHER mods' " +
                     "documents on the client and disconnect players at world join:\n  " +
                     problems.joinToString("\n  ")
             )
@@ -507,6 +580,63 @@ tasks.register<JavaExec>("verifyShadedJar") {
     })
 }
 
+tasks.register<JavaExec>("verifyLootBox") {
+    group = "verification"
+    description = "Checks the LootBox odds, draw, templates, key markers, recovery table and publish gates."
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets.test.get().runtimeClasspath + configurations.compileClasspath.get()
+    mainClass.set("org.hyzionstudios.mysticessentials.modules.lootbox.LootBoxEngineTest")
+}
+
+tasks.register<JavaExec>("verifyLootBoxSaga") {
+    group = "verification"
+    description = "Checks the LootBox opening saga: stale snapshots, duplicate confirms, key spending and recovery."
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets.test.get().runtimeClasspath + configurations.compileClasspath.get()
+    mainClass.set("org.hyzionstudios.mysticessentials.modules.lootbox.LootBoxSagaTest")
+}
+
+tasks.register<JavaExec>("verifyLootBoxDrafts") {
+    group = "verification"
+    description = "Checks the LootBox draft store: optimistic saves, refused ids, archive and the draft lifecycle."
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets.test.get().runtimeClasspath + configurations.compileClasspath.get()
+    mainClass.set("org.hyzionstudios.mysticessentials.modules.lootbox.LootBoxDraftStoreTest")
+}
+
+tasks.register<JavaExec>("verifyLootBoxKeys") {
+    group = "verification"
+    description = "Checks the LootBox keys track: bounded grant history, the physical/virtual conversion saga and stackable keys."
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets.test.get().runtimeClasspath + configurations.compileClasspath.get()
+    mainClass.set("org.hyzionstudios.mysticessentials.modules.lootbox.LootBoxKeysTest")
+}
+
+tasks.register<JavaExec>("verifyLootBoxCrates") {
+    group = "verification"
+    description = "Checks the LootBox crate rules: compatibility, repair decisions, protection and crate documents."
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets.test.get().runtimeClasspath + configurations.compileClasspath.get()
+    mainClass.set("org.hyzionstudios.mysticessentials.modules.lootbox.LootBoxCratesTest")
+}
+
+tasks.register<JavaExec>("verifyLootBoxScreens") {
+    group = "verification"
+    description = "Checks the LootBox screens: simulation rows and warnings, audit filters, paging and export, templates."
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets.test.get().runtimeClasspath + configurations.compileClasspath.get()
+    mainClass.set("org.hyzionstudios.mysticessentials.modules.lootbox.LootBoxScreensTest")
+}
+
+tasks.register<JavaExec>("verifyLootBoxAccessibility") {
+    group = "verification"
+    description = "Checks the LootBox accessibility pass: reduced motion, readable contrast, wrapping text, window sizes and focus."
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets.test.get().runtimeClasspath + configurations.compileClasspath.get()
+    workingDir = projectDir
+    mainClass.set("org.hyzionstudios.mysticessentials.modules.lootbox.LootBoxAccessibilityTest")
+}
+
 tasks.register<JavaExec>("verifyMessageParamOrder") {
     group = "verification"
     description = "Checks message params are filled after placeholders, so they never expand one."
@@ -541,6 +671,13 @@ tasks.named("check") {
         "verifyIntegrationContracts",
         "verifyShadedJar",
         "verifyMessageParamOrder",
-        "verifyChatDelivery"
+        "verifyChatDelivery",
+        "verifyLootBox",
+        "verifyLootBoxSaga",
+        "verifyLootBoxKeys",
+        "verifyLootBoxDrafts",
+        "verifyLootBoxCrates",
+        "verifyLootBoxScreens",
+        "verifyLootBoxAccessibility"
     )
 }

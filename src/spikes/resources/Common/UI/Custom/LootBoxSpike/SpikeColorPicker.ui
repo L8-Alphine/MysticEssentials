@@ -1,0 +1,43 @@
+// DEV ONLY - LootBox spike S3 (ColorPickerDropdownBox). Opened by /lbspike ui. If this page shows,
+// the document parsed; watch the client log for "Markup Error" otherwise.
+$C = "../Common.ui";
+
+$C.@PageOverlay {}
+
+$C.@Container {
+  Anchor: (Width: 680, Height: 460);
+
+  #Title {
+    Group {
+      $C.@Title {
+        @Text = "S3 - ColorPickerDropdownBox";
+      }
+    }
+  }
+
+  #Content {
+    LayoutMode: Top;
+
+    Label #Status {
+      Anchor: (Height: 24, Bottom: 10);
+      Text: "Document parsed. Check the widget below renders and responds.";
+    }
+
+    ColorPickerDropdownBox #Color {
+      Anchor: (Width: 50, Height: 32);
+      Format: Rgb;
+      Style: $C.@DefaultColorPickerDropdownBoxStyle;
+      Color: #e7b84d;
+      DisplayTextField: true;
+    }
+
+    Group {
+      FlexWeight: 1;
+    }
+
+    $C.@TextButton #CloseButton {
+      @Text = "Close";
+      @Anchor = (Width: 150);
+    }
+  }
+}

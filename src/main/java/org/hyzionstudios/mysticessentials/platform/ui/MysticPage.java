@@ -39,16 +39,23 @@ public abstract class MysticPage extends CustomUIPage {
      * table is where the theme's palette reaches text the server writes. The
      * tokens mirror {@code MysticTheme.ui}: display and value text
      * {@code #DEE2EF}, row names white, meta {@code #96A9BE}, eyebrows and
-     * counts {@code #778292}, captions {@code #5A6A7A}, gold for "this one".
+     * counts {@code #858E9D}, captions {@code #5A6A7A}, gold for "this one".
+     * Text that carries information reads at 4.5:1 or better on the window
+     * background ({@code #16212F}); captions do not, so LootBox hints and
+     * notes use the muted colour instead (P2-L).
      */
     private static final String DEFAULT_UI_TEXT_COLOR = "#DEE2EF";
     private static final String TEXT_HI = "#FFFFFF";
     private static final String TEXT_BODY = "#DEE2EF";
     private static final String TEXT_MUTED = "#96A9BE";
-    private static final String TEXT_DIM = "#778292";
+    private static final String TEXT_DIM = "#858E9D";
     private static final String TEXT_FAINT = "#5A6A7A";
     private static final String GOLD = "#E8A93B";
     private static final String GOLD_SOFT = "#E8C97A";
+    private static final String WARN = "#FFCA3A";
+    private static final String DANGER = "#D46A6A";
+    /** {@code @ColorButtonText} in the game's Common.ui. */
+    private static final String BUTTON_TEXT = "#BFCDD5";
     private static final Pattern TEXT_TARGET =
             Pattern.compile("#([A-Za-z0-9_]+)\\.TextSpans$");
     private static final Map<String, String> UI_TEXT_COLORS = Map.ofEntries(
@@ -146,10 +153,97 @@ public abstract class MysticPage extends CustomUIPage {
             Map.entry("MTags", GOLD_SOFT),
             Map.entry("Reward", GOLD_SOFT),
             Map.entry("RewardHeader", GOLD),
+            // LootBox: the odds column is gold so the chance reads before the name.
+            Map.entry("Odds", GOLD_SOFT),
+            Map.entry("OneIn", TEXT_MUTED),
+            Map.entry("Rules", TEXT_MUTED),
+            Map.entry("KeyBalance", GOLD_SOFT),
+            Map.entry("OddsFooter", TEXT_MUTED),
+            Map.entry("Blocker", GOLD_SOFT),
+            Map.entry("Consumes", GOLD_SOFT),
+            // LootBox screens track.
+            // Simulation: the chance column is gold like the preview's odds.
+            Map.entry("SimHint", TEXT_MUTED),
+            Map.entry("SimWarning", WARN),
+            Map.entry("SimSummary", TEXT_MUTED),
+            Map.entry("SimName", TEXT_HI),
+            Map.entry("SimChance", GOLD_SOFT),
+            Map.entry("SimObserved", TEXT_BODY),
+            Map.entry("SimCount", TEXT_MUTED),
+            Map.entry("SimGap", TEXT_BODY),
+            // Audit history.
+            Map.entry("AuditWhen", TEXT_MUTED),
+            Map.entry("AuditAction", GOLD_SOFT),
+            Map.entry("AuditTarget", TEXT_HI),
+            Map.entry("AuditDetail", TEXT_MUTED),
+            Map.entry("AuditWho", TEXT_MUTED),
+            Map.entry("AuditPageInfo", TEXT_DIM),
+            Map.entry("AuditFullHead", TEXT_BODY),
+            Map.entry("AuditFullWho", TEXT_MUTED),
+            Map.entry("AuditFullDetail", TEXT_BODY),
+            // Template library.
+            Map.entry("TplName", TEXT_HI),
+            Map.entry("TplMeta", TEXT_MUTED),
+            Map.entry("TplSide", TEXT_MUTED),
+            Map.entry("TplDetail", TEXT_BODY),
+            Map.entry("TplNoTarget", TEXT_MUTED),
+            Map.entry("ResultName", TEXT_HI),
+            Map.entry("ResultMeta", TEXT_MUTED),
             Map.entry("RosterCounts", GOLD_SOFT),
             Map.entry("State", GOLD_SOFT),
+            // LootBox crates track.
+            Map.entry("CrateWorld", TEXT_BODY),
+            Map.entry("CratePosition", TEXT_BODY),
+            Map.entry("CrateBlock", TEXT_BODY),
+            Map.entry("CrateRotation", TEXT_BODY),
+            Map.entry("CrateBlockStatus", TEXT_BODY),
+            Map.entry("CrateSelectHint", TEXT_MUTED),
+            Map.entry("CrateIdFixed", TEXT_BODY),
+            Map.entry("CrateVerdict", TEXT_BODY),
+            Map.entry("CratePoolRevision", TEXT_BODY),
+            Map.entry("CratePoolRewards", TEXT_BODY),
+            Map.entry("CratePoolKeys", TEXT_BODY),
+            Map.entry("CrateBehaviour", TEXT_HI),
+            Map.entry("CrateBreakState", TEXT_BODY),
+            Map.entry("CrateDamageState", TEXT_BODY),
+            Map.entry("CrateRepairReason", TEXT_HI),
+            Map.entry("CrateRepairStatus", TEXT_BODY),
+            Map.entry("CrateNameplateState", TEXT_BODY),
+            // LootBox editor kit: picker, confirmation, tab bar. A server-written
+            // button label takes the game's button text colour so it matches a
+            // static one.
+            Map.entry("PickerTarget", GOLD),
+            Map.entry("CurrentItem", TEXT_MUTED),
+            Map.entry("TabLabel", TEXT_BODY),
+            Map.entry("ConfirmButton", BUTTON_TEXT),
+            Map.entry("DangerButton", BUTTON_TEXT),
+            // LootBox Manager: the New Pool / Clone form and the selection bar.
+            Map.entry("FormTitle", TEXT_HI),
+            Map.entry("FormHint", TEXT_MUTED),
+            Map.entry("SelectedMeta", TEXT_MUTED),
+            // LootBox pool editor.
+            Map.entry("NamePreview", TEXT_HI),
+            Map.entry("ModeHint", TEXT_MUTED),
+            Map.entry("RewardsSum", TEXT_MUTED),
+            Map.entry("OddsFieldLabel", TEXT_DIM),
+            Map.entry("RewardChance", GOLD_SOFT),
+            Map.entry("EconomyNote", TEXT_MUTED),
+            Map.entry("PermissionNote", TEXT_MUTED),
+            Map.entry("CommandNote", TEXT_MUTED),
+            Map.entry("RewardLock", WARN),
+            // LootBox key editor.
+            Map.entry("PreviewName", TEXT_HI),
+            Map.entry("PreviewMeta", TEXT_MUTED),
+            Map.entry("OpensLine", TEXT_MUTED),
+            // LootBox keys track.
+            Map.entry("PlayersNote", TEXT_MUTED),
+            Map.entry("KindHint", TEXT_MUTED),
+            Map.entry("GiveSummary", TEXT_MUTED),
+            Map.entry("StackHint", TEXT_MUTED),
+            Map.entry("KeysHint", TEXT_MUTED),
+            Map.entry("RulesNote", TEXT_MUTED),
             Map.entry("Unread", "#FFD97A"),
-            Map.entry("Secondary", "#D46A6A"));
+            Map.entry("Secondary", DANGER));
 
     protected final MysticCore core;
     protected final PlayerRef player;
@@ -173,6 +267,11 @@ public abstract class MysticPage extends CustomUIPage {
             return message;
         }
         return MysticText.parse(value == null ? "" : String.valueOf(value), defaultColor);
+    }
+
+    /** The colour {@link #uiText} gives server-written text in the element with {@code id} (no {@code #}). */
+    public static String uiTextColor(String id) {
+        return UI_TEXT_COLORS.getOrDefault(id, DEFAULT_UI_TEXT_COLOR);
     }
 
     private static String defaultUiTextColor(String target) {

@@ -195,6 +195,29 @@ See the [Player Vaults](playervaults-module) page. The module is disabled by def
 | `/pv <number> <player>` | Open another player's vault | `mysticessentials.vaults.admin.open` |
 | `/pv reload` | Reload the vault config | `mysticessentials.vaults.command.reload` |
 
+## LootBox
+
+See the [LootBox](lootbox-module) page for the full command tree. The module is
+disabled by default. Every subcommand also needs `mysticessentials.lootbox.use`.
+
+| Command | Description | Permission |
+| --- | --- | --- |
+| `/lootbox`, `/lb` | Open the loot box catalog | `mysticessentials.lootbox.use` |
+| `/lootbox preview <pool>` | See a pool's exact odds | `mysticessentials.lootbox.use` |
+| `/lootbox pending` | Claim rewards that did not fit | `mysticessentials.lootbox.use` |
+| `/lootbox motion [reduced\|full\|default]` | Show or set reduced motion for reveals | `mysticessentials.lootbox.use` |
+| `/lootbox key deposit` / `key withdraw <keyId> [count]` | Convert between key items and virtual balance | `mysticessentials.lootbox.use` |
+| `/lootbox history [player]` | Opening receipts | `mysticessentials.lootbox.history` (others: `mysticessentials.lootbox.audit`) |
+| `/lootbox key give\|revoke\|info\|list\|grants\|publish …` | Manage keys | `mysticessentials.lootbox.keys.give`, `.keys.revoke`, `.keys`, `.publish` |
+| `/lootbox publish\|rollback …` | Publish pool revisions | `mysticessentials.lootbox.publish` |
+| `/lootbox simulate <pool> [draws]` | Test the odds without awarding | `mysticessentials.lootbox.simulate` |
+| `/lootbox crate select\|convert\|rebind …` | Turn a block into a crate, or bind one to another pool | `mysticessentials.lootbox.crates.place` |
+| `/lootbox crate info\|list\|verify\|remove\|enable\|edit …` | Manage crates | `mysticessentials.lootbox.crates.manage` |
+| `/lootbox crate effects [on\|off]` | Crate particles and sounds for yourself | `mysticessentials.lootbox.use` |
+| `/lootbox audit` | Audit History | `mysticessentials.lootbox.audit` |
+| `/lootbox reconcile <openingId> <regrant\|dismiss>` | Resolve a delivery held for review | `mysticessentials.lootbox.restore` |
+| `/lootbox admin\|reload\|disable\|enable …` | Manager screen, reload, close or reopen a pool | `mysticessentials.lootbox.admin` |
+
 ## Patch Notes
 
 See the [Patch Notes](patchnotes-module) page.

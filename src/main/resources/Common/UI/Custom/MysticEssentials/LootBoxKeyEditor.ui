@@ -1,0 +1,291 @@
+// LootBox key editor (P2-F1): the key's base item, name (colour, bold, italic),
+// lore, uses and expiry on the left; a live preview, the pools it opens, and
+// its problems and changes on the right. Lines in #PreviewLore and #ProblemList
+// are LootBoxConfirmActionLine.ui.
+$C = "../Common.ui";
+$M = "MysticTheme.ui";
+
+$C.@PageOverlay {}
+
+$C.@Container {
+  Anchor: (Width: 960, Height: 700);
+
+  #Title {
+    Group {
+      $C.@Title #HeaderTitle {
+        @Text = "Edit Key";
+      }
+
+      $M.@HeaderMeta #HeaderInfo {
+        @Width = 360;
+      }
+    }
+  }
+
+  #Content {
+    LayoutMode: Top;
+
+    Label #Notice {
+      Anchor: (Bottom: 6);
+      Style: $M.@BodyStyle;
+      Visible: false;
+    }
+
+    Group {
+      LayoutMode: Left;
+      FlexWeight: 1;
+
+      // ----- Fields -----------------------------------------------------------
+      $M.@Panel {
+        @Padding = 14;
+
+        Anchor: (Width: 480, Right: 14);
+
+        $M.@FieldLabel { @Text = "Base item"; }
+        Group {
+          LayoutMode: Left;
+          Anchor: (Height: 44, Bottom: 10);
+
+          $M.@IconWell {
+            @Size = 44;
+            @Anchor = (Right: 12);
+
+            ItemSlot #BaseItemSlot {
+              Anchor: (Width: 36, Height: 36);
+              ShowQualityBackground: true;
+              ShowQuantity: false;
+            }
+          }
+
+          Label #BaseItemName {
+            FlexWeight: 1;
+            Style: $M.@ValueFitStyle;
+          }
+
+          $C.@SecondaryTextButton #BaseItemButton {
+            @Text = "Choose Item";
+            @Anchor = (Width: 150, Left: 8);
+          }
+        }
+
+        $M.@FieldLabel { @Text = "Name"; }
+        Group {
+          LayoutMode: Left;
+          Anchor: (Height: 32, Bottom: 6);
+
+          $C.@TextField #KeyNameInput {
+            FlexWeight: 1;
+            PlaceholderText: "What the key item is called";
+          }
+
+          ColorPickerDropdownBox #NameColor {
+            Anchor: (Width: 50, Height: 32, Left: 8);
+            Format: Rgb;
+            Style: $C.@DefaultColorPickerDropdownBoxStyle;
+            Color: #ffffff;
+            DisplayTextField: true;
+          }
+        }
+
+        Group {
+          LayoutMode: Left;
+          Anchor: (Height: 32, Bottom: 10);
+
+          $C.@SecondaryTextButton #BoldOnButton {
+            @Text = "Bold: Off";
+            @Anchor = (Width: 120);
+          }
+
+          $C.@SecondaryTextButton #BoldOffButton {
+            @Text = "Bold: On";
+            @Anchor = (Width: 120);
+          }
+
+          $C.@SecondaryTextButton #ItalicOnButton {
+            @Text = "Italic: Off";
+            @Anchor = (Width: 120, Left: 6);
+          }
+
+          $C.@SecondaryTextButton #ItalicOffButton {
+            @Text = "Italic: On";
+            @Anchor = (Width: 120, Left: 6);
+          }
+
+          $C.@TertiaryTextButton #ColorClearButton {
+            @Text = "No Colour";
+            @Anchor = (Width: 130, Left: 6);
+          }
+        }
+
+        $M.@FieldLabel { @Text = "Lore (one line each; colour codes allowed)"; }
+        $C.@TextField #Lore1Input { @Anchor = (Bottom: 4); }
+        $C.@TextField #Lore2Input { @Anchor = (Bottom: 4); }
+        $C.@TextField #Lore3Input { @Anchor = (Bottom: 4); }
+        $C.@TextField #Lore4Input { @Anchor = (Bottom: 4); }
+        $C.@TextField #Lore5Input { @Anchor = (Bottom: 8); }
+
+        Group {
+          LayoutMode: Left;
+          Anchor: (Height: 58);
+
+          Group {
+            LayoutMode: Top;
+            Anchor: (Width: 150, Right: 12);
+
+            $M.@FieldLabel { @Text = "Uses"; }
+            $C.@TextField #UsesInput {
+              PlaceholderText: "1-1000";
+            }
+          }
+
+          Group {
+            LayoutMode: Top;
+            Anchor: (Width: 220);
+
+            $M.@FieldLabel { @Text = "Expires after (days)"; }
+            $C.@TextField #ExpiryInput {
+              PlaceholderText: "0 = never";
+            }
+          }
+        }
+
+        // Stackable keys (P2-K): paired static buttons, one shown at a time.
+        Group {
+          LayoutMode: Left;
+          Anchor: (Height: 32, Top: 8);
+
+          $C.@SecondaryTextButton #StackableOnButton {
+            @Text = "Stacking: Off";
+            @Anchor = (Width: 160);
+          }
+
+          $C.@SecondaryTextButton #StackableOffButton {
+            @Text = "Stacking: On";
+            @Anchor = (Width: 160);
+          }
+
+          Label #StackHint {
+            FlexWeight: 1;
+            Anchor: (Left: 10);
+            Style: $M.@HintStyle;
+          }
+        }
+      }
+
+      // ----- Preview, pools, problems -----------------------------------------
+      Group {
+        LayoutMode: Top;
+        FlexWeight: 1;
+
+        $M.@Section {
+          @Text = "Preview";
+          @Anchor = (Bottom: 6);
+        }
+
+        $M.@Panel {
+          @Padding = 12;
+
+          Anchor: (Bottom: 12);
+
+          Group {
+            LayoutMode: Left;
+            Anchor: (Height: 44, Bottom: 6);
+
+            $M.@IconWell {
+              @Size = 44;
+              @Anchor = (Right: 12);
+
+              ItemSlot #PreviewSlot {
+                Anchor: (Width: 36, Height: 36);
+                ShowQualityBackground: true;
+                ShowQuantity: false;
+              }
+            }
+
+            Group {
+              LayoutMode: Top;
+              FlexWeight: 1;
+
+              Label #PreviewName {
+                Anchor: (Height: 22);
+                Style: $M.@SubheadingFitStyle;
+              }
+
+              Label #PreviewMeta {
+                Anchor: (Height: 16);
+                Style: $M.@MetaFitStyle;
+              }
+            }
+          }
+
+          Group #PreviewLore {
+            LayoutMode: Top;
+          }
+        }
+
+        $M.@Section {
+          @Text = "Opens";
+          @Anchor = (Bottom: 6);
+        }
+
+        Label #OpensLine {
+          Anchor: (Bottom: 10);
+          Style: $M.@BodyMutedStyle;
+        }
+
+        $M.@Section {
+          @Text = "Problems and changes";
+          @Anchor = (Bottom: 6);
+        }
+
+        $M.@Well {
+          FlexWeight: 1;
+
+          Group #ProblemList {
+            FlexWeight: 1;
+            LayoutMode: TopScrolling;
+            Padding: (Right: 6);
+            ScrollbarStyle: $C.@DefaultScrollbarStyle;
+          }
+        }
+      }
+    }
+
+    // ----- Footer -------------------------------------------------------------
+    $M.@ActionBar {
+      @Anchor = (Height: 44, Top: 10);
+
+      $C.@TextButton #SaveButton {
+        @Text = "Save Draft";
+        @Anchor = (Width: 160);
+      }
+
+      $C.@SecondaryTextButton #RevertButton {
+        @Text = "Revert";
+        @Anchor = (Width: 120, Left: 6);
+      }
+
+      $C.@SecondaryTextButton #ReloadDiskButton {
+        @Text = "Load From Disk";
+        @Anchor = (Width: 170, Left: 6);
+      }
+
+      $C.@CancelTextButton #OverwriteButton {
+        @Text = "Overwrite";
+        @Anchor = (Width: 140, Left: 6);
+      }
+
+      $M.@Spacer {}
+
+      $C.@SecondaryTextButton #PublishButton {
+        @Text = "Publish";
+        @Anchor = (Width: 140, Right: 6);
+      }
+
+      $C.@TertiaryTextButton #CloseButton {
+        @Text = "Close";
+        @Anchor = (Width: 130);
+      }
+    }
+  }
+}

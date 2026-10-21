@@ -5,6 +5,7 @@ import java.util.logging.Level;
 import javax.annotation.Nonnull;
 
 import org.hyzionstudios.mysticessentials.core.MysticCore;
+import org.hyzionstudios.mysticessentials.modules.lootbox.hytale.CrateInteraction;
 import org.hyzionstudios.mysticessentials.modules.portals.PortalInteraction;
 
 import com.hypixel.hytale.server.core.modules.interaction.interaction.config.Interaction;
@@ -40,6 +41,10 @@ public class MysticessentialsPlugin extends JavaPlugin {
                 .register(PortalInteraction.TYPE_ID,
                         PortalInteraction.class,
                         PortalInteraction.CODEC);
+        getCodecRegistry(Interaction.CODEC)
+                .register(CrateInteraction.TYPE_ID,
+                        CrateInteraction.class,
+                        CrateInteraction.CODEC);
     }
 
     @Override

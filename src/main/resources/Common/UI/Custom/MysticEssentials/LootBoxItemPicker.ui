@@ -1,0 +1,127 @@
+// LootBox item picker: search the item registry, narrow it by category, or take
+// the item in hand. Result rows come from LootBoxItemPickerRow.ui (appended into
+// #ResultList) and category tabs from LootBoxEditorTab.ui (appended into
+// #CategoryTabs). Choosing or cancelling returns to the editor that opened it.
+$C = "../Common.ui";
+$M = "MysticTheme.ui";
+
+$C.@PageOverlay {}
+
+$C.@Container {
+  Anchor: (Width: 940, Height: 660);
+
+  #Title {
+    Group {
+      $C.@Title #HeaderTitle {
+        @Text = "Choose an Item";
+      }
+
+      $M.@HeaderMeta #HeaderInfo {
+        @Width = 240;
+      }
+    }
+  }
+
+  #Content {
+    LayoutMode: Top;
+
+    // ----- What is being chosen, and the current choice ---------------------
+    $M.@Panel {
+      @Padding = 12;
+      Anchor: (Bottom: 12);
+
+      Group {
+        LayoutMode: Left;
+        Anchor: (Height: 52);
+
+        $M.@IconWell {
+          @Size = 52;
+          @Anchor = (Right: 12);
+
+          // ItemSlotButton parent gives the native item tooltip on hover.
+          ItemSlotButton #CurrentButton {
+            Anchor: (Width: 48, Height: 48);
+
+            ItemSlot #CurrentIcon {
+              Anchor: (Full: 0);
+              ShowQualityBackground: true;
+              ShowQuantity: false;
+            }
+          }
+        }
+
+        Group {
+          LayoutMode: Top;
+          FlexWeight: 1;
+
+          $M.@Spacer {}
+
+          Label #PickerTarget {
+            Anchor: (Height: 18, Bottom: 4);
+            Style: $M.@EyebrowGoldStyle;
+          }
+
+          Label #CurrentItem {
+            Anchor: (Height: 18);
+            Style: $M.@MetaStyle;
+          }
+
+          $M.@Spacer {}
+        }
+      }
+    }
+
+    // ----- Filter -------------------------------------------------------------
+    Group #CategoryTabs {
+      LayoutMode: Left;
+      Anchor: (Height: 34, Bottom: 8);
+    }
+
+    // Focused on open, like the game's plugin list: the picker exists to search.
+    $C.@TextField #SearchInput {
+      @Anchor = (Bottom: 8);
+      AutoFocus: true;
+      PlaceholderText: "Search item ids...";
+    }
+
+    // ----- Results ------------------------------------------------------------
+    $M.@Well {
+      FlexWeight: 1;
+
+      Label #ListEmpty {
+        Anchor: (Height: 56);
+        Style: $M.@EmptyStyle;
+        Text: "No matching items. Try another category or a shorter search.";
+        Visible: false;
+      }
+
+      Group #ResultList {
+        FlexWeight: 1;
+        LayoutMode: TopScrolling;
+        Padding: (Right: 6);
+        ScrollbarStyle: $C.@DefaultScrollbarStyle;
+      }
+    }
+
+    $M.@ActionBar {
+      @Anchor = (Height: 44, Top: 12);
+
+      $C.@SecondaryTextButton #HeldButton {
+        @Text = "Use Held Item";
+        @Anchor = (Width: 200);
+      }
+
+      Label {
+        FlexWeight: 1;
+        Anchor: (Left: 14, Right: 14);
+        Style: $M.@HintStyle;
+        Text: "Click an item to choose it. Hover one to see its tooltip.";
+      }
+
+      $C.@TertiaryTextButton #CancelButton {
+        @Text = "Cancel";
+        @Anchor = (Width: 140);
+      }
+    }
+  }
+}
