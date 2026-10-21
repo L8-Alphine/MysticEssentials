@@ -44,7 +44,7 @@ $C.@Container {
     }
 
     Label #Notice {
-      Anchor: (Height: 20, Bottom: 6);
+      Anchor: (Bottom: 6);
       Style: $M.@BodyStyle;
       Visible: false;
     }
@@ -81,12 +81,12 @@ $C.@Container {
 
         Label #SelectedName {
           Anchor: (Height: 22);
-          Style: $M.@SubheadingStyle;
+          Style: $M.@SubheadingFitStyle;
         }
 
         Label #SelectedMeta {
           Anchor: (Height: 16);
-          Style: $M.@MetaStyle;
+          Style: $M.@MetaFitStyle;
         }
       }
 

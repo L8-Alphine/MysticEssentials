@@ -10,7 +10,7 @@ Group #Row {
 
   Label #SimName {
     FlexWeight: 1;
-    Style: $M.@RowNameStyle;
+    Style: $M.@RowNameFitStyle;
   }
 
   Group {

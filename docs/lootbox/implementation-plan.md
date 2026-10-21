@@ -535,6 +535,13 @@ The breakdown into buildable packages, with the first batch in detail, is in [ph
 
 **Exit criteria:** LB-001 entirely in-game, LB-005, LB-006 (the "reports no native id" path), and LB-007/LB-008 for generated variants if S2 passed. Builders run the bible's §09 seven-step placement workflow without typing a command.
 
+**Phase 2 status (21 Oct 2026):** P2-WP1 to P2-WP9 are built (packages and commits in
+[phase2-work-packages.md](phase2-work-packages.md)) and pass every server-side check.
+The exit criteria are in-game tests, so none is passed yet: they wait on the client
+pass. Floating names and generated variants ship switched off until S4 and S2's
+client half run. The reduced-motion setting left open in Phase 1 is now
+`opening.reducedMotionDefault` plus a per-player choice.
+
 ---
 
 ## 8. Phase 3 — Advanced Behaviour

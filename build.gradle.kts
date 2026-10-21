@@ -575,6 +575,15 @@ tasks.register<JavaExec>("verifyLootBoxScreens") {
     mainClass.set("org.hyzionstudios.mysticessentials.modules.lootbox.LootBoxScreensTest")
 }
 
+tasks.register<JavaExec>("verifyLootBoxAccessibility") {
+    group = "verification"
+    description = "Checks the LootBox accessibility pass: reduced motion, readable contrast, wrapping text, window sizes and focus."
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets.test.get().runtimeClasspath + configurations.compileClasspath.get()
+    workingDir = projectDir
+    mainClass.set("org.hyzionstudios.mysticessentials.modules.lootbox.LootBoxAccessibilityTest")
+}
+
 tasks.register<JavaExec>("verifyMessageParamOrder") {
     group = "verification"
     description = "Checks message params are filled after placeholders, so they never expand one."
@@ -615,6 +624,7 @@ tasks.named("check") {
         "verifyLootBoxKeys",
         "verifyLootBoxDrafts",
         "verifyLootBoxCrates",
-        "verifyLootBoxScreens"
+        "verifyLootBoxScreens",
+        "verifyLootBoxAccessibility"
     )
 }

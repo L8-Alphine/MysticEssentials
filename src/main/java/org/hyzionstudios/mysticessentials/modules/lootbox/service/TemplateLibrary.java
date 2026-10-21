@@ -7,6 +7,7 @@ import java.util.Locale;
 import java.util.concurrent.Executor;
 
 import org.hyzionstudios.mysticessentials.core.util.Json;
+import org.hyzionstudios.mysticessentials.modules.lootbox.model.CrateInstance;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.KeyDraft;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.LootBoxDraft;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.LootBoxTemplate;
@@ -97,6 +98,10 @@ public final class TemplateLibrary {
             } else if (template.key.baseItemId == null || template.key.baseItemId.isBlank()) {
                 problems.add("the key look has no base item");
             }
+        } else if (LootBoxTemplate.CRATE_LOOK.equals(template.kind)) {
+            if (template.crate == null) {
+                problems.add("the crate look is missing");
+            }
         } else if (LootBoxTemplate.REWARD_SET.equals(template.kind)) {
             if (template.rewards == null || template.rewards.isEmpty()) {
                 problems.add("the reward set has no rewards");
@@ -123,6 +128,19 @@ public final class TemplateLibrary {
         return template;
     }
 
+    /** A crate look copied from {@code crate}'s visuals. Its pool, place and protection are not kept. */
+    public static LootBoxTemplate crateLook(String id, String name, CrateInstance crate, String actor, long now) {
+        LootBoxTemplate template = base(id, name, LootBoxTemplate.CRATE_LOOK, "crate " + crate.crateId, actor, now);
+        CrateInstance.Visuals visuals = crate.visuals == null ? new CrateInstance.Visuals() : crate.visuals;
+        LootBoxTemplate.CrateLook look = new LootBoxTemplate.CrateLook();
+        look.idleParticle = blank(visuals.idleParticle, "");
+        look.openParticle = blank(visuals.openParticle, "");
+        look.openSound = blank(visuals.openSound, "");
+        look.nameplate = visuals.nameplate;
+        template.crate = look;
+        return template;
+    }
+
     /** A reward set holding a deep copy of every reward of pool draft {@code pool}, in order. */
     public static LootBoxTemplate rewardSet(String id, String name, LootBoxDraft pool, String actor, long now) {
         LootBoxTemplate template = base(id, name, LootBoxTemplate.REWARD_SET, "pool " + pool.id, actor, now);
@@ -132,10 +150,10 @@ public final class TemplateLibrary {
         return template;
     }
 
-    /** {@code <source>_look} for a key look, {@code <source>_rewards} for a set, cut to fit the id pattern. */
+    /** {@code <source>_look} for a key or crate look, {@code <source>_rewards} for a set, cut to fit the id pattern. */
     public static String suggestId(String sourceId, String kind) {
         String base = (sourceId == null ? "" : sourceId).toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9_]", "_");
-        String suffix = LootBoxTemplate.KEY_LOOK.equals(kind) ? "_look" : "_rewards";
+        String suffix = LootBoxTemplate.REWARD_SET.equals(kind) ? "_rewards" : "_look";
         if (base.length() + suffix.length() > 48) {
             base = base.substring(0, 48 - suffix.length());
         }
@@ -152,6 +170,10 @@ public final class TemplateLibrary {
                             + (look.uses == 1 ? " use" : " uses")
                             + (look.expiresAfterDays > 0 ? " · expires after " + look.expiresAfterDays + "d" : "");
         }
+        if (LootBoxTemplate.CRATE_LOOK.equals(template.kind)) {
+            LootBoxTemplate.CrateLook look = template.crate;
+            return look == null ? "Crate look · empty" : "Crate look · " + effects(look);
+        }
         int count = template.rewards == null ? 0 : template.rewards.size();
         return "Reward set · " + count + (count == 1 ? " reward" : " rewards") + " · "
                 + blank(template.rewardMode, "WEIGHTED");
@@ -166,6 +188,24 @@ public final class TemplateLibrary {
         template.createdBy = actor == null ? "" : actor;
         template.createdAt = now;
         return template;
+    }
+
+    /** e.g. {@code idle Block_Treasure_Sparks · open sound SFX_Chest_Legendary_Open · floating name}. */
+    public static String effects(LootBoxTemplate.CrateLook look) {
+        List<String> parts = new ArrayList<>();
+        if (!blank(look.idleParticle, "").isEmpty()) {
+            parts.add("idle " + look.idleParticle);
+        }
+        if (!blank(look.openParticle, "").isEmpty()) {
+            parts.add("open " + look.openParticle);
+        }
+        if (!blank(look.openSound, "").isEmpty()) {
+            parts.add("sound " + look.openSound);
+        }
+        if (look.nameplate) {
+            parts.add("floating name");
+        }
+        return parts.isEmpty() ? "no effects" : String.join(" · ", parts);
     }
 
     private static String blank(String value, String fallback) {

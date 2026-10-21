@@ -48,19 +48,31 @@ P2-B Editor kit ──┘
 
 P2-A and P2-B don't share files and can run at the same time. P2-C needs both. P2-E needs P2-D's tab shell.
 
-**Status (19 Oct 2026):**
+**Status (21 Oct 2026): every package is built.** Each one passes the build with
+every `verify*` task, `validateUiDocuments`, the UI id audit and the 0.7.2 code-ref
+sweep, and the dev server boots with LootBox enabled. **None of the screens has
+been tried in a game client yet**; that is the next gate (§1, G1 to G4).
 
 | Package | State | Where |
 |---|---|---|
-| P2-A | Done; build and code-ref sweep clean | `4462154`, merged in `533e691` |
-| P2-B | Done; build, UI and code-ref sweeps clean | `b39b3d6`, merged in `6cac06f` |
-| P2-C | Done; build, UI and code-ref sweeps clean, dev server boots. **Not yet tried in game** | `ef84a15` |
-| P2-D | Done; build, UI and code-ref sweeps clean, dev server boots. **Not yet tried in game** | `b01048d` |
-| P2-E | Done; build, UI and code-ref sweeps clean, dev server boots. **Not yet tried in game** | `6f7aa72` |
-| P2-F1 | Built (not committed yet): Key Manager and key editor. Build, UI and code-ref sweeps clean, dev server boots. **Not yet tried in game** | `ui/KeyManagerPage.java`, `ui/editor/KeyEditorPage.java`, `KeyText.java`, `KeyDiff.java`, `LootBoxKeyManager.ui`, `LootBoxKeyEditor.ui` |
-| P2-F2 | Not started: grant, revoke and bulk grant screens with history | |
-| P2-F3 | Not started: physical ↔ virtual conversion (`/lootbox key deposit` / `withdraw`) and its saga check | |
-| P2-G … P2-L | Not started | |
+| P2-A | Done | `4462154`, merged in `533e691` |
+| P2-B | Done | `b39b3d6`, merged in `6cac06f` |
+| P2-C | Done | `ef84a15` |
+| P2-D | Done | `b01048d` |
+| P2-E | Done | `6f7aa72` |
+| P2-F1 | Done: Key Manager and key editor | `1f28479` |
+| P2-F2 | Done: key grants page with per-key history | `67f6026`, merged in `abccf3f` |
+| P2-F3 | Done: physical ↔ virtual conversion saga | `9d0c178`, merged in `abccf3f` |
+| P2-K | Done: opt-in stackable keys | `234e417`, merged in `abccf3f` |
+| P2-G | Done: Crate Manager, crate editor and placement | `90fabb8`, merged in `15e5730` |
+| P2-I | Done: crate particles, sounds, floating names. Floating names sit behind `crates.nameplates` (off) until S4 runs | `128fd37`, merged in `15e5730` |
+| P2-J | Done: generated block variants, behind `crates.generatedVariants` (off) until S2's client half runs | `0b17226`, merged in `15e5730` |
+| P2-H | Done: Simulation, Audit History, Template Library | `01e2523`, merged in `64c5b2b` |
+| P2-L | Done: accessibility pass, plus the tracks' leftovers (crate-look templates, Catalog deposit, the stackable-uses check) | after `64c5b2b` |
+
+A fix that every creator screen depended on landed with the merge: `FormFields`
+built `##Id.Value` selectors from ids given with their `#`, so no text field would
+have filled or sent its value (`74d41f9`).
 
 ### P2-A — Draft store and lifecycle (engine-free) · M · part of P2-WP1
 
@@ -125,6 +137,27 @@ P2-A and P2-B don't share files and can run at the same time. P2-C needs both. P
 | **3: Polish and engine features** | **P2-H** Simulation, AuditHistory and TemplateLibrary screens (P2-WP7; `ProgressBar` after G2, text bars before) · **P2-I** crate visuals (P2-WP5) · **P2-J** generated block variants (P2-WP6, using the RAW design in spike results §3) · **P2-K** stackable keys (P2-WP8) · **P2-L** accessibility pass (P2-WP9: reduced motion per player, focus order, contrast, wrapping, narrow screens) | P2-I needs G3; P2-J needs G4; the rest need batch 1 |
 
 Phase 2 exit criteria (implementation plan §7) are met at the end of batch 3. Batch 1 alone meets LB-001 for pools.
+
+### As built, batches 2 and 3
+
+Batches 2 and 3 ran as three parallel tracks (keys, crates, screens) on their own
+branches, then P2-L ran on the merge.
+
+| Package | As built |
+|---|---|
+| **P2-F2** grants | `ui/KeyGrantsPage` from the Key Manager or `/lootbox key grants <keyId>`. Gives through the unchanged `KeyService.grant`, so a PAID source is still refused and audited; more than one key or player confirms first. History is a bounded per-key log (`lootbox_keylog`, `keys.grantLogSize`), because finding one key in the hourly audit buckets would mean scanning all of them |
+| **P2-F3** conversion | Deposit and withdraw run as a small saga like the opening saga, with the decisions in engine-free `service/ConversionRules`. Recovery runs on join and in the 5-minute sweep; serials gain `CONVERTED`, and revoke refuses them. `keys.allowConversion` switches it off. The Catalog's Deposit Held Key button (P2-L) sends a per-page request id, so a double press deposits once |
+| **P2-K** stackable keys | `stackable` per key, default off. One batch per grant; the batch id sits inside the signed serial field, so serialized keys keep exactly their old marker and signature. Recovery of a stack opening always aborts and gives the item back if the player's count dropped. `DraftValidator` refuses a stackable key with more than one use (P2-L) |
+| **P2-G** crates | `ui/CrateManagerPage` and `ui/editor/CrateEditorPage` (steps Block, Check, Pool, Use, Protect, Visuals, Finish, and Repair for disabled crates). Saves are optimistic on `CrateRules.settingsHash`. Convert raycasts on the world thread. The crate document is schema 4; older ones load with defaults |
+| **P2-I** visuals | Particle systems and sounds checked against the 0.7.2 registries, sent only to nearby players with effects on (`lootbox_crate_prefs`). The opening effect is matched from the crate's open request to the player's next committed opening, so `OpeningService` is untouched. Floating names use a holder entity modelled on the warp marker. Glow is dropped |
+| **P2-J** variants | Look-alikes are minimal RAW documents in `mods/MysticEssentialsGenerated/`, loaded the way boot loads them. The swap keeps rotation and filler; removing restores the original; startup checks every recorded look-alike and deletes unused ones. Only single blocks without block data, states or connections qualify |
+| **P2-H** screens | Simulation runs on a worker, one per player; bars are server-sized Groups (`setObject(".Anchor")`), not `ProgressBar`, until G2. Audit History reads hour buckets in bounded windows and exports JSON or CSV (formula-safe) to `exports/`. Templates are their own `DraftStore`. Crate looks (P2-L) apply through `CrateService.update` with the settings hash, and need `crates.manage`. `/lootbox audit` was added so auditors without `admin` can reach the screen |
+| **P2-L** accessibility | **Reduced motion:** `PlayerLootState.reducedMotion` (null follows `opening.reducedMotionDefault`), `/lootbox motion`, and the Catalog's Motion button; the reveal lands at once (`service/MotionRules`). **Contrast:** measured against the real window fill (`#16212f`, from `ContainerFullPatch.png`; a Panel's centre is transparent). `@TextDim` moved `#778292` → `#858e9d` theme-wide to pass 4.5:1; LootBox hints and notes moved off the faint caption colour to `@HintStyle` and `TEXT_MUTED`. **Wrapping:** single-line names use `*FitStyle` (`ShrinkTextToFit`); the shared detail line (problems, diffs, confirmations, lore preview) and long hints wrap with no fixed height, as vanilla description labels do. **Focus:** `AutoFocus` on the item picker's search (vanilla's PluginListPage pattern); nowhere else, because pages rebuild on every press. Element order already matches reading order. **Narrow screens:** no window is larger than the game's own pages (1050 × 700); the Audit window went from 720 to 700. All of it is checked by `verifyLootBoxAccessibility`. Controller navigation could not be verified: the engine index has no client focus API |
+
+**What the client still has to confirm:** every creator screen (watch the client
+log for "Markup Error"); that wrapping labels without a height grow as vanilla's
+do; the Simulation bars' runtime widths; floating names (S4) and generated
+variants (S2 steps 7–11), both off by default; and the reveal in reduced motion.
 
 ## 5. Suggested order of work
 

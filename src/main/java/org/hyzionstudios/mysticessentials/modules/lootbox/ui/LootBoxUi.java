@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.logging.Level;
 
+import org.hyzionstudios.mysticessentials.api.Permissions;
 import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.core.message.MysticText;
 import org.hyzionstudios.mysticessentials.modules.lootbox.LootBoxModule;
@@ -12,6 +13,7 @@ import org.hyzionstudios.mysticessentials.modules.lootbox.model.KeyDraft;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.LootBoxDraft;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.LootBoxRevision;
 import org.hyzionstudios.mysticessentials.modules.lootbox.odds.OddsTable;
+import org.hyzionstudios.mysticessentials.modules.lootbox.service.MotionRules;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.OpeningService;
 import org.hyzionstudios.mysticessentials.modules.lootbox.ui.editor.EditorSession;
 import org.hyzionstudios.mysticessentials.modules.lootbox.ui.editor.KeyEditorPage;
@@ -35,8 +37,46 @@ public final class LootBoxUi {
     }
 
     public void openCatalog(PlayerRef player) {
-        module.pending().inbox(player.getUuid()).thenAccept(inbox -> core.platform().openPage(player,
-                new LootBoxPages.CatalogPage(core, player, module, inbox.items.size())));
+        module.pending().inbox(player.getUuid()).thenCombine(module.opening().reducedMotion(player.getUuid())
+                .exceptionally(error -> module.config().opening.reducedMotionDefault), (inbox, reduced) -> core.platform().openPage(player,
+                        new LootBoxPages.CatalogPage(core, player, module, inbox.items.size(), reduced)));
+    }
+
+    /** The Catalog's Motion button: stores the choice, says so in chat and shows the Catalog again. */
+    public void setMotion(PlayerRef player, MotionRules.Choice choice) {
+        if (!player.hasPermission(Permissions.LOOTBOX_USE)) {
+            return;
+        }
+        module.opening().setMotion(player.getUuid(), choice).whenComplete((setting, error) -> {
+            if (error != null) {
+                core.log(Level.WARNING, "[lootbox] could not store the motion setting of " + player.getUsername()
+                        + ": " + error);
+                core.getMessageService().send(player, "&cYour motion setting could not be saved. Try again.");
+            } else {
+                core.getMessageService().sendKey(player, "lootbox-motion-set", Map.of("motion", setting));
+            }
+            openCatalog(player);
+        });
+    }
+
+    /**
+     * The Catalog's Deposit Held Key button: the same conversion as
+     * {@code /lootbox key deposit}, with the page's request id so a double press
+     * deposits once.
+     */
+    public void depositHeld(PlayerRef player, String requestId) {
+        if (!player.hasPermission(Permissions.LOOTBOX_USE) || !module.config().keys.allowConversion) {
+            return;
+        }
+        module.keys().conversions().deposit(player, requestId).thenAccept(result -> {
+            switch (result.status()) {
+                case DEPOSITED -> core.getMessageService().sendKey(player, "lootbox-key-deposited", Map.of(
+                        "count", Integer.toString(result.count()), "key", result.keyId(),
+                        "balance", Integer.toString(result.balance())));
+                case PENDING, BUSY, DUPLICATE -> core.getMessageService().send(player, "&e" + result.message());
+                default -> core.getMessageService().send(player, "&c" + result.message());
+            }
+        });
     }
 
     public void openPreview(PlayerRef player, String lootboxId, String crateId) {
@@ -150,7 +190,11 @@ public final class LootBoxUi {
                         "reward", MysticText.stripMarkup(reward.name),
                         "chance", result.opening().probability,
                         "receipt", result.opening().openingId));
-                core.platform().openPage(player, new LootBoxPages.RevealPage(core, player, module, result));
+                // A motion setting that can't be read falls back to the server default: the reveal still opens.
+                module.opening().reducedMotion(player.getUuid())
+                        .exceptionally(error -> module.config().opening.reducedMotionDefault)
+                        .thenAccept(reduced -> core.platform().openPage(player,
+                                new LootBoxPages.RevealPage(core, player, module, result, reduced)));
             }
             default -> {
                 core.getMessageService().send(player, "&c" + (result.message() == null ? "Nothing was spent."

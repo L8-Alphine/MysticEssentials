@@ -201,9 +201,6 @@ public final class KeyEditorPage extends MysticPage {
         List<String> problems = new ArrayList<>();
         unparsed().forEach(problem -> problems.add(problem.message()));
         problems.addAll(module.registry().keyStore().status(key).problems());
-        if (key.stackable && key.uses != 1) {
-            problems.add("A stackable key opens once per item: set Uses to 1.");
-        }
         return problems;
     }
 

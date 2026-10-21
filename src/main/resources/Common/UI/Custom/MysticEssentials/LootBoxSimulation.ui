@@ -69,8 +69,7 @@ $C.@Container {
           }
 
           Label #SimHint {
-            Anchor: (Height: 36);
-            Style: $M.@CaptionStyle;
+            Style: $M.@HintStyle;
           }
         }
 
@@ -82,13 +81,13 @@ $C.@Container {
     }
 
     Label #Notice {
-      Anchor: (Height: 20, Bottom: 6);
+      Anchor: (Bottom: 6);
       Style: $M.@BodyStyle;
       Visible: false;
     }
 
     Label #SimWarning {
-      Anchor: (Height: 38, Bottom: 6);
+      Anchor: (Bottom: 6);
       Style: $M.@BodyStyle;
       Visible: false;
     }
@@ -159,13 +158,13 @@ $C.@Container {
     }
 
     Label #SimSummary {
-      Anchor: (Height: 18, Top: 6);
-      Style: $M.@CaptionStyle;
+      Anchor: (Top: 6);
+      Style: $M.@HintStyle;
     }
 
     Label {
       Anchor: (Height: 16);
-      Style: $M.@CaptionStyle;
+      Style: $M.@HintStyle;
       Text: "Gold bar: the exact chance. Blue bar: what the draws gave. Gap is observed minus chance in percentage points: green is within 2 standard errors, yellow within 3, red beyond.";
     }
 

@@ -10,17 +10,20 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.modules.lootbox.LootBoxModule;
+import org.hyzionstudios.mysticessentials.modules.lootbox.config.LootBoxConfig;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.LootBoxDraft;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.LootBoxRevision;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.PendingInbox;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.PlayerLootState;
 import org.hyzionstudios.mysticessentials.modules.lootbox.odds.OddsFormatter;
 import org.hyzionstudios.mysticessentials.modules.lootbox.odds.OddsTable;
+import org.hyzionstudios.mysticessentials.modules.lootbox.service.MotionRules;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.OpeningService;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.RewardService;
 import org.hyzionstudios.mysticessentials.platform.ui.MysticPage;
@@ -149,11 +152,15 @@ public final class LootBoxPages {
 
         private final LootBoxModule module;
         private final int pending;
+        private final boolean reducedMotion;
+        /** Sent with Deposit Held Key, so a double press deposits once. */
+        private final String depositRequest = UUID.randomUUID().toString();
 
-        CatalogPage(MysticCore core, PlayerRef player, LootBoxModule module, int pending) {
+        CatalogPage(MysticCore core, PlayerRef player, LootBoxModule module, int pending, boolean reducedMotion) {
             super(core, player, CustomPageLifetime.CanDismiss);
             this.module = module;
             this.pending = pending;
+            this.reducedMotion = reducedMotion;
         }
 
         @Override
@@ -190,6 +197,18 @@ public final class LootBoxPages {
                     new EventData().put("action", "history"));
             event.addEventBinding(CustomUIEventBindingType.Activating, "#PendingButton",
                     new EventData().put("action", "pending"));
+            cmd.set("#ReduceMotionButton.Visible", !reducedMotion);
+            cmd.set("#FullMotionButton.Visible", reducedMotion);
+            event.addEventBinding(CustomUIEventBindingType.Activating, "#ReduceMotionButton",
+                    new EventData().put("action", "motion").put("to", MotionRules.Choice.REDUCED.name()));
+            event.addEventBinding(CustomUIEventBindingType.Activating, "#FullMotionButton",
+                    new EventData().put("action", "motion").put("to", MotionRules.Choice.FULL.name()));
+            boolean conversion = module.config().keys.allowConversion;
+            cmd.set("#DepositButton.Visible", conversion);
+            if (conversion) {
+                event.addEventBinding(CustomUIEventBindingType.Activating, "#DepositButton",
+                        new EventData().put("action", "deposit").put("request", depositRequest));
+            }
             event.addEventBinding(CustomUIEventBindingType.Activating, "#CloseButton",
                     new EventData().put("action", "close"));
         }
@@ -201,6 +220,9 @@ public final class LootBoxPages {
                 case "preview" -> module.ui().openPreview(player, field(payload, "id"), null);
                 case "history" -> module.ui().openHistory(player, player.getUuid(), player.getUsername());
                 case "pending" -> module.ui().openPending(player);
+                case "motion" -> module.ui().setMotion(player,
+                        "FULL".equals(field(payload, "to")) ? MotionRules.Choice.FULL : MotionRules.Choice.REDUCED);
+                case "deposit" -> module.ui().depositHeld(player, field(payload, "request"));
                 default -> close(ref, store);
             }
         }
@@ -320,6 +342,8 @@ public final class LootBoxPages {
 
         private final LootBoxModule module;
         private final OpeningService.OpenResult result;
+        /** Reduced motion (P2-L): land on the result without animating. */
+        private final boolean reducedMotion;
         private volatile boolean landed;
         private volatile boolean dismissed;
         private volatile String status = "Delivering...";
@@ -327,10 +351,12 @@ public final class LootBoxPages {
         private int highlighted = -1;
         private int frames;
 
-        RevealPage(MysticCore core, PlayerRef player, LootBoxModule module, OpeningService.OpenResult result) {
+        RevealPage(MysticCore core, PlayerRef player, LootBoxModule module, OpeningService.OpenResult result,
+                boolean reducedMotion) {
             super(core, player, CustomPageLifetime.CanDismiss);
             this.module = module;
             this.result = result;
+            this.reducedMotion = reducedMotion;
         }
 
         @Override
@@ -367,9 +393,9 @@ public final class LootBoxPages {
         }
 
         private void startAnimation(World world) {
-            long duration = module.config().opening.revealDurationMs;
-            int fps = Math.max(1, Math.min(30, module.config().opening.revealFramesPerSecond));
-            int total = (int) Math.max(0, duration * fps / 1000L);
+            LootBoxConfig.Opening opening = module.config().opening;
+            int fps = MotionRules.framesPerSecond(opening.revealFramesPerSecond);
+            int total = MotionRules.revealFrames(opening.revealDurationMs, fps, reducedMotion);
             if (total == 0 || animation != null) {
                 world.execute(this::land);
                 return;

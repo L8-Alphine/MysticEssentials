@@ -32,12 +32,12 @@ Button #Row {
 
       Label #TplName {
         Anchor: (Height: 20);
-        Style: $M.@RowNameStyle;
+        Style: $M.@RowNameFitStyle;
       }
 
       Label #TplMeta {
         Anchor: (Height: 14);
-        Style: $M.@RowMetaStyle;
+        Style: $M.@RowMetaFitStyle;
       }
     }
 

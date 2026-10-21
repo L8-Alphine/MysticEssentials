@@ -1,14 +1,14 @@
-// LootBox Template Library (P2-H): saved key looks and reward sets. Rows are
+// LootBox Template Library (P2-H): saved key looks, reward sets and crate looks. Rows are
 // LootBoxTemplateRow.ui appended into #TemplateList; selecting one shows it in
 // #SelectionPanel with Apply / Insert into a chosen draft, Rename and Delete.
-// #FormPanel saves a new template from a draft, or renames the selected one.
+// #FormPanel saves a new template from a draft or crate, or renames the selected one.
 $C = "../Common.ui";
 $M = "MysticTheme.ui";
 
 $C.@PageOverlay {}
 
 $C.@Container {
-  Anchor: (Width: 900, Height: 680);
+  Anchor: (Width: 900, Height: 700);
 
   #Title {
     Group {
@@ -21,18 +21,20 @@ $C.@Container {
   #Content {
     LayoutMode: Top;
 
+    Label #HeaderInfo {
+      Anchor: (Height: 20, Bottom: 6);
+      Style: $M.@MetaFitStyle;
+    }
+
     Group {
       LayoutMode: Left;
       Anchor: (Height: 32, Bottom: 10);
 
-      Label #HeaderInfo {
-        FlexWeight: 1;
-        Style: $M.@MetaStyle;
+      $C.@DropdownBox #KindFilter {
+        Anchor: (Width: 180, Height: 32);
       }
 
-      $C.@DropdownBox #KindFilter {
-        Anchor: (Width: 180, Height: 32, Left: 8);
-      }
+      $M.@Spacer {}
 
       $C.@SecondaryTextButton #SaveKeyLookButton {
         @Text = "Save Key Look";
@@ -41,6 +43,11 @@ $C.@Container {
 
       $C.@SecondaryTextButton #SaveRewardSetButton {
         @Text = "Save Reward Set";
+        @Anchor = (Width: 180, Left: 6);
+      }
+
+      $C.@SecondaryTextButton #SaveCrateLookButton {
+        @Text = "Save Crate Look";
         @Anchor = (Width: 180, Left: 6);
       }
     }
@@ -97,7 +104,7 @@ $C.@Container {
 
         Label #FormHint {
           FlexWeight: 1;
-          Style: $M.@CaptionStyle;
+          Style: $M.@HintStyle;
         }
 
         $C.@SecondaryTextButton #FormCancelButton {
@@ -113,7 +120,7 @@ $C.@Container {
     }
 
     Label #Notice {
-      Anchor: (Height: 20, Bottom: 6);
+      Anchor: (Bottom: 6);
       Style: $M.@BodyStyle;
       Visible: false;
     }
@@ -149,16 +156,16 @@ $C.@Container {
 
       Label #SelectedName {
         Anchor: (Height: 20);
-        Style: $M.@SubheadingStyle;
+        Style: $M.@SubheadingFitStyle;
       }
 
       Label #SelectedMeta {
         Anchor: (Height: 16, Top: 2);
-        Style: $M.@MetaStyle;
+        Style: $M.@MetaFitStyle;
       }
 
       Label #TplDetail {
-        Anchor: (Height: 34, Top: 4);
+        Anchor: (Top: 4);
         Style: $M.@BodyStyle;
       }
 
@@ -172,7 +179,7 @@ $C.@Container {
 
         Label #TplNoTarget {
           FlexWeight: 1;
-          Style: $M.@CaptionStyle;
+          Style: $M.@HintStyle;
           Visible: false;
         }
 

@@ -8,6 +8,7 @@ import java.util.Locale;
 import java.util.Map;
 
 import org.hyzionstudios.mysticessentials.core.message.MysticText;
+import org.hyzionstudios.mysticessentials.modules.lootbox.model.CrateInstance;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.KeyDraft;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.LootBoxDraft;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.LootBoxTemplate;
@@ -18,7 +19,8 @@ import org.hyzionstudios.mysticessentials.modules.lootbox.service.DraftLifecycle
  * Template Library can show it before anything is written. A key look replaces
  * a key's base item, name, lore, uses and expiry; a reward set appends its
  * rewards to a pool, renaming any id the pool already uses with
- * {@link RewardsTab#nextId}, the rule Add and Duplicate follow. Engine-free;
+ * {@link RewardsTab#nextId}, the rule Add and Duplicate follow; a crate look
+ * replaces a placed crate's particles, sound and floating name. Engine-free;
  * {@code verifyLootBoxScreens} checks it.
  */
 public final class TemplateApply {
@@ -108,6 +110,41 @@ public final class TemplateApply {
         }
         return new Insertion(result, List.copyOf(added), Collections.unmodifiableMap(renamed), List.copyOf(notes),
                 hasCommand);
+    }
+
+    /** A copy of {@code crate} with the template's visuals. Its pool, place, behaviour and protection are kept. */
+    public static CrateInstance crateLook(LootBoxTemplate template, CrateInstance crate) {
+        CrateInstance result = crate.copy();
+        LootBoxTemplate.CrateLook look = template.crate;
+        CrateInstance.Visuals visuals = new CrateInstance.Visuals();
+        visuals.idleParticle = look.idleParticle == null ? "" : look.idleParticle;
+        visuals.openParticle = look.openParticle == null ? "" : look.openParticle;
+        visuals.openSound = look.openSound == null ? "" : look.openSound;
+        visuals.nameplate = look.nameplate;
+        result.visuals = visuals;
+        return result;
+    }
+
+    /** The change a crate look makes, as MysticText lines for the confirmation. */
+    public static List<String> crateLookLines(CrateInstance before, CrateInstance after) {
+        CrateInstance.Visuals was = before.visuals == null ? new CrateInstance.Visuals() : before.visuals;
+        CrateInstance.Visuals now = after.visuals;
+        List<String> lines = new ArrayList<>();
+        change(lines, "Idle particles", was.idleParticle, now.idleParticle);
+        change(lines, "Opening particles", was.openParticle, now.openParticle);
+        change(lines, "Opening sound", was.openSound, now.openSound);
+        if (was.nameplate != now.nameplate) {
+            lines.add("&7Floating name: &f" + (was.nameplate ? "on" : "off") + " &7→ &f" + (now.nameplate ? "on" : "off"));
+        }
+        return lines.isEmpty() ? List.of("&7Nothing changes: the crate already looks like this.") : lines;
+    }
+
+    private static void change(List<String> lines, String what, String was, String now) {
+        String before = was == null || was.isBlank() ? "none" : was;
+        String after = now == null || now.isBlank() ? "none" : now;
+        if (!before.equals(after)) {
+            lines.add("&7" + what + ": &f" + before + " &7→ &f" + after);
+        }
     }
 
     /** The set's reward names for the library's detail panel, at most {@code limit}, then "+n more". */

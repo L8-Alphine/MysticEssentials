@@ -19,7 +19,7 @@ Group #Row {
 
     Label #Name {
       FlexWeight: 1;
-      Style: $M.@RowNameStyle;
+      Style: $M.@RowNameFitStyle;
     }
 
     Label #Odds {

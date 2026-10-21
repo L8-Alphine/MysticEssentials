@@ -16,6 +16,7 @@ import org.hyzionstudios.mysticessentials.modules.lootbox.model.CrateInstance;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.KeySerial;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.LootBoxRevision;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.CrateService;
+import org.hyzionstudios.mysticessentials.modules.lootbox.service.MotionRules;
 import org.hyzionstudios.mysticessentials.modules.lootbox.ui.editor.CrateEditorPage;
 import org.hyzionstudios.mysticessentials.modules.lootbox.validate.DraftValidator;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommand;
@@ -28,19 +29,22 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
  * {@code /playervault}, so one entry point covers players and staff:
  *
  * <ul>
- *   <li>no args → catalog; {@code preview <id>}; {@code history [player]}; {@code pending};</li>
+ *   <li>no args → catalog; {@code preview <id>}; {@code history [player]}; {@code pending};
+ *       {@code motion [reduced|full|default]};</li>
  *   <li>{@code key give|revoke|info|list|publish|grants …}; players' {@code key deposit} and
  *       {@code key withdraw <keyId> [count]};</li>
  *   <li>{@code publish|rollback|disable|enable …}; {@code simulate <id> [draws]};</li>
  *   <li>{@code crate select|convert|edit|rebind|remove|info|verify|enable …};</li>
- *   <li>{@code reconcile <openingId> regrant|dismiss}; {@code admin}; {@code reload}.</li>
+ *   <li>{@code crate effects [on|off]} for players;</li>
+ *   <li>{@code reconcile <openingId> regrant|dismiss}; {@code admin}; {@code audit}; {@code reload}.</li>
  * </ul>
  *
  * <p>Every staff branch checks its own node here, on the server.</p>
  */
 public final class LootBoxCommand extends MysticCommand {
 
-    private static final String USAGE = "/lootbox [preview <id>|history|pending|key …|publish <id>|crate …|admin]";
+    private static final String USAGE =
+            "/lootbox [preview <id>|history|pending|motion|key …|publish <id>|crate …|admin|audit]";
 
     private final LootBoxModule module;
 
@@ -63,6 +67,7 @@ public final class LootBoxCommand extends MysticCommand {
             case "preview" -> preview(sender, args);
             case "history" -> history(sender, args);
             case "pending" -> player(sender).ifPresent(player -> module.ui().openPending(player));
+            case "motion" -> motion(sender, args);
             case "key", "keys" -> key(sender, args);
             case "publish" -> publish(sender, args);
             case "rollback" -> rollback(sender, args);
@@ -101,6 +106,27 @@ public final class LootBoxCommand extends MysticCommand {
             return;
         }
         player(sender).ifPresent(player -> module.ui().openPreview(player, args[1].toLowerCase(Locale.ROOT), null));
+    }
+
+    /** {@code /lootbox motion [reduced|full|default]}: shows or sets the player's reduced-motion choice (P2-L). */
+    private void motion(MysticCommandSender sender, String[] args) {
+        Optional<PlayerRef> player = player(sender);
+        if (player.isEmpty()) {
+            return;
+        }
+        UUID id = player.get().getUuid();
+        if (args.length < 2) {
+            module.opening().describeMotion(id)
+                    .thenAccept(setting -> sender.replyKey("lootbox-motion-status", Map.of("motion", setting)));
+            return;
+        }
+        MotionRules.Choice choice = MotionRules.parse(args[1]);
+        if (choice == null) {
+            usage(sender, "/lootbox motion [reduced|full|default]");
+            return;
+        }
+        module.opening().setMotion(id, choice)
+                .thenAccept(setting -> sender.replyKey("lootbox-motion-set", Map.of("motion", setting)));
     }
 
     private void history(MysticCommandSender sender, String[] args) {

@@ -26,7 +26,7 @@ $C.@Container {
     LayoutMode: Top;
 
     Label #Notice {
-      Anchor: (Height: 20, Bottom: 6);
+      Anchor: (Bottom: 6);
       Style: $M.@BodyStyle;
       Visible: false;
     }
@@ -82,7 +82,7 @@ $C.@Container {
             @Anchor = (Bottom: 6);
 
             $M.@Key { @Text = "Status"; }
-            Label #CrateBlockStatus { FlexWeight: 1; Style: $M.@ValueStyle; }
+            Label #CrateBlockStatus { FlexWeight: 1; Style: $M.@ValueFitStyle; }
           }
 
           Group {
@@ -91,7 +91,7 @@ $C.@Container {
 
             Label #CrateSelectHint {
               FlexWeight: 1;
-              Style: $M.@CaptionStyle;
+              Style: $M.@HintStyle;
             }
 
             $C.@SecondaryTextButton #ReselectButton {
@@ -134,7 +134,7 @@ $C.@Container {
           }
 
           Label #CrateVerdict {
-            Anchor: (Height: 44, Bottom: 8);
+            Anchor: (Bottom: 8);
             Style: $M.@BodyStyle;
           }
 
@@ -151,7 +151,7 @@ $C.@Container {
 
           Label {
             Anchor: (Height: 32, Top: 8);
-            Style: $M.@CaptionStyle;
+            Style: $M.@HintStyle;
             Text: "Air, missing blocks and blocks that fall are refused, and so are blocks without a Use interaction unless crates.generatedVariants is on. Warnings still convert.";
           }
         }
@@ -191,7 +191,7 @@ $C.@Container {
 
           Label {
             Anchor: (Height: 48);
-            Style: $M.@CaptionStyle;
+            Style: $M.@HintStyle;
             Text: "The odds and the accepted keys come from the pool's published revision; a crate can never change them. Change the keys in the pool editor.";
           }
         }
@@ -247,7 +247,7 @@ $C.@Container {
 
           Label {
             Anchor: (Height: 32, Bottom: 8);
-            Style: $M.@CaptionStyle;
+            Style: $M.@HintStyle;
             Text: "The server's settings apply to every crate. A crate can add protection, never take it away.";
           }
 
@@ -345,7 +345,7 @@ $C.@Container {
 
             Label {
               FlexWeight: 1;
-              Style: $M.@CaptionStyle;
+              Style: $M.@HintStyle;
               Text: "Effects go only to players near the crate who haven't turned them off with /lootbox crate effects off.";
             }
 
@@ -411,7 +411,7 @@ $C.@Container {
 
           Label {
             Anchor: (Height: 32, Top: 8);
-            Style: $M.@CaptionStyle;
+            Style: $M.@HintStyle;
             Text: "Test in World opens the crate exactly as a player sees it. Confirming there is a real opening and spends a real key.";
           }
         }
@@ -429,11 +429,11 @@ $C.@Container {
 
           Label #CrateRepairReason {
             Anchor: (Height: 44, Bottom: 6);
-            Style: $M.@SubheadingStyle;
+            Style: $M.@SubheadingFitStyle;
           }
 
           Label #CrateRepairStatus {
-            Anchor: (Height: 80, Bottom: 10);
+            Anchor: (Bottom: 10);
             Style: $M.@BodyStyle;
           }
 

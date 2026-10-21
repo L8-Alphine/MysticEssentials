@@ -8,7 +8,7 @@ $M = "MysticTheme.ui";
 $C.@PageOverlay {}
 
 $C.@Container {
-  Anchor: (Width: 960, Height: 720);
+  Anchor: (Width: 960, Height: 700);
 
   #Title {
     Group {
@@ -78,7 +78,7 @@ $C.@Container {
     }
 
     Label #Notice {
-      Anchor: (Height: 20, Bottom: 4);
+      Anchor: (Bottom: 4);
       Style: $M.@BodyStyle;
       Visible: false;
     }
@@ -123,7 +123,7 @@ $C.@Container {
       }
 
       Label #AuditFullDetail {
-        Anchor: (Height: 34, Top: 4);
+        Anchor: (Top: 4);
         Style: $M.@BodyStyle;
       }
     }

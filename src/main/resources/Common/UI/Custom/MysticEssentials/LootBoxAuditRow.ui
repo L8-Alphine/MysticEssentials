@@ -18,12 +18,12 @@ Button #Row {
 
     Label #AuditWhen {
       Anchor: (Width: 140);
-      Style: $M.@RowMetaStyle;
+      Style: $M.@RowMetaFitStyle;
     }
 
     Label #AuditAction {
       Anchor: (Width: 170, Left: 6);
-      Style: $M.@RowMetaStyle;
+      Style: $M.@RowMetaFitStyle;
     }
 
     Group {
@@ -33,12 +33,12 @@ Button #Row {
 
       Label #AuditTarget {
         Anchor: (Height: 18);
-        Style: $M.@RowNameStyle;
+        Style: $M.@RowNameFitStyle;
       }
 
       Label #AuditDetail {
         Anchor: (Height: 14);
-        Style: $M.@RowMetaStyle;
+        Style: $M.@RowMetaFitStyle;
       }
     }
 

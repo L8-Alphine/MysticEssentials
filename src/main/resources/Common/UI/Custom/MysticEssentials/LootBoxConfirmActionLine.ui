@@ -1,15 +1,16 @@
 // One detail line on the LootBox confirmation page. Appended per line:
 //   cmd.append("#BodyList", "MysticEssentials/LootBoxConfirmActionLine.ui")
 //   cmd.set("#BodyList[i] #Line.TextSpans", ...)   (MysticText markup allowed)
+// Also the line of every problem list, diff and the key lore preview. The row
+// has no fixed height: a long line (coloured lore, a validator message) wraps
+// onto as many lines as it needs, the way the game's own description labels do.
 $M = "MysticTheme.ui";
 
 Group #Row {
-  LayoutMode: Left;
-  Anchor: (Height: 24);
-  Padding: (Left: 12, Right: 12);
+  LayoutMode: Top;
+  Padding: (Left: 12, Right: 12, Top: 3, Bottom: 3);
 
   Label #Line {
-    FlexWeight: 1;
-    Style: (FontSize: 14, TextColor: #dee2ef, VerticalAlignment: Center);
+    Style: $M.@BodyStyle;
   }
 }

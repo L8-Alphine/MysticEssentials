@@ -549,6 +549,8 @@ public final class DefaultMessages {
         o.addProperty("lootbox-crate-effects-status", "&7Crate particles and sounds are &f{state}&7 for you. Change it with &f/lootbox crate effects <on|off>&7.");
         o.addProperty("lootbox-crate-effects-on", "&aCrate particles and sounds are on for you.");
         o.addProperty("lootbox-crate-effects-off", "&7Crate particles and sounds are off for you. Floating crate names still show; they're the same for everyone.");
+        o.addProperty("lootbox-motion-status", "&7Reveal motion is &f{motion}&7. Change it with &f/lootbox motion <reduced|full|default>&7.");
+        o.addProperty("lootbox-motion-set", "&aReveal motion is now &f{motion}&a. Reduced shows each result at once; the odds and the result never change.");
         return o;
     }
 }

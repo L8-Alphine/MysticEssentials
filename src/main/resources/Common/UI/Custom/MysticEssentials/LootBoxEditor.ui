@@ -32,7 +32,7 @@ $C.@Container {
     }
 
     Label #Notice {
-      Anchor: (Height: 20, Bottom: 6);
+      Anchor: (Bottom: 6);
       Style: $M.@BodyStyle;
       Visible: false;
     }
@@ -51,7 +51,7 @@ $C.@Container {
       }
 
       Label #NamePreview {
-        Anchor: (Height: 22, Bottom: 12);
+        Anchor: (Bottom: 12);
         Style: $M.@BodyStyle;
       }
 
@@ -105,7 +105,7 @@ $C.@Container {
         Label #ModeHint {
           FlexWeight: 1;
           Anchor: (Left: 12);
-          Style: $M.@CaptionStyle;
+          Style: $M.@HintStyle;
         }
       }
     }
@@ -310,8 +310,8 @@ $C.@Container {
               }
 
               Label #EconomyNote {
-                Anchor: (Height: 18, Top: 4);
-                Style: $M.@CaptionStyle;
+                Anchor: (Top: 4);
+                Style: $M.@HintStyle;
               }
             }
 
@@ -344,8 +344,8 @@ $C.@Container {
               }
 
               Label #PermissionNote {
-                Anchor: (Height: 18, Top: 4);
-                Style: $M.@CaptionStyle;
+                Anchor: (Top: 4);
+                Style: $M.@HintStyle;
               }
             }
 
@@ -389,8 +389,8 @@ $C.@Container {
               }
 
               Label #CommandNote {
-                Anchor: (Height: 18, Top: 4);
-                Style: $M.@CaptionStyle;
+                Anchor: (Top: 4);
+                Style: $M.@HintStyle;
               }
             }
 
@@ -440,8 +440,8 @@ $C.@Container {
       }
 
       Label #KeysHint {
-        Anchor: (Height: 18, Bottom: 6);
-        Style: $M.@CaptionStyle;
+        Anchor: (Bottom: 6);
+        Style: $M.@HintStyle;
       }
 
       $M.@Well {
@@ -481,8 +481,8 @@ $C.@Container {
       }
 
       Label #RulesNote {
-        Anchor: (Height: 18, Top: 6);
-        Style: $M.@CaptionStyle;
+        Anchor: (Top: 6);
+        Style: $M.@HintStyle;
       }
     }
 

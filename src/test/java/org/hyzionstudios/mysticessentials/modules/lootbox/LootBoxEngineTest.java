@@ -303,6 +303,13 @@ public final class LootBoxEngineTest {
         key.baseItemId = "Ingredient_Bar_Iron";
         key.name = "Royal Key";
         require(DraftValidator.validateKey(key, item -> true).isEmpty(), "a valid key was refused");
+        key.stackable = true;
+        require(DraftValidator.validateKey(key, item -> true).isEmpty(), "a one-use stackable key was refused");
+        key.uses = 3;
+        require(contains(DraftValidator.validateKey(key, item -> true), "stackable"),
+                "a stackable key with 3 uses passed, though each stack item opens once");
+        key.stackable = false;
+        require(DraftValidator.validateKey(key, item -> true).isEmpty(), "a 3-use serialized key was refused");
         key.uses = 0;
         require(!DraftValidator.validateKey(key, item -> true).isEmpty(), "a zero-use key passed");
         require("mystic:royal".equals(DraftValidator.normaliseKeyId("Royal")), "namespace default not applied");

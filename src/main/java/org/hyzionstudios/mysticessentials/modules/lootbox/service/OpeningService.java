@@ -823,6 +823,28 @@ public final class OpeningService {
         return storage.loadPlayer(player).thenApply(state -> List.copyOf(state.receipts));
     }
 
+    // ----- Reduced motion (P2-L) ----------------------------------------------
+
+    /** Whether {@code player} sees reveals without animation, after their own choice and the server default. */
+    public CompletableFuture<Boolean> reducedMotion(UUID player) {
+        return storage.loadPlayer(player).thenApply(state -> MotionRules.reduced(state,
+                config.opening.reducedMotionDefault));
+    }
+
+    /** The player's setting as chat and the Catalog show it, e.g. "reduced (server default)". */
+    public CompletableFuture<String> describeMotion(UUID player) {
+        return storage.loadPlayer(player).thenApply(state -> MotionRules.describe(state,
+                config.opening.reducedMotionDefault));
+    }
+
+    /** Stores {@code choice} in the player document. @return the setting as it now reads */
+    public CompletableFuture<String> setMotion(UUID player, MotionRules.Choice choice) {
+        return storage.updatePlayer(player, state -> {
+            state.reducedMotion = choice.stored();
+            return state;
+        }).thenApply(state -> MotionRules.describe(state, config.opening.reducedMotionDefault));
+    }
+
     /** Non-awarding draw test on a worker thread; production RNG, never seeded. */
     public CompletableFuture<long[]> simulate(LootBoxRevision revision, long trials) {
         long bounded = Math.max(1, Math.min(trials, config.simulation.maxTrials));

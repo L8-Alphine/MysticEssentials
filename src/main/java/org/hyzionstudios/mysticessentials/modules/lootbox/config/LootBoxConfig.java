@@ -56,6 +56,12 @@ public final class LootBoxConfig {
         /** Reveal animation frame rate (bounded by spike S7's measurement). */
         public int revealFramesPerSecond = 10;
         public boolean allowSkip = true;
+        /**
+         * Reduced motion for players who never chose (P2-L): true shows every
+         * reveal's result at once. Each player can override it with
+         * {@code /lootbox motion} or the Catalog's Motion button.
+         */
+        public boolean reducedMotionDefault = false;
         /** How many receipts each player keeps for /lootbox history. */
         public int historySize = 50;
     }

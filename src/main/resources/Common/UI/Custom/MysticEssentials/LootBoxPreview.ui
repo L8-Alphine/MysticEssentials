@@ -29,13 +29,13 @@ $C.@Container {
       }
 
       Label #PreviewDescription {
-        Anchor: (Height: 22, Bottom: 6);
+        Anchor: (Bottom: 6);
         Style: $M.@BodyMutedStyle;
       }
 
       Label #Rules {
-        Anchor: (Height: 18, Bottom: 4);
-        Style: $M.@MetaStyle;
+        Anchor: (Bottom: 4);
+        Style: $M.@MetaWrapStyle;
       }
 
       Label #KeyBalance {
@@ -61,8 +61,8 @@ $C.@Container {
     }
 
     Label #OddsFooter {
-      Anchor: (Height: 18, Top: 6);
-      Style: $M.@CaptionStyle;
+      Anchor: (Top: 6);
+      Style: $M.@HintStyle;
     }
 
     Label #Blocker {

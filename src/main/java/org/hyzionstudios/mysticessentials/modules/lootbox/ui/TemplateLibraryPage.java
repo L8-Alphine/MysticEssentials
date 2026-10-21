@@ -17,9 +17,12 @@ import org.hyzionstudios.mysticessentials.api.Permissions;
 import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.core.message.MysticText;
 import org.hyzionstudios.mysticessentials.modules.lootbox.LootBoxModule;
+import org.hyzionstudios.mysticessentials.modules.lootbox.model.CrateInstance;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.KeyDraft;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.LootBoxDraft;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.LootBoxTemplate;
+import org.hyzionstudios.mysticessentials.modules.lootbox.service.CrateRules;
+import org.hyzionstudios.mysticessentials.modules.lootbox.service.CrateService;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.DraftLifecycle;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.DraftStore;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.TemplateLibrary;
@@ -44,10 +47,16 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
 /**
- * The Template Library (P2-H): saved key looks and reward sets, as files under
- * {@code modules/lootbox/templates/}. Save one from a key or pool draft, apply a
- * key look to a key draft, insert a reward set into a pool draft, rename, or
- * delete (which moves the file to {@code templates/_archive/}).
+ * The Template Library (P2-H): saved key looks, reward sets and crate looks, as
+ * files under {@code modules/lootbox/templates/}. Save one from a key or pool
+ * draft or a placed crate, apply a key look to a key draft, insert a reward set
+ * into a pool draft, apply a crate look to a crate, rename, or delete (which
+ * moves the file to {@code templates/_archive/}).
+ *
+ * <p>A crate is live, not a draft: applying a crate look goes through
+ * {@code CrateService.update} with the settings hash read when the change was
+ * shown, so a crate someone saved meanwhile is refused. It also needs
+ * {@code crates.manage}, like the crate editor's Save.</p>
  *
  * <p>Applying never touches an open editor: it loads the target draft from
  * disk, shows what changes, and writes it through the registry's
@@ -63,7 +72,8 @@ public final class TemplateLibraryPage extends MysticPage {
     static final String TEMPLATES_UI = "MysticEssentials/LootBoxTemplates.ui";
     static final String ROW_UI = "MysticEssentials/LootBoxTemplateRow.ui";
 
-    static final List<String> FILTERS = List.of("ALL", LootBoxTemplate.KEY_LOOK, LootBoxTemplate.REWARD_SET);
+    static final List<String> FILTERS = List.of("ALL", LootBoxTemplate.KEY_LOOK, LootBoxTemplate.REWARD_SET,
+            LootBoxTemplate.CRATE_LOOK);
     private static final String RENAME = "RENAME";
     private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("yyyy-MM-dd").withZone(ZoneOffset.UTC);
 
@@ -81,7 +91,8 @@ public final class TemplateLibraryPage extends MysticPage {
     /**
      * The save / rename form.
      *
-     * @param mode   {@code KEY_LOOK} or {@code REWARD_SET} to save a new template, {@code RENAME} to rename
+     * @param mode   {@code KEY_LOOK}, {@code REWARD_SET} or {@code CRATE_LOOK} to save a new template,
+     *               {@code RENAME} to rename
      * @param source the draft a new template copies
      */
     public record Form(String mode, String source, String newId, String newName) {
@@ -156,20 +167,25 @@ public final class TemplateLibraryPage extends MysticPage {
         Entry selected = shown.stream().filter(entry -> entry.template().id.equals(state.selected())).findFirst()
                 .orElse(shown.isEmpty() ? null : shown.get(0));
 
-        long looks = all.stream().filter(entry -> LootBoxTemplate.KEY_LOOK.equals(entry.template().kind)).count();
+        long looks = count(all, LootBoxTemplate.KEY_LOOK);
+        long crateLooks = count(all, LootBoxTemplate.CRATE_LOOK);
         cmd.set("#HeaderInfo.TextSpans", uiText("#HeaderInfo.TextSpans", state.entries() == null ? "Reading templates/..."
-                : all.size() + " template(s) · " + looks + " key look(s) · " + (all.size() - looks) + " reward set(s)"
+                : all.size() + " template(s) · " + looks + " key look(s) · " + count(all, LootBoxTemplate.REWARD_SET)
+                        + " reward set(s) · " + crateLooks + " crate look(s)"
                         + (state.errors().isEmpty() ? "" : " · " + state.errors().size()
                                 + " unreadable file(s), see the server log")));
         cmd.set("#KindFilter.Entries", List.of(entry("All templates", "ALL"), entry("Key looks", LootBoxTemplate.KEY_LOOK),
-                entry("Reward sets", LootBoxTemplate.REWARD_SET)));
+                entry("Reward sets", LootBoxTemplate.REWARD_SET), entry("Crate looks", LootBoxTemplate.CRATE_LOOK)));
         cmd.set("#KindFilter.Value", state.filter());
         event.addEventBinding(CustomUIEventBindingType.ValueChanged, "#KindFilter", INPUTS.event("filter"));
         cmd.set("#SaveKeyLookButton.Visible", state.form() == null);
         cmd.set("#SaveRewardSetButton.Visible", state.form() == null);
+        cmd.set("#SaveCrateLookButton.Visible", state.form() == null);
         event.addEventBinding(CustomUIEventBindingType.Activating, "#SaveKeyLookButton", INPUTS.event("newKeyLook"));
         event.addEventBinding(CustomUIEventBindingType.Activating, "#SaveRewardSetButton",
                 INPUTS.event("newRewardSet"));
+        event.addEventBinding(CustomUIEventBindingType.Activating, "#SaveCrateLookButton",
+                INPUTS.event("newCrateLook"));
         buildForm(cmd, event);
 
         boolean hasNotice = state.notice() != null && !state.notice().isBlank();
@@ -210,8 +226,9 @@ public final class TemplateLibraryPage extends MysticPage {
         }
         boolean renaming = RENAME.equals(form.mode());
         boolean keyLook = LootBoxTemplate.KEY_LOOK.equals(form.mode());
+        boolean crateLook = LootBoxTemplate.CRATE_LOOK.equals(form.mode());
         cmd.set("#FormTitle.TextSpans", uiText("#FormTitle.TextSpans", renaming ? "Rename " + form.newId()
-                : keyLook ? "Save a key look" : "Save a reward set"));
+                : keyLook ? "Save a key look" : crateLook ? "Save a crate look" : "Save a reward set"));
         cmd.set("#FormSourceColumn.Visible", !renaming);
         cmd.set("#FormIdColumn.Visible", !renaming);
         if (!renaming) {
@@ -229,6 +246,7 @@ public final class TemplateLibraryPage extends MysticPage {
         cmd.set("#FormHint.TextSpans", uiText("#FormHint.TextSpans", renaming
                 ? "Only the name changes; the id and file stay."
                 : keyLook ? "Copies the key's base item, name, lore, uses and expiry into templates/<id>.json."
+                : crateLook ? "Copies the crate's particles, opening sound and floating name into templates/<id>.json."
                 : "Copies every reward of the pool, in order, into templates/<id>.json."));
         event.addEventBinding(CustomUIEventBindingType.Activating, "#FormConfirmButton", INPUTS.event("formConfirm"));
         event.addEventBinding(CustomUIEventBindingType.Activating, "#FormCancelButton", INPUTS.event("formCancel"));
@@ -241,6 +259,7 @@ public final class TemplateLibraryPage extends MysticPage {
         }
         LootBoxTemplate template = selected.template();
         boolean keyLook = LootBoxTemplate.KEY_LOOK.equals(template.kind);
+        boolean crateLook = LootBoxTemplate.CRATE_LOOK.equals(template.kind);
         cmd.set("#SelectedName.TextSpans", uiText("#SelectedName.TextSpans",
                 MysticText.stripMarkup(blank(template.name, template.id)) + " &8(" + template.id + ")"));
         cmd.set("#SelectedMeta.TextSpans", uiText("#SelectedMeta.TextSpans", MysticText.stripMarkup(
@@ -260,10 +279,11 @@ public final class TemplateLibraryPage extends MysticPage {
             cmd.set("#TargetPicker.Value", target);
         } else {
             cmd.set("#TplNoTarget.TextSpans", uiText("#TplNoTarget.TextSpans", keyLook
-                    ? "There is no key draft to apply it to." : "There is no pool draft to insert it into."));
+                    ? "There is no key draft to apply it to." : crateLook ? "There is no placed crate to apply it to."
+                    : "There is no pool draft to insert it into."));
         }
-        cmd.set("#ApplyButton.Visible", any && keyLook);
-        cmd.set("#InsertButton.Visible", any && !keyLook);
+        cmd.set("#ApplyButton.Visible", any && (keyLook || crateLook));
+        cmd.set("#InsertButton.Visible", any && !keyLook && !crateLook);
         bind(event, "#ApplyButton", "apply", template.id);
         bind(event, "#InsertButton", "insert", template.id);
         bind(event, "#RenameButton", "rename", template.id);
@@ -296,12 +316,18 @@ public final class TemplateLibraryPage extends MysticPage {
         switch (action) {
             case "filter" -> reopen(ref, store, page(next));
             case "select" -> reopen(ref, store, page(next.withSelected(id)));
-            case "newKeyLook", "newRewardSet" -> {
-                String kind = "newKeyLook".equals(action) ? LootBoxTemplate.KEY_LOOK : LootBoxTemplate.REWARD_SET;
+            case "newKeyLook", "newRewardSet", "newCrateLook" -> {
+                String kind = switch (action) {
+                    case "newKeyLook" -> LootBoxTemplate.KEY_LOOK;
+                    case "newCrateLook" -> LootBoxTemplate.CRATE_LOOK;
+                    default -> LootBoxTemplate.REWARD_SET;
+                };
                 List<String> sources = sources(kind);
                 if (sources.isEmpty()) {
-                    reopen(ref, store, page(next.withNotice("&cThere is no " + (LootBoxTemplate.KEY_LOOK.equals(kind)
-                            ? "key" : "pool") + " draft to save from.")));
+                    reopen(ref, store, page(next.withNotice(LootBoxTemplate.CRATE_LOOK.equals(kind)
+                            ? "&cThere is no placed crate to save from."
+                            : "&cThere is no " + (LootBoxTemplate.KEY_LOOK.equals(kind) ? "key" : "pool")
+                                    + " draft to save from.")));
                     return;
                 }
                 String source = sources.get(0);
@@ -365,7 +391,10 @@ public final class TemplateLibraryPage extends MysticPage {
         String actor = player.getUsername();
         long now = System.currentTimeMillis();
         reopen(ref, store, page(next.withNotice("&7Saving &f" + newId + "&7...")));
-        CompletableFuture<LootBoxTemplate> built = keyLook
+        CompletableFuture<LootBoxTemplate> built = LootBoxTemplate.CRATE_LOOK.equals(form.mode())
+                ? CompletableFuture.completedFuture(module.crates().get(source)
+                        .map(crate -> TemplateLibrary.crateLook(newId, name, crate, actor, now)).orElse(null))
+                : keyLook
                 ? module.registry().keyStore().load(source).thenApply(found -> found.map(loaded ->
                         TemplateLibrary.keyLook(newId, name, loaded.draft(), actor, now)).orElse(null))
                 : module.registry().poolStore().load(source).thenApply(found -> found.map(loaded ->
@@ -373,7 +402,8 @@ public final class TemplateLibraryPage extends MysticPage {
         built.thenCompose(template -> {
             if (template == null) {
                 return CompletableFuture.completedFuture((DraftStore.Result) new DraftStore.Refused(
-                        "the draft " + source + " is gone"));
+                        (LootBoxTemplate.CRATE_LOOK.equals(form.mode()) ? "the crate " : "the draft ") + source
+                                + " is gone"));
             }
             List<String> wrong = TemplateLibrary.problems(template);
             return wrong.isEmpty() ? module.templates().store().save(template, null, actor)
@@ -462,6 +492,23 @@ public final class TemplateLibraryPage extends MysticPage {
             reopen(ref, store, page(next.withNotice("&cThe set has COMMAND rewards, which need rewards.command.")));
             return;
         }
+        if (LootBoxTemplate.CRATE_LOOK.equals(template.kind)) {
+            // A live crate, not a draft file: same gate as the crate editor's Save.
+            if (!allowed(Permissions.LOOTBOX_CRATES_MANAGE)) {
+                return;
+            }
+            CrateInstance live = module.crates().get(target).orElse(null);
+            if (live == null) {
+                reopen(ref, store, page(next.withNotice("&cThe crate " + target + " was removed meanwhile.")));
+                return;
+            }
+            CrateInstance after = TemplateApply.crateLook(template, live);
+            confirmApply(next, template, target, "crate", CrateInstance.class, TemplateApply.crateLookLines(live, after),
+                    CrateRules.settingsHash(live), hash -> CompletableFuture.completedFuture(crateResult(
+                            module.crates().update(target, after, hash, player.getUsername()))),
+                    "look of crate " + target);
+            return;
+        }
         reopen(ref, store, page(next.withNotice("&7Reading &f" + target + "&7...")));
         if (keyLook) {
             module.registry().keyStore().load(target).whenComplete((found, error) -> {
@@ -490,27 +537,34 @@ public final class TemplateLibraryPage extends MysticPage {
         }
     }
 
-    /** Runs on a storage thread: opens the confirmation, whose Confirm writes with the loaded hash. */
+    /**
+     * Opens the confirmation, whose Confirm writes with the loaded hash. Runs on a
+     * storage thread for drafts and on the world thread for crates.
+     */
     private void confirmApply(State next, LootBoxTemplate template, String target, String noun, Class<?> type,
             List<String> changes, String loadedHash, Function<String, CompletableFuture<DraftStore.Result>> write,
             String what) {
         List<String> lines = new ArrayList<>(changes);
+        boolean crate = LootBoxTemplate.CRATE_LOOK.equals(template.kind);
         List<UUID> editing = module.editors().editing(type, target, null);
         boolean mine = editing.contains(player.getUuid());
         int others = editing.size() - (mine ? 1 : 0);
         if (mine || others > 0) {
             lines.add("&e" + (mine ? "You have it open in an editor" + (others > 0 ? ", and so do " + others
                     + " other(s)" : "") : others + " other editor(s) have it open")
-                    + ": the next save there finds the file changed and offers Load From Disk.");
+                    + (crate ? ": the next save there finds the crate changed and offers Load Current."
+                            : ": the next save there finds the file changed and offers Load From Disk."));
         }
-        lines.add("&7Writes the draft file only; nothing is published.");
-        boolean keyLook = LootBoxTemplate.KEY_LOOK.equals(template.kind);
-        ConfirmActionPage.Spec spec = new ConfirmActionPage.Spec((keyLook ? "Apply " : "Insert ")
-                + MysticText.stripMarkup(blank(template.name, template.id)) + (keyLook ? " to " : " into ") + target + "?",
-                lines, keyLook ? "Apply Look" : "Insert Rewards", false, Permissions.LOOTBOX_EDIT);
+        lines.add(crate ? "&7Changes the placed crate at once; its pool, place and protection stay."
+                : "&7Writes the draft file only; nothing is published.");
+        boolean look = !LootBoxTemplate.REWARD_SET.equals(template.kind);
+        ConfirmActionPage.Spec spec = new ConfirmActionPage.Spec((look ? "Apply " : "Insert ")
+                + MysticText.stripMarkup(blank(template.name, template.id)) + (look ? " to " : " into ") + target + "?",
+                lines, look ? "Apply Look" : "Insert Rewards", false, Permissions.LOOTBOX_EDIT);
         core.platform().openPage(player, new ConfirmActionPage(core, player, spec, (r, s) -> {
-            boolean commands = !keyLook && template.rewards.stream().anyMatch(rw -> "COMMAND".equalsIgnoreCase(rw.type));
-            if (commands && !allowed(Permissions.LOOTBOX_REWARDS_COMMAND)) {
+            boolean commands = !look && template.rewards.stream().anyMatch(rw -> "COMMAND".equalsIgnoreCase(rw.type));
+            if ((commands && !allowed(Permissions.LOOTBOX_REWARDS_COMMAND))
+                    || (crate && !allowed(Permissions.LOOTBOX_CRATES_MANAGE))) {
                 reopen(r, s, page(next));
                 return;
             }
@@ -519,14 +573,17 @@ public final class TemplateLibraryPage extends MysticPage {
                 if (result instanceof DraftStore.Saved) {
                     module.audit().record(player.getUsername(), "TEMPLATE_APPLY", target,
                             "template " + template.id + ": " + what);
-                    relist(next, "&a" + (keyLook ? "Applied &f" + template.id + " &ato key &f" + target
-                            : "Inserted &f" + template.id + " &ainto pool &f" + target)
-                            + "&a. Open it from the " + (keyLook ? "Key Manager" : "Manager") + " to check and publish.");
+                    relist(next, crate ? "&aApplied &f" + template.id + " &ato crate &f" + target
+                            + "&a. Players near it see the new look now."
+                            : "&a" + (look ? "Applied &f" + template.id + " &ato key &f" + target
+                                    : "Inserted &f" + template.id + " &ainto pool &f" + target)
+                                    + "&a. Open it from the " + (look ? "Key Manager" : "Manager")
+                                    + " to check and publish.");
                     return;
                 }
-                relist(next, "&cNothing was written to the " + noun + " draft &f" + target + "&c: " + reason(result,
-                        error, "it changed since you looked; press " + (keyLook ? "Apply Look" : "Insert Rewards")
-                                + " again to see the new version") + ".");
+                relist(next, "&cNothing was written to the " + noun + (crate ? " &f" : " draft &f") + target + "&c: "
+                        + reason(result, error, "it changed since you looked; press " + (look ? "Apply Look"
+                                : "Insert Rewards") + " again to see the new version") + ".");
             });
         }, (r, s) -> reopen(r, s, page(next))));
     }
@@ -553,10 +610,31 @@ public final class TemplateLibraryPage extends MysticPage {
         return state.entries().stream().filter(entry -> id.equals(entry.template().id)).findFirst().orElse(null);
     }
 
-    /** The drafts a template of {@code kind} is saved from or applied to: key drafts for looks, else pools. */
+    /**
+     * What a template of {@code kind} is saved from or applied to: key drafts for
+     * key looks, placed crates for crate looks, else pool drafts.
+     */
     private List<String> sources(String kind) {
+        if (LootBoxTemplate.CRATE_LOOK.equals(kind)) {
+            TreeSet<String> crates = new TreeSet<>();
+            module.crates().list().forEach(crate -> crates.add(crate.crateId));
+            return List.copyOf(crates);
+        }
         return List.copyOf(new TreeSet<>(LootBoxTemplate.KEY_LOOK.equals(kind)
                 ? module.registry().keyDrafts().keySet() : module.registry().drafts().keySet()));
+    }
+
+    private static long count(List<Entry> entries, String kind) {
+        return entries.stream().filter(entry -> kind.equals(entry.template().kind)).count();
+    }
+
+    /** A crate save's outcome in the draft store's terms, so crate looks share the confirmation's ending. */
+    private static DraftStore.Result crateResult(CrateService.SaveResult result) {
+        return switch (result) {
+            case CrateService.Saved saved -> new DraftStore.Saved(saved.hash());
+            case CrateService.Conflict conflict -> new DraftStore.Conflict(CrateRules.settingsHash(conflict.current()));
+            case CrateService.Refused refused -> new DraftStore.Refused(refused.reason());
+        };
     }
 
     private static String detail(LootBoxTemplate template) {
@@ -568,6 +646,9 @@ public final class TemplateLibraryPage extends MysticPage {
             List<String> lore = look.lore == null ? List.of() : look.lore;
             return "&r" + blank(look.name, "&7(no name)") + " &r&8· &7" + (lore.isEmpty() ? "no lore"
                     : lore.size() + " lore line(s): &r" + String.join(" &8/ &r", lore));
+        }
+        if (LootBoxTemplate.CRATE_LOOK.equals(template.kind)) {
+            return template.crate == null ? "&7Empty." : "&7" + TemplateLibrary.effects(template.crate);
         }
         return "&7" + TemplateApply.rewardNames(template, 6);
     }

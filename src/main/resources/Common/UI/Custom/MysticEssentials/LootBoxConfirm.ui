@@ -51,8 +51,8 @@ $C.@Container {
     }
 
     Label #OddsFooter {
-      Anchor: (Height: 18, Top: 6);
-      Style: $M.@CaptionStyle;
+      Anchor: (Top: 6);
+      Style: $M.@HintStyle;
     }
 
     $M.@ActionBar {

@@ -21,6 +21,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
 import org.hyzionstudios.mysticessentials.core.util.Json;
+import org.hyzionstudios.mysticessentials.modules.lootbox.model.CrateInstance;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.KeyDraft;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.LootBoxDraft;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.LootBoxRevision;
@@ -76,6 +77,7 @@ public final class LootBoxScreensTest {
             templateSnapshotsAreCopies();
             keyLookApplies();
             rewardSetInsertRenamesCollisions();
+            crateLookCopiesOnlyTheLook();
             templateRulesAndIds();
             templateStoreIsOptimistic();
             applyingWritesWithTheLoadedHash();
@@ -388,6 +390,50 @@ public final class LootBoxScreensTest {
                 TemplateLibrary.rewardSet("cmd_rewards", "Cmd", commands, "alice", 1L), target);
         require(withCommand.hasCommand() && withCommand.notes().stream().anyMatch(n -> n.contains("rewards.command")),
                 "COMMAND rewards are flagged for the permission check");
+    }
+
+    private static void crateLookCopiesOnlyTheLook() {
+        CrateInstance source = new CrateInstance();
+        source.crateId = "spawn_crate";
+        source.lootboxId = "example_supply";
+        source.visuals.idleParticle = "Block_Treasure_Sparks";
+        source.visuals.openParticle = "Block_Break_Treasure";
+        source.visuals.openSound = "SFX_Chest_Legendary_Open";
+        source.visuals.nameplate = true;
+        LootBoxTemplate look = TemplateLibrary.crateLook("spawn_look", "Spawn look", source, "alice", 1L);
+        require(TemplateLibrary.problems(look).isEmpty(), "a crate look has problems: " + TemplateLibrary.problems(look));
+        require("crate spawn_crate".equals(look.source) && LootBoxTemplate.CRATE_LOOK.equals(look.kind),
+                "a crate look doesn't say where it came from");
+        require(TemplateLibrary.summary(look).equals("Crate look · idle Block_Treasure_Sparks · open "
+                + "Block_Break_Treasure · sound SFX_Chest_Legendary_Open · floating name"),
+                "the crate look's summary is wrong: " + TemplateLibrary.summary(look));
+        source.visuals.idleParticle = "changed";
+        require("Block_Treasure_Sparks".equals(look.crate.idleParticle), "the crate look shares the crate's visuals");
+
+        CrateInstance target = new CrateInstance();
+        target.crateId = "vault_crate";
+        target.lootboxId = "mystic_treasure";
+        target.x = 4;
+        target.protection.preventDamage = true;
+        CrateInstance after = TemplateApply.crateLook(look, target);
+        require("mystic_treasure".equals(after.lootboxId) && after.x == 4 && after.protection.preventDamage
+                && "vault_crate".equals(after.crateId), "applying a crate look changed more than the look");
+        require("Block_Break_Treasure".equals(after.visuals.openParticle) && after.visuals.nameplate,
+                "applying a crate look didn't copy the look");
+        require(target.visuals.openParticle.isEmpty(), "applying a crate look changed the crate it was given");
+        List<String> lines = TemplateApply.crateLookLines(target, after);
+        require(lines.size() == 4 && lines.get(0).contains("none") && lines.get(3).contains("off")
+                && lines.get(3).contains("on"), "the crate look's change lines are wrong: " + lines);
+        require(TemplateApply.crateLookLines(after, TemplateApply.crateLook(look, after)).get(0)
+                .contains("Nothing changes"), "a crate that already looks like this reports changes");
+
+        LootBoxTemplate missing = TemplateLibrary.crateLook("bare_look", "Bare", target, "alice", 1L);
+        missing.crate = null;
+        require(TemplateLibrary.problems(missing).contains("the crate look is missing"), "an empty crate look passed");
+        require("Crate look · no effects".equals(TemplateLibrary.summary(TemplateLibrary.crateLook("plain_look",
+                "Plain", new CrateInstance(), "alice", 1L))), "a crate without effects doesn't say so");
+        require(TemplateLibrary.suggestId("spawn_crate", LootBoxTemplate.CRATE_LOOK).equals("spawn_crate_look"),
+                "a crate's id doesn't become a template id");
     }
 
     private static void templateRulesAndIds() {

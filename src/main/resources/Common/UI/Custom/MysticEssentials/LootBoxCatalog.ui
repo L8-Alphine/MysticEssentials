@@ -18,9 +18,26 @@ $C.@Container {
   #Content {
     LayoutMode: Top;
 
-    Label #HeaderInfo {
-      Anchor: (Height: 20, Bottom: 8);
-      Style: $M.@MetaStyle;
+    Group {
+      LayoutMode: Left;
+      Anchor: (Height: 32, Bottom: 8);
+
+      Label #HeaderInfo {
+        FlexWeight: 1;
+        Style: $M.@MetaFitStyle;
+      }
+
+      // Reduced motion (P2-L): paired static buttons, one shown at a time. Each
+      // names the current setting; pressing it switches to the other.
+      $C.@SmallSecondaryTextButton #ReduceMotionButton {
+        @Text = "Motion: Full";
+        @Anchor = (Width: 170, Left: 8);
+      }
+
+      $C.@SmallSecondaryTextButton #FullMotionButton {
+        @Text = "Motion: Reduced";
+        @Anchor = (Width: 170, Left: 8);
+      }
     }
 
     $M.@Section {
@@ -57,6 +74,11 @@ $C.@Container {
       $C.@SecondaryTextButton #PendingButton {
         @Text = "Pending";
         @Anchor = (Width: 160, Left: 8);
+      }
+
+      $C.@SecondaryTextButton #DepositButton {
+        @Text = "Deposit Held Key";
+        @Anchor = (Width: 190, Left: 8);
       }
 
       $M.@Spacer {}

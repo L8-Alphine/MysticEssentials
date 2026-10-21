@@ -46,8 +46,8 @@ $C.@Container {
       }
 
       Label #ResultMeta {
-        Anchor: (Height: 18, Bottom: 2);
-        Style: $M.@MetaStyle;
+        Anchor: (Bottom: 2);
+        Style: $M.@MetaWrapStyle;
       }
 
       Label #Status {

@@ -181,6 +181,9 @@ public final class DraftValidator {
         }
         if (key.uses < 1 || key.uses > 1000) {
             problems.add("uses must be 1-1000");
+        } else if (key.stackable && key.uses != 1) {
+            // Each item of a stack opens once (P2-K); more uses would never be spent.
+            problems.add("a stackable key opens once per item: uses must be 1");
         }
         if (key.expiresAfterDays < 0) {
             problems.add("expiresAfterDays cannot be negative");

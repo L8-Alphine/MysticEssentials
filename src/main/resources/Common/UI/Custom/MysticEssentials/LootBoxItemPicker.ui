@@ -77,8 +77,10 @@ $C.@Container {
       Anchor: (Height: 34, Bottom: 8);
     }
 
+    // Focused on open, like the game's plugin list: the picker exists to search.
     $C.@TextField #SearchInput {
       @Anchor = (Bottom: 8);
+      AutoFocus: true;
       PlaceholderText: "Search item ids...";
     }
 
@@ -112,7 +114,7 @@ $C.@Container {
       Label {
         FlexWeight: 1;
         Anchor: (Left: 14, Right: 14);
-        Style: $M.@CaptionStyle;
+        Style: $M.@HintStyle;
         Text: "Click an item to choose it. Hover one to see its tooltip.";
       }
 

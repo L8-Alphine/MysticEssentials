@@ -590,9 +590,9 @@ The module is disabled by default: set `enabled: true` here **and** `"lootbox": 
 | Block | Controls |
 | --- | --- |
 | `command` | `name`, `aliases` |
-| `opening` | `minIntervalMs`, `requestDedupeMinutes`, `revealDurationMs`, `revealFramesPerSecond`, `allowSkip`, `historySize` |
-| `keys` | `consumeOrder`, `offlineGrant`, `consoleGrantSource`, `maxGrantPerCommand` |
-| `crates` | `preventPlayerBreak`, `preventDamage`, `selectReach` |
+| `opening` | `minIntervalMs`, `requestDedupeMinutes`, `revealDurationMs`, `revealFramesPerSecond`, `allowSkip`, `historySize`, `reducedMotionDefault` |
+| `keys` | `consumeOrder`, `offlineGrant`, `consoleGrantSource`, `maxGrantPerCommand`, `grantLogSize`, `allowConversion` |
+| `crates` | `preventPlayerBreak`, `preventDamage`, `selectReach`, `idleEffectIntervalMs`, `effectRadius`, `defaultIdleParticle`, `defaultOpenParticle`, `defaultOpenSound`, `nameplates`, `nameplateHeight`, `generatedVariants` |
 | `rewards` | `itemOverflow`, `pendingExpiryDays`, `commandAllowlist`, `announceTemplate` |
 | `simulation` | `maxTrials` |
 | `display` | `minDecimals`, `maxDecimals`, `locale` |

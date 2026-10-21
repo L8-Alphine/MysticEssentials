@@ -30,6 +30,10 @@ config's `modules` map **and** `enabled: true` in `modules/lootbox/config.json`.
 5. Items that do not fit in the inventory, and rewards for offline players, go to
    the **pending inbox** (`/lootbox pending`), where they can be claimed later.
 
+The catalog also has **Motion** (full or reduced reveal, see
+[Accessibility](#accessibility)) and **Deposit Held Key**, which works like
+`/lootbox key deposit`.
+
 `/lootbox history` lists the player's own receipts: pool, revision, odds id,
 reward, chance and delivery status.
 
@@ -40,11 +44,16 @@ reward, chance and delivery status.
 | `/lootbox` | Open the catalog | `mysticessentials.lootbox.use` |
 | `/lootbox preview <pool>` | Open a pool's preview | `mysticessentials.lootbox.use` |
 | `/lootbox pending` | Open the pending inbox | `mysticessentials.lootbox.use` |
+| `/lootbox motion [reduced\|full\|default]` | Show or set your reveal motion. Reduced shows each result at once; `default` follows the server's setting | `mysticessentials.lootbox.use` |
+| `/lootbox key deposit` | Turn the key in your active hotbar slot into virtual balance | `mysticessentials.lootbox.use` |
+| `/lootbox key withdraw <keyId> [count]` | Turn virtual balance into key items | `mysticessentials.lootbox.use` |
+| `/lootbox crate effects [on\|off]` | Show or set crate particles and sounds for yourself | `mysticessentials.lootbox.use` |
 | `/lootbox history` | Your own receipts | `mysticessentials.lootbox.history` |
 | `/lootbox history <player>` | Another player's receipts | `mysticessentials.lootbox.audit` |
 | `/lootbox key give <player> <keyId> [count] [virtual] [source=…]` | Issue keys | `mysticessentials.lootbox.keys.give` |
-| `/lootbox key revoke <serial>` | Revoke an issued physical key | `mysticessentials.lootbox.keys.revoke` |
-| `/lootbox key info <serial>` / `key list` | Inspect a key serial / list published keys | `mysticessentials.lootbox.keys` |
+| `/lootbox key revoke <serial\|batch-…>` | Revoke an issued physical key, or every item of a stackable batch | `mysticessentials.lootbox.keys.revoke` |
+| `/lootbox key info <serial\|batch-…>` / `key list` | Inspect a key serial or batch / list published keys | `mysticessentials.lootbox.keys` |
+| `/lootbox key grants <keyId>` | Open the key's Grants page | `mysticessentials.lootbox.keys` |
 | `/lootbox key publish <keyId>` | Publish a key draft | `mysticessentials.lootbox.publish` |
 | `/lootbox publish <pool>` | Publish a pool draft as a new revision | `mysticessentials.lootbox.publish` |
 | `/lootbox rollback <pool> <revision>` | Republish an older revision as a new one | `mysticessentials.lootbox.publish` |
@@ -53,12 +62,19 @@ reward, chance and delivery status.
 | `/lootbox crate select` | Show the block you are looking at | `mysticessentials.lootbox.crates.place` |
 | `/lootbox crate convert <pool> [crateId]` | Bind the block you are looking at to a pool | `mysticessentials.lootbox.crates.place` |
 | `/lootbox crate info` / `list` / `verify` | Inspect crates | `mysticessentials.lootbox.crates.manage` |
-| `/lootbox crate remove [crateId]` / `enable <crateId>` | Unbind or reactivate a crate | `mysticessentials.lootbox.crates.manage` |
+| `/lootbox crate edit [crateId]` | Open the crate editor on the crate you look at, or the one named | `mysticessentials.lootbox.crates.manage` |
+| `/lootbox crate rebind <crateId> <pool>` | Bind a crate to another published pool | `mysticessentials.lootbox.crates.place` |
+| `/lootbox crate remove [crateId] [force]` / `enable <crateId>` | Unbind or reactivate a crate. `force` removes a generated crate without putting its original block back, for a world that no longer exists | `mysticessentials.lootbox.crates.manage` |
 | `/lootbox reconcile <openingId> <regrant\|dismiss>` | Resolve a delivery held for review | `mysticessentials.lootbox.restore` |
+| `/lootbox audit` | Open Audit History | `mysticessentials.lootbox.audit` |
 | `/lootbox admin` | Open the Manager: every pool with its status (Draft, Invalid, Ready, Published, Disabled), search and a status filter | `mysticessentials.lootbox.admin` |
 | Manager: New Pool, Clone, Archive | Write an empty draft (it opens in the editor), copy a draft under a new id, or move a draft to `lootboxes/_archive/` (asks first; nothing is deleted) | `mysticessentials.lootbox.edit` |
 | Manager: Edit | The pool editor. **General**: name (with a coloured preview), description, icon from the item picker, and odds mode; switching between weights and exact percentages converts the numbers and says if anything had to be rounded. **Keys & Rules**: link published keys, cooldown, extra permission. **Rewards**: the reward list with each reward's live chance, plus Add, Duplicate, Up/Down and Delete (asks first). The selected reward's id (fixed once published), name, rarity, weight or percent, and type: an item from the picker with a quantity, an economy amount, a permission node with a duration, or a console command with its allowlisted pattern. Each reward also has an announce switch. Changing a COMMAND reward needs `rewards.command`. **Publish**: the problems that block publishing, and every change from the live revision, chances shown old % → new %. Save Draft writes the file; if someone else changed it meanwhile, the save is refused and you choose Load From Disk or Overwrite | `mysticessentials.lootbox.edit`; Publish also needs `publish` |
-| Manager: Publish, Simulate, Close/Reopen | Publish asks first and only appears when the draft is valid and differs from the live revision | `publish`, `simulate`, `admin` |
+| Manager: Publish, Simulate, Close/Reopen | Publish asks first and only appears when the draft is valid and differs from the live revision. Simulate opens the Simulation screen | `publish`, `simulate`, `admin` |
+| Manager: Crates | The Crate Manager and crate editor (see [Crates](#crates)) | `crates.manage` or `crates.place` |
+| Manager: Audit | Audit History (see [Simulation, audit and templates](#simulation-audit-and-templates)) | `audit` |
+| Manager: Templates | The Template Library | `edit` |
+| Key Manager: Grants | Give a key to a typed name or to online players picked from a list, look up and revoke a serial or batch, and read the key's recent history. More than one key or player asks first; a PAID source is refused and recorded | `keys` to open; `keys.give` to give; `keys.revoke` to revoke |
 | Manager: Keys | The Key Manager: every key with its status and the pools it opens, search, a status filter, New Key, Clone, Archive (asks first) and Publish (asks first; keys already given out keep their look) | `keys`, `edit` or `publish` to open; `edit` for New Key, Clone, Archive, Edit; `publish` for Publish |
 | Key Manager: Edit | The key editor: base item from the picker, name with a colour picker and Bold/Italic switches, five lore lines, uses and expiry, a live preview of the key item, the pools it opens, and its problems and changes. Saves like the pool editor | `edit`; Publish also needs `publish` |
 | `/lootbox reload` | Reload drafts and settings | `mysticessentials.lootbox.admin` |
@@ -138,7 +154,8 @@ A key draft lives in `modules/lootbox/keys/`:
   "name": "<#E7B84D>&lExample Crate Key",
   "lore": ["&7Opens: &fExample Supply Crate"],
   "uses": 1,
-  "expiresAfterDays": 0
+  "expiresAfterDays": 0,
+  "stackable": false
 }
 ```
 
@@ -152,10 +169,51 @@ A key draft lives in `modules/lootbox/keys/`:
 - `keys.consumeOrder` decides which kind is spent first when a player has both.
 - Physical keys given to an offline player go to their pending inbox (or become
   virtual credit with `keys.offlineGrant: VIRTUAL_CREDIT`).
+- **Deposit and withdraw** convert between the two. `/lootbox key deposit` takes
+  the key in the active hotbar slot: a serialized key credits its remaining uses,
+  a stack deposits whole (refused if its batch has fewer units left than the stack
+  holds), and keys that expire can't be deposited. `/lootbox key withdraw <keyId>
+  [count]` issues key items, capped by `keys.maxGrantPerCommand`; each opens once
+  and never expires, and what doesn't fit goes to the pending inbox. A conversion
+  is a small saga: interrupted ones are finished on join and every 5 minutes, and
+  each one is audited. `keys.allowConversion: false` turns both off.
+
+### Stackable keys
+
+Set `"stackable": true` (or Stacking: On in the key editor) to issue a key as one
+stack per grant instead of separate items. Each item of the stack opens once, so a
+stackable key must have `"uses": 1`; publishing refuses more.
+
+The guarantee is weaker than a serialized key's. The stack's batch counter decides
+how many openings are left, not the item, so a copied stack item uses up the
+batch rather than being refused on sight. Stacks only form when the base item's
+stack size is above 1, and keys from different grants never merge. Revoking the
+batch (`/lootbox key revoke batch-…`) kills every item in it.
 
 ## Crates
 
-Look at a block and bind it:
+**From the Manager:** `/lootbox admin` → Crates opens the **Crate Manager**: every
+crate with its world, position, pool and status, with search, a filter, Edit,
+Disable/Enable, Remove (asks first) and Verify This World. **Convert Looked-At
+Block** opens the crate editor on the block you are looking at, as steps:
+
+1. **Block** and **Check**: the block, and the compatibility report with any
+   warnings.
+2. **Pool**: a published pool to open.
+3. **Use**: preview first (the default), or straight to the confirm screen, which
+   still lists every reward with its exact odds.
+4. **Protect**: protection this crate adds; it can only tighten the server's.
+5. **Visuals**: particles, opening sound and floating name.
+6. **Finish**: Create (or Save), and **Test in World**, which is a real opening
+   and spends a key.
+
+A crate the server turned off shows a **Repair** step: turn it back on, use the
+block that is there now, or remove it. A save is refused if someone else saved
+the crate since you opened it. Converting needs `crates.place`; Edit,
+Disable/Enable, Remove and Verify need `crates.manage`; binding an existing crate
+to another pool needs both.
+
+**From commands:** look at a block and bind it:
 
 ```text
 /lootbox crate select
@@ -177,6 +235,65 @@ they hit one. If a crate's block is replaced by another block, the crate disable
 itself the next time someone uses it; if the environment destroys it, the crate is
 disabled and online staff with `crates.manage` are alerted. `/lootbox crate verify`
 checks every crate in your world.
+
+### Crate visuals
+
+Each crate can have idle particles, opening particles and an opening sound. They
+show only to players within `crates.effectRadius` who haven't turned them off with
+`/lootbox crate effects off`. New crates get the `crates.default*` effects;
+crates placed before this update keep none until you choose some.
+
+**Floating names** (`crates.nameplates`, off by default and not yet tested in a
+game client) show the crate's name, or its pool's, above it. They are the same for
+every player, and the effects switch doesn't hide them. Glow is not supported.
+
+### Plain blocks (generated variants)
+
+With `crates.generatedVariants: true` (off by default, not yet tested in a game
+client), a plain block such as stone can become a crate. The module writes a
+look-alike of the block that carries a Use interaction into
+`mods/MysticEssentialsGenerated/` and swaps it in, keeping the rotation. Removing
+the crate puts the original block back, which needs the crate's chunk loaded. At
+startup every recorded look-alike is checked and unused ones are deleted. Only
+single blocks without block data, states or connections qualify. Don't edit that
+folder, and make sure `DefaultModsEnabled` allows it to load at boot.
+
+## Simulation, audit and templates
+
+- **Simulation** (Manager → Simulate): runs 100,000 draws straight away (or
+  `simulation.maxTrials` if lower), then any number up to that cap. Each reward
+  shows its exact chance, the share it actually got, the count against the
+  expected count, and the gap, coloured by how unusual it is. If the rarest reward
+  is expected fewer than 10 times, it says how many draws are needed. Nothing is
+  awarded, spent or recorded, and each player runs one simulation at a time.
+- **Audit History** (Manager → Audit, or `/lootbox audit`): filter by pool or
+  target, actor or player (a name is looked up), action or group, and time window;
+  10 records a page, newest first. **Export** writes the filtered records to
+  `exports/audit-<yyyyMMdd-HHmmss>.json` or `.csv` in the module's data folder
+  (times in UTC; CSV escapes values that look like spreadsheet formulas) and
+  records the export. Reading is bounded: one hour of records at a time, at most
+  744 hours a page, and 100,000 records an export.
+- **Template Library** (Manager → Templates): save a **key look** (base item,
+  name, lore, uses, expiry) from a key draft, a **reward set** from a pool draft,
+  or a **crate look** (particles, sound, floating name) from a placed crate. Apply
+  a look to a key draft or a crate, insert a set into a pool draft (reward ids
+  already in the pool get new ones), rename, or delete (the file moves to
+  `templates/_archive/`). Applying shows what changes first and is refused if the
+  target changed meanwhile. It writes the key or pool draft only, never publishing;
+  a crate look changes the placed crate at once and also needs `crates.manage`.
+
+## Accessibility
+
+- **Reduced motion:** `/lootbox motion reduced`, or the Catalog's Motion button,
+  shows each reveal's result at once. The odds and the result never change, only
+  how they are shown. `/lootbox motion default` follows `opening.reducedMotionDefault`.
+  Crate particles and sounds have their own switch, `/lootbox crate effects`.
+- Every reward's exact chance stays on screen through preview, confirm, reveal and
+  result.
+- Hints, notes and odds read at 4.5:1 contrast or better, long names shrink to fit
+  their row, and long lines (problems, changes, lore) wrap.
+- Windows are no larger than the game's own pages (1050 × 700), so they fit
+  wherever the game's do.
 
 ## Safety and recovery
 
@@ -223,19 +340,27 @@ modules/lootbox/config.json
 | `opening.revealDurationMs` / `revealFramesPerSecond` | `4000` / `10` | Reveal animation; 0 ms reveals immediately |
 | `opening.allowSkip` | `true` | Show the Skip button on the reveal |
 | `opening.historySize` | `50` | Receipts kept per player |
+| `opening.reducedMotionDefault` | `false` | Reduced motion for players who never chose |
 | `keys.consumeOrder` | `VIRTUAL_FIRST` | Or `PHYSICAL_FIRST` |
 | `keys.offlineGrant` | `PENDING_INBOX` | Or `VIRTUAL_CREDIT` |
 | `keys.consoleGrantSource` | `ADMIN_GRANT` | Source recorded for console grants |
-| `keys.maxGrantPerCommand` | `64` | Most keys one `key give` may issue |
+| `keys.maxGrantPerCommand` | `64` | Most keys one `key give` or `key withdraw` may issue |
+| `keys.grantLogSize` | `100` | Entries kept in each key's grant history |
+| `keys.allowConversion` | `true` | Allow `key deposit` and `key withdraw` |
 | `crates.preventPlayerBreak` / `preventDamage` | `true` / `true` | Crate protection |
 | `crates.selectReach` | `10` | How far `crate select`/`convert` look |
+| `crates.idleEffectIntervalMs` | `2000` | How often idle particles play while players are near |
+| `crates.effectRadius` | `24` | How near a player must be to see crate effects |
+| `crates.defaultIdleParticle` / `defaultOpenParticle` / `defaultOpenSound` | `Block_Treasure_Sparks` / `Block_Break_Treasure` / `SFX_Chest_Legendary_Open` | Effects new crates start with |
+| `crates.nameplates` / `nameplateHeight` | `false` / `1.25` | Floating crate names, and how high above the block |
+| `crates.generatedVariants` | `false` | Let plain blocks become crates through generated look-alikes |
 | `rewards.itemOverflow` | `PENDING_INBOX` | Where items that do not fit go |
 | `rewards.pendingExpiryDays` | `30` | Pending rewards expire after this many days |
 | `rewards.commandAllowlist` | one example | `{id, pattern}` pairs for command rewards |
 | `rewards.announceTemplate` | — | Broadcast for `announce` rewards; `{player}` `{reward}` `{pool}` |
-| `simulation.maxTrials` | `1000000` | Cap for `/lootbox simulate` |
+| `simulation.maxTrials` | `1000000` | Cap for `/lootbox simulate` and the Simulation screen |
 | `display.minDecimals` / `maxDecimals` / `locale` | `2` / `8` / `en-US` | How chances are formatted |
-| `audit.retentionDays` | `400` | Audit records older than this are swept |
+| `audit.retentionDays` | `400` | Audit records older than this are swept; shown in Audit History |
 
 ## Data
 
@@ -244,10 +369,14 @@ modules/lootbox/config.json
 | `modules/lootbox/lootboxes/*.json` | Pool drafts (edit these) |
 | `modules/lootbox/keys/*.json` | Key drafts (edit these) |
 | `modules/lootbox/lootboxes/_archive/`, `keys/_archive/` | Archived drafts, named `<id>-<yyyyMMddHHmmss>.json` (UTC; a key id's `:` becomes `.`); never loaded. Move a file back to restore it |
+| `modules/lootbox/templates/*.json`, `templates/_archive/` | Template Library files, and deleted ones |
+| `modules/lootbox/exports/` | Audit History exports |
+| `mods/MysticEssentialsGenerated/` | Generated crate look-alikes (don't edit) |
 | `data/modules/lootbox/secret.key` | Key-signing secret (private) |
 | `lootbox_def`, `lootbox_rev`, `lootbox_keydef` | Each pool's active revision and status, published pool revisions, published key definitions |
 | `lootbox_player`, `lootbox_serial`, `lootbox_open`, `lootbox_pending` | Player balances and receipts, key serials, openings, pending inboxes |
 | `lootbox_crate`, `lootbox_audit` | Crates and hourly audit counters |
+| `lootbox_keylog`, `lootbox_batch`, `lootbox_crate_prefs` | Each key's grant history, stackable-key batches, players who turned crate effects off |
 
 The storage namespaces live in the configured storage provider (JSON files under
 `data/` by default).

@@ -26,7 +26,7 @@ $C.@Container {
     LayoutMode: Top;
 
     Label #Notice {
-      Anchor: (Height: 20, Bottom: 6);
+      Anchor: (Bottom: 6);
       Style: $M.@BodyStyle;
       Visible: false;
     }
@@ -59,7 +59,7 @@ $C.@Container {
 
           Label #BaseItemName {
             FlexWeight: 1;
-            Style: $M.@ValueStyle;
+            Style: $M.@ValueFitStyle;
           }
 
           $C.@SecondaryTextButton #BaseItemButton {
@@ -167,7 +167,7 @@ $C.@Container {
           Label #StackHint {
             FlexWeight: 1;
             Anchor: (Left: 10);
-            Style: $M.@CaptionStyle;
+            Style: $M.@HintStyle;
           }
         }
       }
@@ -208,12 +208,12 @@ $C.@Container {
 
               Label #PreviewName {
                 Anchor: (Height: 22);
-                Style: $M.@SubheadingStyle;
+                Style: $M.@SubheadingFitStyle;
               }
 
               Label #PreviewMeta {
                 Anchor: (Height: 16);
-                Style: $M.@MetaStyle;
+                Style: $M.@MetaFitStyle;
               }
             }
           }
@@ -229,7 +229,7 @@ $C.@Container {
         }
 
         Label #OpensLine {
-          Anchor: (Height: 36, Bottom: 10);
+          Anchor: (Bottom: 10);
           Style: $M.@BodyMutedStyle;
         }
 

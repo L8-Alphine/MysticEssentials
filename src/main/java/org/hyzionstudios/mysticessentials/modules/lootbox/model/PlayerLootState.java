@@ -39,6 +39,12 @@ public final class PlayerLootState {
      * recovery finishes it from this record.
      */
     public List<Conversion> conversions = new ArrayList<>();
+    /**
+     * The player's reduced-motion choice (P2-L): {@code true} reveals results
+     * without animation, {@code false} always animates, {@code null} follows
+     * {@code opening.reducedMotionDefault}. See {@code MotionRules}.
+     */
+    public Boolean reducedMotion;
 
     /** The conversion with {@code conversionId}, or {@code null}. */
     public Conversion conversion(String conversionId) {

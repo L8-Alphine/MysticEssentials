@@ -32,12 +32,12 @@ Button #Row {
 
       Label #Name {
         Anchor: (Height: 18);
-        Style: $M.@RowNameStyle;
+        Style: $M.@RowNameFitStyle;
       }
 
       Label #Meta {
         Anchor: (Height: 14);
-        Style: $M.@RowMetaStyle;
+        Style: $M.@RowMetaFitStyle;
       }
     }
 

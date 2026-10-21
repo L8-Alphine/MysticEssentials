@@ -1,9 +1,11 @@
 # Mystic Essentials Changelog
 
-## Unreleased — LootBox Creator, part 1
+## Unreleased — LootBox Creator (Phase 2)
 
-The first part of the in-game LootBox creator: the Manager and the pool editor,
-with which a pool can be built and published without touching its file.
+The in-game LootBox creator. Pools, keys and crates can now be built, published,
+placed and looked after without touching a file or typing a staff command, and
+the player screens gained reduced motion and a readability pass. None of these
+screens has been tried in a game client yet.
 
 ### LootBox
 
@@ -50,6 +52,87 @@ with which a pool can be built and published without touching its file.
   and Publish work like the pool editor.
 - New permission `mysticessentials.lootbox.edit` for New Pool, Clone, Archive and
   the editors; `mysticessentials.lootbox.keys` also opens the Key Manager.
+- **Key grants** (Key Manager → Grants, or `/lootbox key grants <keyId>`): give a
+  key to a typed player name or to online players picked from a list, look up and
+  revoke a serial or a batch, and read the key's recent history. Giving more than
+  one key, or to more than one player, asks first. A PAID source is still refused,
+  and the refusal is recorded. Viewing needs `keys`, giving `keys.give` and
+  revoking `keys.revoke`, each checked again on every press.
+- **Key deposit and withdraw**: `/lootbox key deposit` turns the key in the active
+  hotbar slot into virtual balance (a serialized key credits its remaining uses;
+  keys that expire can't be deposited). `/lootbox key withdraw <keyId> [count]`
+  turns balance back into key items, which open once and never expire; what
+  doesn't fit goes to `/lootbox pending`. Both run as a recoverable saga, finished
+  on join and by the 5-minute sweep, and every conversion is audited. The Catalog
+  has a **Deposit Held Key** button too. `keys.allowConversion` switches both off.
+- **Stackable keys** (opt-in per key, Stacking: On in the key editor): a grant is
+  issued as one stack instead of separate items, and each item of the stack opens
+  once. A stack is weaker against duplication: the batch counter, not the item,
+  decides how many openings are left, so a copied stack item uses up the batch.
+  Stacks only form when the base item stacks, and different grants never merge.
+  `key info` and `key revoke` accept `batch-…` ids; revoking a batch kills every
+  item in it. A stackable key must have 1 use; publishing refuses more.
+- **Crate Manager** (Manager → Crates): every placed crate with its world,
+  position, pool and status, with search, a filter, Edit, Disable/Enable, Remove
+  (asks first) and Verify This World. **Convert Looked-At Block** opens the crate
+  editor on the block you look at.
+- **Crate editor**: the placement workflow as steps. Block and Check (the
+  compatibility report and its warnings), Pool (published pools only), Use (preview
+  first, or straight to the confirm screen, which still lists every reward with its
+  exact odds), Protect (can only tighten the server's protection), Visuals, and
+  Finish (Create or Save, and Test in World, which is a real opening and spends a
+  key). Crates the server turned off get a Repair step: turn it back on, use the
+  block that is there now, or remove it. A save is refused if someone else saved
+  the crate since you opened it.
+- New crate commands: `/lootbox crate edit [crateId]`, `crate rebind <crateId>
+  <pool>`, `crate remove <crateId> [force]`, and `crate effects [on|off]` for
+  players. `crate select` lists compatibility warnings.
+- **Crate visuals**: idle and opening particles and an opening sound per crate,
+  shown only to nearby players who haven't turned them off. New crates get the
+  defaults from `crates.defaultIdleParticle`, `defaultOpenParticle` and
+  `defaultOpenSound`; existing crates keep none. **Floating names** (off by
+  default, `crates.nameplates`) are the same for everyone. Glow is not supported.
+- **Generated block variants** (off by default, `crates.generatedVariants`): a
+  plain block can become a crate through a look-alike written to
+  `mods/MysticEssentialsGenerated/`. The swap keeps rotation, removing the crate
+  puts the original back, and unused look-alikes are cleaned up at startup. Only
+  single blocks without block data, states or connections qualify. Removing such a
+  crate needs its chunk loaded; `crate remove <id> force` skips the restore.
+- **Simulation** (Manager → Simulate): runs 100,000 draws at once (or
+  `simulation.maxTrials` if lower), then any number up to that cap. Each reward
+  shows its exact chance, the share it got, the count against the expected count
+  and the gap, with two bars. It warns when the rarest reward is expected fewer
+  than 10 times. Nothing is awarded, spent or recorded.
+- **Audit History** (Manager → Audit, or `/lootbox audit`): filter by pool or
+  target, actor or player, action or group, and time window, 10 records a page,
+  newest first. **Export** writes the filtered records as JSON or CSV to
+  `exports/` in the module's data folder and records the export.
+- **Template Library** (Manager → Templates): save a key look from a key draft, a
+  reward set from a pool draft, or a crate look (particles, sound, floating name)
+  from a placed crate. Apply a look to a key draft or a crate, insert a set into
+  a pool draft, rename or delete (to `templates/_archive/`). Applying shows what
+  changes first and is refused if the target changed meanwhile. Applying a crate
+  look also needs `crates.manage`.
+- **Reduced motion**: `/lootbox motion [reduced|full|default]` and a Motion button
+  on the Catalog. Reduced shows each reveal's result at once; the odds and the
+  result never change. `opening.reducedMotionDefault` sets it for players who
+  never chose.
+- **Readability**: hints, notes and odds footers on the LootBox screens now read
+  at 4.5:1 contrast or better. Long names shrink to fit their row instead of
+  running past it; problem lists, diffs, confirmation lines, preview rules and the
+  key lore preview wrap. The item picker's search box has focus when it opens. No
+  LootBox window is larger than the game's own pages (1050 × 700).
+
+### Changed
+
+- The theme's dim text colour (section titles, key labels, counts) is a little
+  lighter on every Mystic Essentials page (`#778292` → `#858e9d`), so it reads at
+  4.5:1 on the window background.
+
+### Fixed
+
+- Text fields in the LootBox creator screens were bound to `##Id.Value`, so they
+  would neither show nor send their values on a client.
 
 ### Verification
 
@@ -59,9 +142,19 @@ with which a pool can be built and published without touching its file.
   styling (colour, bold, italic) and the key diff.
 - New `verifyLootBoxDrafts` check: save/load round trips, conflict detection,
   clone and archive, and the Draft → Invalid → Ready → Published lifecycle.
+- New `verifyLootBoxKeys`: the bounded grant history, the conversion saga's
+  rules and recovery, and stack spending, splitting and revoking.
+- New `verifyLootBoxCrates`: compatibility, repair decisions, protection and
+  crate documents, including old ones.
+- New `verifyLootBoxScreens`: simulation rows and warnings, audit filters,
+  paging, export escaping and caps, and templates (key looks, reward sets with
+  colliding ids, crate looks, optimistic saves).
+- New `verifyLootBoxAccessibility`: reduced motion, the contrast of every theme
+  text colour and every LootBox label's runtime colour, wrapping and fitting text,
+  window sizes and focus.
 - On a 0.7.2 dev server, republishing an existing pool and key still answers
-  "unchanged" after the draft store change. The Manager and the editor still
-  need an in-game test.
+  "unchanged" after the draft store change. Every creator screen, reduced motion,
+  floating names and generated variants still need an in-game test.
 
 ## 1.0.6 — LootBox Module
 
