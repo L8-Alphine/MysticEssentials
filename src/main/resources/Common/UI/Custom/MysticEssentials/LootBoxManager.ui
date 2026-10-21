@@ -40,6 +40,11 @@ $C.@Container {
         @Anchor = (Width: 110, Left: 8);
       }
 
+      $C.@SecondaryTextButton #CratesButton {
+        @Text = "Crates";
+        @Anchor = (Width: 110, Left: 6);
+      }
+
       $C.@SecondaryTextButton #CreateButton {
         @Text = "New Pool";
         @Anchor = (Width: 150, Left: 6);

@@ -253,4 +253,38 @@ public final class LootBoxStorage {
             UnaryOperator<org.hyzionstudios.mysticessentials.modules.lootbox.model.KeyBatch> change) {
         return update(BATCH_NS, batch, org.hyzionstudios.mysticessentials.modules.lootbox.model.KeyBatch.class, change);
     }
+
+    // ----- Crate effects (P2-I) -------------------------------------------------
+
+    static final String CRATE_PREFS_NS = "lootbox_crate_prefs";
+    private static final String EFFECTS_OFF_KEY = "effects_off";
+
+    /** Players who turned crate particles and sounds off, as UUID strings. */
+    public CompletableFuture<List<String>> loadCrateEffectsOff() {
+        return storage().load(CRATE_PREFS_NS, EFFECTS_OFF_KEY).thenApply(element -> {
+            List<String> players = new java.util.ArrayList<>();
+            if (element != null && element.isJsonArray()) {
+                element.getAsJsonArray().forEach(entry -> players.add(entry.getAsString()));
+            }
+            return players;
+        });
+    }
+
+    /** Adds or removes {@code player} from the crate-effects opt-out list in one read-modify-write. */
+    public CompletableFuture<Void> setCrateEffectsOff(UUID player, boolean off) {
+        String id = player.toString();
+        return storage().update(CRATE_PREFS_NS, EFFECTS_OFF_KEY, element -> {
+            JsonArray players = element != null && element.isJsonArray() ? element.getAsJsonArray() : new JsonArray();
+            JsonArray next = new JsonArray();
+            players.forEach(entry -> {
+                if (!entry.getAsString().equals(id)) {
+                    next.add(entry);
+                }
+            });
+            if (off) {
+                next.add(id);
+            }
+            return next;
+        }).thenApply(stored -> null);
+    }
 }

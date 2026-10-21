@@ -160,6 +160,24 @@ public abstract class MysticPage extends CustomUIPage {
             Map.entry("ResultMeta", TEXT_MUTED),
             Map.entry("RosterCounts", GOLD_SOFT),
             Map.entry("State", GOLD_SOFT),
+            // LootBox crates track.
+            Map.entry("CrateWorld", TEXT_BODY),
+            Map.entry("CratePosition", TEXT_BODY),
+            Map.entry("CrateBlock", TEXT_BODY),
+            Map.entry("CrateRotation", TEXT_BODY),
+            Map.entry("CrateBlockStatus", TEXT_BODY),
+            Map.entry("CrateSelectHint", TEXT_FAINT),
+            Map.entry("CrateIdFixed", TEXT_BODY),
+            Map.entry("CrateVerdict", TEXT_BODY),
+            Map.entry("CratePoolRevision", TEXT_BODY),
+            Map.entry("CratePoolRewards", TEXT_BODY),
+            Map.entry("CratePoolKeys", TEXT_BODY),
+            Map.entry("CrateBehaviour", TEXT_HI),
+            Map.entry("CrateBreakState", TEXT_BODY),
+            Map.entry("CrateDamageState", TEXT_BODY),
+            Map.entry("CrateRepairReason", TEXT_HI),
+            Map.entry("CrateRepairStatus", TEXT_BODY),
+            Map.entry("CrateNameplateState", TEXT_BODY),
             // LootBox editor kit: picker, confirmation, tab bar. A server-written
             // button label takes the game's button text colour so it matches a
             // static one.

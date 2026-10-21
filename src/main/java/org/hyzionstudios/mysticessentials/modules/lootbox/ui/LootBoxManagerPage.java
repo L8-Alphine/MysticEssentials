@@ -154,6 +154,8 @@ public final class LootBoxManagerPage extends MysticPage {
         cmd.set("#KeysButton.Visible", canEdit || player.hasPermission(Permissions.LOOTBOX_KEYS)
                 || player.hasPermission(Permissions.LOOTBOX_PUBLISH));
         event.addEventBinding(CustomUIEventBindingType.Activating, "#KeysButton", INPUTS.event("keys"));
+        cmd.set("#CratesButton.Visible", CrateManagerPage.mayOpen(player));
+        event.addEventBinding(CustomUIEventBindingType.Activating, "#CratesButton", INPUTS.event("crates"));
         buildForm(cmd, event);
 
         boolean hasNotice = state.notice() != null && !state.notice().isBlank();
@@ -273,6 +275,13 @@ public final class LootBoxManagerPage extends MysticPage {
                     reopen(ref, store, new KeyManagerPage(core, player, module, KeyManagerPage.State.initial()));
                 } else {
                     allowed(Permissions.LOOTBOX_KEYS);
+                }
+            }
+            case "crates" -> {
+                if (CrateManagerPage.mayOpen(player)) {
+                    reopen(ref, store, new CrateManagerPage(core, player, module, CrateManagerPage.State.initial()));
+                } else {
+                    allowed(Permissions.LOOTBOX_CRATES_MANAGE);
                 }
             }
             case "formCancel" -> reopen(ref, store, page(next.withForm(null)));

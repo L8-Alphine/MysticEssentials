@@ -40,12 +40,24 @@ public final class LootBoxUi {
     }
 
     public void openPreview(PlayerRef player, String lootboxId, String crateId) {
+        openPreview(player, lootboxId, crateId, false);
+    }
+
+    /**
+     * Opens the preview, or with {@code direct} (a crate set to
+     * {@code DIRECT_CONFIRM}) the confirm screen, which lists every reward with
+     * its exact odds too. Anything that stops the opening (no key, cooldown)
+     * still shows on the preview.
+     */
+    public void openPreview(PlayerRef player, String lootboxId, String crateId, boolean direct) {
         module.opening().preview(player, lootboxId, crateId).thenAccept(preview -> {
             if (preview.revision() == null) {
                 core.getMessageService().sendKey(player, "lootbox-unknown-pool", Map.of("pool", String.valueOf(lootboxId)));
                 return;
             }
-            core.platform().openPage(player, new LootBoxPages.PreviewPage(core, player, module, preview));
+            core.platform().openPage(player, direct && preview.blockers().isEmpty()
+                    ? new LootBoxPages.ConfirmPage(core, player, module, preview)
+                    : new LootBoxPages.PreviewPage(core, player, module, preview));
         });
     }
 

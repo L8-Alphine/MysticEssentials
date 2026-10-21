@@ -85,6 +85,31 @@ public final class LootBoxConfig {
         public boolean preventDamage = true;
         /** How far /lootbox crate convert looks for the targeted block. */
         public double selectReach = 10.0;
+
+        /** How often idle particles are refreshed while players are near a crate (at least 500). */
+        public long idleEffectIntervalMs = 2000L;
+        /** How far from a crate players see its particles. */
+        public double effectRadius = 24.0;
+        /** Effects a crate starts with when it is made in the crate editor; blank means none. */
+        public String defaultIdleParticle = "Block_Treasure_Sparks";
+        public String defaultOpenParticle = "Block_Break_Treasure";
+        public String defaultOpenSound = "SFX_Chest_Legendary_Open";
+        /**
+         * Floating crate names through a nameplate holder entity. UNVERIFIED in game:
+         * the nameplate spike (S4) was never run, so this is off until someone has
+         * seen it work. Nameplates are global; they can't be shown per player.
+         */
+        public boolean nameplates = false;
+        /** Height of the floating name above the crate block's base, in blocks. */
+        public double nameplateHeight = 1.25;
+        /**
+         * Let plain blocks (no Use interaction) become crates by swapping them for a
+         * generated look-alike in mods/MysticEssentialsGenerated/. UNVERIFIED in game:
+         * the server side passed spike S2, but nobody has seen a swapped block in a
+         * client yet. Off: plain blocks are refused, as before. Existing generated
+         * crates keep working and still restore their block when this is off.
+         */
+        public boolean generatedVariants = false;
     }
 
     public static final class Rewards {

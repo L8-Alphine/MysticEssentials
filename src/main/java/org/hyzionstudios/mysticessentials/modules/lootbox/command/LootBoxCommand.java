@@ -11,10 +11,12 @@ import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.modules.lootbox.LootBoxModule;
 import org.hyzionstudios.mysticessentials.modules.lootbox.api.GrantSource;
 import org.hyzionstudios.mysticessentials.modules.lootbox.hytale.BlockTargets;
+import org.hyzionstudios.mysticessentials.modules.lootbox.hytale.CrateVisuals;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.CrateInstance;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.KeySerial;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.LootBoxRevision;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.CrateService;
+import org.hyzionstudios.mysticessentials.modules.lootbox.ui.editor.CrateEditorPage;
 import org.hyzionstudios.mysticessentials.modules.lootbox.validate.DraftValidator;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommand;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommandSender;
@@ -30,7 +32,7 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
  *   <li>{@code key give|revoke|info|list|publish|grants …}; players' {@code key deposit} and
  *       {@code key withdraw <keyId> [count]};</li>
  *   <li>{@code publish|rollback|disable|enable …}; {@code simulate <id> [draws]};</li>
- *   <li>{@code crate select|convert|remove|info|verify|enable …};</li>
+ *   <li>{@code crate select|convert|edit|rebind|remove|info|verify|enable …};</li>
  *   <li>{@code reconcile <openingId> regrant|dismiss}; {@code admin}; {@code reload}.</li>
  * </ul>
  *
@@ -403,10 +405,14 @@ public final class LootBoxCommand extends MysticCommand {
                         return;
                     }
                     Optional<CrateInstance> crate = module.crates().at(block.world(), block.x(), block.y(), block.z());
+                    var report = module.crates().check(block, crate.orElse(null));
                     sender.reply("&7Looking at &f" + block.key() + " &7at &f" + block.x() + "," + block.y() + ","
                             + block.z() + (crate.map(c -> " &d- crate " + c.crateId + " → " + c.lootboxId
                                     + (c.disabled ? " &c(disabled: " + c.disabledReason + ")" : "")).orElse(
-                                    block.hasUse() ? " &a- can become a crate" : " &c- no Use interaction")));
+                                    report.ok() ? " &a- can become a crate" : " &c- " + report.problem())));
+                    if (crate.isEmpty()) {
+                        report.warnings().forEach(warning -> sender.reply("&e! " + warning));
+                    }
                 }));
             }
             case "convert" -> {
@@ -426,7 +432,7 @@ public final class LootBoxCommand extends MysticCommand {
                 player(sender).ifPresent(player -> onWorld(sender, player, (store, entity) -> {
                     CrateService.ConvertResult result = module.crates().convert(
                             BlockTargets.target(entity, store, module.config().crates.selectReach), lootboxId, crateId,
-                            sender.name());
+                            CrateVisuals.defaults(module.config().crates), sender.name());
                     if (result.problem() != null) {
                         sender.replyKey("lootbox-crate-incompatible", Map.of("reason", result.problem()));
                         return;
@@ -443,17 +449,31 @@ public final class LootBoxCommand extends MysticCommand {
                     return;
                 }
                 if (args.length > 2) {
-                    sender.reply(module.crates().remove(args[2], sender.name()).map(c -> "&aRemoved crate &f" + c.crateId)
-                            .orElse("&cNo crate called &f" + args[2]));
+                    boolean force = args.length > 3 && args[3].equalsIgnoreCase("force");
+                    CrateInstance named = module.crates().get(args[2]).orElse(null);
+                    if (named == null) {
+                        sender.reply("&cNo crate called &f" + args[2]);
+                        return;
+                    }
+                    // A generated crate puts its original block back, which needs its world's thread.
+                    var world = CrateInstance.KIND_GENERATED.equals(named.kind)
+                            ? core.platform().world(named.worldId).or(() -> core.platform().world(named.worldName))
+                                    .orElse(null)
+                            : null;
+                    if (world == null) {
+                        sender.reply(removed(module.crates().remove(named.crateId, null, force, sender.name())));
+                    } else {
+                        world.execute(() -> sender.reply(removed(module.crates().remove(named.crateId, world, force,
+                                sender.name()))));
+                    }
                     return;
                 }
                 player(sender).ifPresent(player -> onWorld(sender, player, (store, entity) -> {
                     BlockTargets.Block block = BlockTargets.target(entity, store, module.config().crates.selectReach);
                     Optional<CrateInstance> crate = block == null ? Optional.empty()
                             : module.crates().at(block.world(), block.x(), block.y(), block.z());
-                    sender.reply(crate.flatMap(c -> module.crates().remove(c.crateId, sender.name()))
-                            .map(c -> "&aRemoved crate &f" + c.crateId)
-                            .orElse("&cLook at a crate, or name it: /lootbox crate remove <crateId>"));
+                    sender.reply(crate.map(c -> removed(module.crates().remove(c.crateId, block.world(), false,
+                            sender.name()))).orElse("&cLook at a crate, or name it: /lootbox crate remove <crateId>"));
                 }));
             }
             case "enable" -> {
@@ -474,9 +494,9 @@ public final class LootBoxCommand extends MysticCommand {
                     return;
                 }
                 player(sender).ifPresent(player -> onWorld(sender, player, (store, entity) -> {
-                    var lines = module.crates().verify(store.getExternalData().getWorld());
-                    sender.reply("&d&lCrates in this world &7(" + lines.size() + ")");
-                    lines.forEach(line -> sender.reply("&7- " + line));
+                    var verified = module.crates().verify(store.getExternalData().getWorld());
+                    sender.reply("&d&lCrates in this world &7(" + verified.checked() + ")");
+                    verified.lines().forEach(line -> sender.reply("&7- " + line));
                 }));
             }
             case "list" -> {
@@ -487,8 +507,74 @@ public final class LootBoxCommand extends MysticCommand {
                 module.crates().list().forEach(crate -> sender.reply("&7- &f" + crate.crateId + " &7→ &f"
                         + crate.lootboxId + " &7at " + crate.position() + (crate.disabled ? " &c(disabled)" : "")));
             }
-            default -> usage(sender, "/lootbox crate <select|convert|remove|enable|verify|list|info> …");
+            case "rebind" -> {
+                if (!allowed(sender, Permissions.LOOTBOX_CRATES_PLACE)) {
+                    return;
+                }
+                if (args.length < 4) {
+                    usage(sender, "/lootbox crate rebind <crateId> <pool>");
+                    return;
+                }
+                String lootboxId = args[3].toLowerCase(Locale.ROOT);
+                if (module.registry().active(lootboxId).isEmpty()) {
+                    sender.reply("&c" + lootboxId + " has no published revision; publish it first.");
+                    return;
+                }
+                sender.reply(module.crates().get(args[2]).map(crate -> {
+                    String previous = crate.lootboxId;
+                    module.crates().rebind(crate, lootboxId, sender.name());
+                    return "&aCrate &f" + crate.crateId + " &anow opens &f" + lootboxId + " &7(was " + previous + ").";
+                }).orElse("&cNo crate called &f" + args[2]));
+            }
+            case "edit" -> {
+                if (!allowed(sender, Permissions.LOOTBOX_CRATES_MANAGE)) {
+                    return;
+                }
+                player(sender).ifPresent(player -> onWorld(sender, player, (store, entity) -> {
+                    Optional<CrateInstance> crate;
+                    if (args.length > 2) {
+                        crate = module.crates().get(args[2]);
+                    } else {
+                        BlockTargets.Block block = BlockTargets.target(entity, store, module.config().crates.selectReach);
+                        crate = block == null ? Optional.empty()
+                                : module.crates().at(block.world(), block.x(), block.y(), block.z());
+                    }
+                    if (crate.isEmpty()) {
+                        sender.reply("&cLook at a crate, or name it: /lootbox crate edit <crateId>");
+                        return;
+                    }
+                    core.platform().openPage(player, CrateEditorPage.forCrate(core, player, module, crate.get(), null));
+                }));
+            }
+            case "effects" -> {
+                if (!allowed(sender, Permissions.LOOTBOX_USE)) {
+                    return;
+                }
+                player(sender).ifPresent(player -> {
+                    boolean on = module.visuals().effectsOn(player.getUuid());
+                    if (args.length < 3) {
+                        sender.replyKey("lootbox-crate-effects-status", Map.of("state", on ? "on" : "off"));
+                        return;
+                    }
+                    String choice = args[2].toLowerCase(Locale.ROOT);
+                    if (!choice.equals("on") && !choice.equals("off")) {
+                        usage(sender, "/lootbox crate effects <on|off>");
+                        return;
+                    }
+                    module.visuals().setEffects(player.getUuid(), choice.equals("on"));
+                    sender.replyKey(choice.equals("on") ? "lootbox-crate-effects-on" : "lootbox-crate-effects-off");
+                });
+            }
+            default -> usage(sender, "/lootbox crate <select|convert|edit|rebind|remove|enable|verify|list|info|effects> …");
         }
+    }
+
+    private static String removed(CrateService.RemoveResult result) {
+        return switch (result) {
+            case CrateService.Removed done -> "&aRemoved crate &f" + done.crate().crateId
+                    + (done.note() == null ? "" : " &7(" + done.note() + ")");
+            case CrateService.NotRemoved not -> "&cNot removed: " + not.reason() + ".";
+        };
     }
 
     private void reconcile(MysticCommandSender sender, String[] args) {
