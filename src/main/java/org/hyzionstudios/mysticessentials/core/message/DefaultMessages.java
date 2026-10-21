@@ -536,6 +536,8 @@ public final class DefaultMessages {
         o.addProperty("lootbox-publish-unchanged", "&7{pool} is unchanged; revision {revision} stays live.");
         o.addProperty("lootbox-publish-failed", "&cCould not publish &f{pool}&c: {reason}");
         o.addProperty("lootbox-reloaded", "&aLootBox drafts and settings reloaded ({pools} pools, {keys} keys).");
+        // LootBox screens (P2-H): the Audit History export says where the file went.
+        o.addProperty("lootbox-audit-exported", "&aExported {count} audit record(s) to &f{path}");
         o.addProperty("lootbox-crate-incompatible", "&cThat block can't be a crate: {reason}");
         o.addProperty("lootbox-crate-converted", "&aCrate &f{crate} &anow opens &f{pool}&a.");
         o.addProperty("lootbox-crate-inactive", "&cThis crate is inactive.");

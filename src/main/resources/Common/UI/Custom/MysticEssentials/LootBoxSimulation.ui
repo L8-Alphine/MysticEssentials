@@ -1,0 +1,188 @@
+// LootBox Simulation (P2-H): draws from a pool's live revision without
+// awarding anything, then shows the exact chance against the observed share
+// for every reward. Rows are LootBoxSimulationRow.ui appended into
+// #ResultList; the server sets each bar's width.
+$C = "../Common.ui";
+$M = "MysticTheme.ui";
+
+$C.@PageOverlay {}
+
+$C.@Container {
+  Anchor: (Width: 960, Height: 700);
+
+  #Title {
+    Group {
+      $C.@Title {
+        @Text = "Simulation";
+      }
+
+      $M.@HeaderMeta #HeaderInfo {
+        @Width = 440;
+      }
+    }
+  }
+
+  #Content {
+    LayoutMode: Top;
+
+    $M.@Panel {
+      @Padding = 12;
+
+      Anchor: (Bottom: 10);
+
+      Group {
+        LayoutMode: Left;
+        Anchor: (Height: 58);
+
+        Group {
+          LayoutMode: Top;
+          Anchor: (Width: 220, Right: 12);
+
+          $M.@FieldLabel { @Text = "Draws"; }
+          $C.@TextField #DrawsInput {
+            PlaceholderText: "100000";
+          }
+        }
+
+        Group {
+          LayoutMode: Top;
+          FlexWeight: 1;
+
+          Group {
+            LayoutMode: Left;
+            Anchor: (Height: 18, Bottom: 4);
+
+            Group {
+              Anchor: (Width: 170, Height: 18);
+              Background: #3c8c58(0.9);
+              Padding: (Horizontal: 6);
+              LayoutMode: CenterMiddle;
+
+              Label {
+                FlexWeight: 1;
+                Style: $M.@PillStyle;
+                Text: "Nothing is awarded";
+              }
+            }
+
+            $M.@Spacer {}
+          }
+
+          Label #SimHint {
+            Anchor: (Height: 36);
+            Style: $M.@CaptionStyle;
+          }
+        }
+
+        $C.@TextButton #RunButton {
+          @Text = "Run";
+          @Anchor = (Width: 150, Left: 12, Top: 14);
+        }
+      }
+    }
+
+    Label #Notice {
+      Anchor: (Height: 20, Bottom: 6);
+      Style: $M.@BodyStyle;
+      Visible: false;
+    }
+
+    Label #SimWarning {
+      Anchor: (Height: 38, Bottom: 6);
+      Style: $M.@BodyStyle;
+      Visible: false;
+    }
+
+    $M.@Section {
+      @Text = "Results";
+      @Anchor = (Bottom: 6);
+    }
+
+    Group {
+      LayoutMode: Left;
+      Anchor: (Height: 16, Bottom: 4);
+      Padding: (Left: 16, Right: 22);
+
+      Label {
+        FlexWeight: 1;
+        Style: $M.@EyebrowStyle;
+        Text: "Reward";
+      }
+
+      Label {
+        Anchor: (Width: 180, Left: 10);
+        Style: $M.@EyebrowStyle;
+        Text: "Chance / observed";
+      }
+
+      Label {
+        Anchor: (Width: 100, Left: 8);
+        Style: $M.@EyebrowStyle;
+        Text: "Chance";
+      }
+
+      Label {
+        Anchor: (Width: 100, Left: 8);
+        Style: $M.@EyebrowStyle;
+        Text: "Observed";
+      }
+
+      Label {
+        Anchor: (Width: 150, Left: 8);
+        Style: $M.@EyebrowStyle;
+        Text: "Count";
+      }
+
+      Label {
+        Anchor: (Width: 110, Left: 8);
+        Style: $M.@EyebrowStyle;
+        Text: "Gap";
+      }
+    }
+
+    $M.@Well {
+      FlexWeight: 1;
+
+      Label #ListEmpty {
+        Anchor: (Height: 64);
+        Style: $M.@EmptyStyle;
+        Text: "Press Run to draw.";
+        Visible: false;
+      }
+
+      Group #ResultList {
+        FlexWeight: 1;
+        LayoutMode: TopScrolling;
+        Padding: (Right: 6);
+        ScrollbarStyle: $C.@DefaultScrollbarStyle;
+      }
+    }
+
+    Label #SimSummary {
+      Anchor: (Height: 18, Top: 6);
+      Style: $M.@CaptionStyle;
+    }
+
+    Label {
+      Anchor: (Height: 16);
+      Style: $M.@CaptionStyle;
+      Text: "Gold bar: the exact chance. Blue bar: what the draws gave. Gap is observed minus chance in percentage points: green is within 2 standard errors, yellow within 3, red beyond.";
+    }
+
+    $M.@ActionBar {
+      @Anchor = (Height: 44, Top: 8);
+
+      $C.@SecondaryTextButton #BackButton {
+        @Text = "Back";
+        @Anchor = (Width: 150);
+      }
+
+      $M.@Spacer {}
+
+      $C.@TextButton #CloseButton {
+        @Text = "Close";
+        @Anchor = (Width: 150);
+      }
+    }
+  }
+}

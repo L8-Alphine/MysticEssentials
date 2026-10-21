@@ -1,0 +1,62 @@
+// One reward in a simulation: its name, two bars (the exact chance and the
+// observed share, widths set by the server), the numbers and the gap.
+$M = "MysticTheme.ui";
+
+Group #Row {
+  Anchor: (Height: 40, Bottom: 4);
+  Background: #0a0f16(0.38);
+  LayoutMode: Left;
+  Padding: (Left: 10, Right: 10, Top: 6, Bottom: 6);
+
+  Label #SimName {
+    FlexWeight: 1;
+    Style: $M.@RowNameStyle;
+  }
+
+  Group {
+    LayoutMode: Top;
+    Anchor: (Width: 180, Left: 10, Top: 6, Bottom: 6);
+
+    Group {
+      LayoutMode: Left;
+      Anchor: (Height: 6, Bottom: 4);
+      Background: #0a0f16(0.55);
+
+      Group #TheoryBar {
+        Anchor: (Width: 1, Height: 6);
+        Background: #e8c97a(0.9);
+      }
+    }
+
+    Group {
+      LayoutMode: Left;
+      Anchor: (Height: 6);
+      Background: #0a0f16(0.55);
+
+      Group #ObservedBar {
+        Anchor: (Width: 1, Height: 6);
+        Background: #7a9cc6;
+      }
+    }
+  }
+
+  Label #SimChance {
+    Anchor: (Width: 100, Left: 8);
+    Style: $M.@RowSideGoldStyle;
+  }
+
+  Label #SimObserved {
+    Anchor: (Width: 100, Left: 8);
+    Style: $M.@RowSideStyle;
+  }
+
+  Label #SimCount {
+    Anchor: (Width: 150, Left: 8);
+    Style: $M.@RowSideStyle;
+  }
+
+  Label #SimGap {
+    Anchor: (Width: 110, Left: 8);
+    Style: $M.@RowSideStyle;
+  }
+}

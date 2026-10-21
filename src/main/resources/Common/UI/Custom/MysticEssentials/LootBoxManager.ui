@@ -199,6 +199,16 @@ $C.@Container {
         @Anchor = (Width: 170);
       }
 
+      $C.@SecondaryTextButton #TemplatesButton {
+        @Text = "Templates";
+        @Anchor = (Width: 140, Left: 6);
+      }
+
+      $C.@SecondaryTextButton #AuditButton {
+        @Text = "Audit Log";
+        @Anchor = (Width: 140, Left: 6);
+      }
+
       $M.@Spacer {}
 
       $C.@TextButton #CloseButton {

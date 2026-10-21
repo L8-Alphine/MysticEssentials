@@ -83,6 +83,12 @@ public final class LootBoxCommand extends MysticCommand {
                             "keys", Integer.toString(module.registry().keyDrafts().size())));
                 }
             }
+            case "audit" -> {
+                if (allowed(sender, Permissions.LOOTBOX_AUDIT)) {
+                    player(sender).ifPresent(player -> org.hyzionstudios.mysticessentials.modules.lootbox.ui
+                            .AuditHistoryPage.openFor(core, player, module));
+                }
+            }
             default -> usage(sender, USAGE);
         }
     }

@@ -183,6 +183,10 @@ public final class LootBoxManagerPage extends MysticPage {
 
         buildSelection(cmd, event, selected);
         event.addEventBinding(CustomUIEventBindingType.Activating, "#ReloadButton", INPUTS.event("reload"));
+        cmd.set("#TemplatesButton.Visible", canEdit);
+        cmd.set("#AuditButton.Visible", player.hasPermission(Permissions.LOOTBOX_AUDIT));
+        event.addEventBinding(CustomUIEventBindingType.Activating, "#TemplatesButton", INPUTS.event("templates"));
+        event.addEventBinding(CustomUIEventBindingType.Activating, "#AuditButton", INPUTS.event("audit"));
         event.addEventBinding(CustomUIEventBindingType.Activating, "#CloseButton", new EventData().put("action", "close"));
     }
 
@@ -297,9 +301,7 @@ public final class LootBoxManagerPage extends MysticPage {
             }
             case "simulate" -> {
                 if (allowed(Permissions.LOOTBOX_SIMULATE)) {
-                    module.ui().simulate(player, id, 100_000);
-                    reopen(ref, store, page(next.withSelected(id).withNotice(
-                            "&7Simulating 100,000 draws of &f" + id + "&7; the results are in chat.")));
+                    SimulationPage.openAndRun(core, player, module, ref, store, id);
                 }
             }
             case "closePool", "reopenPool" -> {
@@ -317,6 +319,16 @@ public final class LootBoxManagerPage extends MysticPage {
                     module.onReload();
                     reopen(ref, store, page(next.withNotice("&7Reloaded &f" + module.registry().drafts().size()
                             + " &7pool and &f" + module.registry().keyDrafts().size() + " &7key draft(s) from disk.")));
+                }
+            }
+            case "templates" -> {
+                if (allowed(Permissions.LOOTBOX_EDIT)) {
+                    TemplateLibraryPage.open(core, player, module, ref, store);
+                }
+            }
+            case "audit" -> {
+                if (allowed(Permissions.LOOTBOX_AUDIT)) {
+                    AuditHistoryPage.open(core, player, module, ref, store);
                 }
             }
             default -> reopen(ref, store, page(next));
