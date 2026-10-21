@@ -57,9 +57,13 @@ public final class FormFields {
             return new Field(key, elementId, Property.COLOR, label);
         }
 
-        /** The client-side value reference, e.g. {@code #NameInput.Value}. */
+        /**
+         * The client-side value reference, e.g. {@code #NameInput.Value}. The element
+         * id may be given with or without its leading {@code #}; pages use both.
+         */
         public String selector() {
-            return "#" + elementId + property.suffix;
+            String id = elementId.startsWith("#") ? elementId.substring(1) : elementId;
+            return "#" + id + property.suffix;
         }
 
         /** The key in the event payload, e.g. {@code @name}. */

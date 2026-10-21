@@ -393,6 +393,10 @@ public final class LootBoxEngineTest {
                 && "#ColorInput.Color".equals(event.events().get("@color"))
                 && "tab".equals(event.events().get("action")) && "rewards".equals(event.events().get("tab")),
                 "an event did not carry every field: " + event.events());
+        // Pages pass ids with their '#'; a doubled "##NameInput.Value" binds nothing on the client.
+        require("#NameInput.Value".equals(FormFields.Field.text("name", "#NameInput", "Name").selector())
+                && "#NameColor.Color".equals(FormFields.Field.color("c", "#NameColor", "Colour").selector()),
+                "an element id given with '#' produced a doubled selector");
 
         JsonObject payload = new JsonObject();
         payload.addProperty("action", "tab");
