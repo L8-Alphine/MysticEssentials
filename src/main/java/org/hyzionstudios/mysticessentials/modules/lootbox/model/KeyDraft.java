@@ -22,6 +22,13 @@ public final class KeyDraft {
     public int uses = 1;
     /** Days after issue a physical key stops working; 0 = never. */
     public long expiresAfterDays = 0;
+    /**
+     * Opt-in (P2-K): issue key items as stacks that share one signed batch marker
+     * ({@link KeyBatch}) instead of one serial each. Each item opens once, whatever
+     * {@link #uses} says. Weaker against duplication exploits; see {@link KeyBatch}.
+     * Off by default, which leaves serialized keys exactly as they were.
+     */
+    public boolean stackable = false;
 
     /** A published key definition ({@code lootbox_keydef/<id>}). */
     public static final class Published {

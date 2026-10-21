@@ -67,8 +67,15 @@ public final class LootBoxConfig {
         public String offlineGrant = "PENDING_INBOX";
         /** Source recorded for console grants. Never wire store deliveries to key grants on All Ages servers. */
         public String consoleGrantSource = "ADMIN_GRANT";
-        /** Most keys one {@code /lootbox key give} may issue. */
+        /** Most keys one {@code /lootbox key give} (or one player on the Grants page) may issue. */
         public int maxGrantPerCommand = 64;
+        /** Grants, revocations and conversions each key remembers for the Grants page's history. */
+        public int grantLogSize = 100;
+        /**
+         * Whether players may turn a held key item into virtual balance
+         * ({@code /lootbox key deposit}) and back ({@code /lootbox key withdraw}).
+         */
+        public boolean allowConversion = true;
     }
 
     public static final class Crates {

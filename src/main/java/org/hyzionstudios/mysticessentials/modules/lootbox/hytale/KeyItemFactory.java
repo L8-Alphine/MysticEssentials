@@ -10,6 +10,7 @@ import org.hyzionstudios.mysticessentials.modules.lootbox.service.KeyMarker;
 
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.server.core.Message;
+import com.hypixel.hytale.server.core.asset.type.item.config.Item;
 import com.hypixel.hytale.server.core.asset.type.item.config.metadata.ItemDisplayMetadata;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 
@@ -26,13 +27,32 @@ public final class KeyItemFactory {
     }
 
     public static ItemStack create(KeyDraft.Published definition, KeyMarker marker) {
+        return create(definition, marker, 1);
+    }
+
+    /**
+     * {@code quantity} items carrying {@code marker}. Only a batch marker (P2-K)
+     * is meant for more than one: those items share their metadata, so the
+     * engine stacks them like any ordinary item (up to the base item's MaxStack).
+     */
+    public static ItemStack create(KeyDraft.Published definition, KeyMarker marker, int quantity) {
         KeyDraft spec = definition.spec;
         Message name = MysticText.parse(spec.name == null ? spec.id : spec.name);
         Message description = spec.lore == null || spec.lore.isEmpty() ? null
                 : MysticText.parse(String.join("\n", spec.lore));
-        return new ItemStack(spec.baseItemId, 1)
+        return new ItemStack(spec.baseItemId, Math.max(1, quantity))
                 .withMetadata(ItemDisplayMetadata.KEYED_CODEC, new ItemDisplayMetadata(name, description))
                 .withMetadata(KeyMarker.METADATA_KEY, toBson(marker));
+    }
+
+    /** The base item's MaxStack, or 0 when the item is unknown; a stackable key on a MaxStack-1 item never stacks. */
+    public static int maxStack(String itemId) {
+        try {
+            Item item = itemId == null ? null : Item.getAssetMap().getAsset(itemId);
+            return item == null ? 0 : item.getMaxStack();
+        } catch (RuntimeException e) {
+            return 0;
+        }
     }
 
     /** @return the stack's marker, or {@code null} when it carries none (any ordinary item). */

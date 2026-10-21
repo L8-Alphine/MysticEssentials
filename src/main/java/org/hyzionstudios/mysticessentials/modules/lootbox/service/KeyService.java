@@ -22,7 +22,9 @@ import org.hyzionstudios.mysticessentials.modules.lootbox.api.event.KeyRevokedEv
 import org.hyzionstudios.mysticessentials.modules.lootbox.config.LootBoxConfig;
 import org.hyzionstudios.mysticessentials.modules.lootbox.hytale.InventoryAdapter;
 import org.hyzionstudios.mysticessentials.modules.lootbox.hytale.KeyItemFactory;
+import org.hyzionstudios.mysticessentials.modules.lootbox.model.KeyBatch;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.KeyDraft;
+import org.hyzionstudios.mysticessentials.modules.lootbox.model.KeyLog;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.KeySerial;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.PendingInbox;
 import org.hyzionstudios.mysticessentials.modules.lootbox.odds.SecureDraw;
@@ -58,6 +60,7 @@ public final class KeyService {
     private final SecureDraw draw;
     private volatile LootBoxConfig config;
     private byte[] secret;
+    private final ConversionService conversions;
 
     public KeyService(MysticCore core, LootBoxStorage storage, LootBoxRegistry registry, AuditService audit,
             PlayerLanes lanes, SecureDraw draw, LootBoxConfig config) {
@@ -68,10 +71,20 @@ public final class KeyService {
         this.lanes = lanes;
         this.draw = draw;
         this.config = config;
+        this.conversions = new ConversionService(core, storage, registry, audit, lanes, draw, this);
     }
 
     public void updateConfig(LootBoxConfig config) {
         this.config = config;
+    }
+
+    LootBoxConfig config() {
+        return config;
+    }
+
+    /** {@code /lootbox key deposit} and {@code withdraw} (P2-F3). */
+    public ConversionService conversions() {
+        return conversions;
     }
 
     /** Loads the signing secret, creating it on first enable. Kept out of config.json. */
@@ -111,17 +124,34 @@ public final class KeyService {
      */
     public CompletableFuture<GrantResult> grant(UUID owner, String keyId, int count, boolean virtual,
             GrantSource source, String actor) {
+        return grant(owner, null, keyId, count, virtual, source, actor);
+    }
+
+    /**
+     * {@link #grant(UUID, String, int, boolean, GrantSource, String)} with the
+     * owner's name for the key's history, when the caller knows it (an offline
+     * player's name is not otherwise at hand). The result completes once the
+     * history entry is written, so a page that reloads the history sees it.
+     */
+    public CompletableFuture<GrantResult> grant(UUID owner, String ownerName, String keyId, int count, boolean virtual,
+            GrantSource source, String actor) {
         KeyDraft.Published definition = registry.key(keyId).orElse(null);
         if (definition == null) {
             return CompletableFuture.completedFuture(GrantResult.failed("key '" + keyId + "' is not published"));
         }
+        PlayerRef online = core.platform().findPlayer(owner).orElse(null);
+        String name = ownerName != null ? ownerName : online != null ? online.getUsername() : null;
         String policy = policyProblem(source);
         if (policy != null) {
             audit.record(actor, "KEY_GRANT_REFUSED", owner.toString(), keyId + " x" + count + " source " + source);
-            return CompletableFuture.completedFuture(GrantResult.failed(policy));
+            KeyLog.Entry refused = logEntry(KeyLog.REFUSED, actor, owner.toString(), name);
+            refused.count = count;
+            refused.virtual = virtual;
+            refused.source = source.name();
+            refused.detail = policy;
+            return log(keyId, refused).thenApply(ignored -> GrantResult.failed(policy));
         }
         int amount = Math.max(1, Math.min(count, Math.max(1, config.keys.maxGrantPerCommand)));
-        PlayerRef online = core.platform().findPlayer(owner).orElse(null);
         boolean asVirtual = virtual || (online == null && "VIRTUAL_CREDIT".equalsIgnoreCase(config.keys.offlineGrant));
         CompletableFuture<GrantResult> result = lanes.run(owner, () -> asVirtual
                 ? grantVirtual(owner, keyId, amount)
@@ -133,6 +163,16 @@ public final class KeyService {
                 core.getEventBus().publish(new KeyGrantedEvent(owner, keyId, amount, asVirtual, source.name(), actor));
             }
             return granted;
+        }).thenCompose(granted -> {
+            if (!granted.ok()) {
+                return CompletableFuture.completedFuture(granted);
+            }
+            KeyLog.Entry entry = logEntry(KeyLog.GRANT, actor, owner.toString(), name);
+            entry.count = amount;
+            entry.virtual = asVirtual;
+            entry.source = source.name();
+            entry.pending = granted.pending();
+            return log(keyId, entry).thenApply(ignored -> granted);
         });
     }
 
@@ -145,6 +185,9 @@ public final class KeyService {
 
     private CompletableFuture<GrantResult> grantPhysical(UUID owner, PlayerRef online, KeyDraft.Published definition,
             int amount, GrantSource source, String actor) {
+        if (definition.spec.stackable) {
+            return grantBatch(owner, online, definition, amount, source, actor);
+        }
         List<CompletableFuture<ItemStack>> issued = new ArrayList<>();
         for (int i = 0; i < amount; i++) {
             issued.add(issueSerial(owner, definition, source, actor));
@@ -190,16 +233,94 @@ public final class KeyService {
         return storage.saveSerial(serial).thenApply(saved -> KeyItemFactory.create(definition, marker));
     }
 
-    private CompletableFuture<Integer> toInbox(UUID owner, List<ItemStack> stacks) {
+    /**
+     * One stackable grant (P2-K): the batch's ledger entry first, then ONE stack
+     * of {@code amount} items carrying its marker (the engine splits it by the
+     * base item's MaxStack). What does not fit goes to the inbox as one entry.
+     */
+    private CompletableFuture<GrantResult> grantBatch(UUID owner, PlayerRef online, KeyDraft.Published definition,
+            int amount, GrantSource source, String actor) {
+        long now = System.currentTimeMillis();
+        long expiresAt = definition.spec.expiresAfterDays <= 0 ? 0
+                : now + TimeUnit.DAYS.toMillis(definition.spec.expiresAfterDays);
+        KeyBatch batch = StackRules.newBatch(KeyBatch.PREFIX + draw.id(), definition.spec.id, definition.version,
+                owner.toString(), amount, source.name(), actor, now, expiresAt);
+        ItemStack stack = KeyItemFactory.create(definition, KeyMarker.signed(batch.keyId, batch.defVersion, batch.batch,
+                SECRET_ID, secret), amount);
+        String grantId = draw.id();
+        return storage.saveBatch(batch).thenCompose(saved -> {
+            if (online == null) {
+                return toInbox(owner, List.of(stack), grantId).thenApply(n -> new GrantResult(true, 0, n, null));
+            }
+            CompletableFuture<List<ItemStack>> leftovers = new CompletableFuture<>();
+            boolean dispatched = core.platform().runOnEntityThread(online, (store, entity, world) -> {
+                ItemStack remainder = InventoryAdapter.give(store, entity, stack);
+                leftovers.complete(remainder == null ? List.of() : List.of(remainder));
+            });
+            if (!dispatched) {
+                leftovers.complete(List.of(stack));
+            }
+            return leftovers.thenCompose(left -> toInbox(owner, left, grantId)
+                    .thenApply(n -> new GrantResult(true, amount - n, n, null)));
+        });
+    }
+
+    /**
+     * Gives {@code count} new items of {@code batch} back to {@code player}
+     * (inventory first, then the inbox), after recovery released a hold whose
+     * items may have been taken (P2-K, {@link StackRules#regive}). The batch's
+     * counter is unchanged, so this never adds an opening. {@code holder} keys
+     * the inbox entry, so recovery repeating it files it once.
+     */
+    CompletableFuture<Void> regive(PlayerRef player, KeyBatch batch, int count, String holder) {
+        KeyDraft.Published definition = registry.key(batch.keyId).orElse(null);
+        if (definition == null || count < 1) {
+            return CompletableFuture.completedFuture(null);
+        }
+        ItemStack stack = KeyItemFactory.create(definition, KeyMarker.signed(batch.keyId, batch.defVersion, batch.batch,
+                SECRET_ID, secret), count);
+        CompletableFuture<List<ItemStack>> leftovers = new CompletableFuture<>();
+        boolean dispatched = core.platform().runOnEntityThread(player, (store, entity, world) -> {
+            try {
+                ItemStack remainder = InventoryAdapter.give(store, entity, stack);
+                leftovers.complete(remainder == null ? List.of() : List.of(remainder));
+            } catch (Throwable t) {
+                leftovers.complete(List.of(stack));
+            }
+        });
+        if (!dispatched) {
+            leftovers.complete(List.of(stack));
+        }
+        audit.record("server", "KEY_BATCH_REGIVE", batch.batch, count + " for " + holder);
+        return leftovers.thenCompose(left -> toInbox(player.getUuid(), left, holder + "#regive"))
+                .thenApply(n -> null);
+    }
+
+    /** Files key items in the pending inbox, once per serial. @return how many were filed or already there */
+    CompletableFuture<Integer> toInbox(UUID owner, List<ItemStack> stacks) {
+        return toInbox(owner, stacks, null);
+    }
+
+    /**
+     * {@link #toInbox(UUID, List)}, with {@code context} telling a batch's entries
+     * apart (P2-K): its items share one marker, so their entries are
+     * {@code key#<batch>#<context>}. A serialized key's entry stays {@code key#<serial>}.
+     *
+     * @return the items filed or already there
+     */
+    CompletableFuture<Integer> toInbox(UUID owner, List<ItemStack> stacks, String context) {
         if (stacks.isEmpty()) {
             return CompletableFuture.completedFuture(0);
         }
         long now = System.currentTimeMillis();
+        int items = stacks.stream().mapToInt(ItemStack::getQuantity).sum();
         return storage.updatePending(owner, inbox -> {
             for (ItemStack stack : stacks) {
                 KeyMarker marker = KeyItemFactory.read(stack);
                 PendingInbox.PendingReward entry = new PendingInbox.PendingReward();
-                entry.fulfillmentId = "key#" + (marker == null ? draw.id() : marker.serial());
+                entry.fulfillmentId = "key#" + (marker == null ? draw.id() : marker.serial())
+                        + (marker != null && KeyBatch.isBatch(marker.serial()) ? "#" + (context == null ? draw.id() : context)
+                                : "");
                 if (inbox.contains(entry.fulfillmentId)) {
                     continue;
                 }
@@ -211,30 +332,106 @@ public final class KeyService {
                 inbox.items.add(entry);
             }
             return inbox;
-        }).thenApply(inbox -> stacks.size());
+        }).thenApply(inbox -> items);
     }
 
     // ----- Revoke and inspect -------------------------------------------------
 
+    /** Revokes a serial, or a whole batch of stackable keys when {@code serial} is a batch id (P2-K). */
     public CompletableFuture<Boolean> revoke(String serial, String actor) {
+        if (KeyBatch.isBatch(serial)) {
+            return revokeBatch(serial, actor);
+        }
         AtomicBoolean changed = new AtomicBoolean();
         return storage.updateSerial(serial, entry -> {
-            if (entry == null || KeySerial.REVOKED.equals(entry.state) || KeySerial.REDEEMED.equals(entry.state)) {
+            if (entry == null || KeySerial.REVOKED.equals(entry.state) || KeySerial.REDEEMED.equals(entry.state)
+                    || KeySerial.CONVERTED.equals(entry.state)) {
                 return null;
             }
             entry.state = KeySerial.REVOKED;
             changed.set(true);
             return entry;
-        }).thenApply(entry -> {
-            if (changed.get()) {
-                audit.record(actor, "KEY_REVOKE", serial, entry.keyId);
-                core.getEventBus().publish(new KeyRevokedEvent(serial, entry.keyId, actor));
+        }).thenCompose(entry -> {
+            if (!changed.get()) {
+                return CompletableFuture.completedFuture(false);
             }
-            return changed.get();
+            audit.record(actor, "KEY_REVOKE", serial, entry.keyId);
+            core.getEventBus().publish(new KeyRevokedEvent(serial, entry.keyId, actor));
+            KeyLog.Entry revoked = logEntry(KeyLog.REVOKE, actor, entry.owner, ownerName(entry.owner));
+            revoked.count = 1;
+            revoked.serial = serial;
+            revoked.source = entry.source;
+            return log(entry.keyId, revoked).thenApply(ignored -> true);
+        });
+    }
+
+    /** Every item of the batch stops working at once: the counter is the batch's only authority. */
+    private CompletableFuture<Boolean> revokeBatch(String batchId, String actor) {
+        AtomicBoolean changed = new AtomicBoolean();
+        return storage.updateBatch(batchId, batch -> {
+            if (batch == null || batch.revoked || batch.remaining < 1) {
+                return null;
+            }
+            batch.revoked = true;
+            changed.set(true);
+            return batch;
+        }).thenCompose(batch -> {
+            if (!changed.get()) {
+                return CompletableFuture.completedFuture(false);
+            }
+            audit.record(actor, "KEY_REVOKE", batchId, batch.keyId + " batch, " + batch.remaining + " unspent");
+            core.getEventBus().publish(new KeyRevokedEvent(batchId, batch.keyId, actor));
+            KeyLog.Entry revoked = logEntry(KeyLog.REVOKE, actor, batch.owner, ownerName(batch.owner));
+            revoked.count = batch.remaining;
+            revoked.serial = batchId;
+            revoked.source = batch.source;
+            return log(batch.keyId, revoked).thenApply(ignored -> true);
         });
     }
 
     public CompletableFuture<KeySerial> serial(String serial) {
         return storage.loadSerial(serial);
+    }
+
+    /** A batch of stackable keys (P2-K), or {@code null}. */
+    public CompletableFuture<KeyBatch> batch(String batch) {
+        return storage.loadBatch(batch);
+    }
+
+    // ----- History (P2-F2) ----------------------------------------------------
+
+    /** The key's recent grants, refusals, revocations and conversions. */
+    public CompletableFuture<KeyLog> history(String keyId) {
+        return storage.loadKeyLog(keyId);
+    }
+
+    static KeyLog.Entry logEntry(String action, String actor, String owner, String ownerName) {
+        KeyLog.Entry entry = new KeyLog.Entry();
+        entry.at = System.currentTimeMillis();
+        entry.action = action;
+        entry.actor = actor;
+        entry.owner = owner;
+        entry.ownerName = ownerName;
+        return entry;
+    }
+
+    /** Appends to the key's history. Never fails the caller; a failed write is logged. */
+    CompletableFuture<Void> log(String keyId, KeyLog.Entry entry) {
+        return storage.appendKeyLog(keyId, entry, Math.max(1, config.keys.grantLogSize)).handle((log, error) -> {
+            if (error != null) {
+                core.log(Level.WARNING, "[lootbox] key history write failed for " + keyId + " " + entry.action + ": "
+                        + error);
+            }
+            return null;
+        });
+    }
+
+    private String ownerName(String owner) {
+        try {
+            return owner == null ? null
+                    : core.platform().findPlayer(UUID.fromString(owner)).map(PlayerRef::getUsername).orElse(null);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 }

@@ -91,6 +91,36 @@ public final class InventoryAdapter {
         return false;
     }
 
+    /** Items carrying {@code serial} across the key-holding containers: a batch's count (P2-K), or a serial's copies. */
+    public static int countSerial(Store<EntityStore> store, Ref<EntityStore> entity, String serial) {
+        int count = 0;
+        for (KeyStack stack : findSerial(store, entity, serial)) {
+            count += stack.quantity();
+        }
+        return count;
+    }
+
+    /**
+     * Removes exactly {@code count} items from {@code expected}'s slot, for a
+     * deposit of a held stack (P2-K). Nothing is removed unless the slot still
+     * holds at least {@code count} items with that marker's serial.
+     */
+    public static boolean takeCount(Store<EntityStore> store, Ref<EntityStore> entity, KeyStack expected, int count) {
+        ItemContainer container = container(store, entity, expected.section());
+        short slot = expected.slot();
+        if (container == null || slot < 0 || slot >= container.getCapacity() || count < 1) {
+            return false;
+        }
+        ItemStack stack = container.getItemStack(slot);
+        KeyMarker marker = KeyItemFactory.read(stack);
+        if (marker == null || !expected.marker().serial().equals(marker.serial()) || stack.getQuantity() < count) {
+            return false;
+        }
+        int left = stack.getQuantity() - count;
+        container.setItemStackForSlot(slot, left <= 0 ? ItemStack.EMPTY : stack.withQuantity(left));
+        return true;
+    }
+
     /** Removes every stack carrying {@code serial} (a spent key that came back). @return stacks removed. */
     public static int removeAll(Store<EntityStore> store, Ref<EntityStore> entity, String serial) {
         int removed = 0;
@@ -120,6 +150,28 @@ public final class InventoryAdapter {
     public static String heldItemId(Store<EntityStore> store, Ref<EntityStore> entity) {
         ItemStack held = InventoryComponent.getItemInHand(store, entity);
         return ItemStack.isEmpty(held) ? null : held.getItemId();
+    }
+
+    /**
+     * The stack in the active hotbar slot when it carries a key marker, for
+     * {@code /lootbox key deposit}. Its signature is NOT checked here. A builder
+     * tool in hand does not count: keys are never tools.
+     *
+     * @return the stack and its slot, or {@code null} for an empty hand or an ordinary item
+     */
+    public static KeyStack heldKey(Store<EntityStore> store, Ref<EntityStore> entity) {
+        InventoryComponent.Hotbar hotbar = store.getComponent(entity, InventoryComponent.Hotbar.getComponentType());
+        if (hotbar == null) {
+            return null;
+        }
+        short slot = hotbar.getActiveSlot();
+        ItemContainer container = hotbar.getInventory();
+        if (slot < 0 || slot >= container.getCapacity()) {
+            return null;
+        }
+        ItemStack stack = container.getItemStack(slot);
+        KeyMarker marker = KeyItemFactory.read(stack);
+        return marker == null ? null : new KeyStack(Section.HOTBAR, slot, marker, stack.getQuantity());
     }
 
     /** Builds a stack from stored parts; {@code metadataJson} may be null. */

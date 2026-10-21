@@ -148,6 +148,28 @@ $C.@Container {
             }
           }
         }
+
+        // Stackable keys (P2-K): paired static buttons, one shown at a time.
+        Group {
+          LayoutMode: Left;
+          Anchor: (Height: 32, Top: 8);
+
+          $C.@SecondaryTextButton #StackableOnButton {
+            @Text = "Stacking: Off";
+            @Anchor = (Width: 160);
+          }
+
+          $C.@SecondaryTextButton #StackableOffButton {
+            @Text = "Stacking: On";
+            @Anchor = (Width: 160);
+          }
+
+          Label #StackHint {
+            FlexWeight: 1;
+            Anchor: (Left: 10);
+            Style: $M.@CaptionStyle;
+          }
+        }
       }
 
       // ----- Preview, pools, problems -----------------------------------------

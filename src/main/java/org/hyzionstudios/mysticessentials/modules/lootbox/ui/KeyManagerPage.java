@@ -171,8 +171,9 @@ public final class KeyManagerPage extends MysticPage {
                     && player.hasPermission(Permissions.LOOTBOX_PUBLISH));
             cmd.set("#CloneButton.Visible", editable && state.form() == null);
             cmd.set("#ArchiveButton.Visible", editable);
+            cmd.set("#GrantsButton.Visible", selected.live() != null && player.hasPermission(Permissions.LOOTBOX_KEYS));
             for (String[] button : new String[][] {{"#EditButton", "edit"}, {"#PublishButton", "publish"},
-                    {"#CloneButton", "clone"}, {"#ArchiveButton", "archive"}}) {
+                    {"#CloneButton", "clone"}, {"#ArchiveButton", "archive"}, {"#GrantsButton", "grants"}}) {
                 event.addEventBinding(CustomUIEventBindingType.Activating, button[0],
                         INPUTS.event(button[1]).put("id", selected.id()));
             }
@@ -245,6 +246,16 @@ public final class KeyManagerPage extends MysticPage {
             case "archive" -> {
                 if (allowed(Permissions.LOOTBOX_EDIT)) {
                     confirmArchive(ref, store, next.withSelected(id), id);
+                }
+            }
+            case "grants" -> {
+                if (allowed(Permissions.LOOTBOX_KEYS)) {
+                    if (module.registry().key(id).isEmpty()) {
+                        reopen(ref, store, page(next.withSelected(id).withNotice("&c" + id
+                                + " is not published; publish it before giving it out.")));
+                    } else {
+                        KeyGrantsPage.open(core, player, module, ref, store, id);
+                    }
                 }
             }
             case "pools" -> reopen(ref, store, new LootBoxManagerPage(core, player, module, LootBoxManagerPage.State.initial()));
