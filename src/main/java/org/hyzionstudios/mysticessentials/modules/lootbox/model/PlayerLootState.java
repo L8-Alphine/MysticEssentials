@@ -34,6 +34,12 @@ public final class PlayerLootState {
     public List<String> openDeliveries = new ArrayList<>();
     public long lastOpenAt;
     /**
+     * The highest network fencing token (P4-WP2) that wrote this document. A
+     * server whose lease is older is refused, so a lock that went stale can't
+     * spend twice. 0 when no network opening ever touched it.
+     */
+    public long fence;
+    /**
      * Physical ↔ virtual key conversions (P2-F3), newest last. A finished one is
      * dropped beyond {@link #MAX_CONVERSIONS}; an unfinished one never is, because
      * recovery finishes it from this record.

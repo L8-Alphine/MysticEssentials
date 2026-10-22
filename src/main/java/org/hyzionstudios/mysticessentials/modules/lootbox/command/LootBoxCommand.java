@@ -37,7 +37,7 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
  *   <li>{@code key give|revoke|info|list|publish|grants …}; players' {@code key deposit} and
  *       {@code key withdraw <keyId> [count]};</li>
  *   <li>{@code publish|rollback|disable|enable …}; {@code simulate <id> [draws]};
- *       {@code chance <id> <itemId>}; {@code providers};</li>
+ *       {@code chance <id> <itemId>}; {@code providers}; {@code stats <id> [revision] [days]};</li>
  *   <li>{@code crate select|convert|edit|rebind|remove|info|verify|enable …};</li>
  *   <li>{@code crate effects [on|off]} for players;</li>
  *   <li>{@code reconcile <openingId> regrant|dismiss}; {@code admin}; {@code audit}; {@code reload}.</li>
@@ -48,7 +48,7 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 public final class LootBoxCommand extends MysticCommand {
 
     private static final String USAGE =
-            "/lootbox [preview <id>|history|pending|motion|key …|publish <id>|crate …|admin|audit]";
+            "/lootbox [preview <id>|history|pending|motion|key …|publish <id>|crate …|stats <id>|admin|audit]";
 
     private final LootBoxModule module;
 
@@ -80,6 +80,7 @@ public final class LootBoxCommand extends MysticCommand {
             case "chance" -> chance(sender, args);
             case "schedule" -> schedule(sender, args);
             case "providers" -> providers(sender);
+            case "stats" -> stats(sender, args);
             case "crate", "crates" -> crate(sender, args);
             case "reconcile" -> reconcile(sender, args);
             case "admin" -> {
@@ -522,6 +523,68 @@ public final class LootBoxCommand extends MysticCommand {
             sender.reply("&d&lMystic integrations");
             module.bridges().status().forEach(line -> sender.reply("&7- " + MysticText.stripMarkup(line)));
         }
+    }
+
+    /**
+     * {@code /lootbox stats <id> [revision] [days]} (P4-WP4): observed against
+     * theoretical over the last days of committed openings on base odds, with a
+     * binomial z per reward. Openings on personalised odds are counted apart.
+     */
+    private void stats(MysticCommandSender sender, String[] args) {
+        if (!allowed(sender, Permissions.LOOTBOX_AUDIT)) {
+            return;
+        }
+        if (args.length < 2) {
+            usage(sender, "/lootbox stats <id> [revision] [days]");
+            return;
+        }
+        if (module.stats() == null) {
+            sender.reply("&cLootBox is disabled.");
+            return;
+        }
+        String id = args[1].toLowerCase(Locale.ROOT);
+        int revision = 0;
+        int days = module.config().stats.windowDays;
+        try {
+            if (args.length >= 3) {
+                revision = Integer.parseInt(args[2]);
+            }
+            if (args.length >= 4) {
+                days = Integer.parseInt(args[3]);
+            }
+        } catch (NumberFormatException e) {
+            usage(sender, "/lootbox stats <id> [revision] [days]");
+            return;
+        }
+        if (revision < 0 || days < 1 || days > 366) {
+            usage(sender, "/lootbox stats <id> [revision] [days 1-366]");
+            return;
+        }
+        module.stats().report(id, revision, days, System.currentTimeMillis()).whenComplete((report, error) -> {
+            if (error != null || report == null) {
+                sender.reply(error == null ? "&cNo such pool or revision: &f" + id
+                        : "&cThe statistics could not be read; see the server log.");
+                return;
+            }
+            sender.reply("&d&l" + MysticText.stripMarkup(report.revision().spec.displayName == null ? id
+                    : report.revision().spec.displayName) + " &7revision &f" + report.revision().revision
+                    + " &7odds &f" + report.oddsId() + " &7last &f" + report.days() + "d");
+            sender.reply("&7Base-odds openings: &f" + report.total() + " &8(personalised, not compared: "
+                    + report.personal() + ")");
+            var formatter = module.opening().formatter();
+            for (var row : report.rows()) {
+                sender.reply((row.anomaly() ? "&c! " : "&7- ") + "&f" + MysticText.stripMarkup(row.name())
+                        + " &7chance &f" + formatter.percent(row.weight(), row.tableTotal()) + " &7seen &f" + row.count()
+                        + " &8(expected " + String.format(Locale.ROOT, "%.1f", row.expected()) + ", z "
+                        + String.format(Locale.ROOT, "%+.2f", row.z()) + ")");
+            }
+            if (report.anomaly()) {
+                sender.reply("&cAt least one reward is far from its published chance. Check the pool and the "
+                        + "audit history before trusting it.");
+            } else if (report.total() > 0) {
+                sender.reply("&aObserved results are consistent with the published odds.");
+            }
+        });
     }
 
     private void simulate(MysticCommandSender sender, String[] args) {

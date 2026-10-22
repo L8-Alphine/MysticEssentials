@@ -11,6 +11,8 @@ import java.util.List;
 public final class PendingInbox {
 
     public int schema = 1;
+    /** The highest network fencing token that wrote this inbox (P4-WP2); 0 for local writes. */
+    public long fence;
     public List<PendingReward> items = new ArrayList<>();
 
     public boolean contains(String fulfillmentId) {

@@ -2,6 +2,7 @@ package org.hyzionstudios.mysticessentials.core.storage;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.UnaryOperator;
 
 import com.google.gson.JsonElement;
 
@@ -28,6 +29,21 @@ public interface StorageProvider {
 
     /** Lists every key stored under {@code namespace} (empty if none). */
     CompletableFuture<List<String>> listKeys(String namespace);
+
+    /** Whether {@link #updateAtomic} is atomic across every server using this store. */
+    default boolean atomicUpdates() {
+        return false;
+    }
+
+    /**
+     * Read-modify-write of one document in one transaction (see
+     * {@code StorageService#updateShared}). Only called when
+     * {@link #atomicUpdates()} is true.
+     */
+    default CompletableFuture<JsonElement> updateAtomic(String namespace, String key,
+            UnaryOperator<JsonElement> updater) {
+        throw new UnsupportedOperationException(id() + " has no atomic updates");
+    }
 
     /** Flushes and closes the provider. Called during Core shutdown. */
     void shutdown();

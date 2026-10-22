@@ -12,6 +12,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.UnaryOperator;
 import java.util.logging.Level;
 
 import org.hyzionstudios.mysticessentials.core.MysticCore;
@@ -49,6 +50,12 @@ public final class SqlStorageProvider implements StorageProvider {
     private static final String DELETE = "DELETE FROM mystic_documents WHERE namespace = ? AND id = ?";
     private static final String EXISTS = "SELECT 1 FROM mystic_documents WHERE namespace = ? AND id = ? LIMIT 1";
     private static final String LIST_KEYS = "SELECT id FROM mystic_documents WHERE namespace = ?";
+    private static final String SELECT_FOR_UPDATE =
+            "SELECT data FROM mystic_documents WHERE namespace = ? AND id = ? FOR UPDATE";
+    private static final String INSERT = "INSERT INTO mystic_documents (namespace, id, data) VALUES (?, ?, ?)";
+    private static final String UPDATE = "UPDATE mystic_documents SET data = ? WHERE namespace = ? AND id = ?";
+    /** Attempts of one atomic update before giving up on a contended row. */
+    static final int ATOMIC_ATTEMPTS = 6;
 
     private final MysticCore core;
     private final MainConfig.Mysql config;
@@ -137,6 +144,89 @@ public final class SqlStorageProvider implements StorageProvider {
                 throw new JsonStorageProvider.StorageException("save " + namespace + "/" + key, e);
             }
         }, executor);
+    }
+
+    @Override
+    public boolean atomicUpdates() {
+        return true;
+    }
+
+    /**
+     * One transaction: {@code SELECT ... FOR UPDATE} locks the row (every server
+     * shares the database, so this is the network-wide lock on the document), the
+     * updater runs, then {@code UPDATE} or {@code INSERT}, then commit. A
+     * missing row has nothing to lock: two servers inserting it at once collide on
+     * the primary key, and the loser is retried and then sees the winner's row.
+     * Deadlocks and lock-wait timeouts are retried the same way. An exception from
+     * the updater rolls back and reaches the caller unchanged.
+     */
+    @Override
+    public CompletableFuture<JsonElement> updateAtomic(String namespace, String key,
+            UnaryOperator<JsonElement> updater) {
+        return CompletableFuture.supplyAsync(() -> {
+            SQLException last = null;
+            for (int attempt = 1; attempt <= ATOMIC_ATTEMPTS; attempt++) {
+                try {
+                    return updateOnce(namespace, key, updater);
+                } catch (SQLException e) {
+                    last = e;
+                    if (!SqlRetry.retryable(e)) {
+                        break;
+                    }
+                    SqlRetry.pause(attempt);
+                }
+            }
+            throw new JsonStorageProvider.StorageException("updateAtomic " + namespace + "/" + key, last);
+        }, executor);
+    }
+
+    private JsonElement updateOnce(String namespace, String key, UnaryOperator<JsonElement> updater)
+            throws SQLException {
+        try (Connection connection = dataSource.getConnection()) {
+            boolean autoCommit = connection.getAutoCommit();
+            int isolation = connection.getTransactionIsolation();
+            connection.setAutoCommit(false);
+            connection.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
+            try {
+                JsonElement current;
+                boolean exists;
+                try (PreparedStatement select = connection.prepareStatement(SELECT_FOR_UPDATE)) {
+                    select.setString(1, namespace);
+                    select.setString(2, key);
+                    try (ResultSet rs = select.executeQuery()) {
+                        exists = rs.next();
+                        current = exists ? Json.parse(rs.getString(1)) : null;
+                    }
+                }
+                JsonElement next = updater.apply(current);
+                if (next != null) {
+                    try (PreparedStatement write = connection.prepareStatement(exists ? UPDATE : INSERT)) {
+                        if (exists) {
+                            write.setString(1, Json.toString(next));
+                            write.setString(2, namespace);
+                            write.setString(3, key);
+                        } else {
+                            write.setString(1, namespace);
+                            write.setString(2, key);
+                            write.setString(3, Json.toString(next));
+                        }
+                        write.executeUpdate();
+                    }
+                }
+                connection.commit();
+                return next == null ? current : next;
+            } catch (SQLException | RuntimeException | Error e) {
+                try {
+                    connection.rollback();
+                } catch (SQLException ignored) {
+                    // The connection is going back to the pool either way.
+                }
+                throw e;
+            } finally {
+                connection.setAutoCommit(autoCommit);
+                connection.setTransactionIsolation(isolation);
+            }
+        }
     }
 
     @Override

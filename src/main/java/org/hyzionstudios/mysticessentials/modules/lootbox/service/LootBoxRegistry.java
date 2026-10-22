@@ -66,6 +66,8 @@ public final class LootBoxRegistry {
     private final Map<String, LootBoxRevision> scheduled = new ConcurrentHashMap<>();
     /** Announces a changed pool to the other servers (P4-WP3); {@code null} on a single server. */
     private volatile java.util.function.Consumer<String> changes;
+    /** Where key publications are announced to other servers (P4-WP3), or {@code null}. */
+    private volatile java.util.function.Consumer<String> keyChanges;
     private final Map<String, LootBoxRevision.State> states = new ConcurrentHashMap<>();
     private final Map<String, KeyDraft.Published> keys = new ConcurrentHashMap<>();
     private volatile Map<String, LootBoxDraft> drafts = Map.of();
@@ -597,6 +599,20 @@ public final class LootBoxRegistry {
         this.changes = sink;
     }
 
+    /** Where key publications are announced to other servers (P4-WP3), or {@code null}. */
+    public void onKeyChange(java.util.function.Consumer<String> sink) {
+        this.keyChanges = sink;
+    }
+
+    /** Re-reads one published key after another server published it (P4-WP3). */
+    public CompletableFuture<Void> refreshKey(String keyId) {
+        return storage.loadKeyDefinition(keyId).thenAccept(published -> {
+            if (published != null && published.spec != null && keyId.equals(published.spec.id)) {
+                keys.put(keyId, published);
+            }
+        });
+    }
+
     public CompletableFuture<Boolean> setDisabled(String lootboxId, boolean disabled, String actor) {
         if (!states.containsKey(lootboxId)) {
             return CompletableFuture.completedFuture(false);
@@ -646,6 +662,14 @@ public final class LootBoxRegistry {
         }).thenApply(published -> {
             keys.put(keyId, published);
             audit.record(actor, "KEY_PUBLISH", keyId, "version " + published.version);
+            java.util.function.Consumer<String> sink = keyChanges;
+            if (sink != null) {
+                try {
+                    sink.accept(keyId);
+                } catch (RuntimeException e) {
+                    core.log(Level.WARNING, "[lootbox] could not announce key " + keyId + ": " + e);
+                }
+            }
             return new PublishResult(true, published.version, "", List.of(), false);
         });
     }

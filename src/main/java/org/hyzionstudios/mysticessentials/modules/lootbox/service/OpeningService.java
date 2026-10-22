@@ -8,7 +8,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -93,6 +95,8 @@ public final class OpeningService {
     private volatile LootBoxConfig config;
     private volatile OddsFormatter formatter;
     private final Map<UUID, OpeningRules.Confirm> confirms = new ConcurrentHashMap<>();
+    /** The network authority (P4-WP2), or {@code null} when this server runs alone. */
+    private volatile NetworkAuthority network;
 
     public OpeningService(MysticCore core, LootBoxStorage storage, LootBoxRegistry registry, KeyService keys,
             RewardService rewards, AuditService audit, PlayerLanes lanes, SecureDraw draw,
@@ -107,6 +111,11 @@ public final class OpeningService {
         this.draw = draw;
         this.integrations = integrations;
         updateConfig(config);
+    }
+
+    /** Installs the network authority NETWORK pools open under (P4-WP2). */
+    public void network(NetworkAuthority authority) {
+        this.network = authority;
     }
 
     public void updateConfig(LootBoxConfig config) {
@@ -245,12 +254,71 @@ public final class OpeningService {
     public CompletableFuture<OpenResult> open(PlayerRef player, String lootboxId, String snapshotHash,
             String requestId) {
         UUID uuid = player.getUuid();
-        return lanes.run(uuid, () -> openInLane(player, lootboxId, snapshotHash, requestId))
+        LootBoxRevision live = registry.active(lootboxId).orElse(null);
+        boolean networked = live != null && NetworkRules.isNetwork(live.spec);
+        return lanes.run(uuid, () -> networked ? openOnNetwork(player, lootboxId, snapshotHash, requestId)
+                : openInLane(player, lootboxId, snapshotHash, requestId))
                 .exceptionally(error -> {
                     core.log(Level.SEVERE, "[lootbox] opening of " + lootboxId + " by " + player.getUsername()
                             + " failed: " + error);
                     return OpenResult.of(Status.ERROR, "Something went wrong; nothing was spent.");
                 });
+    }
+
+    /**
+     * A NETWORK pool (P4-WP2/WP3): the whole opening runs under the player's
+     * network lock, with every write fenced, after checking that this server's
+     * revision is still the one in the shared store. Fails closed: when the lock
+     * or the shared store is unavailable, nothing is read for spending.
+     */
+    private CompletableFuture<OpenResult> openOnNetwork(PlayerRef player, String lootboxId, String snapshotHash,
+            String requestId) {
+        NetworkAuthority authority = network;
+        if (authority == null) {
+            return done(Status.CLOSED, "Network loot boxes are unavailable on this server; nothing was spent.");
+        }
+        return authority.withLease(player.getUuid(), lease -> sharedRevisionChanged(lootboxId)
+                .thenCompose(changed -> changed
+                        ? done(Status.STALE, "The odds changed on another server. Check them and confirm again.")
+                        : openInLane(player, lootboxId, snapshotHash, requestId)))
+                .exceptionally(error -> {
+                    NetworkAuthority.Unavailable unavailable = NetworkAuthority.unavailableIn(error);
+                    if (unavailable != null) {
+                        audit.counter("NETWORK_CLOSED").incrementAndGet();
+                        return OpenResult.of(Status.CLOSED, "Network loot boxes are unavailable right now ("
+                                + unavailable.getMessage() + "); nothing was spent.");
+                    }
+                    if (NetworkRules.fencedOut(error)) {
+                        audit.counter("FENCED_OUT").incrementAndGet();
+                        core.log(Level.WARNING, "[lootbox] an opening of " + lootboxId + " by "
+                                + player.getUsername() + " was fenced out: another server took over.");
+                        return OpenResult.of(Status.ERROR, "Another server took over this opening; "
+                                + "/lootbox history shows what happened.");
+                    }
+                    throw error instanceof CompletionException completion ? completion
+                            : new CompletionException(error);
+                });
+    }
+
+    /**
+     * Commit-time check of a NETWORK pool against the shared store (P4-WP3):
+     * true, after refreshing the caches, when another server published,
+     * rolled back or closed it since this server cached it.
+     */
+    private CompletableFuture<Boolean> sharedRevisionChanged(String lootboxId) {
+        LootBoxRevision local = registry.active(lootboxId).orElse(null);
+        return storage.loadState(lootboxId).thenCompose(state -> {
+            if (local == null || state == null || state.activeRevision != local.revision
+                    || state.disabled != registry.isDisabled(lootboxId)) {
+                return registry.refreshPool(lootboxId).thenApply(ignored -> true);
+            }
+            return storage.loadRevision(lootboxId, state.activeRevision).thenCompose(shared -> {
+                if (shared != null && Objects.equals(shared.contentHash, local.contentHash)) {
+                    return CompletableFuture.completedFuture(false);
+                }
+                return registry.refreshPool(lootboxId).thenApply(ignored -> true);
+            });
+        });
     }
 
     private CompletableFuture<OpenResult> openInLane(PlayerRef player, String lootboxId, String snapshotHash,
@@ -674,15 +742,33 @@ public final class OpeningService {
      */
     public CompletableFuture<Void> recover(PlayerRef player) {
         UUID uuid = player.getUuid();
-        return lanes.run(uuid, () -> storage.loadPlayer(uuid).thenCompose(state -> {
+        NetworkAuthority authority = network;
+        boolean networked = authority != null && authority.enabled();
+        return lanes.run(uuid, () -> networked
+                // On a network, recovery decides the fate of openings another server may have
+                // started: it runs under the player's lock, fenced, or not at all (P4-WP2).
+                ? authority.withLease(uuid, lease -> recoverInLane(player))
+                : recoverInLane(player)).exceptionally(error -> {
+                    NetworkAuthority.Unavailable unavailable = NetworkAuthority.unavailableIn(error);
+                    if (unavailable != null) {
+                        core.log(Level.FINE, "[lootbox] recovery for " + player.getUsername()
+                                + " postponed: " + unavailable.getMessage());
+                    } else {
+                        core.log(Level.WARNING, "[lootbox] recovery for " + player.getUsername() + " failed: "
+                                + error);
+                    }
+                    return null;
+                });
+    }
+
+    private CompletableFuture<Void> recoverInLane(PlayerRef player) {
+        UUID uuid = player.getUuid();
+        return storage.loadPlayer(uuid).thenCompose(state -> {
             CompletableFuture<Void> active = state.activeOpening == null ? CompletableFuture.completedFuture(null)
                     : storage.loadOpening(state.activeOpening).thenCompose(opening -> recoverActive(player, opening,
                             state.activeOpening));
             return active.thenCompose(ignored -> storage.loadPlayer(uuid)).thenCompose(this::resumeDeliveries)
                     .thenCompose(ignored -> keys.conversions().recoverInLane(player));
-        })).exceptionally(error -> {
-            core.log(Level.WARNING, "[lootbox] recovery for " + player.getUsername() + " failed: " + error);
-            return null;
         });
     }
 

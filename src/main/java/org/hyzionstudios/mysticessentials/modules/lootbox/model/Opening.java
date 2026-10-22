@@ -45,6 +45,8 @@ public final class Opening {
     public long createdAt;
     public long committedAt;
     public String note;
+    /** The highest network fencing token that wrote this opening (P4-WP2); 0 for local openings. */
+    public long fence;
     public List<Fulfillment> fulfillments = new ArrayList<>();
     /** The bonus draws (P3-WP2), one per bonus roll of the revision; empty when it has none. */
     public List<BonusDraw> bonus = new ArrayList<>();

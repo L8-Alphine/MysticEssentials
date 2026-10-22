@@ -5,7 +5,10 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -34,6 +37,9 @@ import org.hyzionstudios.mysticessentials.modules.lootbox.service.CrateService;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.IntegrationRegistry;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.KeyService;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.LootBoxRegistry;
+import org.hyzionstudios.mysticessentials.modules.lootbox.service.NetworkAuthority;
+import org.hyzionstudios.mysticessentials.modules.lootbox.service.StatsService;
+import org.hyzionstudios.mysticessentials.modules.lootbox.api.event.OpeningCommittedEvent;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.OpeningService;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.PendingRewardService;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.PlayerLanes;
@@ -96,6 +102,17 @@ public final class LootBoxModule extends AbstractMysticModule implements LootBox
     /** How often scheduled revisions and time-limited odds are checked. */
     private static final long SCHEDULE_CHECK_SECONDS = 30L;
     private ScheduledFuture<?> recoveryTask;
+    /** Observed-odds statistics and the retention sweep (P4-WP4/WP5). */
+    private StatsService stats;
+    private ScheduledFuture<?> anomalyTask;
+    private org.hyzionstudios.mysticessentials.api.event.EventBus.Subscription statsSubscription;
+    /** Network authority (P4); its blocking Redis calls run on {@link #networkThreads}. */
+    private NetworkAuthority network;
+    private ExecutorService networkThreads;
+    private ScheduledExecutorService networkRenewals;
+    /** The Redis channel pool and key changes travel on (P4-WP3). */
+    static final String CHANGES_CHANNEL = "lootbox:changes";
+    private java.util.function.Consumer<String> changesHandler;
 
     public LootBoxModule() {
         super("lootbox", "LootBox", "1.0.0");
@@ -125,9 +142,17 @@ public final class LootBoxModule extends AbstractMysticModule implements LootBox
             core.log(Level.SEVERE, "[lootbox] cannot read or create the key-signing secret; not enabling: " + e);
             return;
         }
+        audit.pseudonymSalt(keys.secret());
         rewards = new RewardService(core, storage, audit, integrations, config);
         pending = new PendingRewardService(core, storage, audit, lanes);
         opening = new OpeningService(core, storage, registry, keys, rewards, audit, lanes, draw, integrations, config);
+        startNetwork();
+        stats = new StatsService(storage, registry, audit, () -> this.config,
+                flag -> core.getEventBus().publish(flag),
+                (message, error) -> core.log(Level.WARNING,
+                        "[lootbox] " + message + (error == null ? "" : ": " + error)));
+        statsSubscription = core.getEventBus().subscribe(OpeningCommittedEvent.class,
+                event -> stats.onCommitted(event, System.currentTimeMillis()));
         generated = new GeneratedAssetService(core);
         crates = new CrateService(core, storage, audit, generated, () -> this.config.crates.generatedVariants);
         visuals = new CrateVisuals(core, this, storage);
@@ -187,7 +212,12 @@ public final class LootBoxModule extends AbstractMysticModule implements LootBox
                 opening.recover(player);
             }
         }, 5, 5, TimeUnit.MINUTES);
-        sweepTask = core.scheduler().runRepeating(audit::sweep, 1, 24, TimeUnit.HOURS);
+        sweepTask = core.scheduler().runRepeating(() -> {
+            audit.sweep();
+            stats.sweep(System.currentTimeMillis());
+        }, 1, 24, TimeUnit.HOURS);
+        anomalyTask = core.scheduler().runRepeating(() -> stats.checkAnomalies(System.currentTimeMillis()),
+                1, 1, TimeUnit.HOURS);
         // Scheduled revisions start, time-limited odds end, scheduled rollbacks run (P3-WP5).
         // Also attaches integrations that started after this plugin, and new keys' placeholders.
         scheduleTask = core.scheduler().runRepeating(() -> {
@@ -249,6 +279,131 @@ public final class LootBoxModule extends AbstractMysticModule implements LootBox
             bridges.disable();
         }
         NativeKeyItems.clear();
+        stopNetwork();
+        if (anomalyTask != null) {
+            anomalyTask.cancel(false);
+            anomalyTask = null;
+        }
+        if (statsSubscription != null) {
+            statsSubscription.close();
+            statsSubscription = null;
+        }
+    }
+
+    // ----- Network (P4) -------------------------------------------------------
+
+    /**
+     * The network authority NETWORK pools open under, and revision and key
+     * propagation over Redis. Built always (it answers "unavailable" while
+     * {@code network.enabled} is off); propagation only runs when it is on.
+     */
+    private void startNetwork() {
+        networkThreads = Executors.newCachedThreadPool(daemon("MysticEssentials-LootBox-Net"));
+        networkRenewals = Executors.newSingleThreadScheduledExecutor(daemon("MysticEssentials-LootBox-Lease"));
+        NetworkAuthority.Lock lock = new NetworkAuthority.Lock() {
+            @Override
+            public boolean available() {
+                return core.redis() != null && core.redis().isEnabled();
+            }
+
+            @Override
+            public boolean acquire(String key, String payload, long ttlSeconds) {
+                return available() && core.redis().lockAcquire(key, payload, ttlSeconds);
+            }
+
+            @Override
+            public boolean renew(String key, String payload, long ttlSeconds) {
+                return available() && core.redis().lockRenew(key, payload, ttlSeconds);
+            }
+
+            @Override
+            public boolean release(String key, String payload) {
+                return available() && core.redis().lockRelease(key, payload);
+            }
+        };
+        network = new NetworkAuthority(storage, lock, networkThreads, networkRenewals, () -> {
+            LootBoxConfig.Network n = config.network == null ? new LootBoxConfig.Network() : config.network;
+            long ttl = Math.max(5L, n.lockTtlSeconds);
+            return new NetworkAuthority.Timing(ttl, Math.max(1L, Math.min(n.renewSeconds, ttl / 2)),
+                    Math.max(0L, n.acquireTimeoutMs), Math.max(5L, n.retryMs));
+        }, () -> config.network != null && config.network.enabled,
+                () -> core.redis() == null ? null : core.redis().networkId(),
+                () -> core.redis() == null || core.redis().serverId() == null ? "local" : core.redis().serverId(),
+                System::currentTimeMillis);
+        opening.network(network);
+        if (config.network == null || !config.network.enabled) {
+            return;
+        }
+        String fingerprint = fingerprint(keys.secret());
+        storage.claimSecretFingerprint(fingerprint).whenComplete((recorded, error) -> {
+            boolean agreed = error == null && fingerprint.equals(recorded);
+            network.secretAgreed(agreed);
+            if (!agreed) {
+                core.log(Level.SEVERE, "[lootbox] network: this server's secret.key differs from the network's"
+                        + (error == null ? "" : " (or the shared store did not answer: " + error + ")")
+                        + ". Copy secret.key from the LootBox data folder of the first server to every server; "
+                        + "NETWORK pools stay closed here until then.");
+            }
+        });
+        if (core.redis() != null) {
+            changesHandler = this::onRemoteChange;
+            core.redis().subscribe(CHANGES_CHANNEL, changesHandler);
+            registry.onPoolChange(id -> core.redis().publish(CHANGES_CHANNEL, "pool:" + id));
+            registry.onKeyChange(id -> core.redis().publish(CHANGES_CHANNEL, "key:" + id));
+        }
+        String problem = network.unavailable();
+        log("LootBox network mode: " + (problem == null ? "ready" : "NETWORK pools closed (" + problem + ")") + ".");
+    }
+
+    /** Another server changed a pool or published a key: re-read it (never re-announced, so no echo loop). */
+    private void onRemoteChange(String payload) {
+        if (registry == null || payload == null) {
+            return;
+        }
+        if (payload.startsWith("pool:")) {
+            registry.refreshPool(payload.substring(5));
+        } else if (payload.startsWith("key:")) {
+            registry.refreshKey(payload.substring(4)).thenRun(this::syncNativeKeyItems);
+        }
+    }
+
+    private void stopNetwork() {
+        if (changesHandler != null && core.redis() != null) {
+            core.redis().unsubscribe(CHANGES_CHANNEL, changesHandler);
+        }
+        changesHandler = null;
+        if (registry != null) {
+            registry.onPoolChange(null);
+            registry.onKeyChange(null);
+        }
+        if (networkRenewals != null) {
+            networkRenewals.shutdownNow();
+            networkRenewals = null;
+        }
+        if (networkThreads != null) {
+            networkThreads.shutdown();
+            networkThreads = null;
+        }
+        network = null;
+    }
+
+    private static java.util.concurrent.ThreadFactory daemon(String name) {
+        java.util.concurrent.atomic.AtomicInteger count = new java.util.concurrent.atomic.AtomicInteger();
+        return runnable -> {
+            Thread thread = new Thread(runnable, name + "-" + count.incrementAndGet());
+            thread.setDaemon(true);
+            return thread;
+        };
+    }
+
+    /** SHA-256 of the key-signing secret, hex; the only form of it that leaves this server. */
+    static String fingerprint(byte[] secret) {
+        try {
+            return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(secret == null ? new byte[0] : secret));
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     // ----- Crate callbacks (from the crate systems and interaction) -----------
@@ -350,6 +505,16 @@ public final class LootBoxModule extends AbstractMysticModule implements LootBox
 
     public EditorSessions editors() {
         return editors;
+    }
+
+    /** Statistics (P4-WP4), or {@code null} while disabled. */
+    public StatsService stats() {
+        return stats;
+    }
+
+    /** The network authority (P4), or {@code null} while disabled. */
+    public NetworkAuthority network() {
+        return network;
     }
 
     /** The Mystic sibling bridges, or {@code null} before the first enable. */

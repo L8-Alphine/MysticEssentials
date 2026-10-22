@@ -59,6 +59,12 @@ public final class LootBoxDraft {
      * was live before these odds, {@code CLOSE} closes the pool.
      */
     public String afterEnd;
+    /**
+     * {@code LOCAL} (default) or {@code NETWORK} (P4-WP2). A NETWORK pool opens
+     * only under the network lock with a fencing token, against the shared store,
+     * and refuses (nothing spent) while Redis or the shared SQL store is unreachable.
+     */
+    public String scope;
 
     /** The bonus rolls, never {@code null}. */
     public List<BonusRoll> bonusRolls() {

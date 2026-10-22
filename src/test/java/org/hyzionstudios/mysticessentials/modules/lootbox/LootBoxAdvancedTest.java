@@ -580,7 +580,7 @@ public final class LootBoxAdvancedTest {
         List<Long> weights = OddsEngine.resolveWeights(draft);
         JsonObject phaseTwo = Json.toTree(draft).getAsJsonObject();
         for (String key : List.of("bonusRolls", "conditions", "ineligibleRewards", "pity", "startsAt", "endsAt",
-                "afterEnd")) {
+                "afterEnd", "scope")) {
             phaseTwo.remove(key);
         }
         JsonArray rewards = phaseTwo.getAsJsonArray("rewards");

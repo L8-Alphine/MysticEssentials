@@ -125,6 +125,10 @@ public final class DraftValidator {
         validateConditions(draft, env, problems);
         validatePity(draft, problems);
         problems.addAll(ScheduleRules.validate(draft, System.currentTimeMillis()));
+        String scope = org.hyzionstudios.mysticessentials.modules.lootbox.service.NetworkRules.validateScope(draft.scope);
+        if (scope != null) {
+            problems.add(scope);
+        }
         return problems;
     }
 

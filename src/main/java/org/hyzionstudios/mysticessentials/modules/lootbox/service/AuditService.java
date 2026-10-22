@@ -79,9 +79,20 @@ public final class AuditService {
         return counters;
     }
 
-    /** Drops buckets older than {@code audit.retentionDays}; runs off the world threads. */
+    /** Keyed-hash salt for pseudonyms in exports (P4-WP5); set from the key-signing secret at enable. */
+    private volatile byte[] pseudonymSalt = new byte[0];
+
+    public void pseudonymSalt(byte[] salt) {
+        this.pseudonymSalt = salt == null ? new byte[0] : salt.clone();
+    }
+
+    /**
+     * Drops buckets older than {@code audit.retentionDays} (at least 365 days under
+     * PAID_RANDOM_RESTRICTED, P4-WP5); runs off the world threads.
+     */
     public void sweep() {
-        long cutoff = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(Math.max(1, config.audit.retentionDays));
+        int days = RetentionRules.effectiveDays(config.audit.retentionDays, config.policyProfile);
+        long cutoff = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(days);
         String oldest = BUCKET.format(Instant.ofEpochMilli(cutoff));
         storage.listAuditBuckets().thenAccept(buckets -> {
             for (String bucket : buckets) {
@@ -138,7 +149,9 @@ public final class AuditService {
      * stream to a temporary file that is moved into place when complete, so a
      * failed export leaves nothing half-written. The export itself is audited.
      */
-    public CompletableFuture<Export> export(AuditQuery.Filter filter, ExportFormat format, String actor) {
+    public CompletableFuture<Export> export(AuditQuery.Filter filter, ExportFormat format, String actor,
+            boolean identifiers) {
+        byte[] salt = pseudonymSalt;
         return CompletableFuture.supplyAsync(() -> {
             try {
                 synchronized (exportNames) {
@@ -171,7 +184,12 @@ public final class AuditService {
                 return CompletableFuture.failedFuture(e);
             }
             return AuditQuery.export(source(), filter, EXPORT_MAX_RECORDS, EXPORT_MAX_BUCKETS,
-                    ForkJoinPool.commonPool(), record -> {
+                    ForkJoinPool.commonPool(), found -> {
+                        // Without the identifiers permission, player UUIDs become pseudonyms (P4-WP5).
+                        AuditQuery.Record record = identifiers ? found : new AuditQuery.Record(found.at(),
+                                found.server(), RetentionRules.pseudonymise(found.actor(), salt), found.action(),
+                                RetentionRules.pseudonymise(found.target(), salt),
+                                RetentionRules.pseudonymise(found.detail(), salt));
                         if (json != null) {
                             AuditQuery.json(json, record);
                         } else {
@@ -188,7 +206,8 @@ public final class AuditService {
                                 out.close();
                                 move(temp, target);
                                 record(actor, "AUDIT_EXPORT", target.getFileName().toString(),
-                                        written.records() + " records, " + filter.describe());
+                                        written.records() + " records, " + filter.describe()
+                                                + (identifiers ? ", with identifiers" : ", pseudonymised"));
                                 return new Export(target, written);
                             }
                             out.close();
