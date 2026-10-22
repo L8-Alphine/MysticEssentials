@@ -13,8 +13,10 @@ import java.util.logging.Level;
 
 import org.hyzionstudios.mysticessentials.api.Permissions;
 import org.hyzionstudios.mysticessentials.core.module.AbstractMysticModule;
+import org.hyzionstudios.mysticessentials.modules.lootbox.api.ConditionProvider;
 import org.hyzionstudios.mysticessentials.modules.lootbox.api.GrantSource;
 import org.hyzionstudios.mysticessentials.modules.lootbox.api.LootBoxApi;
+import org.hyzionstudios.mysticessentials.modules.lootbox.api.RewardProvider;
 import org.hyzionstudios.mysticessentials.modules.lootbox.command.LootBoxCommand;
 import org.hyzionstudios.mysticessentials.modules.lootbox.config.LootBoxConfig;
 import org.hyzionstudios.mysticessentials.modules.lootbox.hytale.BlockTargets;
@@ -27,6 +29,7 @@ import org.hyzionstudios.mysticessentials.modules.lootbox.model.PlayerLootState;
 import org.hyzionstudios.mysticessentials.modules.lootbox.odds.SecureDraw;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.AuditService;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.CrateService;
+import org.hyzionstudios.mysticessentials.modules.lootbox.service.IntegrationRegistry;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.KeyService;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.LootBoxRegistry;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.OpeningService;
@@ -77,6 +80,11 @@ public final class LootBoxModule extends AbstractMysticModule implements LootBox
     private LootBoxUi ui;
     /** Open in-game editors, one per player; the working copies never outlive a disconnect or a disable. */
     private final EditorSessions editors = new EditorSessions();
+    /**
+     * Reward and condition providers (P3-WP1). Kept for the plugin's lifetime:
+     * other plugins register once when they start, whether or not LootBox is on.
+     */
+    private final IntegrationRegistry integrations = new IntegrationRegistry();
     private ScheduledFuture<?> sweepTask;
     private ScheduledFuture<?> recoveryTask;
 
@@ -98,7 +106,7 @@ public final class LootBoxModule extends AbstractMysticModule implements LootBox
         }
         storage = new LootBoxStorage(core);
         audit = new AuditService(core, storage, config);
-        registry = new LootBoxRegistry(core, storage, audit, config);
+        registry = new LootBoxRegistry(core, storage, audit, integrations, config);
         PlayerLanes lanes = new PlayerLanes();
         SecureDraw draw = new SecureDraw();
         keys = new KeyService(core, storage, registry, audit, lanes, draw, config);
@@ -108,9 +116,9 @@ public final class LootBoxModule extends AbstractMysticModule implements LootBox
             core.log(Level.SEVERE, "[lootbox] cannot read or create the key-signing secret; not enabling: " + e);
             return;
         }
-        rewards = new RewardService(core, storage, audit, config);
+        rewards = new RewardService(core, storage, audit, integrations, config);
         pending = new PendingRewardService(core, storage, audit, lanes);
-        opening = new OpeningService(core, storage, registry, keys, rewards, audit, lanes, draw, config);
+        opening = new OpeningService(core, storage, registry, keys, rewards, audit, lanes, draw, integrations, config);
         crates = new CrateService(core, storage, audit, new GeneratedAssetService(core),
                 () -> this.config.crates.generatedVariants);
         visuals = new CrateVisuals(core, this, storage);
@@ -331,6 +339,31 @@ public final class LootBoxModule extends AbstractMysticModule implements LootBox
     @Override
     public CompletableFuture<java.util.List<PlayerLootState.Receipt>> receipts(UUID player) {
         return opening == null ? CompletableFuture.completedFuture(java.util.List.of()) : opening.history(player);
+    }
+
+    @Override
+    public IntegrationRegistry integrations() {
+        return integrations;
+    }
+
+    @Override
+    public void registerRewardProvider(RewardProvider provider) {
+        integrations.register(provider);
+    }
+
+    @Override
+    public boolean unregisterRewardProvider(RewardProvider provider) {
+        return integrations.unregister(provider);
+    }
+
+    @Override
+    public void registerConditionProvider(ConditionProvider provider) {
+        integrations.register(provider);
+    }
+
+    @Override
+    public boolean unregisterConditionProvider(ConditionProvider provider) {
+        return integrations.unregister(provider);
     }
 
     @Override

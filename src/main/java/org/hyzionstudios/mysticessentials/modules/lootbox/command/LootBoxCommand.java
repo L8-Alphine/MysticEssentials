@@ -8,6 +8,7 @@ import java.util.function.BiConsumer;
 
 import org.hyzionstudios.mysticessentials.api.Permissions;
 import org.hyzionstudios.mysticessentials.core.MysticCore;
+import org.hyzionstudios.mysticessentials.core.message.MysticText;
 import org.hyzionstudios.mysticessentials.modules.lootbox.LootBoxModule;
 import org.hyzionstudios.mysticessentials.modules.lootbox.api.GrantSource;
 import org.hyzionstudios.mysticessentials.modules.lootbox.hytale.BlockTargets;
@@ -15,6 +16,7 @@ import org.hyzionstudios.mysticessentials.modules.lootbox.hytale.CrateVisuals;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.CrateInstance;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.KeySerial;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.LootBoxRevision;
+import org.hyzionstudios.mysticessentials.modules.lootbox.odds.ItemChance;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.CrateService;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.MotionRules;
 import org.hyzionstudios.mysticessentials.modules.lootbox.ui.editor.CrateEditorPage;
@@ -33,7 +35,8 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
  *       {@code motion [reduced|full|default]};</li>
  *   <li>{@code key give|revoke|info|list|publish|grants …}; players' {@code key deposit} and
  *       {@code key withdraw <keyId> [count]};</li>
- *   <li>{@code publish|rollback|disable|enable …}; {@code simulate <id> [draws]};</li>
+ *   <li>{@code publish|rollback|disable|enable …}; {@code simulate <id> [draws]};
+ *       {@code chance <id> <itemId>}; {@code providers};</li>
  *   <li>{@code crate select|convert|edit|rebind|remove|info|verify|enable …};</li>
  *   <li>{@code crate effects [on|off]} for players;</li>
  *   <li>{@code reconcile <openingId> regrant|dismiss}; {@code admin}; {@code audit}; {@code reload}.</li>
@@ -73,6 +76,8 @@ public final class LootBoxCommand extends MysticCommand {
             case "rollback" -> rollback(sender, args);
             case "disable", "enable" -> toggle(sender, args, "disable".equals(sub));
             case "simulate" -> simulate(sender, args);
+            case "chance" -> chance(sender, args);
+            case "providers" -> providers(sender);
             case "crate", "crates" -> crate(sender, args);
             case "reconcile" -> reconcile(sender, args);
             case "admin" -> {
@@ -392,6 +397,61 @@ public final class LootBoxCommand extends MysticCommand {
         module.registry().setDisabled(id, disable, sender.name()).thenAccept(changed -> sender.reply(changed
                 ? (disable ? "&e" + id + " is now closed." : "&a" + id + " is open again.")
                 : "&c" + id + " has never been published."));
+    }
+
+    /**
+     * {@code /lootbox chance <id> <itemId>} (P3-WP6): the exact chance that one
+     * opening gives at least one {@code itemId}, through the main reward, a bundle
+     * or a bonus roll. A player gets their own odds; the console the published ones.
+     */
+    private void chance(MysticCommandSender sender, String[] args) {
+        if (args.length < 3) {
+            usage(sender, "/lootbox chance <id> <itemId>");
+            return;
+        }
+        LootBoxRevision revision = module.registry().active(args[1].toLowerCase(Locale.ROOT)).orElse(null);
+        if (revision == null) {
+            sender.replyKey("lootbox-unknown-pool", Map.of("pool", args[1]));
+            return;
+        }
+        String itemId = args[2];
+        PlayerRef viewer = sender.player().orElse(null);
+        module.opening().tableFor(viewer, revision).thenAccept(table -> {
+            ItemChance.Chance chance = ItemChance.of(table, revision, ItemChance.containsItem(itemId));
+            var formatter = module.opening().formatter();
+            String shown = chance.isZero() ? "not possible" : formatter.percent(chance.numerator(),
+                    chance.denominator()) + " (" + formatter.oneIn(chance.numerator(), chance.denominator()) + ")";
+            sender.reply("&7Chance of getting &f" + itemId + " &7from one opening of &f"
+                    + MysticText.stripMarkup(revision.spec.displayName) + "&7: &6" + shown + " &8(odds "
+                    + table.oddsId() + (viewer == null ? ", published odds" : ", your odds") + ")");
+        });
+    }
+
+    /**
+     * {@code /lootbox providers}: the reward and condition providers other plugins
+     * registered (P3-WP1), and every published pool that can't be opened because
+     * one it needs is missing.
+     */
+    private void providers(MysticCommandSender sender) {
+        if (!allowed(sender, Permissions.LOOTBOX_ADMIN)) {
+            return;
+        }
+        var integrations = module.integrations();
+        sender.reply("&d&lLootBox providers");
+        integrations.rewardProviders().forEach(provider -> sender.reply("&7- reward &f" + provider.id() + " &8("
+                + provider.kind() + ", " + provider.guarantee() + ")"));
+        integrations.conditionProviders().forEach(provider -> sender.reply("&7- condition &f" + provider.type()));
+        int invalid = 0;
+        for (LootBoxRevision revision : module.registry().publishedPools()) {
+            java.util.List<String> missing = integrations.missing(revision.spec);
+            if (!missing.isEmpty()) {
+                invalid++;
+                sender.reply("&c" + revision.lootboxId + " &7can't be opened: missing " + String.join(", ", missing));
+            }
+        }
+        if (invalid == 0) {
+            sender.reply("&aEvery published pool has the providers it needs.");
+        }
     }
 
     private void simulate(MysticCommandSender sender, String[] args) {

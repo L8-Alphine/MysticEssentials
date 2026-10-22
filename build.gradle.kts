@@ -645,6 +645,14 @@ tasks.register<JavaExec>("verifyLootBoxAccessibility") {
     mainClass.set("org.hyzionstudios.mysticessentials.modules.lootbox.LootBoxAccessibilityTest")
 }
 
+tasks.register<JavaExec>("verifyLootBoxAdvanced") {
+    group = "verification"
+    description = "Checks LootBox Phase 3: providers, bundles, bonus rolls, conditions, pity and personal odds (LB-003, LB-013)."
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets.test.get().runtimeClasspath + configurations.compileClasspath.get()
+    mainClass.set("org.hyzionstudios.mysticessentials.modules.lootbox.LootBoxAdvancedTest")
+}
+
 tasks.register<JavaExec>("verifyMessageParamOrder") {
     group = "verification"
     description = "Checks message params are filled after placeholders, so they never expand one."
@@ -686,6 +694,7 @@ tasks.named("check") {
         "verifyLootBoxDrafts",
         "verifyLootBoxCrates",
         "verifyLootBoxScreens",
-        "verifyLootBoxAccessibility"
+        "verifyLootBoxAccessibility",
+        "verifyLootBoxAdvanced"
     )
 }

@@ -57,6 +57,7 @@ public final class LootBoxRegistry {
     private final MysticCore core;
     private final LootBoxStorage storage;
     private final AuditService audit;
+    private final IntegrationRegistry integrations;
     private volatile LootBoxConfig config;
 
     private final Map<String, LootBoxRevision> active = new ConcurrentHashMap<>();
@@ -69,10 +70,12 @@ public final class LootBoxRegistry {
     private final DraftStore<LootBoxDraft> poolStore;
     private final DraftStore<KeyDraft> keyStore;
 
-    public LootBoxRegistry(MysticCore core, LootBoxStorage storage, AuditService audit, LootBoxConfig config) {
+    public LootBoxRegistry(MysticCore core, LootBoxStorage storage, AuditService audit,
+            IntegrationRegistry integrations, LootBoxConfig config) {
         this.core = core;
         this.storage = storage;
         this.audit = audit;
+        this.integrations = integrations;
         this.config = config;
         DraftLifecycle<LootBoxDraft> pools = DraftLifecycle.pools(() -> environment(true), id -> {
             LootBoxRevision revision = active.get(id);
@@ -235,6 +238,11 @@ public final class LootBoxRegistry {
         return Optional.ofNullable(draft == null ? null : poolStore.status(draft));
     }
 
+    /** The registered reward and condition providers (P3-WP1). */
+    public IntegrationRegistry integrations() {
+        return integrations;
+    }
+
     public Optional<LootBoxRevision> active(String lootboxId) {
         return Optional.ofNullable(lootboxId == null ? null : active.get(lootboxId));
     }
@@ -285,13 +293,14 @@ public final class LootBoxRegistry {
             return CompletableFuture.completedFuture(PublishResult.failed(problems));
         }
         List<Long> weights = OddsEngine.resolveWeights(frozen);
+        List<LootBoxRevision.BonusWeights> bonusWeights = OddsEngine.resolveBonus(frozen);
         String contentHash = DraftLifecycle.poolContentHash(frozen, weights);
         LootBoxRevision current = active.get(lootboxId);
         if (current != null && contentHash.equals(current.contentHash)) {
             return CompletableFuture.completedFuture(
                     new PublishResult(true, current.revision, contentHash, List.of(), true));
         }
-        return freeze(lootboxId, frozen, weights, contentHash, actor, null);
+        return freeze(lootboxId, frozen, weights, bonusWeights, contentHash, actor, null);
     }
 
     /** Republishes revision {@code from}'s content as a new revision. */
@@ -301,12 +310,13 @@ public final class LootBoxRegistry {
                 return CompletableFuture.completedFuture(
                         PublishResult.failed("revision " + from + " of '" + lootboxId + "' does not exist"));
             }
-            return freeze(lootboxId, old.spec, old.weights, old.contentHash, actor, from);
+            return freeze(lootboxId, old.spec, old.weights, old.bonusWeights, old.contentHash, actor, from);
         });
     }
 
     private CompletableFuture<PublishResult> freeze(String lootboxId, LootBoxDraft spec, List<Long> weights,
-            String contentHash, String actor, Integer rolledBackFrom) {
+            List<LootBoxRevision.BonusWeights> bonusWeights, String contentHash, String actor,
+            Integer rolledBackFrom) {
         AtomicInteger next = new AtomicInteger();
         return storage.updateState(lootboxId, state -> {
             LootBoxRevision.State s = state == null ? new LootBoxRevision.State() : state;
@@ -320,6 +330,7 @@ public final class LootBoxRegistry {
             revision.revision = next.get();
             revision.spec = spec;
             revision.weights = new ArrayList<>(weights);
+            revision.bonusWeights = new ArrayList<>(bonusWeights == null ? List.of() : bonusWeights);
             revision.contentHash = contentHash;
             revision.publishedBy = actor;
             revision.publishedAt = System.currentTimeMillis();
@@ -414,7 +425,7 @@ public final class LootBoxRegistry {
         }
         boolean grants = core.getPermissionService() != null && core.getPermissionService().canGrant();
         return new DraftValidator.Environment(LootBoxRegistry::itemExists, keys::containsKey, patterns,
-                economy, grants, mayPublishCommands);
+                economy, grants, mayPublishCommands, integrations);
     }
 
     private static <T> Map<String, T> withDraft(Map<String, T> current, String id, T draft) {

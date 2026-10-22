@@ -9,11 +9,13 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 
 import org.hyzionstudios.mysticessentials.core.MysticCore;
+import org.hyzionstudios.mysticessentials.modules.lootbox.api.RewardProvider;
 import org.hyzionstudios.mysticessentials.modules.lootbox.api.event.RewardDeliveryCompletedEvent;
 import org.hyzionstudios.mysticessentials.modules.lootbox.api.event.RewardDeliveryFailedEvent;
 import org.hyzionstudios.mysticessentials.modules.lootbox.config.LootBoxConfig;
 import org.hyzionstudios.mysticessentials.modules.lootbox.hytale.InventoryAdapter;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.LootBoxDraft;
+import org.hyzionstudios.mysticessentials.modules.lootbox.model.LootBoxRevision;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.Opening;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.PendingInbox;
 import org.hyzionstudios.mysticessentials.modules.lootbox.storage.LootBoxStorage;
@@ -52,14 +54,17 @@ public final class RewardService {
     private final MysticCore core;
     private final LootBoxStorage storage;
     private final AuditService audit;
+    private final IntegrationRegistry integrations;
     private volatile LootBoxConfig config;
     /** Openings this server is delivering, with when each delivery started. */
     private final Map<String, Long> delivering = new ConcurrentHashMap<>();
 
-    public RewardService(MysticCore core, LootBoxStorage storage, AuditService audit, LootBoxConfig config) {
+    public RewardService(MysticCore core, LootBoxStorage storage, AuditService audit, IntegrationRegistry integrations,
+            LootBoxConfig config) {
         this.core = core;
         this.storage = storage;
         this.audit = audit;
+        this.integrations = integrations;
         this.config = config;
     }
 
@@ -68,10 +73,12 @@ public final class RewardService {
     }
 
     /**
-     * Runs every unsettled action of {@code opening}. {@code force} also re-runs
-     * actions in REVIEW ({@code /lootbox reconcile … regrant}).
+     * Runs every unsettled action of {@code opening}: the main outcome's actions
+     * (several for a bundle) and each bonus roll's, each resolved from the
+     * opening's own revision. {@code force} also re-runs actions in REVIEW
+     * ({@code /lootbox reconcile … regrant}).
      */
-    public CompletableFuture<Status> deliver(Opening opening, LootBoxDraft.RewardSpec reward, boolean force) {
+    public CompletableFuture<Status> deliver(Opening opening, LootBoxRevision revision, boolean force) {
         UUID player = UUID.fromString(opening.player);
         // Registered before the first step: the opening's lane lets go as soon as
         // this returns, and recovery in that lane must already see it running.
@@ -80,7 +87,7 @@ public final class RewardService {
         CompletableFuture<Status> chain = CompletableFuture.completedFuture(Status.DELIVERED);
         for (int i = 0; i < opening.fulfillments.size(); i++) {
             int index = i;
-            chain = chain.thenCompose(worst -> deliverOne(opening, index, reward, player, force)
+            chain = chain.thenCompose(worst -> deliverOne(opening, index, revision, player, force)
                     .thenApply(status -> worse(worst, status)));
         }
         return chain.thenCompose(status -> settle(opening, player, status))
@@ -92,10 +99,21 @@ public final class RewardService {
         return delivering.get(openingId);
     }
 
-    private CompletableFuture<Status> deliverOne(Opening opening, int index, LootBoxDraft.RewardSpec reward,
-            UUID player, boolean force) {
+    private CompletableFuture<Status> deliverOne(Opening opening, int index, LootBoxRevision revision, UUID player,
+            boolean force) {
         Opening.Fulfillment action = opening.fulfillments.get(index);
-        DeliveryRules.Step step = DeliveryRules.step(action, DeliveryRules.replaySafe(reward), force);
+        LootBoxDraft.RewardSpec reward = RewardActions.actionOf(revision, opening, action);
+        if (reward == null) {
+            if (action.isSettled()) {
+                return CompletableFuture.completedFuture(Opening.Fulfillment.PENDING_INBOX.equals(action.state)
+                        ? Status.PENDING_INBOX : Status.DELIVERED);
+            }
+            return mark(opening, index, Opening.Fulfillment.REVIEW, "its revision or reward is gone")
+                    .thenApply(done -> Status.REVIEW);
+        }
+        String label = RewardActions.labelOf(revision, opening, action);
+        RewardProvider.Guarantee guarantee = RewardActions.guarantee(reward, integrations::reward);
+        DeliveryRules.Step step = DeliveryRules.step(action, guarantee, force);
         if (step == DeliveryRules.Step.SETTLED) {
             return CompletableFuture.completedFuture(Opening.Fulfillment.PENDING_INBOX.equals(action.state)
                     ? Status.PENDING_INBOX : Status.DELIVERED);
@@ -106,19 +124,95 @@ public final class RewardService {
                             ? "interrupted after it started; outcome unknown" : action.detail)
                     .thenApply(ignored -> Status.REVIEW);
         }
-        String type = reward.type == null ? "" : reward.type.toUpperCase(Locale.ROOT);
-        return mark(opening, index, Opening.Fulfillment.ATTEMPTED, null).thenCompose(ignored -> switch (type) {
-            case "ITEM" -> deliverItem(opening, index, reward, player);
-            case "ECONOMY" -> deliverEconomy(opening, index, reward, player);
-            case "COMMAND" -> deliverCommand(opening, index, reward, player);
-            case "PERMISSION" -> deliverPermission(opening, index, reward, player);
-            default -> mark(opening, index, Opening.Fulfillment.REVIEW, "unknown reward type " + reward.type)
-                    .thenApply(done -> Status.REVIEW);
+        if (step == DeliveryRules.Step.RECONCILE) {
+            return reconcileProvider(opening, index, reward, player);
+        }
+        String type = RewardActions.type(reward);
+        return mark(opening, index, Opening.Fulfillment.ATTEMPTED, null).thenCompose(ignored -> {
+            if (RewardActions.needsProvider(reward)) {
+                return deliverProvider(opening, index, reward, player);
+            }
+            return switch (type) {
+                case "ITEM" -> deliverItem(opening, index, reward, label, player);
+                case "ECONOMY" -> deliverEconomy(opening, index, reward, player);
+                case "COMMAND" -> deliverCommand(opening, index, reward, player);
+                case "PERMISSION" -> deliverPermission(opening, index, reward, player);
+                default -> mark(opening, index, Opening.Fulfillment.REVIEW, "unknown reward type " + reward.type)
+                        .thenApply(done -> Status.REVIEW);
+            };
         });
     }
 
-    private CompletableFuture<Status> deliverItem(Opening opening, int index, LootBoxDraft.RewardSpec reward,
+    /**
+     * A provider-delivered action (P3-WP1). With the provider gone it goes to
+     * review: nothing else is ever delivered in its place.
+     */
+    private CompletableFuture<Status> deliverProvider(Opening opening, int index, LootBoxDraft.RewardSpec reward,
             UUID player) {
+        RewardProvider provider = integrations.reward(reward.provider);
+        if (provider == null) {
+            return mark(opening, index, Opening.Fulfillment.REVIEW, "reward provider '" + reward.provider
+                    + "' is not installed; nothing was substituted").thenApply(done -> Status.REVIEW);
+        }
+        String fulfillmentId = opening.fulfillments.get(index).id;
+        CompletableFuture<RewardProvider.Result> granted;
+        try {
+            granted = provider.grant(fulfillmentId, player, RewardActions.providerParams(reward));
+        } catch (Throwable t) {
+            granted = CompletableFuture.failedFuture(t);
+        }
+        return granted.handle((result, error) -> settleProvider(opening, index, provider,
+                error != null ? RewardProvider.Result.unknown("grant threw " + error)
+                        : result == null ? RewardProvider.Result.unknown("no answer") : result))
+                .thenCompose(future -> future);
+    }
+
+    /** Asks a reconcilable provider whether an interrupted action was applied. */
+    private CompletableFuture<Status> reconcileProvider(Opening opening, int index, LootBoxDraft.RewardSpec reward,
+            UUID player) {
+        RewardProvider provider = integrations.reward(reward.provider);
+        if (provider == null) {
+            return mark(opening, index, Opening.Fulfillment.REVIEW, "interrupted, and reward provider '"
+                    + reward.provider + "' is not installed to reconcile it").thenApply(done -> Status.REVIEW);
+        }
+        String fulfillmentId = opening.fulfillments.get(index).id;
+        CompletableFuture<RewardProvider.Result> asked;
+        try {
+            asked = provider.reconcile(fulfillmentId, player, RewardActions.providerParams(reward));
+        } catch (Throwable t) {
+            asked = CompletableFuture.failedFuture(t);
+        }
+        return asked.handle((result, error) -> {
+            RewardProvider.Outcome outcome = error != null || result == null ? RewardProvider.Outcome.UNKNOWN
+                    : result.outcome();
+            String detail = error != null ? "reconcile threw " + error : result == null ? "no answer"
+                    : result.detail();
+            audit.record("server", "DELIVERY_RECONCILE", fulfillmentId, outcome + " " + detail);
+            return switch (outcome) {
+                case DELIVERED, ALREADY_DELIVERED -> mark(opening, index, Opening.Fulfillment.DELIVERED,
+                        "reconciled: " + detail).thenApply(done -> Status.DELIVERED);
+                case FAILED -> deliverProvider(opening, index, reward, player);
+                case UNKNOWN -> mark(opening, index, Opening.Fulfillment.REVIEW, "interrupted; the provider "
+                        + "can't tell whether it was applied (" + detail + ")").thenApply(done -> Status.REVIEW);
+            };
+        }).thenCompose(future -> future);
+    }
+
+    private CompletableFuture<Status> settleProvider(Opening opening, int index, RewardProvider provider,
+            RewardProvider.Result result) {
+        String detail = provider.id() + ": " + (result.detail() == null ? "" : result.detail());
+        return switch (result.outcome()) {
+            case DELIVERED, ALREADY_DELIVERED -> mark(opening, index, Opening.Fulfillment.DELIVERED, detail)
+                    .thenApply(done -> Status.DELIVERED);
+            case FAILED -> mark(opening, index, Opening.Fulfillment.REVIEW, "not delivered: " + detail)
+                    .thenApply(done -> Status.REVIEW);
+            case UNKNOWN -> mark(opening, index, Opening.Fulfillment.REVIEW, "outcome unknown: " + detail)
+                    .thenApply(done -> Status.REVIEW);
+        };
+    }
+
+    private CompletableFuture<Status> deliverItem(Opening opening, int index, LootBoxDraft.RewardSpec reward,
+            String label, UUID player) {
         ItemStack stack;
         try {
             stack = InventoryAdapter.stack(reward.item.itemId, reward.item.quantity, reward.item.metadata);
@@ -128,7 +222,7 @@ public final class RewardService {
         }
         PlayerRef online = core.platform().findPlayer(player).orElse(null);
         if (online == null) {
-            return toInbox(opening, index, player, stack, reward.name);
+            return toInbox(opening, index, player, stack, label);
         }
         CompletableFuture<ItemStack> leftover = new CompletableFuture<>();
         boolean dispatched = core.platform().runOnEntityThread(online, (store, entity, world) -> {
@@ -139,7 +233,7 @@ public final class RewardService {
             }
         });
         if (!dispatched) {
-            return toInbox(opening, index, player, stack, reward.name);
+            return toInbox(opening, index, player, stack, label);
         }
         return leftover.handle((remainder, error) -> {
             if (error != null) {
@@ -147,7 +241,7 @@ public final class RewardService {
                         .thenApply(done -> Status.REVIEW);
             }
             if (remainder != null) {
-                return toInbox(opening, index, player, remainder, reward.name);
+                return toInbox(opening, index, player, remainder, label);
             }
             return mark(opening, index, Opening.Fulfillment.DELIVERED, null).thenApply(done -> Status.DELIVERED);
         }).thenCompose(future -> future);

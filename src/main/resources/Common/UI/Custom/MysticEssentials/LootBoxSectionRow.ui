@@ -1,0 +1,17 @@
+// A heading row inside a LootBox reward list: a bonus roll and its own chance,
+// "not available to you", or "chance of getting each item". Appended between
+// reward rows, so every chance stays in the one scrolling list.
+//   cmd.append("#RewardList", "MysticEssentials/LootBoxSectionRow.ui")
+// then set #SectionText TextSpans.
+$M = "MysticTheme.ui";
+
+Group #Row {
+  Anchor: (Height: 26, Top: 4, Bottom: 2);
+  LayoutMode: Left;
+  Padding: (Left: 4, Right: 4);
+
+  Label #SectionText {
+    FlexWeight: 1;
+    Style: $M.@RowNameFitStyle;
+  }
+}

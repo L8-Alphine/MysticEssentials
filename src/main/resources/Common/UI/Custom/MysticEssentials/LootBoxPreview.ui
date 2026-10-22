@@ -42,6 +42,12 @@ $C.@Container {
         Anchor: (Height: 18);
         Style: $M.@MetaGoldStyle;
       }
+
+      Label #Personal {
+        Anchor: (Top: 4);
+        Style: $M.@MetaWrapStyle;
+        Visible: false;
+      }
     }
 
     $M.@Section {

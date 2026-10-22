@@ -93,6 +93,16 @@ public final class OpeningRules {
      */
     public static Debit spendVirtual(PlayerLootState state, String keyId, Opening opening, String poolName,
             int historySize, long now) {
+        return spendVirtual(state, keyId, opening, poolName, historySize, now, EligibilityRules.Effects.NONE);
+    }
+
+    /**
+     * {@link #spendVirtual(PlayerLootState, String, Opening, String, int, long)}
+     * that also applies the opening's pity and duplicate-protection
+     * {@code effects} in the same write (P3-WP4).
+     */
+    public static Debit spendVirtual(PlayerLootState state, String keyId, Opening opening, String poolName,
+            int historySize, long now, EligibilityRules.Effects effects) {
         if (state.hasCommit(opening.openingId)) {
             return Debit.ALREADY_COMMITTED;
         }
@@ -108,13 +118,23 @@ public final class OpeningRules {
         } else {
             state.virtualKeys.put(keyId, balance - 1);
         }
-        recordCommit(state, opening, poolName, historySize, now);
+        recordCommit(state, opening, poolName, historySize, now, effects);
         return Debit.SPENT;
     }
 
     /** Appends the commit record, receipt and bookkeeping of {@code opening} (the caller holds the update). */
     public static void recordCommit(PlayerLootState state, Opening opening, String poolName, int historySize,
             long now) {
+        recordCommit(state, opening, poolName, historySize, now, EligibilityRules.Effects.NONE);
+    }
+
+    /**
+     * Appends the commit record, receipt and bookkeeping of {@code opening},
+     * including its pity and owned-reward {@code effects} (the caller holds the
+     * update, so they land in the same write as the commit record).
+     */
+    public static void recordCommit(PlayerLootState state, Opening opening, String poolName, int historySize,
+            long now, EligibilityRules.Effects effects) {
         PlayerLootState.CommitRecord commit = new PlayerLootState.CommitRecord();
         commit.openingId = opening.openingId;
         commit.lootboxId = opening.lootboxId;
@@ -124,6 +144,13 @@ public final class OpeningRules {
         commit.keyId = opening.keyId;
         commit.keyKind = opening.keyKind;
         commit.at = now;
+        if (opening.bonus != null) {
+            for (Opening.BonusDraw draw : opening.bonus) {
+                if (draw.outcomeId != null) {
+                    commit.bonusOutcomes.add(draw.rollId + "/" + draw.outcomeId);
+                }
+            }
+        }
         state.commits.add(commit);
         while (state.commits.size() > PlayerLootState.MAX_COMMITS) {
             state.commits.remove(0);
@@ -132,6 +159,7 @@ public final class OpeningRules {
                 id -> new PlayerLootState.PoolState());
         pool.lastOpenAt = now;
         pool.opens++;
+        EligibilityRules.apply(pool, effects == null ? EligibilityRules.Effects.NONE : effects);
         state.lastOpenAt = now;
         if (opening.openingId.equals(state.activeOpening)) {
             state.activeOpening = null;

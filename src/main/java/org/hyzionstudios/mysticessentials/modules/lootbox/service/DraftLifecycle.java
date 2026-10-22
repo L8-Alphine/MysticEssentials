@@ -1,6 +1,7 @@
 package org.hyzionstudios.mysticessentials.modules.lootbox.service;
 
 import java.util.List;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -10,6 +11,9 @@ import org.hyzionstudios.mysticessentials.modules.lootbox.model.KeyDraft;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.LootBoxDraft;
 import org.hyzionstudios.mysticessentials.modules.lootbox.odds.OddsEngine;
 import org.hyzionstudios.mysticessentials.modules.lootbox.validate.DraftValidator;
+
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 
 /**
  * Computes a draft's lifecycle state (implementation plan §4.1) from the draft and
@@ -114,12 +118,64 @@ public record DraftLifecycle<T>(
 
     /** The {@code contentHash} a revision of {@code frozen} carries. Publishing uses this too. */
     public static String poolContentHash(LootBoxDraft frozen, List<Long> weights) {
-        return OddsEngine.sha256(Json.toString(frozen) + "|" + weights);
+        return OddsEngine.sha256(Json.toString(canonical(frozen)) + "|" + weights);
     }
 
     /** Publishing a key answers "unchanged" exactly when these are equal. */
     public static String keySpecHash(KeyDraft spec) {
-        return OddsEngine.sha256(Json.toString(spec));
+        return OddsEngine.sha256(Json.toString(canonical(spec)));
+    }
+
+    /**
+     * Fields added after Phase 2. While unset ({@code null}, or an empty string,
+     * list or map) they are left out of the canonical JSON, so a pool or key
+     * published before they existed keeps its content hash and still reads
+     * "Published" instead of asking to be republished.
+     */
+    static final Set<String> LATER_FIELDS = Set.of(
+            // pools (P3/P4)
+            "conditions", "ineligibleRewards", "bonusRolls", "pity", "startsAt", "endsAt", "afterEnd", "scope",
+            "paidDisclosure",
+            // rewards (P3)
+            "provider", "params", "bundle", "duplicates", "currency",
+            // keys (P3-WP8)
+            "identityMode");
+
+    /** The JSON tree hashed for {@code value}: its Gson tree without unset {@link #LATER_FIELDS}. */
+    public static JsonElement canonical(Object value) {
+        JsonElement tree = Json.toTree(value);
+        strip(tree);
+        return tree;
+    }
+
+    private static void strip(JsonElement element) {
+        if (element == null) {
+            return;
+        }
+        if (element.isJsonArray()) {
+            element.getAsJsonArray().forEach(DraftLifecycle::strip);
+            return;
+        }
+        if (!element.isJsonObject()) {
+            return;
+        }
+        JsonObject object = element.getAsJsonObject();
+        for (String key : List.copyOf(object.keySet())) {
+            JsonElement child = object.get(key);
+            if (LATER_FIELDS.contains(key) && unset(child)) {
+                object.remove(key);
+            } else {
+                strip(child);
+            }
+        }
+    }
+
+    private static boolean unset(JsonElement value) {
+        return value == null || value.isJsonNull()
+                || (value.isJsonArray() && value.getAsJsonArray().isEmpty())
+                || (value.isJsonObject() && value.getAsJsonObject().isEmpty())
+                || (value.isJsonPrimitive() && value.getAsJsonPrimitive().isString()
+                        && value.getAsString().isEmpty());
     }
 
     /** A deep copy through the JSON tree: what publishing freezes and what a save writes. */

@@ -2,6 +2,7 @@ package org.hyzionstudios.mysticessentials.modules.lootbox.model;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * One pool as authored in {@code modules/lootbox/lootboxes/<id>.json}. Editing the
@@ -29,6 +30,38 @@ public final class LootBoxDraft {
     public String permission = "";
     public List<RewardSpec> rewards = new ArrayList<>();
 
+    // Phase 3 and later. Every one of these defaults to null (meaning "off") and is
+    // left out of the content hash while unset, so pools published before they
+    // existed keep their hash (DraftLifecycle.canonical).
+
+    /** Independent bonus draws (P3-WP2); {@code null} or empty for none. */
+    public List<BonusRoll> bonusRolls;
+    /** Who may open at all (P3-WP3): every condition must pass. */
+    public List<ConditionSpec> conditions;
+    /**
+     * What a reward whose own conditions fail does to the player's odds (P3-WP3):
+     * {@code RENORMALIZE} (default) leaves it out and recalculates the rest, and
+     * the preview says so; {@code BLOCK} refuses the opening instead.
+     */
+    public String ineligibleRewards;
+    /** Pity and guarantees (P3-WP4); {@code null} for none. */
+    public Pity pity;
+
+    /** The bonus rolls, never {@code null}. */
+    public List<BonusRoll> bonusRolls() {
+        return bonusRolls == null ? List.of() : bonusRolls;
+    }
+
+    /** The pool's own conditions, never {@code null}. */
+    public List<ConditionSpec> conditions() {
+        return conditions == null ? List.of() : conditions;
+    }
+
+    /** Whether an ineligible reward blocks the opening instead of leaving the table. */
+    public boolean blocksIneligible() {
+        return "BLOCK".equalsIgnoreCase(ineligibleRewards);
+    }
+
     /** One possible outcome. Exactly one is drawn per opening. */
     public static final class RewardSpec {
         /** Unique within the pool. */
@@ -37,7 +70,12 @@ public final class LootBoxDraft {
         public String name;
         /** Optional label such as {@code Rare}; shown next to the name. */
         public String rarity = "";
-        /** {@code ITEM}, {@code COMMAND}, {@code ECONOMY} or {@code PERMISSION}. */
+        /**
+         * {@code ITEM}, {@code COMMAND}, {@code ECONOMY} or {@code PERMISSION}; from
+         * Phase 3 also {@code BUNDLE} (several guaranteed actions, {@link #bundle})
+         * and {@code EXTENSION}, {@code COSMETIC} and {@code RPG}, which a
+         * registered {@link #provider} delivers.
+         */
         public String type;
         /** Relative weight in {@code WEIGHTED} mode (positive integer). */
         public long weight;
@@ -60,6 +98,111 @@ public final class LootBoxDraft {
         public String node;
         /** PERMISSION: seconds the node lasts; 0 = permanent. */
         public long durationSeconds;
+
+        // Fields below are Phase 3 and later. They default to null and are left out
+        // of the content hash while unset (DraftLifecycle.canonical), so pools
+        // published before them keep their hash.
+
+        /**
+         * EXTENSION, COSMETIC and RPG (and ECONOMY through MysticEconomy): the id of
+         * the {@code RewardProvider} that delivers it. A missing provider makes the
+         * pool invalid; nothing is substituted.
+         */
+        public String provider;
+        /** The provider's parameters, passed to it unchanged. */
+        public Map<String, String> params;
+        /**
+         * BUNDLE: the actions this one outcome delivers, every one of them, in
+         * order. Each is a reward without odds (its weight and percent are
+         * ignored); a bundle can't contain a bundle.
+         */
+        public List<RewardSpec> bundle;
+        /** ECONOMY through a provider: the currency id; blank uses the provider's default. */
+        public String currency;
+        /** Who may win this reward (P3-WP3): every condition must pass. */
+        public List<ConditionSpec> conditions;
+        /**
+         * Duplicate protection (P3-WP4): {@code ALLOW} (default) or
+         * {@code EXCLUDE_OWNED}, which leaves the reward out of a player's odds once
+         * they won it from this pool (or, with a provider that can tell, own it).
+         * COSMETIC rewards must say which.
+         */
+        public String duplicates;
+
+        /** Provider parameters, never {@code null}. */
+        public Map<String, String> params() {
+            return params == null ? Map.of() : params;
+        }
+
+        /** This reward's conditions, never {@code null}. */
+        public List<ConditionSpec> conditions() {
+            return conditions == null ? List.of() : conditions;
+        }
+
+        public boolean excludesOwned() {
+            return "EXCLUDE_OWNED".equalsIgnoreCase(duplicates);
+        }
+    }
+
+    /**
+     * One eligibility rule (P3-WP3). Built in: {@code PERMISSION} ({@code node}),
+     * {@code WORLD} ({@code worlds}, comma-separated), {@code REGION}
+     * ({@code world}, {@code min} and {@code max} as {@code x,y,z}) and
+     * {@code DATE_WINDOW} ({@code from} and/or {@code until}, ISO-8601 instants).
+     * Any other type is answered by a registered {@code ConditionProvider}.
+     */
+    public static final class ConditionSpec {
+        public String type;
+        public Map<String, String> params = new java.util.LinkedHashMap<>();
+        /** Passes when the rule does NOT hold. */
+        public boolean negate;
+        /** Shown to players instead of the generated description; blank to generate it. */
+        public String label = "";
+
+        public Map<String, String> params() {
+            return params == null ? Map.of() : params;
+        }
+    }
+
+    /**
+     * Pity (P3-WP4): counts a player's openings of this pool since they last won
+     * one of the {@link #targets}, and raises those rewards' odds or guarantees
+     * one. The player's personal odds for the next opening are always shown, with
+     * a plain-language summary, before a key is spent.
+     */
+    public static final class Pity {
+        /** Reward ids of the main table that the counter waits for; winning one resets it. */
+        public List<String> targets = new ArrayList<>();
+        /**
+         * Hard pity: the {@code hardAfter}-th opening without a target draws only
+         * targets (their own weights, renormalised). 0 = off.
+         */
+        public int hardAfter;
+        /** Soft pity: after this many openings without a target, targets' weights grow. 0 = off. */
+        public int softAfter;
+        /** Soft pity: percent added to each target's weight per opening past {@link #softAfter}. */
+        public int softStepPercent;
+    }
+
+    /**
+     * An independent extra draw (P3-WP2), e.g. "10% chance of one additional
+     * cosmetic". It is rolled on every opening beside the main draw, with its own
+     * labelled distribution: its rewards' weights plus a "no bonus" weight. It is
+     * never mixed into the main table, so "outcome selected" and "chance of a
+     * bonus" are never confused (Design Bible §07).
+     */
+    public static final class BonusRoll {
+        /** {@code [a-z0-9_]{1,48}}, unique within the pool. */
+        public String id;
+        /** Shown above its rows, e.g. {@code Bonus cosmetic}. MysticText markup allowed. */
+        public String label;
+        /** {@code WEIGHTED} or {@code EXACT_PERCENT}, like the pool. */
+        public String mode = "WEIGHTED";
+        /** WEIGHTED: the weight of "no bonus"; 0 makes the bonus certain. */
+        public long noneWeight;
+        /** EXACT_PERCENT: the chance of "no bonus"; with the rewards it sums to exactly 100. */
+        public String nonePercent;
+        public List<RewardSpec> rewards = new ArrayList<>();
     }
 
     /** An item reward. {@code metadata} is the stack's BSON metadata as JSON, when it needs any. */
