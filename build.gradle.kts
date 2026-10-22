@@ -261,8 +261,16 @@ val mysticIdentity: SourceSet = sourceSets.create("mysticIdentity") {
     compileClasspath += sourceSets.main.get().output + sourceSets.main.get().compileClasspath
 }
 
+// Whichever api jar the sibling MysticIdentity checkout last built (its version moves), or the
+// jar named by -PmysticIdentityApiJar.
+val mysticIdentityApiJar: String = (findProperty("mysticIdentityApiJar") as String?)?.ifBlank { null }
+    ?: file("$projectDir/../MysticIdentity/mysticidentity-api/build/libs")
+        .listFiles { candidate -> candidate.name.matches(Regex("""mysticidentity-api-[0-9.]+\.jar""")) }
+        ?.maxByOrNull { it.lastModified() }?.path
+    ?: "$projectDir/../MysticIdentity/mysticidentity-api/build/libs/mysticidentity-api-0.1.0.jar"
+
 dependencies {
-    "mysticIdentityCompileOnly"(files("../MysticIdentity/mysticidentity-api/build/libs/mysticidentity-api-0.1.1.jar"))
+    "mysticIdentityCompileOnly"(files(mysticIdentityApiJar))
 }
 
 tasks.shadowJar {
