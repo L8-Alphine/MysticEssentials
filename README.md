@@ -593,6 +593,10 @@ subcommand also needs `mysticessentials.lootbox.use`.
 | `/lootbox key revoke\|info\|list\|grants\|publish …` | Manage keys | `…keys.revoke` / `…keys` / `…publish` |
 | `/lootbox publish <pool>` / `rollback <pool> <rev>` | Publish a revision | `mysticessentials.lootbox.publish` |
 | `/lootbox simulate <pool> [draws]` | Test odds without awarding | `mysticessentials.lootbox.simulate` |
+| `/lootbox chance <pool> <itemId>` | Your exact chance of getting an item | `mysticessentials.lootbox.use` |
+| `/lootbox schedule <pool> [cancel]` / `rollback <pool> <rev> at <instant>` | Scheduled and time-limited odds | `mysticessentials.lootbox.publish` |
+| `/lootbox stats <pool> [revision] [days]` | Observed results against the published chances | `mysticessentials.lootbox.audit` |
+| `/lootbox providers` | Reward/condition providers and Mystic integrations | `mysticessentials.lootbox.admin` |
 | `/lootbox crate select\|convert <pool>\|rebind` | Bind the block you look at, or rebind a crate | `mysticessentials.lootbox.crates.place` |
 | `/lootbox crate info\|list\|verify\|remove\|enable\|edit` | Manage crates | `mysticessentials.lootbox.crates.manage` |
 | `/lootbox audit` | Audit History with JSON/CSV export | `mysticessentials.lootbox.audit` |
@@ -603,7 +607,12 @@ Spending the key and drawing the result happen in one server-side write, so a
 crash never spends a key without a result. Interrupted openings finish when the
 player rejoins. The bundled asset pack adds a **Mystic Crate** block
 (`MysticEssentials_LootBox_Crate`); chests, doors and benches can be crates too.
-See `wiki/features/lootbox-module.md`.
+Pools can also have bundles, bonus rolls, eligibility conditions, pity, duplicate
+protection and scheduled odds, every player always seeing their own exact odds;
+optional MysticEconomy, MysticQuests, MysticRPG, MysticIdentity and
+MysticModeration integrations; and a network mode (shared SQL + Redis, `scope:
+NETWORK` pools under a fenced per-player lock that fails closed). See
+`wiki/features/lootbox-module.md`.
 
 ---
 

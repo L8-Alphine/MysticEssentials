@@ -562,6 +562,58 @@ client half run. The reduced-motion setting left open in Phase 1 is now
 
 **Exit criteria:** LB-003, LB-006 (native path if S1 passed) and LB-013 (providers) pass, and the personalised odds shown match the server draw in property tests across pity and duplicate states.
 
+**Phase 3 status (22 Oct 2026):** built on `master`, checked by `verifyLootBoxAdvanced`
+(LootBoxAdvancedTest). Server-side exit criteria pass: the personalised table equals
+the draw over many seeded rolls across pity, conditions and owned states (LB-003),
+a missing provider blocks new openings and is never substituted (LB-013), and a
+native key id is never reported unless its asset is loaded (LB-006). Nothing of it
+has been seen in a game client.
+
+| WP | State | Where |
+|---|---|---|
+| P3-WP1 | Done | `api/RewardProvider`, `api/ConditionProvider`, `service/IntegrationRegistry`; `/lootbox providers` |
+| P3-WP2 | Done | `BUNDLE` rewards (max 16 actions), up to 4 `bonusRolls` with their own table, odds rows and snapshot section |
+| P3-WP3 | Done | `conditions` on pools and rewards: `PERMISSION`, `WORLD`, `REGION`, `DATE_WINDOW` built in, others through providers; `ineligibleRewards: RENORMALIZE\|BLOCK`; unavailable answers fail closed |
+| P3-WP4 | Done | `pity` (hard, soft), `duplicates: EXCLUDE_OWNED`, the personal "your next opening" table and notes, exact `BigInteger` odds |
+| P3-WP5 | Done | `startsAt`/`endsAt`/`afterEnd`, preview banner, `/lootbox schedule`, `/lootbox rollback <id> <rev> at <instant>`; one server claims each due action |
+| P3-WP6 | Done | `/lootbox chance <id> <itemId>` and the preview's item section: `1 − Π(1 − p)` over every path, bundle-aware |
+| P3-WP7 | Done, with gaps | `integration/`: MysticEconomy rewards, MysticQuests condition and quest event, MysticRPG (pending a 0.7 build), MysticIdentity paid-grant gate, MysticModeration forwarding, placeholders. Guilds pending (no API). See below |
+| P3-WP8 | Built, switched off | `identityMode: REGISTERED_CUSTOM_ASSET` behind `keys.nativeKeyItems=false` until S1 is checked in game |
+| P3-WP9 | Done | `COSMETIC` (must state `duplicates`) and `RPG` rewards through providers; built-in COSMETIC provider `permission` (LuckPerms node, ownership by permission) |
+
+What the other Mystic repos would need to change (none was edited):
+
+- **MysticEconomy:** deposits carry `lootboxFulfillment` in their metadata, and
+  recovery searches the last `integrations.economyReconcileDepth` ledger entries for
+  it. That is reconcilable, not exactly-once: an entry outside the window goes to
+  staff review. Exactly-once needs `PaymentService.transfer(..., String
+  idempotencyKey)` that refuses a second transfer with the same key, plus
+  `LedgerService.findByReference(String module, String reference)`.
+- **MysticIdentity:** there is no age signal. Paid grants under
+  `PAID_RANDOM_RESTRICTED` need a known non-managed account and, while
+  `integrations.identity.requireAgeSignal` is true (the default), an explicit adult
+  signal, so they stay refused. Needed: `PlayerIdentity.ageVerifiedAdult()` (an
+  `Optional<Boolean>`), or a `ManagedCapability` for "may buy random items". Also,
+  `ManagedAccountService.check` allows economy capabilities for a managed account
+  whose policy has not arrived; LootBox works around it by also requiring
+  `isManaged == false` and a known claim.
+- **MysticGuilds:** no public membership query, so there is no `GUILD` condition.
+  Needed: a service such as `GuildQueryService.guildOf(UUID)` returning the guild
+  id and rank, readable from a cache on any thread.
+- **MysticRPG:** does not compile against Hytale 0.7.x, so the bridge
+  (`RPG_LEVEL`, `RPG_CLASS`, provider `mysticrpg` for XP) binds to the API as it is
+  in that repo and registers nothing today. XP grants have no idempotency key, so
+  they are `AT_MOST_ONCE`. Class rewards were left out: changing a class is an
+  advancement decision MysticRPG should own.
+- **MysticModeration:** flags become `CHEAT` reports from a fixed "LootBox"
+  reporter, or an investigation note when the reports module refuses. A
+  `StaffAlertService` for system alerts would fit better than a synthetic reporter.
+- **MysticGeneration:** nothing to bind; it grants keys through `LootBoxApi.grantKey`.
+
+In-game checks still open: S1 for native key items (does the client render an Item
+registered mid-session, and is it there after a restart?), the bonus and personal
+sections of the preview, and a quest event granting a key.
+
 ---
 
 ## 9. Phase 4 — Network and Analytics
@@ -578,6 +630,30 @@ client half run. The reduced-motion setting left open in Phase 1 is now
 | P4-WP6 | **Chaos tests:** kill a server mid-commit, take Redis down, take SQL down, send duplicate packets, open on two servers at once against the same virtual balance, partition the network during step 6 | L |
 
 **Exit criteria:** the chaos suite shows no double spends and no lost committed rewards (outcomes may end up in `REVIEW`, never wrong).
+
+**Phase 4 status (22 Oct 2026):** built on `master`. The chaos suite
+(`verifyLootBoxNetwork`, LootBoxNetworkTest) passes: every scenario ends with no
+double spend and no lost committed reward. It runs the production
+`LootBoxStorage`, `PlayerLanes` and `NetworkAuthority` of two servers against one
+in-memory shared store and lock; `OpeningService` itself needs a running server, so
+the saga steps are driven the way `LootBoxSagaTest` drives them. Never run against a
+real MySQL and Redis pair yet.
+
+| WP | State | Where |
+|---|---|---|
+| P4-WP1 | Done | `StorageService.updateShared`: one `SELECT ... FOR UPDATE` transaction on MySQL/MariaDB (retried on deadlock, lock wait and duplicate-key races), plain `update` on JSON. Every LootBox read-modify-write uses it |
+| P4-WP2 | Done | `scope: LOCAL\|NETWORK`; `service/NetworkAuthority` (Redis lock per player, TTL and renewal, fencing token from `lootbox_meta/fence`); player, opening and inbox writes of an older lease are refused (`NetworkRules.FencedOut`). Recovery runs under the lease on a network. Fails closed without `network.enabled`, the shared SQL store, Redis, or a matching `secret.key` fingerprint |
+| P4-WP3 | Done | Pool and key changes on the Redis channel `lootbox:changes`; a NETWORK opening re-reads the shared state and content hash before it spends (`STALE`) |
+| P4-WP4 | Done, partly | `service/StatsService`: per pool, revision and UTC day in the shared store; `/lootbox stats`; binomial z per reward over `stats.windowDays`; hourly `ODDS_ANOMALY` audit; per-player luck → `OpeningFlagged` → MysticModeration. Not done: MysticWatchDog export (no API known) and bonus-roll statistics (main roll only) |
+| P4-WP5 | Done | Retention sweep of statistics and settled openings (`retention.*`), 365-day minimum under `PAID_RANDOM_RESTRICTED` (audit too); audit exports pseudonymise player UUIDs unless the exporter has `mysticessentials.lootbox.audit.identifiers` |
+| P4-WP6 | Done | Concurrent openings on two servers against one balance, duplicate packets, Redis down, SQL down before and during the commit, a server killed after its commit, a partition before the commit, a lost commit acknowledgement, a stale delivery |
+
+Limits worth knowing: the fence stops a stale server's writes, not effects outside
+LootBox's documents (a command, a provider grant) it already started; those stay
+covered by the delivery guarantees (`AT_MOST_ONCE` goes to review). LOCAL pools on a
+shared store are atomic per document but don't take the lock. Stackable keys work
+on NETWORK pools through their batch document, with the weaker guarantee P2-K
+documents.
 
 ---
 
