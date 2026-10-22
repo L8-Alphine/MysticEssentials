@@ -8,6 +8,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.SplittableRandom;
 import java.util.UUID;
@@ -16,6 +17,8 @@ import java.util.concurrent.CompletableFuture;
 import org.hyzionstudios.mysticessentials.core.util.Json;
 import org.hyzionstudios.mysticessentials.modules.lootbox.api.ConditionProvider;
 import org.hyzionstudios.mysticessentials.modules.lootbox.api.RewardProvider;
+import org.hyzionstudios.mysticessentials.modules.lootbox.integration.IntegrationRules;
+import org.hyzionstudios.mysticessentials.modules.lootbox.integration.PaidPolicy;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.LootBoxDraft;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.LootBoxRevision;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.Opening;
@@ -71,6 +74,7 @@ public final class LootBoxAdvancedTest {
         schedulesStartEndAndRollBackOnce();
         phaseTwoPoolsKeepTheirHashes();
         validatorGatesPhaseThree();
+        integrationsFailClosedAndParseSafely();
         System.out.println("LootBoxAdvancedTest: all checks passed.");
     }
 
@@ -809,6 +813,81 @@ public final class LootBoxAdvancedTest {
 
     private static boolean contains(List<String> problems, String fragment) {
         return problems.stream().anyMatch(problem -> problem.contains(fragment));
+    }
+
+    // ----- P3-WP7 Integrations -------------------------------------------------
+
+    private static void integrationsFailClosedAndParseSafely() {
+        // PAID grants under PAID_RANDOM_RESTRICTED: every unknown refuses.
+        Optional<Boolean> no = Optional.of(false);
+        require(PaidPolicy.refusal(PaidPolicy.Signals.absent(), false) != null, "no MysticIdentity must refuse");
+        require(PaidPolicy.refusal(null, false) != null, "no signals must refuse");
+        require(PaidPolicy.refusal(new PaidPolicy.Signals(true, Optional.empty(), false, true, Optional.of(true)),
+                false) != null, "an unknown managed claim must refuse");
+        require(PaidPolicy.refusal(new PaidPolicy.Signals(true, Optional.of(true), false, true, Optional.of(true)),
+                false) != null, "a managed claim must refuse");
+        require(PaidPolicy.refusal(new PaidPolicy.Signals(true, no, true, true, Optional.of(true)), false) != null,
+                "isManaged must refuse even when the claim says no");
+        require(PaidPolicy.refusal(new PaidPolicy.Signals(true, no, false, false, Optional.of(true)), false) != null,
+                "a refused REAL_MONEY_PURCHASE must refuse");
+        require(PaidPolicy.refusal(new PaidPolicy.Signals(true, no, false, true, Optional.empty()), true) != null,
+                "a required age signal that is missing must refuse");
+        require(PaidPolicy.refusal(new PaidPolicy.Signals(true, no, false, true, Optional.of(false)), true) != null,
+                "a minor must be refused");
+        require(PaidPolicy.refusal(new PaidPolicy.Signals(true, no, false, true, Optional.empty()), false) == null,
+                "a known adult-path account must be allowed when ages are verified elsewhere");
+        require(PaidPolicy.refusal(new PaidPolicy.Signals(true, no, false, true, Optional.of(true)), true) == null,
+                "an explicit adult signal must be allowed");
+
+        // Quest event fields.
+        Map<String, String> fields = new HashMap<>(Map.of("key", "Mystic:Gold"));
+        Object parsed = IntegrationRules.parseQuestKeyGrant(fields::get, 64);
+        require(parsed.equals(new IntegrationRules.QuestKeyGrant("mystic:gold", 1, true)),
+                "quest key grant defaults are wrong: " + parsed);
+        fields.put("amount", "3");
+        fields.put("virtual", "false");
+        require(IntegrationRules.parseQuestKeyGrant(fields::get, 64)
+                .equals(new IntegrationRules.QuestKeyGrant("mystic:gold", 3, false)), "amount/virtual not read");
+        fields.put("amount", "65");
+        require(IntegrationRules.parseQuestKeyGrant(fields::get, 64) instanceof String, "amount over the cap passed");
+        fields.put("amount", "0");
+        require(IntegrationRules.parseQuestKeyGrant(fields::get, 64) instanceof String, "amount 0 passed");
+        fields.put("amount", "1");
+        fields.put("virtual", "maybe");
+        require(IntegrationRules.parseQuestKeyGrant(fields::get, 64) instanceof String, "virtual=maybe passed");
+        require(IntegrationRules.parseQuestKeyGrant(Map.of("key", "gold")::get, 64) instanceof String,
+                "a key id without namespace passed");
+        require(IntegrationRules.parseQuestKeyGrant(k -> null, 64) instanceof String, "a missing key passed");
+
+        // Quest ids can't smuggle placeholder syntax.
+        require(IntegrationRules.QUEST_ID.matcher("main:intro").matches(), "main:intro must be a quest id");
+        require(IntegrationRules.QUEST_ID.matcher("chapters/one:boss-1").matches(), "package paths must pass");
+        require(!IntegrationRules.QUEST_ID.matcher("main:a.b").matches(), "'.' must be refused");
+        require(!IntegrationRules.QUEST_ID.matcher("main:a%b").matches(), "'%' must be refused");
+        require(!IntegrationRules.QUEST_ID.matcher("a>b:c").matches(), "'>' must be refused");
+        require(IntegrationRules.questPlaceholder("main:intro").equals("%quest.main:intro%"), "quest placeholder");
+        require(IntegrationRules.questPackage("main:intro").equals("main"), "quest package");
+
+        // RPG keys follow MysticRPG's NamespacedKey.parse.
+        require(IntegrationRules.rpgKey("Warrior").equals("mysticrpg:warrior"), "bare RPG key not namespaced");
+        require(IntegrationRules.rpgKey("addon:mage").equals("addon:mage"), "namespaced RPG key changed");
+
+        // Placeholder names; a collision answers nothing rather than the wrong key.
+        Map<String, String> names = IntegrationRules.keyPlaceholders(List.of("mystic:gold", "a_b:c", "a:b_c"));
+        require("mystic:gold".equals(names.get("lootbox_keys_mystic_gold")), "key placeholder name: " + names);
+        require(names.containsKey("lootbox_keys_a_b_c") && names.get("lootbox_keys_a_b_c") == null,
+                "colliding key placeholders must resolve to neither: " + names);
+
+        // Flags: one per player and pool per cooldown.
+        IntegrationRules.FlagThrottle throttle = new IntegrationRules.FlagThrottle();
+        UUID player = UUID.randomUUID();
+        require(throttle.admit(player, "pool", 1_000, 60_000), "first flag must pass");
+        require(!throttle.admit(player, "pool", 30_000, 60_000), "a flag inside the cooldown must be held");
+        require(throttle.admit(player, "other", 30_000, 60_000), "another pool is a separate flag");
+        require(throttle.admit(player, "pool", 61_000, 60_000), "after the cooldown a flag must pass");
+        String reason = IntegrationRules.flagReason("pool", "key forged", "x".repeat(1000));
+        require(reason.length() <= 480 && reason.startsWith("LootBox flag on pool: key forged"),
+                "flag text not bounded: " + reason.length());
     }
 
     private static void requireThrows(Runnable action, String message) {

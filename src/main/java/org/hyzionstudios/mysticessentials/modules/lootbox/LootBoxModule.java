@@ -23,6 +23,7 @@ import org.hyzionstudios.mysticessentials.modules.lootbox.hytale.BlockTargets;
 import org.hyzionstudios.mysticessentials.modules.lootbox.hytale.CrateSystems;
 import org.hyzionstudios.mysticessentials.modules.lootbox.hytale.CrateVisuals;
 import org.hyzionstudios.mysticessentials.modules.lootbox.hytale.GeneratedAssetService;
+import org.hyzionstudios.mysticessentials.modules.lootbox.integration.LootBoxIntegrations;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.CrateInstance;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.LootBoxRevision;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.PlayerLootState;
@@ -85,6 +86,8 @@ public final class LootBoxModule extends AbstractMysticModule implements LootBox
      * other plugins register once when they start, whether or not LootBox is on.
      */
     private final IntegrationRegistry integrations = new IntegrationRegistry();
+    /** The Mystic sibling bridges (P3-WP7); created on first enable, attached while enabled. */
+    private LootBoxIntegrations bridges;
     private ScheduledFuture<?> sweepTask;
     private ScheduledFuture<?> scheduleTask;
     /** How often scheduled revisions and time-limited odds are checked. */
@@ -126,6 +129,9 @@ public final class LootBoxModule extends AbstractMysticModule implements LootBox
                 () -> this.config.crates.generatedVariants);
         visuals = new CrateVisuals(core, this, storage);
         ui = new LootBoxUi(core, this);
+        if (bridges == null) {
+            bridges = new LootBoxIntegrations(core, integrations, () -> this.config);
+        }
 
         registry.writeExamplesIfMissing();
         registry.reloadDrafts();
@@ -143,6 +149,8 @@ public final class LootBoxModule extends AbstractMysticModule implements LootBox
         // Generated look-alikes must resolve before any crate is used; unused ones are only
         // cleaned up when the whole crate index is known.
         crates.startVariants(cratesLoaded);
+        bridges.enable(this, storage, audit, this::publishedKeyIds);
+        keys.paidGate(bridges::paidRefusal);
         registerCommand(new LootBoxCommand(core, this, config.command.name, config.command.aliases));
         if (!systemsRegistered) {
             boolean all = true;
@@ -158,12 +166,14 @@ public final class LootBoxModule extends AbstractMysticModule implements LootBox
             PlayerRef player = event.getPlayerRef();
             if (player != null) {
                 opening.recover(player);
+                bridges.playerJoined(player.getUuid());
             }
         });
         registerEvent(PlayerDisconnectEvent.class, (PlayerDisconnectEvent event) -> {
             PlayerRef player = event.getPlayerRef();
             if (player != null) {
                 editors.end(player.getUuid());
+                bridges.playerLeft(player.getUuid());
             }
         });
         // Openings left mid-saga by a crash or disconnect are finished on join; this
@@ -175,8 +185,12 @@ public final class LootBoxModule extends AbstractMysticModule implements LootBox
         }, 5, 5, TimeUnit.MINUTES);
         sweepTask = core.scheduler().runRepeating(audit::sweep, 1, 24, TimeUnit.HOURS);
         // Scheduled revisions start, time-limited odds end, scheduled rollbacks run (P3-WP5).
-        scheduleTask = core.scheduler().runRepeating(() -> registry.runSchedule(System.currentTimeMillis()),
-                SCHEDULE_CHECK_SECONDS, SCHEDULE_CHECK_SECONDS, TimeUnit.SECONDS);
+        // Also attaches integrations that started after this plugin, and new keys' placeholders.
+        scheduleTask = core.scheduler().runRepeating(() -> {
+            registry.runSchedule(System.currentTimeMillis());
+            bridges.tick();
+            bridges.keysChanged(publishedKeyIds());
+        }, SCHEDULE_CHECK_SECONDS, SCHEDULE_CHECK_SECONDS, TimeUnit.SECONDS);
 
         active = this;
         visuals.start();
@@ -225,6 +239,9 @@ public final class LootBoxModule extends AbstractMysticModule implements LootBox
         if (scheduleTask != null) {
             scheduleTask.cancel(false);
             scheduleTask = null;
+        }
+        if (bridges != null) {
+            bridges.disable();
         }
     }
 
@@ -327,6 +344,23 @@ public final class LootBoxModule extends AbstractMysticModule implements LootBox
 
     public EditorSessions editors() {
         return editors;
+    }
+
+    /** The Mystic sibling bridges, or {@code null} before the first enable. */
+    public LootBoxIntegrations bridges() {
+        return bridges;
+    }
+
+    private java.util.List<String> publishedKeyIds() {
+        java.util.List<String> ids = new java.util.ArrayList<>();
+        if (registry != null) {
+            for (var key : registry.keys()) {
+                if (key.spec != null && key.spec.id != null) {
+                    ids.add(key.spec.id);
+                }
+            }
+        }
+        return ids;
     }
 
     // ----- LootBoxApi ---------------------------------------------------------

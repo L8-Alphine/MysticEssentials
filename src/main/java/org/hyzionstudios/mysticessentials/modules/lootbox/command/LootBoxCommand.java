@@ -502,6 +502,10 @@ public final class LootBoxCommand extends MysticCommand {
         if (invalid == 0) {
             sender.reply("&aEvery published pool has the providers it needs.");
         }
+        if (module.bridges() != null) {
+            sender.reply("&d&lMystic integrations");
+            module.bridges().status().forEach(line -> sender.reply("&7- " + MysticText.stripMarkup(line)));
+        }
     }
 
     private void simulate(MysticCommandSender sender, String[] args) {

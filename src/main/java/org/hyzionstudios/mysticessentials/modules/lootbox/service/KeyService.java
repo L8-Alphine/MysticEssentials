@@ -13,6 +13,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Function;
 import java.util.logging.Level;
 
 import org.hyzionstudios.mysticessentials.core.MysticCore;
@@ -61,6 +62,12 @@ public final class KeyService {
     private volatile LootBoxConfig config;
     private byte[] secret;
     private final ConversionService conversions;
+    /**
+     * Who may receive a PAID grant under {@code PAID_RANDOM_RESTRICTED}: {@code null}
+     * allows, anything else is the refusal. Refuses everyone until the module installs
+     * the MysticIdentity gate (P3-WP7).
+     */
+    private volatile Function<UUID, String> paidGate = player -> "no paid-grant gate is installed";
 
     public KeyService(MysticCore core, LootBoxStorage storage, LootBoxRegistry registry, AuditService audit,
             PlayerLanes lanes, SecureDraw draw, LootBoxConfig config) {
@@ -106,6 +113,28 @@ public final class KeyService {
         return secret;
     }
 
+    /** Installs the PAID grant gate (the module's MysticIdentity check). */
+    public void paidGate(Function<UUID, String> gate) {
+        this.paidGate = gate == null ? player -> "no paid-grant gate is installed" : gate;
+    }
+
+    /**
+     * {@link #policyProblem(GrantSource)}, then for a PAID grant the player's own
+     * check: MysticIdentity must confirm the account is not a managed one (fails
+     * closed).
+     */
+    public String policyProblem(GrantSource source, UUID owner) {
+        String problem = policyProblem(source);
+        if (problem != null || source != GrantSource.PAID) {
+            return problem;
+        }
+        try {
+            return paidGate.apply(owner);
+        } catch (RuntimeException e) {
+            return "the paid-grant check failed: " + e.getMessage();
+        }
+    }
+
     /** {@code null} when allowed, otherwise why the policy profile refuses this source. */
     public String policyProblem(GrantSource source) {
         String profile = config.policyProfile == null ? "" : config.policyProfile.toUpperCase(Locale.ROOT);
@@ -141,7 +170,7 @@ public final class KeyService {
         }
         PlayerRef online = core.platform().findPlayer(owner).orElse(null);
         String name = ownerName != null ? ownerName : online != null ? online.getUsername() : null;
-        String policy = policyProblem(source);
+        String policy = policyProblem(source, owner);
         if (policy != null) {
             audit.record(actor, "KEY_GRANT_REFUSED", owner.toString(), keyId + " x" + count + " source " + source);
             KeyLog.Entry refused = logEntry(KeyLog.REFUSED, actor, owner.toString(), name);
