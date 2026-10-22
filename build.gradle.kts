@@ -653,6 +653,14 @@ tasks.register<JavaExec>("verifyLootBoxAdvanced") {
     mainClass.set("org.hyzionstudios.mysticessentials.modules.lootbox.LootBoxAdvancedTest")
 }
 
+tasks.register<JavaExec>("verifyLootBoxNetwork") {
+    group = "verification"
+    description = "Chaos checks of LootBox Phase 4: two servers, shared store and lock, crashes, outages, partitions."
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets.test.get().runtimeClasspath + configurations.compileClasspath.get()
+    mainClass.set("org.hyzionstudios.mysticessentials.modules.lootbox.LootBoxNetworkTest")
+}
+
 tasks.register<JavaExec>("verifyMessageParamOrder") {
     group = "verification"
     description = "Checks message params are filled after placeholders, so they never expand one."
@@ -695,6 +703,7 @@ tasks.named("check") {
         "verifyLootBoxCrates",
         "verifyLootBoxScreens",
         "verifyLootBoxAccessibility",
-        "verifyLootBoxAdvanced"
+        "verifyLootBoxAdvanced",
+        "verifyLootBoxNetwork"
     )
 }
