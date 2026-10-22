@@ -19,6 +19,7 @@ import org.hyzionstudios.mysticessentials.modules.lootbox.model.LootBoxRevision;
 import org.hyzionstudios.mysticessentials.modules.lootbox.odds.ItemChance;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.CrateService;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.MotionRules;
+import org.hyzionstudios.mysticessentials.modules.lootbox.service.ScheduleRules;
 import org.hyzionstudios.mysticessentials.modules.lootbox.ui.editor.CrateEditorPage;
 import org.hyzionstudios.mysticessentials.modules.lootbox.validate.DraftValidator;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommand;
@@ -77,6 +78,7 @@ public final class LootBoxCommand extends MysticCommand {
             case "disable", "enable" -> toggle(sender, args, "disable".equals(sub));
             case "simulate" -> simulate(sender, args);
             case "chance" -> chance(sender, args);
+            case "schedule" -> schedule(sender, args);
             case "providers" -> providers(sender);
             case "crate", "crates" -> crate(sender, args);
             case "reconcile" -> reconcile(sender, args);
@@ -368,7 +370,7 @@ public final class LootBoxCommand extends MysticCommand {
             return;
         }
         if (args.length < 3) {
-            usage(sender, "/lootbox rollback <id> <revision>");
+            usage(sender, "/lootbox rollback <id> <revision> [at <instant>]");
             return;
         }
         int revision;
@@ -379,6 +381,24 @@ public final class LootBoxCommand extends MysticCommand {
             return;
         }
         String id = args[1].toLowerCase(Locale.ROOT);
+        if (args.length >= 5 && "at".equalsIgnoreCase(args[3])) {
+            long at;
+            try {
+                at = ScheduleRules.instant(args[4]);
+            } catch (java.time.format.DateTimeParseException e) {
+                usage(sender, "/lootbox rollback <id> <revision> at <2026-12-31T23:59:59Z>");
+                return;
+            }
+            if (at <= System.currentTimeMillis()) {
+                sender.reply("&cThat time has already passed; leave out 'at' to roll back now.");
+                return;
+            }
+            module.registry().scheduleRollback(id, revision, at, sender.name()).thenAccept(ok -> sender.reply(ok
+                    ? "&aRevision &f" + revision + " &aof &f" + id + " &areturns &f" + ScheduleRules.shown(at)
+                            + "&a. Players see the date in the preview."
+                    : "&c" + id + " has no revision " + revision + "."));
+            return;
+        }
         module.registry().rollback(id, revision, sender.name()).thenAccept(result -> sender.reply(result.ok()
                 ? "&aRepublished revision &f" + revision + " &aof &f" + id + " &aas revision &f" + result.revision()
                         + " &7(odds " + result.hash() + ")"
@@ -425,6 +445,36 @@ public final class LootBoxCommand extends MysticCommand {
                     + MysticText.stripMarkup(revision.spec.displayName) + "&7: &6" + shown + " &8(odds "
                     + table.oddsId() + (viewer == null ? ", published odds" : ", your odds") + ")");
         });
+    }
+
+    /**
+     * {@code /lootbox schedule <id> [cancel]} (P3-WP5): shows what is scheduled
+     * for a pool (a revision waiting for its start, the end of time-limited odds,
+     * a scheduled rollback), or cancels the scheduled revision and rollback.
+     */
+    private void schedule(MysticCommandSender sender, String[] args) {
+        if (!allowed(sender, Permissions.LOOTBOX_PUBLISH)) {
+            return;
+        }
+        if (args.length < 2) {
+            usage(sender, "/lootbox schedule <id> [cancel]");
+            return;
+        }
+        String id = args[1].toLowerCase(Locale.ROOT);
+        if (args.length >= 3 && "cancel".equalsIgnoreCase(args[2])) {
+            module.registry().cancelSchedule(id, sender.name()).thenAccept(ok -> sender.reply(ok
+                    ? "&aCancelled the scheduled revision and rollback of &f" + id + "&a. Live odds and their end stay."
+                    : "&cNo published pool called " + id + "."));
+            return;
+        }
+        LootBoxRevision.State state = module.registry().state(id).orElse(null);
+        if (state == null) {
+            sender.replyKey("lootbox-unknown-pool", Map.of("pool", id));
+            return;
+        }
+        String banner = ScheduleRules.banner(state, System.currentTimeMillis());
+        sender.reply("&d" + id + " &7live revision &f" + state.activeRevision + "&7: "
+                + (banner == null ? "nothing scheduled." : banner));
     }
 
     /**

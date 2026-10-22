@@ -46,6 +46,19 @@ public final class LootBoxDraft {
     public String ineligibleRewards;
     /** Pity and guarantees (P3-WP4); {@code null} for none. */
     public Pity pity;
+    /**
+     * When these odds start (P3-WP5), an ISO-8601 instant such as
+     * {@code 2026-12-01T00:00:00Z}. Publishing before then schedules the revision;
+     * the preview shows the date. Blank: live as soon as it is published.
+     */
+    public String startsAt;
+    /** When these odds end (P3-WP5), ISO-8601; blank for never. The preview shows a time-limited banner. */
+    public String endsAt;
+    /**
+     * At {@link #endsAt}: {@code REVERT} (default) republishes the revision that
+     * was live before these odds, {@code CLOSE} closes the pool.
+     */
+    public String afterEnd;
 
     /** The bonus rolls, never {@code null}. */
     public List<BonusRoll> bonusRolls() {

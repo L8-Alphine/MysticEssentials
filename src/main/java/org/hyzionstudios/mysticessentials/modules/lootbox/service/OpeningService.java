@@ -159,6 +159,8 @@ public final class OpeningService {
         List<String> blockers = new ArrayList<>();
         if ("DISABLED".equals(policyProfile()) || registry.isDisabled(revision.lootboxId)) {
             blockers.add("This loot box is closed right now.");
+        } else if (ended(revision)) {
+            blockers.add("These time-limited odds have ended.");
         }
         String node = revision.spec.permission;
         if (node != null && !node.isBlank() && !player.hasPermission(node)) {
@@ -218,6 +220,17 @@ public final class OpeningService {
                 System.currentTimeMillis());
     }
 
+    /**
+     * Whether the live revision's time-limited odds are over (P3-WP5): the
+     * schedule sweep reverts or closes the pool within a minute, and until then
+     * nobody opens on odds that ended.
+     */
+    private boolean ended(LootBoxRevision revision) {
+        LootBoxRevision.State state = registry.state(revision.lootboxId).orElse(null);
+        return state != null && state.activeRevision == revision.revision && state.endsAt > 0
+                && System.currentTimeMillis() >= state.endsAt;
+    }
+
     private long cooldownRemaining(PlayerLootState state, LootBoxRevision revision) {
         PlayerLootState.PoolState pool = state.pools.get(revision.lootboxId);
         if (pool == null || revision.spec.cooldownSeconds <= 0) {
@@ -263,6 +276,9 @@ public final class OpeningService {
             LootBoxRevision revision = registry.active(lootboxId).orElse(null);
             if (revision == null || registry.isDisabled(lootboxId) || "DISABLED".equals(policyProfile())) {
                 return done(Status.CLOSED, "This loot box is closed right now.");
+            }
+            if (ended(revision)) {
+                return done(Status.CLOSED, "These time-limited odds have ended.");
             }
             String node = revision.spec.permission;
             if (node != null && !node.isBlank() && !player.hasPermission(node)) {

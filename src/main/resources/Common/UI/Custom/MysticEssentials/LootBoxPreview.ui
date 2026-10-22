@@ -38,6 +38,12 @@ $C.@Container {
         Style: $M.@MetaWrapStyle;
       }
 
+      Label #Schedule {
+        Anchor: (Bottom: 4);
+        Style: $M.@MetaWrapStyle;
+        Visible: false;
+      }
+
       Label #KeyBalance {
         Anchor: (Height: 18);
         Style: $M.@MetaGoldStyle;

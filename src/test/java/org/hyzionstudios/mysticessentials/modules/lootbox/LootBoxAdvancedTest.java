@@ -33,6 +33,7 @@ import org.hyzionstudios.mysticessentials.modules.lootbox.service.EligibilityRul
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.IntegrationRegistry;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.OpeningRules;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.RewardActions;
+import org.hyzionstudios.mysticessentials.modules.lootbox.service.ScheduleRules;
 import org.hyzionstudios.mysticessentials.modules.lootbox.validate.DraftValidator;
 
 import com.google.gson.JsonArray;
@@ -67,6 +68,7 @@ public final class LootBoxAdvancedTest {
         personalOddsMatchTheDraw();
         hardPityGuaranteesWithinTheLimit();
         itemChanceCombinesPathsExactly();
+        schedulesStartEndAndRollBackOnce();
         phaseTwoPoolsKeepTheirHashes();
         validatorGatesPhaseThree();
         System.out.println("LootBoxAdvancedTest: all checks passed.");
@@ -485,6 +487,79 @@ public final class LootBoxAdvancedTest {
                 "item chances shown for a pool where they equal the rows");
     }
 
+    // ----- P3-WP5 Schedules ---------------------------------------------------
+
+    private static void schedulesStartEndAndRollBackOnce() {
+        long now = ScheduleRules.instant("2026-11-01T00:00:00Z");
+        LootBoxDraft draft = bibleDraft();
+        draft.startsAt = "2026-12-01T00:00:00Z";
+        draft.endsAt = "2026-12-31T00:00:00Z";
+        require(ScheduleRules.validate(draft, now).isEmpty(), "a valid schedule was refused: "
+                + ScheduleRules.validate(draft, now));
+        require(ScheduleRules.startsLater(draft, now), "a future start was not scheduled");
+        LootBoxDraft bad = bibleDraft();
+        bad.startsAt = "next week";
+        bad.endsAt = "2026-10-01T00:00:00Z";
+        bad.afterEnd = "EXPLODE";
+        List<String> problems = ScheduleRules.validate(bad, now);
+        require(contains(problems, "startsAt must be") && contains(problems, "already in the past")
+                && contains(problems, "REVERT or CLOSE"), "bad schedule fields passed: " + problems);
+
+        // Scheduled → live at its start, remembering what was live before.
+        LootBoxRevision.State state = new LootBoxRevision.State();
+        state.activeRevision = 2;
+        state.scheduledRevision = 3;
+        state.scheduledAt = ScheduleRules.instant(draft.startsAt);
+        LootBoxRevision three = revision(draft);
+        three.revision = 3;
+        require(ScheduleRules.due(state, now) == ScheduleRules.Due.NONE, "something was due before the start");
+        require(ScheduleRules.banner(state, now).contains("start 2026-12-01"), "the start date was not shown: "
+                + ScheduleRules.banner(state, now));
+        long start = state.scheduledAt;
+        require(ScheduleRules.due(state, start) == ScheduleRules.Due.ACTIVATE, "the start was not due");
+        ScheduleRules.Claim claim = ScheduleRules.claim(state, ScheduleRules.Due.ACTIVATE, three, start);
+        require(claim != null && state.activeRevision == 3 && state.revertTo == 2 && state.scheduledRevision == 0,
+                "activation did not switch to the scheduled revision and remember the old one");
+        // A second server sweeping the same state finds nothing to do.
+        require(ScheduleRules.claim(state, ScheduleRules.Due.ACTIVATE, three, start) == null,
+                "a second server activated the revision again");
+        require(ScheduleRules.banner(state, start).contains("Time-limited odds until 2026-12-31"),
+                "the time-limited banner is missing");
+
+        // At the end: revert exactly once.
+        long end = state.endsAt;
+        require(ScheduleRules.due(state, end) == ScheduleRules.Due.END_REVERT, "the end was not due as a revert");
+        ScheduleRules.Claim revert = ScheduleRules.claim(state, ScheduleRules.Due.END_REVERT, null, end);
+        require(revert != null && revert.revision() == 2 && state.endsAt == 0, "the revert did not claim revision 2");
+        require(ScheduleRules.claim(state, ScheduleRules.Due.END_REVERT, null, end) == null,
+                "the end was claimed twice");
+
+        // CLOSE instead of REVERT closes the pool.
+        LootBoxRevision.State closing = new LootBoxRevision.State();
+        LootBoxDraft closes = bibleDraft();
+        closes.endsAt = "2026-12-31T00:00:00Z";
+        closes.afterEnd = "close";
+        LootBoxRevision closingRevision = revision(closes);
+        ScheduleRules.activate(closing, closingRevision, 1, now);
+        require(ScheduleRules.claim(closing, ScheduleRules.Due.END_CLOSE, null, end) != null && closing.disabled,
+                "afterEnd CLOSE did not close the pool");
+
+        // A rollback of old time-limited odds doesn't end the moment it starts.
+        LootBoxRevision.State late = new LootBoxRevision.State();
+        ScheduleRules.activate(late, closingRevision, 1, end + 1);
+        require(late.endsAt == 0, "an end that already passed was kept");
+
+        // A staff-scheduled rollback.
+        LootBoxRevision.State rollback = new LootBoxRevision.State();
+        rollback.activeRevision = 5;
+        rollback.rollbackTo = 4;
+        rollback.rollbackAt = now + 1000;
+        require(ScheduleRules.due(rollback, now) == ScheduleRules.Due.NONE
+                && ScheduleRules.due(rollback, now + 1000) == ScheduleRules.Due.ROLLBACK, "rollback timing is wrong");
+        ScheduleRules.Claim back = ScheduleRules.claim(rollback, ScheduleRules.Due.ROLLBACK, null, now + 1000);
+        require(back != null && back.revision() == 4 && rollback.rollbackTo == 0, "the rollback was not claimed");
+    }
+
     // ----- Compatibility ------------------------------------------------------
 
     /**
@@ -497,7 +572,8 @@ public final class LootBoxAdvancedTest {
         LootBoxDraft draft = bibleDraft();
         List<Long> weights = OddsEngine.resolveWeights(draft);
         JsonObject phaseTwo = Json.toTree(draft).getAsJsonObject();
-        for (String key : List.of("bonusRolls", "conditions", "ineligibleRewards", "pity")) {
+        for (String key : List.of("bonusRolls", "conditions", "ineligibleRewards", "pity", "startsAt", "endsAt",
+                "afterEnd")) {
             phaseTwo.remove(key);
         }
         JsonArray rewards = phaseTwo.getAsJsonArray("rewards");

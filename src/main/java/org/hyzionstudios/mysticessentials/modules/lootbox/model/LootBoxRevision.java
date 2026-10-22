@@ -52,5 +52,19 @@ public final class LootBoxRevision {
         public boolean disabled;
         public String updatedBy;
         public long updatedAt;
+
+        // Schedule (P3-WP5); 0 / false when nothing is scheduled.
+        /** A published revision waiting for its start, and when it starts. */
+        public int scheduledRevision;
+        public long scheduledAt;
+        /** When the live revision's time-limited odds end. */
+        public long endsAt;
+        /** Close the pool at {@link #endsAt} instead of going back to {@link #revertTo}. */
+        public boolean closeAtEnd;
+        /** The revision that was live before the time-limited one; republished at {@link #endsAt}. */
+        public int revertTo;
+        /** A staff-scheduled rollback: republish revision {@code rollbackTo} at {@code rollbackAt}. */
+        public int rollbackTo;
+        public long rollbackAt;
     }
 }

@@ -16,6 +16,7 @@ import org.hyzionstudios.mysticessentials.modules.lootbox.odds.OddsEngine;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.ConditionRules;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.IntegrationRegistry;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.RewardActions;
+import org.hyzionstudios.mysticessentials.modules.lootbox.service.ScheduleRules;
 
 /**
  * The publish gates (Design Bible §05) for pools and keys. Every engine lookup is
@@ -123,6 +124,7 @@ public final class DraftValidator {
         validateBonusRolls(draft, env, problems);
         validateConditions(draft, env, problems);
         validatePity(draft, problems);
+        problems.addAll(ScheduleRules.validate(draft, System.currentTimeMillis()));
         return problems;
     }
 

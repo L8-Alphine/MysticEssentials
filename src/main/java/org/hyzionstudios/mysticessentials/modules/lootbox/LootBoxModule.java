@@ -86,6 +86,9 @@ public final class LootBoxModule extends AbstractMysticModule implements LootBox
      */
     private final IntegrationRegistry integrations = new IntegrationRegistry();
     private ScheduledFuture<?> sweepTask;
+    private ScheduledFuture<?> scheduleTask;
+    /** How often scheduled revisions and time-limited odds are checked. */
+    private static final long SCHEDULE_CHECK_SECONDS = 30L;
     private ScheduledFuture<?> recoveryTask;
 
     public LootBoxModule() {
@@ -171,6 +174,9 @@ public final class LootBoxModule extends AbstractMysticModule implements LootBox
             }
         }, 5, 5, TimeUnit.MINUTES);
         sweepTask = core.scheduler().runRepeating(audit::sweep, 1, 24, TimeUnit.HOURS);
+        // Scheduled revisions start, time-limited odds end, scheduled rollbacks run (P3-WP5).
+        scheduleTask = core.scheduler().runRepeating(() -> registry.runSchedule(System.currentTimeMillis()),
+                SCHEDULE_CHECK_SECONDS, SCHEDULE_CHECK_SECONDS, TimeUnit.SECONDS);
 
         active = this;
         visuals.start();
@@ -215,6 +221,10 @@ public final class LootBoxModule extends AbstractMysticModule implements LootBox
         if (sweepTask != null) {
             sweepTask.cancel(false);
             sweepTask = null;
+        }
+        if (scheduleTask != null) {
+            scheduleTask.cancel(false);
+            scheduleTask = null;
         }
     }
 

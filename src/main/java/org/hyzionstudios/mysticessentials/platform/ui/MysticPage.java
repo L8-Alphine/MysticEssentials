@@ -164,6 +164,7 @@ public abstract class MysticPage extends CustomUIPage {
             // LootBox Phase 3: personal-odds notes and the section rows inside a reward list.
             Map.entry("Personal", GOLD_SOFT),
             Map.entry("SectionText", GOLD),
+            Map.entry("Schedule", GOLD_SOFT),
             // LootBox screens track.
             // Simulation: the chance column is gold like the preview's odds.
             Map.entry("SimHint", TEXT_MUTED),

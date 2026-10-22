@@ -406,6 +406,12 @@ public final class LootBoxPages {
             cmd.set("#PreviewDescription.TextSpans", uiText("#PreviewDescription.TextSpans",
                     revision.spec.description == null ? "" : revision.spec.description));
             cmd.set("#Rules.TextSpans", uiText("#Rules.TextSpans", rules(revision)));
+            String schedule = org.hyzionstudios.mysticessentials.modules.lootbox.service.ScheduleRules.banner(
+                    module.registry().state(revision.lootboxId).orElse(null), System.currentTimeMillis());
+            if (schedule != null) {
+                cmd.set("#Schedule.Visible", true);
+                cmd.set("#Schedule.TextSpans", uiText("#Schedule.TextSpans", schedule));
+            }
             cmd.set("#KeyBalance.TextSpans", uiText("#KeyBalance.TextSpans", "Your keys: " + preview.keys()
                     + " (" + preview.physicalKeys() + " held, " + preview.virtualKeys() + " virtual) · Opens with "
                     + keyNames(module, revision)));
