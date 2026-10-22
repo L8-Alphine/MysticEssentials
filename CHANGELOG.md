@@ -1,5 +1,64 @@
 # Mystic Essentials Changelog
 
+## Unreleased — LootBox Advanced Behaviour and Network (Phases 3–4)
+
+Everything here is checked on the server side only; none of it has been tried in
+a game client or against a real MySQL and Redis pair yet.
+
+### LootBox: advanced pools
+
+- **Bundles** (one outcome, up to 16 actions) and up to 4 **bonus rolls** with
+  their own labelled odds, shown as their own sections of the odds list.
+- **Eligibility conditions** on pools and rewards: permission, world, region,
+  date window, plus provider conditions. Ineligible rewards are either dropped
+  from the player's odds or block the opening, as the pool says. A condition the
+  server can't answer refuses the opening.
+- **Pity** (hard and soft) and **duplicate protection** (`duplicates:
+  EXCLUDE_OWNED`). Players see their own exact "your next opening" odds and a
+  plain-language note before they confirm; the confirmation is bound to that table.
+- **Scheduled and time-limited odds** (`startsAt`, `endsAt`, `afterEnd`), a banner
+  in the preview, `/lootbox schedule`, and scheduled rollbacks
+  (`/lootbox rollback <pool> <rev> at <instant>`).
+- **`/lootbox chance <pool> <itemId>`** and a "chance of getting each item"
+  section: exact, over every path.
+- **Provider API** for other plugins (`RewardProvider`, `ConditionProvider`), with
+  `IDEMPOTENT`, `RECONCILABLE` or `AT_MOST_ONCE` delivery. A pool whose provider is
+  missing can't be opened, and nothing is ever substituted. `/lootbox providers`.
+- **COSMETIC and RPG rewards** through providers; COSMETIC rewards must say how
+  duplicates are handled. Built-in COSMETIC provider `permission` (LuckPerms).
+- **Mystic integrations**, each optional and found by class presence:
+  MysticEconomy deposits, MysticQuests (`QUEST_COMPLETED`, and the quest event
+  `mysticessentials:lootbox_key`), MysticRPG (pending its 0.7 build),
+  MysticModeration (flags become reports), and the placeholders
+  `lootbox_keys`, `lootbox_keys_<ns>_<name>` and `lootbox_pending`.
+- **Paid grants are stricter:** under `PAID_RANDOM_RESTRICTED`, a PAID grant now
+  also needs MysticIdentity to report a known non-managed account and, while
+  `integrations.identity.requireAgeSignal` is on (the default), an adult signal
+  MysticIdentity doesn't have yet. Until then PAID grants are refused.
+- **Native key items** (`identityMode: REGISTERED_CUSTOM_ASSET`), behind
+  `keys.nativeKeyItems`, off until checked in game.
+
+### LootBox: network and analytics
+
+- New config section `network`. With the shared MySQL/MariaDB provider, Redis and
+  the same `secret.key` everywhere, pools with `scope: NETWORK` open under a
+  per-player lock with a fencing token; a stale server can't spend or deliver.
+  Without any of those, NETWORK pools refuse to open and spend nothing.
+- Pool and key changes reach the other servers at once, and a NETWORK opening
+  re-checks the shared revision before it spends.
+- **`/lootbox stats`**: observed against published chances with a z-score per
+  reward; hourly anomaly entries in the audit log; unusual luck flagged to staff.
+- **Retention** for settled openings and statistics (`retention.*`), at least 365
+  days of everything under `PAID_RANDOM_RESTRICTED`.
+- Audit exports now carry pseudonyms instead of player UUIDs unless the exporter
+  has the new `mysticessentials.lootbox.audit.identifiers`.
+
+### Core
+
+- `StorageService.updateShared`: a read-modify-write that is atomic across every
+  server sharing the MySQL/MariaDB store (one transaction holding the row lock,
+  retried on deadlocks and races). On JSON storage it is the usual `update`.
+
 ## Unreleased — LootBox Creator (Phase 2)
 
 The in-game LootBox creator. Pools, keys and crates can now be built, published,

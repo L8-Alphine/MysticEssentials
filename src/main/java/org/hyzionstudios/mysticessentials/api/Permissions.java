@@ -334,6 +334,11 @@ public final class Permissions {
     public static final String LOOTBOX_HISTORY = "mysticessentials.lootbox.history";
     /** Another player's receipts, audit records and statistics. */
     public static final String LOOTBOX_AUDIT = "mysticessentials.lootbox.audit";
+    /**
+     * Player UUIDs in audit exports (P4-WP5). Without it, exports carry stable
+     * pseudonyms ({@code player-<hash>}) instead.
+     */
+    public static final String LOOTBOX_AUDIT_IDENTIFIERS = "mysticessentials.lootbox.audit.identifiers";
     /** {@code /lootbox key list|info}. */
     public static final String LOOTBOX_KEYS = "mysticessentials.lootbox.keys";
     /** {@code /lootbox key give}: issue physical or virtual keys (audited). */

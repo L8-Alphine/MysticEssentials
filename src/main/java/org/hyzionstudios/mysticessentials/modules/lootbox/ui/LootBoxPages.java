@@ -21,6 +21,7 @@ import org.hyzionstudios.mysticessentials.modules.lootbox.model.LootBoxDraft;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.LootBoxRevision;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.PendingInbox;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.PlayerLootState;
+import org.hyzionstudios.mysticessentials.modules.lootbox.odds.ItemChance;
 import org.hyzionstudios.mysticessentials.modules.lootbox.odds.OddsFormatter;
 import org.hyzionstudios.mysticessentials.modules.lootbox.odds.OddsTable;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.MotionRules;
@@ -59,6 +60,7 @@ public final class LootBoxPages {
     static final String HISTORY_ROW_UI = "MysticEssentials/LootBoxHistoryRow.ui";
     static final String PENDING_UI = "MysticEssentials/LootBoxPending.ui";
     static final String PENDING_ROW_UI = "MysticEssentials/LootBoxPendingRow.ui";
+    static final String SECTION_ROW_UI = "MysticEssentials/LootBoxSectionRow.ui";
 
     private static final DateTimeFormatter WHEN = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
             .withZone(ZoneId.systemDefault());
@@ -83,9 +85,101 @@ public final class LootBoxPages {
         cmd.set(row + " #OneIn.TextSpans", uiText(row + " #OneIn.TextSpans", formatter.oneIn(entry.weight(), total)));
     }
 
+    /** A row whose odds columns are text: an excluded reward, or an item's combined chance. */
+    static void textRow(UICommandBuilder cmd, String list, int index, String icon, String name, String meta,
+            String odds, String oneIn) {
+        String row = list + "[" + index + "]";
+        cmd.append(list, REWARD_ROW_UI);
+        if (icon != null) {
+            cmd.set(row + " #Icon.ItemId", icon);
+        }
+        cmd.set(row + " #Name.TextSpans", uiText(row + " #Name.TextSpans", name));
+        cmd.set(row + " #Meta.TextSpans", uiText(row + " #Meta.TextSpans", meta));
+        cmd.set(row + " #Odds.TextSpans", uiText(row + " #Odds.TextSpans", odds));
+        cmd.set(row + " #OneIn.TextSpans", uiText(row + " #OneIn.TextSpans", oneIn));
+    }
+
+    static void sectionRow(UICommandBuilder cmd, String list, int index, String text) {
+        String row = list + "[" + index + "]";
+        cmd.append(list, SECTION_ROW_UI);
+        cmd.set(row + " #SectionText.TextSpans", uiText(row + " #SectionText.TextSpans", text));
+    }
+
+    /**
+     * The whole odds list of a table (§4.7, P3): every outcome of the main draw
+     * with its exact chance; then, each under its own heading, every bonus roll
+     * with its own chances (never mixed into the main table, Design Bible §07);
+     * the rewards left out of this player's odds and why; and, when an item can
+     * come from more than one path, the exact chance of getting each item at all
+     * ({@code itemChances}, P3-WP6). Nothing is behind a tooltip.
+     *
+     * @return the number of rows appended
+     */
+    static int oddsList(UICommandBuilder cmd, String list, LootBoxRevision revision, OddsTable table,
+            OddsFormatter formatter, boolean itemChances) {
+        int row = 0;
+        for (OddsTable.Entry entry : table.entries()) {
+            rewardRow(cmd, list, row++, revision.spec.rewards.get(entry.index()), entry, table.total(), formatter);
+        }
+        for (OddsTable.BonusTable bonus : table.bonus()) {
+            LootBoxDraft.BonusRoll roll = revision.spec.bonusRolls().get(bonus.rollIndex());
+            sectionRow(cmd, list, row++, "Bonus roll · " + bonus.label() + " · "
+                    + (bonus.total() <= 0 ? "nothing left for you to win"
+                            : formatter.percent(bonus.anyWeight(), bonus.total()) + " chance of a bonus, rolled "
+                                    + "separately from the main reward"));
+            for (OddsTable.Entry entry : bonus.entries()) {
+                rewardRow(cmd, list, row++, roll.rewards.get(entry.index()), entry, bonus.total(), formatter);
+            }
+        }
+        List<OddsTable.Excluded> excluded = table.personal().excluded();
+        if (!excluded.isEmpty()) {
+            sectionRow(cmd, list, row++, "Not in your odds right now");
+            for (OddsTable.Excluded out : excluded) {
+                LootBoxDraft.RewardSpec reward = out.bonusRoll() == null ? revision.spec.rewards.get(out.index())
+                        : org.hyzionstudios.mysticessentials.modules.lootbox.service.RewardActions.find(revision.spec,
+                                out.rewardId(), out.bonusRoll());
+                if (reward == null) {
+                    continue;
+                }
+                textRow(cmd, list, row++, rewardIcon(reward), rewardName(reward), rewardMeta(reward),
+                        "Not available", out.reason());
+            }
+        }
+        if (itemChances && ItemChance.worthShowing(revision)) {
+            List<String> items = ItemChance.items(revision);
+            if (!items.isEmpty()) {
+                sectionRow(cmd, list, row++, "Chance of getting each item from one opening (any path)");
+                for (String itemId : items) {
+                    ItemChance.Chance chance = ItemChance.of(table, revision, ItemChance.containsItem(itemId));
+                    textRow(cmd, list, row++, itemId, itemId, "Main reward, bundles and bonus rolls combined",
+                            chance.isZero() ? "Not available" : formatter.percent(chance.numerator(),
+                                    chance.denominator()),
+                            chance.isZero() ? "" : formatter.oneIn(chance.numerator(), chance.denominator()));
+                }
+            }
+        }
+        return row;
+    }
+
+    /** The plain-language summary of what made the player's odds personal, or {@code null}. */
+    static String personalNotes(OddsTable table) {
+        List<String> notes = table.personal().notes();
+        return notes.isEmpty() ? null : "Your odds for your next opening: " + String.join(" ", notes);
+    }
+
     static String rewardIcon(LootBoxDraft.RewardSpec reward) {
-        return reward.item != null && reward.item.itemId != null && !reward.item.itemId.isBlank()
-                ? reward.item.itemId : null;
+        if (reward.item != null && reward.item.itemId != null && !reward.item.itemId.isBlank()) {
+            return reward.item.itemId;
+        }
+        if ("BUNDLE".equalsIgnoreCase(reward.type) && reward.bundle != null) {
+            for (LootBoxDraft.RewardSpec action : reward.bundle) {
+                if (action != null && action.item != null && action.item.itemId != null
+                        && !action.item.itemId.isBlank()) {
+                    return action.item.itemId;
+                }
+            }
+        }
+        return null;
     }
 
     static String rewardName(LootBoxDraft.RewardSpec reward) {
@@ -101,14 +195,75 @@ public final class LootBoxPages {
             case "COMMAND" -> "Server reward";
             case "PERMISSION" -> "Permission" + (reward.durationSeconds > 0
                     ? " for " + duration(reward.durationSeconds) : " (permanent)");
+            case "BUNDLE" -> "Bundle of " + (reward.bundle == null ? 0 : reward.bundle.size()) + ": "
+                    + bundleSummary(reward);
+            case "EXTENSION", "COSMETIC", "RPG" -> providerMeta(reward, type);
             default -> type;
         };
     }
 
+    private static String bundleSummary(LootBoxDraft.RewardSpec reward) {
+        List<String> parts = new ArrayList<>();
+        if (reward.bundle != null) {
+            for (LootBoxDraft.RewardSpec action : reward.bundle) {
+                if (action != null) {
+                    parts.add(action.name != null && !action.name.isBlank()
+                            ? org.hyzionstudios.mysticessentials.core.message.MysticText.stripMarkup(action.name)
+                            : rewardMeta(action));
+                }
+            }
+        }
+        return String.join(", ", parts);
+    }
+
+    /** A provider reward described by its provider, or by its type when the provider is gone. */
+    private static String providerMeta(LootBoxDraft.RewardSpec reward, String type) {
+        LootBoxModule module = LootBoxModule.active();
+        var provider = module == null ? null : module.integrations().reward(reward.provider);
+        String described = null;
+        try {
+            described = provider == null ? null : provider.describe(reward.params());
+        } catch (RuntimeException ignored) {
+            // Falls back to the type.
+        }
+        String base = described != null && !described.isBlank() ? described
+                : type.charAt(0) + type.substring(1).toLowerCase(Locale.ROOT)
+                        + (provider == null ? " (provider not installed)" : "");
+        return base + (reward.excludesOwned() ? " · no duplicates" : "");
+    }
+
     static String rules(LootBoxRevision revision) {
-        return "One reward per opening · Duplicates possible · No pity · Uses "
-                + Math.max(1, revision.spec.keysPerOpening) + " key"
-                + (revision.spec.cooldownSeconds > 0 ? " · Cooldown " + duration(revision.spec.cooldownSeconds) : "");
+        LootBoxDraft spec = revision.spec;
+        StringBuilder rules = new StringBuilder("One reward per opening");
+        int bonus = spec.bonusRolls().size();
+        if (bonus > 0) {
+            rules.append(" plus ").append(bonus).append(bonus == 1 ? " separate bonus roll" : " separate bonus rolls");
+        }
+        boolean uniques = false;
+        boolean conditional = !spec.conditions().isEmpty();
+        for (LootBoxDraft.RewardSpec reward : org.hyzionstudios.mysticessentials.modules.lootbox.service.RewardActions
+                .everyReward(spec)) {
+            uniques |= reward.excludesOwned();
+            conditional |= !reward.conditions().isEmpty();
+        }
+        rules.append(uniques ? " · Unique rewards you own are left out" : " · Duplicates possible");
+        LootBoxDraft.Pity pity = spec.pity;
+        if (pity == null) {
+            rules.append(" · No pity");
+        } else if (pity.hardAfter > 0) {
+            rules.append(" · Pity: guaranteed within ").append(pity.hardAfter).append(" openings");
+        } else {
+            rules.append(" · Pity: odds rise after ").append(pity.softAfter).append(" openings");
+        }
+        if (conditional) {
+            rules.append(spec.blocksIneligible() ? " · Some rewards have conditions; if you miss one you can't open"
+                    : " · Some rewards have conditions; your odds leave out the ones you miss");
+        }
+        rules.append(" · Uses ").append(Math.max(1, spec.keysPerOpening)).append(" key");
+        if (spec.cooldownSeconds > 0) {
+            rules.append(" · Cooldown ").append(duration(spec.cooldownSeconds));
+        }
+        return rules.toString();
     }
 
     static String oddsFooter(LootBoxRevision revision, OddsTable table, OddsFormatter formatter) {
@@ -251,13 +406,20 @@ public final class LootBoxPages {
             cmd.set("#PreviewDescription.TextSpans", uiText("#PreviewDescription.TextSpans",
                     revision.spec.description == null ? "" : revision.spec.description));
             cmd.set("#Rules.TextSpans", uiText("#Rules.TextSpans", rules(revision)));
+            String schedule = org.hyzionstudios.mysticessentials.modules.lootbox.service.ScheduleRules.banner(
+                    module.registry().state(revision.lootboxId).orElse(null), System.currentTimeMillis());
+            if (schedule != null) {
+                cmd.set("#Schedule.Visible", true);
+                cmd.set("#Schedule.TextSpans", uiText("#Schedule.TextSpans", schedule));
+            }
             cmd.set("#KeyBalance.TextSpans", uiText("#KeyBalance.TextSpans", "Your keys: " + preview.keys()
                     + " (" + preview.physicalKeys() + " held, " + preview.virtualKeys() + " virtual) · Opens with "
                     + keyNames(module, revision)));
-            for (int i = 0; i < table.entries().size(); i++) {
-                OddsTable.Entry entry = table.entries().get(i);
-                rewardRow(cmd, "#RewardList", i, revision.spec.rewards.get(entry.index()), entry, table.total(),
-                        formatter);
+            oddsList(cmd, "#RewardList", revision, table, formatter, true);
+            String notes = personalNotes(table);
+            if (notes != null) {
+                cmd.set("#Personal.Visible", true);
+                cmd.set("#Personal.TextSpans", uiText("#Personal.TextSpans", notes));
             }
             cmd.set("#OddsFooter.TextSpans", uiText("#OddsFooter.TextSpans", oddsFooter(revision, table, formatter)));
             if (!preview.blockers().isEmpty()) {
@@ -307,10 +469,11 @@ public final class LootBoxPages {
             cmd.set("#PreviewTitle.TextSpans", uiText("#PreviewTitle.TextSpans", revision.spec.displayName));
             cmd.set("#Consumes.TextSpans", uiText("#Consumes.TextSpans", "Consumes 1 " + keyNames(module, revision)
                     + ". Cancel spends nothing."));
-            for (int i = 0; i < table.entries().size(); i++) {
-                OddsTable.Entry entry = table.entries().get(i);
-                rewardRow(cmd, "#RewardList", i, revision.spec.rewards.get(entry.index()), entry, table.total(),
-                        formatter);
+            oddsList(cmd, "#RewardList", revision, table, formatter, false);
+            String notes = personalNotes(table);
+            if (notes != null) {
+                cmd.set("#Personal.Visible", true);
+                cmd.set("#Personal.TextSpans", uiText("#Personal.TextSpans", notes));
             }
             cmd.set("#OddsFooter.TextSpans", uiText("#OddsFooter.TextSpans", oddsFooter(revision, table, formatter)));
             event.addEventBinding(CustomUIEventBindingType.Activating, "#ConfirmButton",
@@ -375,6 +538,24 @@ public final class LootBoxPages {
                 cmd.set(row + " #Odds.TextSpans", uiText(row + " #Odds.TextSpans",
                         formatter.percent(entry.weight(), table.total())));
             }
+            int next = table.entries().size();
+            for (OddsTable.BonusTable bonus : table.bonus()) {
+                LootBoxDraft.BonusRoll roll = revision.spec.bonusRolls().get(bonus.rollIndex());
+                String heading = "#RevealList[" + next++ + "]";
+                cmd.append("#RevealList", REVEAL_ROW_UI);
+                cmd.set(heading + " #Name.TextSpans", uiText(heading + " #Name.TextSpans", "&6Bonus roll · "
+                        + bonus.label()));
+                cmd.set(heading + " #Odds.TextSpans", uiText(heading + " #Odds.TextSpans", bonus.total() <= 0 ? ""
+                        : formatter.percent(bonus.anyWeight(), bonus.total()) + " any"));
+                for (OddsTable.Entry entry : bonus.entries()) {
+                    String row = "#RevealList[" + next++ + "]";
+                    cmd.append("#RevealList", REVEAL_ROW_UI);
+                    cmd.set(row + " #Name.TextSpans", uiText(row + " #Name.TextSpans",
+                            rewardName(roll.rewards.get(entry.index()))));
+                    cmd.set(row + " #Odds.TextSpans", uiText(row + " #Odds.TextSpans",
+                            formatter.percent(entry.weight(), bonus.total())));
+                }
+            }
             cmd.set("#ResultName.TextSpans", uiText("#ResultName.TextSpans", "..."));
             cmd.set("#ResultMeta.TextSpans", uiText("#ResultMeta.TextSpans", "Receipt " + result.opening().openingId));
             cmd.set("#Status.TextSpans", uiText("#Status.TextSpans", "Opening..."));
@@ -430,9 +611,24 @@ public final class LootBoxPages {
             cmd.set("#ResultName.TextSpans", uiText("#ResultName.TextSpans", "You won " + rewardName(reward)));
             cmd.set("#ResultMeta.TextSpans", uiText("#ResultMeta.TextSpans", "Chance " + result.opening().probability
                     + " · " + module.opening().formatter().oneIn(result.entry().weight(), result.table().total())
-                    + " · Receipt " + result.opening().openingId));
+                    + bonusLine(result.opening()) + " · Receipt " + result.opening().openingId));
             cmd.set("#Status.TextSpans", uiText("#Status.TextSpans", status));
             highlight(result.table().entries().indexOf(result.entry()), cmd);
+        }
+
+        /** What each bonus roll landed on, with the exact chance it had. */
+        private static String bonusLine(org.hyzionstudios.mysticessentials.modules.lootbox.model.Opening opening) {
+            StringBuilder line = new StringBuilder();
+            for (var bonus : opening.bonus) {
+                if (bonus.total <= 0) {
+                    continue;
+                }
+                line.append(" · ").append(bonus.label).append(": ")
+                        .append(bonus.outcomeId == null ? "no bonus" : "won " + (bonus.outcomeName == null
+                                ? bonus.outcomeId : bonus.outcomeName))
+                        .append(" (").append(bonus.probability).append(")");
+            }
+            return line.toString();
         }
 
         private void pushStatus() {

@@ -8,7 +8,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -31,6 +33,7 @@ import org.hyzionstudios.mysticessentials.modules.lootbox.model.PlayerLootState;
 import org.hyzionstudios.mysticessentials.modules.lootbox.odds.OddsEngine;
 import org.hyzionstudios.mysticessentials.modules.lootbox.odds.OddsFormatter;
 import org.hyzionstudios.mysticessentials.modules.lootbox.odds.OddsTable;
+import org.hyzionstudios.mysticessentials.modules.lootbox.odds.PlayerOdds;
 import org.hyzionstudios.mysticessentials.modules.lootbox.odds.SecureDraw;
 import org.hyzionstudios.mysticessentials.modules.lootbox.storage.LootBoxStorage;
 
@@ -88,12 +91,16 @@ public final class OpeningService {
     private final AuditService audit;
     private final PlayerLanes lanes;
     private final SecureDraw draw;
+    private final IntegrationRegistry integrations;
     private volatile LootBoxConfig config;
     private volatile OddsFormatter formatter;
     private final Map<UUID, OpeningRules.Confirm> confirms = new ConcurrentHashMap<>();
+    /** The network authority (P4-WP2), or {@code null} when this server runs alone. */
+    private volatile NetworkAuthority network;
 
     public OpeningService(MysticCore core, LootBoxStorage storage, LootBoxRegistry registry, KeyService keys,
-            RewardService rewards, AuditService audit, PlayerLanes lanes, SecureDraw draw, LootBoxConfig config) {
+            RewardService rewards, AuditService audit, PlayerLanes lanes, SecureDraw draw,
+            IntegrationRegistry integrations, LootBoxConfig config) {
         this.core = core;
         this.storage = storage;
         this.registry = registry;
@@ -102,7 +109,13 @@ public final class OpeningService {
         this.audit = audit;
         this.lanes = lanes;
         this.draw = draw;
+        this.integrations = integrations;
         updateConfig(config);
+    }
+
+    /** Installs the network authority NETWORK pools open under (P4-WP2). */
+    public void network(NetworkAuthority authority) {
+        this.network = authority;
     }
 
     public void updateConfig(LootBoxConfig config) {
@@ -131,7 +144,6 @@ public final class OpeningService {
             return CompletableFuture.completedFuture(
                     new Preview(null, null, 0, 0, null, crateId, List.of("This loot box does not exist.")));
         }
-        OddsTable table = OddsEngine.table(revision, policyProfile());
         Set<String> keyIds = new LinkedHashSet<>(revision.spec.keys);
         CompletableFuture<Integer> physical = countPhysical(player, keyIds);
         return storage.loadPlayer(player.getUuid()).thenCombine(physical, (state, held) -> {
@@ -139,7 +151,11 @@ public final class OpeningService {
             for (String keyId : keyIds) {
                 virtual += state.virtualKeys.getOrDefault(keyId, 0);
             }
+            OddsTable table = personalTable(player, revision, state);
             List<String> blockers = blockers(player, revision, state, virtual + held);
+            if (table.blocked() != null) {
+                blockers.add(0, table.blocked());
+            }
             String requestId = draw.id();
             confirms.put(player.getUuid(), new OpeningRules.Confirm(lootboxId, table.hash(), requestId, crateId,
                     System.currentTimeMillis()));
@@ -152,6 +168,8 @@ public final class OpeningService {
         List<String> blockers = new ArrayList<>();
         if ("DISABLED".equals(policyProfile()) || registry.isDisabled(revision.lootboxId)) {
             blockers.add("This loot box is closed right now.");
+        } else if (ended(revision)) {
+            blockers.add("These time-limited odds have ended.");
         }
         String node = revision.spec.permission;
         if (node != null && !node.isBlank() && !player.hasPermission(node)) {
@@ -165,6 +183,61 @@ public final class OpeningService {
             blockers.add("You need a key to open this.");
         }
         return blockers;
+    }
+
+    /**
+     * The odds {@code player} sees and draws from (Design Bible §07 steps 1–4):
+     * the revision, then their conditions, owned unique rewards and pity. The
+     * preview and the confirmation both build it from the player document they
+     * just read, so the confirmation is stale whenever it changed in between.
+     */
+    public OddsTable personalTable(PlayerRef player, LootBoxRevision revision, PlayerLootState state) {
+        PlayerOdds odds = EligibilityRules.evaluate(revision, state.pools.get(revision.lootboxId),
+                conditionContext(player), integrations);
+        return OddsEngine.table(revision, policyProfile(), odds);
+    }
+
+    /** {@code player}'s table for {@code revision}, or the table with nothing personal for the console ({@code null}). */
+    public CompletableFuture<OddsTable> tableFor(PlayerRef player, LootBoxRevision revision) {
+        if (player == null) {
+            return CompletableFuture.completedFuture(OddsEngine.table(revision, policyProfile()));
+        }
+        return storage.loadPlayer(player.getUuid()).thenApply(state -> personalTable(player, revision, state));
+    }
+
+    /**
+     * What conditions may read about {@code player}: permissions, and the world
+     * and position the player last ticked in (readable off the world thread; the
+     * confirmation re-reads them, and a move in between makes it stale).
+     */
+    private ConditionRules.Context conditionContext(PlayerRef player) {
+        String world = core.platform().worldNameOf(player).orElse(null);
+        double x = 0;
+        double y = 0;
+        double z = 0;
+        boolean known = false;
+        try {
+            var position = player.getTransform().getPosition();
+            x = position.x();
+            y = position.y();
+            z = position.z();
+            known = world != null;
+        } catch (RuntimeException e) {
+            // Unknown position: REGION conditions answer UNAVAILABLE and fail closed.
+        }
+        return new ConditionRules.Context(player.getUuid(), player::hasPermission, world, x, y, z, known,
+                System.currentTimeMillis());
+    }
+
+    /**
+     * Whether the live revision's time-limited odds are over (P3-WP5): the
+     * schedule sweep reverts or closes the pool within a minute, and until then
+     * nobody opens on odds that ended.
+     */
+    private boolean ended(LootBoxRevision revision) {
+        LootBoxRevision.State state = registry.state(revision.lootboxId).orElse(null);
+        return state != null && state.activeRevision == revision.revision && state.endsAt > 0
+                && System.currentTimeMillis() >= state.endsAt;
     }
 
     private long cooldownRemaining(PlayerLootState state, LootBoxRevision revision) {
@@ -181,12 +254,71 @@ public final class OpeningService {
     public CompletableFuture<OpenResult> open(PlayerRef player, String lootboxId, String snapshotHash,
             String requestId) {
         UUID uuid = player.getUuid();
-        return lanes.run(uuid, () -> openInLane(player, lootboxId, snapshotHash, requestId))
+        LootBoxRevision live = registry.active(lootboxId).orElse(null);
+        boolean networked = live != null && NetworkRules.isNetwork(live.spec);
+        return lanes.run(uuid, () -> networked ? openOnNetwork(player, lootboxId, snapshotHash, requestId)
+                : openInLane(player, lootboxId, snapshotHash, requestId))
                 .exceptionally(error -> {
                     core.log(Level.SEVERE, "[lootbox] opening of " + lootboxId + " by " + player.getUsername()
                             + " failed: " + error);
                     return OpenResult.of(Status.ERROR, "Something went wrong; nothing was spent.");
                 });
+    }
+
+    /**
+     * A NETWORK pool (P4-WP2/WP3): the whole opening runs under the player's
+     * network lock, with every write fenced, after checking that this server's
+     * revision is still the one in the shared store. Fails closed: when the lock
+     * or the shared store is unavailable, nothing is read for spending.
+     */
+    private CompletableFuture<OpenResult> openOnNetwork(PlayerRef player, String lootboxId, String snapshotHash,
+            String requestId) {
+        NetworkAuthority authority = network;
+        if (authority == null) {
+            return done(Status.CLOSED, "Network loot boxes are unavailable on this server; nothing was spent.");
+        }
+        return authority.withLease(player.getUuid(), lease -> sharedRevisionChanged(lootboxId)
+                .thenCompose(changed -> changed
+                        ? done(Status.STALE, "The odds changed on another server. Check them and confirm again.")
+                        : openInLane(player, lootboxId, snapshotHash, requestId)))
+                .exceptionally(error -> {
+                    NetworkAuthority.Unavailable unavailable = NetworkAuthority.unavailableIn(error);
+                    if (unavailable != null) {
+                        audit.counter("NETWORK_CLOSED").incrementAndGet();
+                        return OpenResult.of(Status.CLOSED, "Network loot boxes are unavailable right now ("
+                                + unavailable.getMessage() + "); nothing was spent.");
+                    }
+                    if (NetworkRules.fencedOut(error)) {
+                        audit.counter("FENCED_OUT").incrementAndGet();
+                        core.log(Level.WARNING, "[lootbox] an opening of " + lootboxId + " by "
+                                + player.getUsername() + " was fenced out: another server took over.");
+                        return OpenResult.of(Status.ERROR, "Another server took over this opening; "
+                                + "/lootbox history shows what happened.");
+                    }
+                    throw error instanceof CompletionException completion ? completion
+                            : new CompletionException(error);
+                });
+    }
+
+    /**
+     * Commit-time check of a NETWORK pool against the shared store (P4-WP3):
+     * true, after refreshing the caches, when another server published,
+     * rolled back or closed it since this server cached it.
+     */
+    private CompletableFuture<Boolean> sharedRevisionChanged(String lootboxId) {
+        LootBoxRevision local = registry.active(lootboxId).orElse(null);
+        return storage.loadState(lootboxId).thenCompose(state -> {
+            if (local == null || state == null || state.activeRevision != local.revision
+                    || state.disabled != registry.isDisabled(lootboxId)) {
+                return registry.refreshPool(lootboxId).thenApply(ignored -> true);
+            }
+            return storage.loadRevision(lootboxId, state.activeRevision).thenCompose(shared -> {
+                if (shared != null && Objects.equals(shared.contentHash, local.contentHash)) {
+                    return CompletableFuture.completedFuture(false);
+                }
+                return registry.refreshPool(lootboxId).thenApply(ignored -> true);
+            });
+        });
     }
 
     private CompletableFuture<OpenResult> openInLane(PlayerRef player, String lootboxId, String snapshotHash,
@@ -213,6 +345,9 @@ public final class OpeningService {
             if (revision == null || registry.isDisabled(lootboxId) || "DISABLED".equals(policyProfile())) {
                 return done(Status.CLOSED, "This loot box is closed right now.");
             }
+            if (ended(revision)) {
+                return done(Status.CLOSED, "These time-limited odds have ended.");
+            }
             String node = revision.spec.permission;
             if (node != null && !node.isBlank() && !player.hasPermission(node)) {
                 return done(Status.DENIED, "You don't have permission to open this.");
@@ -222,10 +357,13 @@ public final class OpeningService {
                 return done(Status.COOLDOWN, "You can open this again in "
                         + TimeUnit.MILLISECONDS.toSeconds(wait + 999) + "s.");
             }
-            OddsTable table = OddsEngine.table(revision, policyProfile());
+            OddsTable table = personalTable(player, revision, state);
             if (!OpeningRules.snapshotCurrent(snapshotHash, table)) {
                 audit.counter("STALE").incrementAndGet();
                 return done(Status.STALE, "The odds changed while you were looking. Check them and confirm again.");
+            }
+            if (table.blocked() != null) {
+                return done(Status.DENIED, table.blocked());
             }
             OpeningRequestedEvent requested = core.getEventBus().publish(
                     new OpeningRequestedEvent(uuid, lootboxId, revision.revision, confirm.crateId()));
@@ -265,8 +403,9 @@ public final class OpeningService {
     /** Draws the outcome and records the opening as PREPARED before any key is touched. */
     private CompletableFuture<Opening> prepare(PlayerRef player, LootBoxRevision revision, OddsTable table,
             String requestId, String crateId) {
-        long roll = draw.roll(table.total());
-        OddsTable.Entry entry = table.pick(roll);
+        OddsEngine.Draw drawn = OddsEngine.draw(table, draw);
+        long roll = drawn.roll();
+        OddsTable.Entry entry = drawn.entry();
         LootBoxDraft.RewardSpec reward = revision.spec.rewards.get(entry.index());
         Opening opening = new Opening();
         opening.openingId = draw.id();
@@ -284,10 +423,25 @@ public final class OpeningService {
         opening.probability = formatter.percent(entry.weight(), table.total());
         opening.crateId = crateId;
         opening.createdAt = System.currentTimeMillis();
-        Opening.Fulfillment action = new Opening.Fulfillment();
-        action.id = opening.openingId + "#0";
-        action.type = reward.type == null ? "" : reward.type.toUpperCase(Locale.ROOT);
-        opening.fulfillments.add(action);
+        RewardActions.plan(opening, reward, null);
+        for (OddsEngine.BonusResult bonus : drawn.bonus()) {
+            Opening.BonusDraw record = new Opening.BonusDraw();
+            record.rollId = bonus.table().rollId();
+            record.label = bonus.table().label();
+            record.roll = bonus.roll();
+            record.total = bonus.table().total();
+            if (bonus.entry() != null) {
+                LootBoxDraft.RewardSpec won = revision.spec.bonusRolls().get(bonus.table().rollIndex()).rewards
+                        .get(bonus.entry().index());
+                record.outcomeId = won.id;
+                record.outcomeName = won.name;
+                record.probability = formatter.percent(bonus.entry().weight(), bonus.table().total());
+                RewardActions.plan(opening, won, record.rollId);
+            } else if (bonus.table().total() > 0) {
+                record.probability = formatter.percent(bonus.table().none(), bonus.table().total());
+            }
+            opening.bonus.add(record);
+        }
         audit.record(player.getUuid().toString(), "OPEN_REQUEST", opening.openingId,
                 revision.lootboxId + "@" + revision.revision + " odds " + table.oddsId());
         return storage.saveOpening(opening).thenCompose(saved -> storage.updatePlayer(player.getUuid(), state -> {
@@ -303,7 +457,8 @@ public final class OpeningService {
         AtomicBoolean committed = new AtomicBoolean();
         return storage.updatePlayer(player.getUuid(), state -> {
             OpeningRules.Debit debit = OpeningRules.spendVirtual(state, keyId, opening, revision.spec.displayName,
-                    config.opening.historySize, System.currentTimeMillis());
+                    config.opening.historySize, System.currentTimeMillis(),
+                    EligibilityRules.effects(revision.spec, opening));
             committed.set(debit != OpeningRules.Debit.NO_KEY);
             return debit == OpeningRules.Debit.ALREADY_COMMITTED ? null : state;
         }).thenCompose(state -> committed.get()
@@ -470,7 +625,7 @@ public final class OpeningService {
     /** Appends the commit record, receipt and bookkeeping to the player document (caller holds the update). */
     private void recordCommit(PlayerLootState state, Opening opening, LootBoxRevision revision) {
         OpeningRules.recordCommit(state, opening, revision.spec.displayName, config.opening.historySize,
-                System.currentTimeMillis());
+                System.currentTimeMillis(), EligibilityRules.effects(revision.spec, opening));
     }
 
     private CompletableFuture<OpenResult> finishCommit(PlayerRef player, Opening opening, LootBoxRevision revision,
@@ -485,13 +640,20 @@ public final class OpeningService {
                     + (opening.keySerial == null ? "" : " " + opening.keySerial));
             core.getEventBus().publish(new OpeningCommittedEvent(opening.openingId, player.getUuid(),
                     opening.lootboxId, opening.revision, opening.outcomeId, opening.probability, table.oddsId()));
-            CompletableFuture<RewardService.Status> delivery = rewards.deliver(opening, reward, false)
+            CompletableFuture<RewardService.Status> delivery = rewards.deliver(opening, revision, false)
                     .exceptionally(error -> {
                         rewards.logFailure(opening, error);
                         return RewardService.Status.REVIEW;
                     });
             if (reward.announce) {
                 delivery.thenRun(() -> announce(player, revision, reward));
+            }
+            for (Opening.BonusDraw bonus : opening.bonus) {
+                LootBoxDraft.RewardSpec won = bonus.outcomeId == null ? null
+                        : RewardActions.find(revision.spec, bonus.outcomeId, bonus.rollId);
+                if (won != null && won.announce) {
+                    delivery.thenRun(() -> announce(player, revision, won));
+                }
             }
             return new OpenResult(Status.COMMITTED, null, opening, revision, table, entry, delivery);
         });
@@ -580,15 +742,33 @@ public final class OpeningService {
      */
     public CompletableFuture<Void> recover(PlayerRef player) {
         UUID uuid = player.getUuid();
-        return lanes.run(uuid, () -> storage.loadPlayer(uuid).thenCompose(state -> {
+        NetworkAuthority authority = network;
+        boolean networked = authority != null && authority.enabled();
+        return lanes.run(uuid, () -> networked
+                // On a network, recovery decides the fate of openings another server may have
+                // started: it runs under the player's lock, fenced, or not at all (P4-WP2).
+                ? authority.withLease(uuid, lease -> recoverInLane(player))
+                : recoverInLane(player)).exceptionally(error -> {
+                    NetworkAuthority.Unavailable unavailable = NetworkAuthority.unavailableIn(error);
+                    if (unavailable != null) {
+                        core.log(Level.FINE, "[lootbox] recovery for " + player.getUsername()
+                                + " postponed: " + unavailable.getMessage());
+                    } else {
+                        core.log(Level.WARNING, "[lootbox] recovery for " + player.getUsername() + " failed: "
+                                + error);
+                    }
+                    return null;
+                });
+    }
+
+    private CompletableFuture<Void> recoverInLane(PlayerRef player) {
+        UUID uuid = player.getUuid();
+        return storage.loadPlayer(uuid).thenCompose(state -> {
             CompletableFuture<Void> active = state.activeOpening == null ? CompletableFuture.completedFuture(null)
                     : storage.loadOpening(state.activeOpening).thenCompose(opening -> recoverActive(player, opening,
                             state.activeOpening));
             return active.thenCompose(ignored -> storage.loadPlayer(uuid)).thenCompose(this::resumeDeliveries)
                     .thenCompose(ignored -> keys.conversions().recoverInLane(player));
-        })).exceptionally(error -> {
-            core.log(Level.WARNING, "[lootbox] recovery for " + player.getUsername() + " failed: " + error);
-            return null;
         });
     }
 
@@ -713,11 +893,10 @@ public final class OpeningService {
                         return CompletableFuture.completedFuture(null);
                     }
                     return revisionOf(opening).thenCompose(revision -> {
-                        LootBoxDraft.RewardSpec reward = rewardOf(revision, opening.outcomeId).orElse(null);
-                        if (reward == null) {
+                        if (revision == null) {
                             return CompletableFuture.completedFuture(null);
                         }
-                        return rewards.deliver(opening, reward, false).thenApply(status -> (Void) null);
+                        return rewards.deliver(opening, revision, false).thenApply(status -> (Void) null);
                     });
                 });
             });
@@ -767,11 +946,10 @@ public final class OpeningService {
                         })).thenApply(state -> CompletableFuture.completedFuture("dismissed"));
             }
             return revisionOf(opening).thenApply(revision -> {
-                LootBoxDraft.RewardSpec reward = rewardOf(revision, opening.outcomeId).orElse(null);
-                if (reward == null) {
+                if (rewardOf(revision, opening.outcomeId).isEmpty()) {
                     return CompletableFuture.completedFuture("its revision or reward is gone");
                 }
-                return rewards.deliver(opening, reward, true).thenApply(status -> status.label());
+                return rewards.deliver(opening, revision, true).thenApply(status -> status.label());
             });
         });
     }

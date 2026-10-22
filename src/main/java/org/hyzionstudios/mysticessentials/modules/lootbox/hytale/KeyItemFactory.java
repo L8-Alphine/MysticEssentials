@@ -40,7 +40,8 @@ public final class KeyItemFactory {
         Message name = MysticText.parse(spec.name == null ? spec.id : spec.name);
         Message description = spec.lore == null || spec.lore.isEmpty() ? null
                 : MysticText.parse(String.join("\n", spec.lore));
-        return new ItemStack(spec.baseItemId, Math.max(1, quantity))
+        // The native item when one is loaded (P3-WP8), else the base item; either way the marker decides.
+        return new ItemStack(NativeKeyItems.itemFor(definition), Math.max(1, quantity))
                 .withMetadata(ItemDisplayMetadata.KEYED_CODEC, new ItemDisplayMetadata(name, description))
                 .withMetadata(KeyMarker.METADATA_KEY, toBson(marker));
     }

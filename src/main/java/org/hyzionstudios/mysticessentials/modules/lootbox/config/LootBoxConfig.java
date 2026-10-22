@@ -40,6 +40,10 @@ public final class LootBoxConfig {
     public Simulation simulation = new Simulation();
     public Display display = new Display();
     public Audit audit = new Audit();
+    public Integrations integrations = new Integrations();
+    public Network network = new Network();
+    public Stats stats = new Stats();
+    public Retention retention = new Retention();
 
     public static final class Command {
         public String name = "lootbox";
@@ -82,6 +86,15 @@ public final class LootBoxConfig {
          * ({@code /lootbox key deposit}) and back ({@code /lootbox key withdraw}).
          */
         public boolean allowConversion = true;
+        /**
+         * Hand out keys with {@code identityMode: REGISTERED_CUSTOM_ASSET} as their own
+         * generated Item ({@code MysticLootBox_...}, a child of the base item) in
+         * mods/MysticEssentialsGenerated/. UNVERIFIED in game: spike S1 (does the client
+         * render an Item registered mid-session, and keep it after a restart?) has not
+         * been run, so this is off and such keys use their base item. Generated key
+         * items are never deleted automatically: key items in inventories use them.
+         */
+        public boolean nativeKeyItems = false;
     }
 
     public static final class Crates {
@@ -154,6 +167,90 @@ public final class LootBoxConfig {
     }
 
     public static final class Audit {
+        /** Raised to 365 days under PAID_RANDOM_RESTRICTED, whatever is set here. */
         public int retentionDays = 400;
+    }
+
+    /** Observed against theoretical odds (P4-WP4, {@code /lootbox stats}). */
+    public static final class Stats {
+        public boolean enabled = true;
+        /** Days of counts {@code /lootbox stats} and the anomaly check add up. */
+        public int windowDays = 7;
+        /** A reward is an anomaly at this |z| or beyond... */
+        public double zLimit = 4.0;
+        /** ...and only once at least this many wins were expected. */
+        public double minExpected = 20.0;
+        /** A win is rare at this base chance (percent) or below. */
+        public double rarePercent = 1.0;
+        /** A player's rare wins are tested once they opened a pool this many times on base odds... */
+        public int luckMinOpenings = 30;
+        /** ...and flagged to staff ({@code OpeningFlagged}) at this z-score or beyond. */
+        public double luckZ = 4.5;
+    }
+
+    /** How long LootBox keeps records (P4-WP5). Raised to 365 days under PAID_RANDOM_RESTRICTED. */
+    public static final class Retention {
+        /** Settled openings (delivered or aborted); unsettled ones are never swept. */
+        public int openingsDays = 400;
+        /** Daily statistics buckets. */
+        public int statsDays = 400;
+    }
+
+    /**
+     * Several servers sharing LootBox (P4). Needs the MySQL/MariaDB storage provider
+     * shared by every server, Redis, and the same {@code secret.key} on every server.
+     * Pools with {@code "scope": "NETWORK"} then open under a per-player Redis lock
+     * with a fencing token; while any of that is unreachable they refuse to open
+     * (nothing is spent). LOCAL pools are unaffected.
+     */
+    public static final class Network {
+        public boolean enabled = false;
+        /** How long a player's network lock lives without renewal. */
+        public long lockTtlSeconds = 30L;
+        /** How often a held lock is renewed (well under the TTL). */
+        public long renewSeconds = 10L;
+        /** How long an opening waits for another server to release the player's lock. */
+        public long acquireTimeoutMs = 3000L;
+        /** Pause between attempts to take a held lock. */
+        public long retryMs = 50L;
+    }
+
+    /**
+     * Mystic plugins LootBox works with (P3-WP7). Each is optional and found by
+     * class presence; a switch here only stops LootBox from using one that is
+     * installed. A pool that names a provider which is off or missing is invalid:
+     * nothing stands in for it.
+     */
+    public static final class Integrations {
+        /** ECONOMY rewards with {@code "provider": "mysticeconomy"}. */
+        public boolean mysticEconomy = true;
+        /** Ledger entries searched when reconciling an interrupted MysticEconomy deposit. */
+        public int economyReconcileDepth = 200;
+        /** The {@code QUEST_COMPLETED} condition and the {@code mysticessentials:lootbox_key} quest event. */
+        public boolean mysticQuests = true;
+        /** {@code RPG_LEVEL}, {@code RPG_CLASS} and the {@code mysticrpg} reward provider (pending a 0.7 MysticRPG). */
+        public boolean mysticRpg = true;
+        /** Forward {@code OpeningFlagged} to MysticModeration as reports (or notes). */
+        public boolean mysticModeration = true;
+        /** At most one forwarded flag per player and pool in this many minutes. */
+        public long flagCooldownMinutes = 10L;
+        /** The built-in COSMETIC provider {@code permission} (needs LuckPerms). */
+        public boolean permissionCosmetics = true;
+        /** {@code lootbox_keys}, {@code lootbox_keys_<ns>_<name>} and {@code lootbox_pending} placeholders. */
+        public boolean placeholders = true;
+        public Identity identity = new Identity();
+    }
+
+    /**
+     * {@code PAID} key grants under {@code PAID_RANDOM_RESTRICTED} need MysticIdentity
+     * to confirm the account is not a managed (child) account. Fails closed.
+     */
+    public static final class Identity {
+        /**
+         * Also require an explicit adult signal. MysticIdentity has none yet, so while
+         * this is true every paid grant is refused. Only turn it off on a server that
+         * verifies ages another way and may legally sell random items.
+         */
+        public boolean requireAgeSignal = true;
     }
 }

@@ -189,6 +189,11 @@ public final class RewardsTab {
         if (ctx.mayCommand() || COMMAND_TYPE.equals(type)) {
             types.add(entry("Console command", COMMAND_TYPE));
         }
+        // Phase 3 types (bundles, provider rewards) are authored in the draft JSON;
+        // a reward that already is one keeps showing its type here.
+        if (PHASE_THREE_TYPES.contains(type)) {
+            types.add(entry(type.charAt(0) + type.substring(1).toLowerCase(Locale.ROOT) + " (edit in JSON)", type));
+        }
         cmd.set("#RewardTypeInput.Entries", types);
         cmd.set("#RewardTypeInput.Value", type);
         event.addEventBinding(CustomUIEventBindingType.ValueChanged, "#RewardTypeInput",
@@ -487,10 +492,20 @@ public final class RewardsTab {
         return target;
     }
 
+    /** Reward types the editor shows but doesn't author: they are set up in the draft JSON (P3). */
+    static final java.util.Set<String> PHASE_THREE_TYPES = java.util.Set.of("BUNDLE", "EXTENSION", "COSMETIC", "RPG");
+
     /** Sets {@code type} and clears the other types' fields, so a revision never carries a stale command or node. */
     public static void setType(LootBoxDraft.RewardSpec reward, String type) {
         String next = type == null ? ITEM : type.toUpperCase(Locale.ROOT);
         reward.type = next;
+        if (!"BUNDLE".equals(next)) {
+            reward.bundle = null;
+        }
+        if (!PHASE_THREE_TYPES.contains(next) && !ECONOMY.equals(next)) {
+            reward.provider = null;
+            reward.params = null;
+        }
         if (ITEM.equals(next)) {
             if (reward.item == null) {
                 reward.item = new LootBoxDraft.ItemSpec();

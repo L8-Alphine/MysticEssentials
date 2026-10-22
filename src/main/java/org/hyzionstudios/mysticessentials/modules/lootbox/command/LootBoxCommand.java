@@ -8,6 +8,7 @@ import java.util.function.BiConsumer;
 
 import org.hyzionstudios.mysticessentials.api.Permissions;
 import org.hyzionstudios.mysticessentials.core.MysticCore;
+import org.hyzionstudios.mysticessentials.core.message.MysticText;
 import org.hyzionstudios.mysticessentials.modules.lootbox.LootBoxModule;
 import org.hyzionstudios.mysticessentials.modules.lootbox.api.GrantSource;
 import org.hyzionstudios.mysticessentials.modules.lootbox.hytale.BlockTargets;
@@ -15,8 +16,10 @@ import org.hyzionstudios.mysticessentials.modules.lootbox.hytale.CrateVisuals;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.CrateInstance;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.KeySerial;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.LootBoxRevision;
+import org.hyzionstudios.mysticessentials.modules.lootbox.odds.ItemChance;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.CrateService;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.MotionRules;
+import org.hyzionstudios.mysticessentials.modules.lootbox.service.ScheduleRules;
 import org.hyzionstudios.mysticessentials.modules.lootbox.ui.editor.CrateEditorPage;
 import org.hyzionstudios.mysticessentials.modules.lootbox.validate.DraftValidator;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommand;
@@ -33,7 +36,8 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
  *       {@code motion [reduced|full|default]};</li>
  *   <li>{@code key give|revoke|info|list|publish|grants …}; players' {@code key deposit} and
  *       {@code key withdraw <keyId> [count]};</li>
- *   <li>{@code publish|rollback|disable|enable …}; {@code simulate <id> [draws]};</li>
+ *   <li>{@code publish|rollback|disable|enable …}; {@code simulate <id> [draws]};
+ *       {@code chance <id> <itemId>}; {@code providers}; {@code stats <id> [revision] [days]};</li>
  *   <li>{@code crate select|convert|edit|rebind|remove|info|verify|enable …};</li>
  *   <li>{@code crate effects [on|off]} for players;</li>
  *   <li>{@code reconcile <openingId> regrant|dismiss}; {@code admin}; {@code audit}; {@code reload}.</li>
@@ -44,7 +48,7 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 public final class LootBoxCommand extends MysticCommand {
 
     private static final String USAGE =
-            "/lootbox [preview <id>|history|pending|motion|key …|publish <id>|crate …|admin|audit]";
+            "/lootbox [preview <id>|history|pending|motion|key …|publish <id>|crate …|stats <id>|admin|audit]";
 
     private final LootBoxModule module;
 
@@ -73,6 +77,10 @@ public final class LootBoxCommand extends MysticCommand {
             case "rollback" -> rollback(sender, args);
             case "disable", "enable" -> toggle(sender, args, "disable".equals(sub));
             case "simulate" -> simulate(sender, args);
+            case "chance" -> chance(sender, args);
+            case "schedule" -> schedule(sender, args);
+            case "providers" -> providers(sender);
+            case "stats" -> stats(sender, args);
             case "crate", "crates" -> crate(sender, args);
             case "reconcile" -> reconcile(sender, args);
             case "admin" -> {
@@ -183,7 +191,7 @@ public final class LootBoxCommand extends MysticCommand {
                 }
                 sender.reply("&d&lPublished keys &7(" + module.registry().keys().size() + ")");
                 module.registry().keys().forEach(key -> sender.reply("&7- &f" + key.spec.id + " &8v" + key.version
-                        + " &7base &f" + key.spec.baseItemId + " &7uses &f" + key.spec.uses));
+                        + " &7base &f" + key.spec.baseItemId + " &7uses &f" + key.spec.uses + nativeItem(key)));
             }
             case "publish" -> {
                 if (!allowed(sender, Permissions.LOOTBOX_PUBLISH)) {
@@ -316,6 +324,22 @@ public final class LootBoxCommand extends MysticCommand {
         }
     }
 
+    /** The native item part of a key line (P3-WP8): reported only once the asset is loaded (LB-006). */
+    private String nativeItem(org.hyzionstudios.mysticessentials.modules.lootbox.model.KeyDraft.Published key) {
+        if (!org.hyzionstudios.mysticessentials.modules.lootbox.service.NativeKeyRules.wantsNative(key.spec)) {
+            return "";
+        }
+        if (!module.config().keys.nativeKeyItems) {
+            return " &8(native item off: keys.nativeKeyItems)";
+        }
+        String id = org.hyzionstudios.mysticessentials.modules.lootbox.hytale.NativeKeyItems.customItemId(key.spec.id);
+        if (id != null) {
+            return " &7native &f" + id;
+        }
+        String problem = org.hyzionstudios.mysticessentials.modules.lootbox.hytale.NativeKeyItems.problem(key.spec.id);
+        return " &c(no native item" + (problem == null ? " yet" : ": " + MysticText.stripMarkup(problem)) + ")";
+    }
+
     private static String describeBatch(org.hyzionstudios.mysticessentials.modules.lootbox.model.KeyBatch batch,
             String id) {
         if (batch == null) {
@@ -363,7 +387,7 @@ public final class LootBoxCommand extends MysticCommand {
             return;
         }
         if (args.length < 3) {
-            usage(sender, "/lootbox rollback <id> <revision>");
+            usage(sender, "/lootbox rollback <id> <revision> [at <instant>]");
             return;
         }
         int revision;
@@ -374,6 +398,24 @@ public final class LootBoxCommand extends MysticCommand {
             return;
         }
         String id = args[1].toLowerCase(Locale.ROOT);
+        if (args.length >= 5 && "at".equalsIgnoreCase(args[3])) {
+            long at;
+            try {
+                at = ScheduleRules.instant(args[4]);
+            } catch (java.time.format.DateTimeParseException e) {
+                usage(sender, "/lootbox rollback <id> <revision> at <2026-12-31T23:59:59Z>");
+                return;
+            }
+            if (at <= System.currentTimeMillis()) {
+                sender.reply("&cThat time has already passed; leave out 'at' to roll back now.");
+                return;
+            }
+            module.registry().scheduleRollback(id, revision, at, sender.name()).thenAccept(ok -> sender.reply(ok
+                    ? "&aRevision &f" + revision + " &aof &f" + id + " &areturns &f" + ScheduleRules.shown(at)
+                            + "&a. Players see the date in the preview."
+                    : "&c" + id + " has no revision " + revision + "."));
+            return;
+        }
         module.registry().rollback(id, revision, sender.name()).thenAccept(result -> sender.reply(result.ok()
                 ? "&aRepublished revision &f" + revision + " &aof &f" + id + " &aas revision &f" + result.revision()
                         + " &7(odds " + result.hash() + ")"
@@ -392,6 +434,157 @@ public final class LootBoxCommand extends MysticCommand {
         module.registry().setDisabled(id, disable, sender.name()).thenAccept(changed -> sender.reply(changed
                 ? (disable ? "&e" + id + " is now closed." : "&a" + id + " is open again.")
                 : "&c" + id + " has never been published."));
+    }
+
+    /**
+     * {@code /lootbox chance <id> <itemId>} (P3-WP6): the exact chance that one
+     * opening gives at least one {@code itemId}, through the main reward, a bundle
+     * or a bonus roll. A player gets their own odds; the console the published ones.
+     */
+    private void chance(MysticCommandSender sender, String[] args) {
+        if (args.length < 3) {
+            usage(sender, "/lootbox chance <id> <itemId>");
+            return;
+        }
+        LootBoxRevision revision = module.registry().active(args[1].toLowerCase(Locale.ROOT)).orElse(null);
+        if (revision == null) {
+            sender.replyKey("lootbox-unknown-pool", Map.of("pool", args[1]));
+            return;
+        }
+        String itemId = args[2];
+        PlayerRef viewer = sender.player().orElse(null);
+        module.opening().tableFor(viewer, revision).thenAccept(table -> {
+            ItemChance.Chance chance = ItemChance.of(table, revision, ItemChance.containsItem(itemId));
+            var formatter = module.opening().formatter();
+            String shown = chance.isZero() ? "not possible" : formatter.percent(chance.numerator(),
+                    chance.denominator()) + " (" + formatter.oneIn(chance.numerator(), chance.denominator()) + ")";
+            sender.reply("&7Chance of getting &f" + itemId + " &7from one opening of &f"
+                    + MysticText.stripMarkup(revision.spec.displayName) + "&7: &6" + shown + " &8(odds "
+                    + table.oddsId() + (viewer == null ? ", published odds" : ", your odds") + ")");
+        });
+    }
+
+    /**
+     * {@code /lootbox schedule <id> [cancel]} (P3-WP5): shows what is scheduled
+     * for a pool (a revision waiting for its start, the end of time-limited odds,
+     * a scheduled rollback), or cancels the scheduled revision and rollback.
+     */
+    private void schedule(MysticCommandSender sender, String[] args) {
+        if (!allowed(sender, Permissions.LOOTBOX_PUBLISH)) {
+            return;
+        }
+        if (args.length < 2) {
+            usage(sender, "/lootbox schedule <id> [cancel]");
+            return;
+        }
+        String id = args[1].toLowerCase(Locale.ROOT);
+        if (args.length >= 3 && "cancel".equalsIgnoreCase(args[2])) {
+            module.registry().cancelSchedule(id, sender.name()).thenAccept(ok -> sender.reply(ok
+                    ? "&aCancelled the scheduled revision and rollback of &f" + id + "&a. Live odds and their end stay."
+                    : "&cNo published pool called " + id + "."));
+            return;
+        }
+        LootBoxRevision.State state = module.registry().state(id).orElse(null);
+        if (state == null) {
+            sender.replyKey("lootbox-unknown-pool", Map.of("pool", id));
+            return;
+        }
+        String banner = ScheduleRules.banner(state, System.currentTimeMillis());
+        sender.reply("&d" + id + " &7live revision &f" + state.activeRevision + "&7: "
+                + (banner == null ? "nothing scheduled." : banner));
+    }
+
+    /**
+     * {@code /lootbox providers}: the reward and condition providers other plugins
+     * registered (P3-WP1), and every published pool that can't be opened because
+     * one it needs is missing.
+     */
+    private void providers(MysticCommandSender sender) {
+        if (!allowed(sender, Permissions.LOOTBOX_ADMIN)) {
+            return;
+        }
+        var integrations = module.integrations();
+        sender.reply("&d&lLootBox providers");
+        integrations.rewardProviders().forEach(provider -> sender.reply("&7- reward &f" + provider.id() + " &8("
+                + provider.kind() + ", " + provider.guarantee() + ")"));
+        integrations.conditionProviders().forEach(provider -> sender.reply("&7- condition &f" + provider.type()));
+        int invalid = 0;
+        for (LootBoxRevision revision : module.registry().publishedPools()) {
+            java.util.List<String> missing = integrations.missing(revision.spec);
+            if (!missing.isEmpty()) {
+                invalid++;
+                sender.reply("&c" + revision.lootboxId + " &7can't be opened: missing " + String.join(", ", missing));
+            }
+        }
+        if (invalid == 0) {
+            sender.reply("&aEvery published pool has the providers it needs.");
+        }
+        if (module.bridges() != null) {
+            sender.reply("&d&lMystic integrations");
+            module.bridges().status().forEach(line -> sender.reply("&7- " + MysticText.stripMarkup(line)));
+        }
+    }
+
+    /**
+     * {@code /lootbox stats <id> [revision] [days]} (P4-WP4): observed against
+     * theoretical over the last days of committed openings on base odds, with a
+     * binomial z per reward. Openings on personalised odds are counted apart.
+     */
+    private void stats(MysticCommandSender sender, String[] args) {
+        if (!allowed(sender, Permissions.LOOTBOX_AUDIT)) {
+            return;
+        }
+        if (args.length < 2) {
+            usage(sender, "/lootbox stats <id> [revision] [days]");
+            return;
+        }
+        if (module.stats() == null) {
+            sender.reply("&cLootBox is disabled.");
+            return;
+        }
+        String id = args[1].toLowerCase(Locale.ROOT);
+        int revision = 0;
+        int days = module.config().stats.windowDays;
+        try {
+            if (args.length >= 3) {
+                revision = Integer.parseInt(args[2]);
+            }
+            if (args.length >= 4) {
+                days = Integer.parseInt(args[3]);
+            }
+        } catch (NumberFormatException e) {
+            usage(sender, "/lootbox stats <id> [revision] [days]");
+            return;
+        }
+        if (revision < 0 || days < 1 || days > 366) {
+            usage(sender, "/lootbox stats <id> [revision] [days 1-366]");
+            return;
+        }
+        module.stats().report(id, revision, days, System.currentTimeMillis()).whenComplete((report, error) -> {
+            if (error != null || report == null) {
+                sender.reply(error == null ? "&cNo such pool or revision: &f" + id
+                        : "&cThe statistics could not be read; see the server log.");
+                return;
+            }
+            sender.reply("&d&l" + MysticText.stripMarkup(report.revision().spec.displayName == null ? id
+                    : report.revision().spec.displayName) + " &7revision &f" + report.revision().revision
+                    + " &7odds &f" + report.oddsId() + " &7last &f" + report.days() + "d");
+            sender.reply("&7Base-odds openings: &f" + report.total() + " &8(personalised, not compared: "
+                    + report.personal() + ")");
+            var formatter = module.opening().formatter();
+            for (var row : report.rows()) {
+                sender.reply((row.anomaly() ? "&c! " : "&7- ") + "&f" + MysticText.stripMarkup(row.name())
+                        + " &7chance &f" + formatter.percent(row.weight(), row.tableTotal()) + " &7seen &f" + row.count()
+                        + " &8(expected " + String.format(Locale.ROOT, "%.1f", row.expected()) + ", z "
+                        + String.format(Locale.ROOT, "%+.2f", row.z()) + ")");
+            }
+            if (report.anomaly()) {
+                sender.reply("&cAt least one reward is far from its published chance. Check the pool and the "
+                        + "audit history before trusting it.");
+            } else if (report.total() > 0) {
+                sender.reply("&aObserved results are consistent with the published odds.");
+            }
+        });
     }
 
     private void simulate(MysticCommandSender sender, String[] args) {

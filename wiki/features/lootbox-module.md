@@ -57,6 +57,11 @@ reward, chance and delivery status.
 | `/lootbox key publish <keyId>` | Publish a key draft | `mysticessentials.lootbox.publish` |
 | `/lootbox publish <pool>` | Publish a pool draft as a new revision | `mysticessentials.lootbox.publish` |
 | `/lootbox rollback <pool> <revision>` | Republish an older revision as a new one | `mysticessentials.lootbox.publish` |
+| `/lootbox rollback <pool> <revision> at <instant>` | Schedule that rollback for an ISO-8601 time, e.g. `2026-12-31T23:00:00Z` | `mysticessentials.lootbox.publish` |
+| `/lootbox schedule <pool> [cancel]` | Show (or cancel) a pool's scheduled revision, end of time-limited odds and scheduled rollback | `mysticessentials.lootbox.publish` |
+| `/lootbox chance <pool> <itemId>` | Your exact chance of getting an item from one opening, over every path (main roll, bundles, bonus rolls) | `mysticessentials.lootbox.use` |
+| `/lootbox providers` | Registered reward and condition providers, Mystic integrations, and published pools missing one | `mysticessentials.lootbox.admin` |
+| `/lootbox stats <pool> [revision] [days]` | Observed results against the published chances, with a z-score per reward | `mysticessentials.lootbox.audit` |
 | `/lootbox disable <pool>` / `enable <pool>` | Close or reopen a pool | `mysticessentials.lootbox.admin` |
 | `/lootbox simulate <pool> [draws]` | Draw many times without awarding anything | `mysticessentials.lootbox.simulate` |
 | `/lootbox crate select` | Show the block you are looking at | `mysticessentials.lootbox.crates.place` |
@@ -311,6 +316,92 @@ folder, and make sure `DefaultModsEnabled` allows it to load at boot.
 - Draws use `SecureRandom`; `/lootbox simulate` shows expected against observed
   rates without awarding anything.
 
+## Advanced pools
+
+Optional fields of a pool draft. Left out, a pool behaves (and hashes) exactly as
+before, so published pools don't ask to be republished.
+
+| Field | Meaning |
+| --- | --- |
+| reward `type: BUNDLE`, `bundle: [...]` | One outcome that delivers up to 16 actions together; the preview lists them |
+| `bonusRolls: [{id, label, mode, noneWeight\|nonePercent, rewards}]` | Up to 4 extra rolls with their own odds, shown as their own section ("10% chance of one extra cosmetic") |
+| `conditions: [{type, params, negate, label}]` (pool or reward) | `PERMISSION`, `WORLD`, `REGION`, `DATE_WINDOW`, or a provider's type such as `QUEST_COMPLETED`, `RPG_LEVEL`, `RPG_CLASS`. An answer the server can't give refuses the opening |
+| `ineligibleRewards: RENORMALIZE\|BLOCK` | Rewards a player isn't eligible for are dropped from that player's odds (shown as "Not available") or block the opening |
+| `pity: {targets, hardAfter, softAfter, softStepPercent}` | Guarantees: after `hardAfter` openings without a target, the next one is a target; soft pity raises the targets' weight step by step. The player's next-opening odds show it |
+| reward `duplicates: ALLOW\|EXCLUDE_OWNED` | Leave out rewards the player already owns (won from this pool, or reported by the provider). Required on COSMETIC rewards |
+| reward `type: EXTENSION\|COSMETIC\|RPG`, `provider`, `params` | Delivered by a registered provider. A missing provider makes the pool unopenable; nothing is ever substituted |
+| `startsAt`, `endsAt`, `afterEnd: REVERT\|CLOSE` | Scheduled and time-limited odds. Publishing before `startsAt` schedules the revision; at `endsAt` the earlier odds return or the pool closes. The preview shows the dates |
+| `scope: LOCAL\|NETWORK` | NETWORK pools open under the network lock (see [Network](#network)) |
+
+Every player sees their own "your next opening" odds before they confirm, with a
+plain-language note for pity, conditions and excluded duplicates. The confirmation
+is bound to that exact table.
+
+### Mystic integrations
+
+Each one is optional and found by class presence; none is a dependency. Switch one
+off under `integrations` in the config. `/lootbox providers` shows what was found.
+
+| Plugin | What LootBox does with it |
+| --- | --- |
+| MysticEconomy | ECONOMY rewards with `"provider": "mysticeconomy"` (`params.amount`, optional `currency`): a deposit from the server account. Each deposit carries its fulfillment id, and an interrupted one is looked up in the player's recent ledger; not found goes to staff review |
+| MysticQuests | Condition `QUEST_COMPLETED` (`params.quest: "main:intro"`), and the quest event `mysticessentials:lootbox_key` (`key`, `amount`, `virtual`) that grants keys with source QUEST |
+| MysticRPG | `RPG_LEVEL` (`min`, `max`), `RPG_CLASS` (`class`), and RPG rewards `"provider": "mysticrpg"` (`params.xp`). Registers nothing until MysticRPG ships for Hytale 0.7 |
+| MysticIdentity | PAID key grants under `PAID_RANDOM_RESTRICTED` need a known non-managed account, and (while `integrations.identity.requireAgeSignal` is on) an adult signal MysticIdentity doesn't provide yet, so they stay refused. Without MysticIdentity every PAID grant is refused |
+| MysticModeration | `OpeningFlagged` (forged or replayed keys, unusual luck) becomes a CHEAT report from "LootBox", or an investigation note; at most one per player and pool per `integrations.flagCooldownMinutes` |
+| LuckPerms | The COSMETIC provider `permission` (`params.node`, `params.name`): grants the node; a player who has it owns the cosmetic |
+| Placeholders | `{lootbox_keys}`, `{lootbox_keys_<namespace>_<name>}`, `{lootbox_pending}` (also `%mysticessentials_…%` with PlaceholderAPI). Virtual keys only; refreshed after grants, openings and claims |
+
+MysticGuilds has no membership API to ask yet, so there is no guild condition.
+MysticGeneration grants keys through the developer API.
+
+### Native key items
+
+A key with `"identityMode": "REGISTERED_CUSTOM_ASSET"` can be handed out as its own
+item, `MysticLootBox_<Namespace>_<Name>_<hash>`, a child of its base item generated
+into `mods/MysticEssentialsGenerated/`. Off by default (`keys.nativeKeyItems`):
+nobody has checked yet that a client shows an item registered while the server runs
+(spike S1). To check it: turn the switch on, publish such a key, give one to a
+player who is online, and look at the item; then restart and look again. Until the
+item is loaded the key uses its base item, and either way the signed marker is what
+makes it a key. `/lootbox key list` shows the native id only once it exists.
+
+## Network
+
+Several servers can share LootBox when they share the MySQL/MariaDB storage
+provider and Redis. Turn on `network.enabled` on every server and copy
+`secret.key` from the first server's LootBox data folder to the others.
+
+- Every read-modify-write runs as one SQL transaction holding the row lock, so two
+  servers can never both act on the same balance or serial.
+- A pool with `"scope": "NETWORK"` opens under a per-player Redis lock. Each lock
+  takes a fencing token from a shared counter, and the player's documents refuse
+  writes from an older token, so a server whose lock ran out mid-opening (a long
+  pause, a network split) can't spend or deliver after another took over.
+  Recovery of interrupted openings runs under the same lock.
+- Without the shared store, Redis or a matching secret, NETWORK pools refuse to
+  open and nothing is spent. LOCAL pools keep working.
+- Publishing, rolling back, closing a pool or publishing a key is announced to the
+  other servers, and a NETWORK opening re-checks the shared revision before it
+  spends; if it changed, the player is asked to look at the odds again.
+
+## Statistics and retention
+
+`/lootbox stats <pool>` compares what was drawn over the last `stats.windowDays`
+with the published chances, per reward, with a binomial z-score. Openings on
+personal odds (pity, conditions, duplicates) are counted apart, because their odds
+were different by design. Once an hour a pool whose results are far off
+(`stats.zLimit`, with at least `stats.minExpected` expected wins) is written to the
+audit log as `ODDS_ANOMALY`. A player whose rare wins are improbable
+(`stats.luckZ` after `stats.luckMinOpenings` openings) is flagged to staff as
+`OpeningFlagged`; nothing happens to the player automatically.
+
+Settled openings and statistics are swept after `retention.openingsDays` and
+`retention.statsDays`; an opening still delivering or under review is kept. Under
+`PAID_RANDOM_RESTRICTED` everything, the audit log included, is kept at least 365
+days. Audit exports replace player UUIDs with stable pseudonyms unless the exporter
+has `mysticessentials.lootbox.audit.identifiers`.
+
 ## Policy profile
 
 `policyProfile` controls how keys may be sourced:
@@ -360,7 +451,20 @@ modules/lootbox/config.json
 | `rewards.announceTemplate` | — | Broadcast for `announce` rewards; `{player}` `{reward}` `{pool}` |
 | `simulation.maxTrials` | `1000000` | Cap for `/lootbox simulate` and the Simulation screen |
 | `display.minDecimals` / `maxDecimals` / `locale` | `2` / `8` / `en-US` | How chances are formatted |
-| `audit.retentionDays` | `400` | Audit records older than this are swept; shown in Audit History |
+| `audit.retentionDays` | `400` | Audit records older than this are swept; shown in Audit History (at least 365 under `PAID_RANDOM_RESTRICTED`) |
+| `keys.nativeKeyItems` | `false` | Hand out `REGISTERED_CUSTOM_ASSET` keys as their own generated item (unverified in game) |
+| `integrations.mysticEconomy` / `economyReconcileDepth` | `true` / `200` | MysticEconomy rewards; ledger entries searched when reconciling |
+| `integrations.mysticQuests` / `mysticRpg` / `mysticModeration` | `true` | Use those plugins when installed |
+| `integrations.flagCooldownMinutes` | `10` | At most one forwarded flag per player and pool in this time |
+| `integrations.permissionCosmetics` / `placeholders` | `true` / `true` | The `permission` COSMETIC provider; the LootBox placeholders |
+| `integrations.identity.requireAgeSignal` | `true` | PAID grants also need an adult signal (none exists yet, so they are refused) |
+| `network.enabled` | `false` | Network mode (shared SQL + Redis + same `secret.key`) |
+| `network.lockTtlSeconds` / `renewSeconds` | `30` / `10` | The per-player lock's lifetime and renewal |
+| `network.acquireTimeoutMs` / `retryMs` | `3000` / `50` | How long an opening waits for another server's lock |
+| `stats.enabled` / `windowDays` | `true` / `7` | Statistics and the window `/lootbox stats` and the anomaly check use |
+| `stats.zLimit` / `minExpected` | `4.0` / `20` | When a reward counts as an anomaly |
+| `stats.rarePercent` / `luckMinOpenings` / `luckZ` | `1.0` / `30` / `4.5` | When a player's luck is flagged |
+| `retention.openingsDays` / `statsDays` | `400` / `400` | How long settled openings and daily statistics are kept |
 
 ## Data
 
@@ -377,6 +481,8 @@ modules/lootbox/config.json
 | `lootbox_player`, `lootbox_serial`, `lootbox_open`, `lootbox_pending` | Player balances and receipts, key serials, openings, pending inboxes |
 | `lootbox_crate`, `lootbox_audit` | Crates and hourly audit counters |
 | `lootbox_keylog`, `lootbox_batch`, `lootbox_crate_prefs` | Each key's grant history, stackable-key batches, players who turned crate effects off |
+| `lootbox_stats`, `lootbox_stats_player`, `lootbox_meta` | Daily counts per pool revision, players' luck tallies, the network fencing counter and secret fingerprint |
+| `mods/MysticEssentialsGenerated/Server/Item/Items/MysticLootBox/` | Generated native key items (never deleted automatically) |
 
 The storage namespaces live in the configured storage provider (JSON files under
 `data/` by default).
@@ -385,6 +491,11 @@ The storage namespaces live in the configured storage provider (JSON files under
 
 The module implements `LootBoxApi`, resolvable through
 `getModuleManager().getModule("lootbox")`: `activeRevision`, `grantKey` (with a
-`GrantSource`), `receipts`, `openPreview` and `openCatalog`. It publishes
+`GrantSource`), `receipts`, `openPreview` and `openCatalog`, and
+`registerRewardProvider` / `registerConditionProvider` (and their `unregister…`) for
+`RewardProvider` and `ConditionProvider`. A reward provider declares its guarantee:
+`IDEMPOTENT` (repeating a fulfillment id does nothing), `RECONCILABLE` (it can say
+whether one was applied) or `AT_MOST_ONCE` (an interrupted grant goes to staff
+review). It publishes
 `MysticEvent`s for revisions, key grants and revocations, crate changes, openings
 (`OpeningRequestedEvent` is cancellable), deliveries and pending claims.

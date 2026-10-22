@@ -52,4 +52,28 @@ public interface StorageService {
                     : save(namespace, key, next).thenApply(ignored -> next);
         });
     }
+
+    /**
+     * Whether {@link #updateShared} is atomic across servers, not just on this
+     * one: true for the SQL providers, where every server of a network writes the
+     * same database.
+     */
+    default boolean sharedAcrossServers() {
+        return false;
+    }
+
+    /**
+     * {@link #update}, but atomic against every server sharing the store: on SQL
+     * the read, {@code updater} and write run in one transaction holding the
+     * document's row lock, so two servers can never both act on the same old
+     * value. On a store that isn't shared it is {@link #update}.
+     *
+     * <p>{@code updater} may run more than once (a transaction that lost a race
+     * is retried with the new document), so it must be a pure function of its
+     * input and quick: it runs while the row is locked.</p>
+     */
+    default CompletableFuture<JsonElement> updateShared(String namespace, String key,
+            UnaryOperator<JsonElement> updater) {
+        return update(namespace, key, updater);
+    }
 }

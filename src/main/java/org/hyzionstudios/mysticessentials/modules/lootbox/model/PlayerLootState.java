@@ -34,6 +34,12 @@ public final class PlayerLootState {
     public List<String> openDeliveries = new ArrayList<>();
     public long lastOpenAt;
     /**
+     * The highest network fencing token (P4-WP2) that wrote this document. A
+     * server whose lease is older is refused, so a lock that went stale can't
+     * spend twice. 0 when no network opening ever touched it.
+     */
+    public long fence;
+    /**
      * Physical ↔ virtual key conversions (P2-F3), newest last. A finished one is
      * dropped beyond {@link #MAX_CONVERSIONS}; an unfinished one never is, because
      * recovery finishes it from this record.
@@ -84,6 +90,8 @@ public final class PlayerLootState {
         /** {@code VIRTUAL} or {@code PHYSICAL}. */
         public String keyKind;
         public long at;
+        /** What the bonus rolls awarded (P3-WP2), as {@code <rollId>/<rewardId>}. */
+        public List<String> bonusOutcomes = new ArrayList<>();
     }
 
     /**
@@ -134,6 +142,18 @@ public final class PlayerLootState {
     public static final class PoolState {
         public long lastOpenAt;
         public long opens;
+        /**
+         * Openings since the player last won one of the pool's pity targets
+         * (P3-WP4). Counted only while the pool has pity; changed in the same write
+         * as the commit, so the counter and the outcome never disagree.
+         */
+        public int sincePity;
+        /**
+         * Unique rewards the player won from this pool (P3-WP4, duplicate
+         * protection): reward ids, and {@code <bonusRollId>/<rewardId>} for a bonus
+         * roll's. Never trimmed: dropping one would let a duplicate through.
+         */
+        public List<String> owned = new ArrayList<>();
     }
 
     /** What /lootbox history shows; readable even after the pool changes. */

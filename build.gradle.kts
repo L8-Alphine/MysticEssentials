@@ -261,8 +261,16 @@ val mysticIdentity: SourceSet = sourceSets.create("mysticIdentity") {
     compileClasspath += sourceSets.main.get().output + sourceSets.main.get().compileClasspath
 }
 
+// Whichever api jar the sibling MysticIdentity checkout last built (its version moves), or the
+// jar named by -PmysticIdentityApiJar.
+val mysticIdentityApiJar: String = (findProperty("mysticIdentityApiJar") as String?)?.ifBlank { null }
+    ?: file("$projectDir/../MysticIdentity/mysticidentity-api/build/libs")
+        .listFiles { candidate -> candidate.name.matches(Regex("""mysticidentity-api-[0-9.]+\.jar""")) }
+        ?.maxByOrNull { it.lastModified() }?.path
+    ?: "$projectDir/../MysticIdentity/mysticidentity-api/build/libs/mysticidentity-api-0.1.0.jar"
+
 dependencies {
-    "mysticIdentityCompileOnly"(files("../MysticIdentity/mysticidentity-api/build/libs/mysticidentity-api-0.1.1.jar"))
+    "mysticIdentityCompileOnly"(files(mysticIdentityApiJar))
 }
 
 tasks.shadowJar {
@@ -637,6 +645,22 @@ tasks.register<JavaExec>("verifyLootBoxAccessibility") {
     mainClass.set("org.hyzionstudios.mysticessentials.modules.lootbox.LootBoxAccessibilityTest")
 }
 
+tasks.register<JavaExec>("verifyLootBoxAdvanced") {
+    group = "verification"
+    description = "Checks LootBox Phase 3: providers, bundles, bonus rolls, conditions, pity and personal odds (LB-003, LB-013)."
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets.test.get().runtimeClasspath + configurations.compileClasspath.get()
+    mainClass.set("org.hyzionstudios.mysticessentials.modules.lootbox.LootBoxAdvancedTest")
+}
+
+tasks.register<JavaExec>("verifyLootBoxNetwork") {
+    group = "verification"
+    description = "Chaos checks of LootBox Phase 4: two servers, shared store and lock, crashes, outages, partitions."
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets.test.get().runtimeClasspath + configurations.compileClasspath.get()
+    mainClass.set("org.hyzionstudios.mysticessentials.modules.lootbox.LootBoxNetworkTest")
+}
+
 tasks.register<JavaExec>("verifyMessageParamOrder") {
     group = "verification"
     description = "Checks message params are filled after placeholders, so they never expand one."
@@ -678,6 +702,8 @@ tasks.named("check") {
         "verifyLootBoxDrafts",
         "verifyLootBoxCrates",
         "verifyLootBoxScreens",
-        "verifyLootBoxAccessibility"
+        "verifyLootBoxAccessibility",
+        "verifyLootBoxAdvanced",
+        "verifyLootBoxNetwork"
     )
 }

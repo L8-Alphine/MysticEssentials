@@ -34,14 +34,23 @@ public final class OddsFormatter {
 
     /** @return e.g. {@code 45.00%}, {@code 0.0125%}, {@code 100%}, or {@code <0.00000001%}. */
     public String percent(long weight, long total) {
-        if (weight <= 0 || total <= 0) {
+        return percent(java.math.BigInteger.valueOf(weight), java.math.BigInteger.valueOf(total));
+    }
+
+    /**
+     * {@link #percent(long, long)} for an exact fraction too large for a
+     * {@code long}, such as the combined chance of getting an item through the
+     * main draw and several bonus rolls (P3-WP6).
+     */
+    public String percent(java.math.BigInteger weight, java.math.BigInteger total) {
+        if (weight.signum() <= 0 || total.signum() <= 0) {
             return format(BigDecimal.ZERO, minDecimals) + "%";
         }
-        if (weight >= total) {
+        if (weight.compareTo(total) >= 0) {
             return "100%";
         }
-        BigDecimal numerator = BigDecimal.valueOf(weight).multiply(BigDecimal.valueOf(100));
-        BigDecimal denominator = BigDecimal.valueOf(total);
+        BigDecimal numerator = new BigDecimal(weight).multiply(BigDecimal.valueOf(100));
+        BigDecimal denominator = new BigDecimal(total);
         try {
             BigDecimal terminating = numerator.divide(denominator);
             int scale = Math.max(minDecimals, Math.max(0, terminating.stripTrailingZeros().scale()));
@@ -67,10 +76,14 @@ public final class OddsFormatter {
 
     /** @return {@code 1 in 8,000}, rounded to the nearest whole number. */
     public String oneIn(long weight, long total) {
-        if (weight <= 0) {
+        return oneIn(java.math.BigInteger.valueOf(weight), java.math.BigInteger.valueOf(total));
+    }
+
+    public String oneIn(java.math.BigInteger weight, java.math.BigInteger total) {
+        if (weight.signum() <= 0) {
             return "never";
         }
-        BigDecimal ratio = BigDecimal.valueOf(total).divide(BigDecimal.valueOf(weight), 0, RoundingMode.HALF_UP);
+        BigDecimal ratio = new BigDecimal(total).divide(new BigDecimal(weight), 0, RoundingMode.HALF_UP);
         return "1 in " + NumberFormat.getIntegerInstance(locale).format(ratio);
     }
 

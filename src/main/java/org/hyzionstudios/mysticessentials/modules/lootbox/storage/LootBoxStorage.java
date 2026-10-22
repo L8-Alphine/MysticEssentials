@@ -3,6 +3,7 @@ package org.hyzionstudios.mysticessentials.modules.lootbox.storage;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 
@@ -16,10 +17,12 @@ import org.hyzionstudios.mysticessentials.modules.lootbox.model.LootBoxRevision;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.Opening;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.PendingInbox;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.PlayerLootState;
+import org.hyzionstudios.mysticessentials.modules.lootbox.service.NetworkRules;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonPrimitive;
 
 /**
  * Document IO for LootBox over the Core {@link StorageService}, so every provider
@@ -27,9 +30,15 @@ import com.google.gson.JsonObject;
  * filesystem-safe because the JSON provider uses them as file names (key ids'
  * {@code :} becomes {@code .}).
  *
- * <p>{@link StorageService#update} runs each read-modify-write after every earlier
- * operation on the same key, which is what makes the single-document commits of
- * the opening saga atomic on one server.</p>
+ * <p>Every read-modify-write goes through {@link StorageService#updateShared}: on
+ * one server it runs after every earlier operation on the same key, and on the
+ * shared SQL provider it is one transaction holding the row lock, so the
+ * single-document commits of the opening saga are atomic across servers too
+ * (P4-WP1).</p>
+ *
+ * <p>While this server holds a player's network lease (P4-WP2), every write to
+ * that player's documents (player state, openings, pending inbox) carries the
+ * lease's fencing token and is refused when the document saw a newer one.</p>
  */
 public final class LootBoxStorage {
 
@@ -42,8 +51,13 @@ public final class LootBoxStorage {
     static final String PENDING_NS = "lootbox_pending";
     static final String CRATE_NS = "lootbox_crate";
     static final String AUDIT_NS = "lootbox_audit";
+    static final String META_NS = "lootbox_meta";
+    static final String STATS_NS = "lootbox_stats";
+    static final String STATS_PLAYER_NS = "lootbox_stats_player";
 
     private final Supplier<StorageService> storage;
+    /** The fencing token of the lease this server holds for a player, or 0 (P4-WP2). */
+    private volatile Function<UUID, Long> fences = player -> 0L;
 
     public LootBoxStorage(MysticCore core) {
         this(core::getStorageService);
@@ -56,6 +70,50 @@ public final class LootBoxStorage {
 
     private StorageService storage() {
         return storage.get();
+    }
+
+    /** Where the fencing tokens of held network leases come from (P4-WP2). */
+    public void fences(Function<UUID, Long> source) {
+        this.fences = source == null ? player -> 0L : source;
+    }
+
+    /** Whether updates are atomic across every server (the shared SQL provider). */
+    public boolean sharedAcrossServers() {
+        return storage().sharedAcrossServers();
+    }
+
+    private long fenceOf(UUID player) {
+        Long fence = player == null ? null : fences.apply(player);
+        return fence == null ? 0L : fence;
+    }
+
+    private static UUID uuidOrNull(String player) {
+        try {
+            return player == null ? null : UUID.fromString(player);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    // ----- Network (P4-WP1/WP2) -----------------------------------------------
+
+    /** The next fencing token: one shared counter, incremented atomically. */
+    public CompletableFuture<Long> nextFence() {
+        return storage().updateShared(META_NS, "fence", element -> {
+            long current = element != null && element.isJsonPrimitive() ? element.getAsLong() : 0L;
+            return new JsonPrimitive(current + 1);
+        }).thenApply(JsonElement::getAsLong);
+    }
+
+    /**
+     * Records {@code fingerprint} as the network's key-signing secret when none is
+     * recorded, and returns the recorded one. Only a fingerprint is stored, never
+     * the secret.
+     */
+    public CompletableFuture<String> claimSecretFingerprint(String fingerprint) {
+        return storage().updateShared(META_NS, "secret", element -> element != null && element.isJsonPrimitive()
+                ? null : new JsonPrimitive(fingerprint))
+                .thenApply(stored -> stored == null ? null : stored.getAsString());
     }
 
     /** {@code mystic:royal_key} → {@code mystic.royal_key}. */
@@ -126,10 +184,21 @@ public final class LootBoxStorage {
                 .thenApply(state -> state == null ? new PlayerLootState() : state);
     }
 
-    /** Atomic per player: the commit point of virtual-key openings. {@code change} gets a fresh state if none is stored. */
+    /**
+     * Atomic per player: the commit point of virtual-key openings. {@code change}
+     * gets a fresh state if none is stored. Fenced while a network lease is held.
+     */
     public CompletableFuture<PlayerLootState> updatePlayer(UUID player, UnaryOperator<PlayerLootState> change) {
-        return update(PLAYER_NS, player.toString(), PlayerLootState.class,
-                state -> change.apply(state == null ? new PlayerLootState() : state));
+        long lease = fenceOf(player);
+        return update(PLAYER_NS, player.toString(), PlayerLootState.class, state -> {
+            PlayerLootState current = state == null ? new PlayerLootState() : state;
+            NetworkRules.admit(current.fence, lease);
+            PlayerLootState next = change.apply(current);
+            if (next != null) {
+                next.fence = NetworkRules.after(current.fence, lease);
+            }
+            return next;
+        });
     }
 
     // ----- Openings -----------------------------------------------------------
@@ -138,12 +207,65 @@ public final class LootBoxStorage {
         return load(OPEN_NS, openingId, Opening.class);
     }
 
+    /** Writes the whole opening; fenced (as a read-modify-write) while its player's network lease is held. */
     public CompletableFuture<Void> saveOpening(Opening opening) {
-        return storage().save(OPEN_NS, opening.openingId, Json.toTree(opening));
+        long lease = fenceOf(uuidOrNull(opening.player));
+        if (lease <= 0) {
+            return storage().save(OPEN_NS, opening.openingId, Json.toTree(opening));
+        }
+        return update(OPEN_NS, opening.openingId, Opening.class, stored -> {
+            long seen = stored == null ? 0L : stored.fence;
+            NetworkRules.admit(seen, lease);
+            opening.fence = NetworkRules.after(seen, lease);
+            return opening;
+        }).thenApply(saved -> null);
     }
 
     public CompletableFuture<Opening> updateOpening(String openingId, UnaryOperator<Opening> change) {
-        return update(OPEN_NS, openingId, Opening.class, change);
+        return update(OPEN_NS, openingId, Opening.class, stored -> {
+            long lease = stored == null ? 0L : fenceOf(uuidOrNull(stored.player));
+            if (stored != null) {
+                NetworkRules.admit(stored.fence, lease);
+            }
+            Opening next = change.apply(stored);
+            if (next != null && stored != null) {
+                next.fence = NetworkRules.after(stored.fence, lease);
+            }
+            return next;
+        });
+    }
+
+    /** Every stored opening id; the retention sweep (P4-WP5) walks them. */
+    public CompletableFuture<List<String>> listOpenings() {
+        return storage().listKeys(OPEN_NS);
+    }
+
+    public CompletableFuture<Boolean> deleteOpening(String openingId) {
+        return storage().delete(OPEN_NS, openingId);
+    }
+
+    // ----- Statistics (P4-WP4) -------------------------------------------------
+
+    public CompletableFuture<JsonElement> loadStats(String bucket) {
+        return storage().load(STATS_NS, bucket);
+    }
+
+    /** One atomic update of a day's counts; shared across servers like every other update. */
+    public CompletableFuture<JsonElement> updateStats(String bucket, UnaryOperator<JsonElement> change) {
+        return storage().updateShared(STATS_NS, bucket, change);
+    }
+
+    public CompletableFuture<List<String>> listStats() {
+        return storage().listKeys(STATS_NS);
+    }
+
+    public CompletableFuture<Boolean> deleteStats(String bucket) {
+        return storage().delete(STATS_NS, bucket);
+    }
+
+    /** A player's luck tallies per pool revision. */
+    public CompletableFuture<JsonElement> updatePlayerStats(UUID player, UnaryOperator<JsonElement> change) {
+        return storage().updateShared(STATS_PLAYER_NS, player.toString(), change);
     }
 
     // ----- Pending inbox ------------------------------------------------------
@@ -153,9 +275,18 @@ public final class LootBoxStorage {
                 .thenApply(inbox -> inbox == null ? new PendingInbox() : inbox);
     }
 
+    /** Fenced like {@link #updatePlayer}: a stale lease can't add a second copy of a reward. */
     public CompletableFuture<PendingInbox> updatePending(UUID player, UnaryOperator<PendingInbox> change) {
-        return update(PENDING_NS, player.toString(), PendingInbox.class,
-                inbox -> change.apply(inbox == null ? new PendingInbox() : inbox));
+        long lease = fenceOf(player);
+        return update(PENDING_NS, player.toString(), PendingInbox.class, inbox -> {
+            PendingInbox current = inbox == null ? new PendingInbox() : inbox;
+            NetworkRules.admit(current.fence, lease);
+            PendingInbox next = change.apply(current);
+            if (next != null) {
+                next.fence = NetworkRules.after(current.fence, lease);
+            }
+            return next;
+        });
     }
 
     // ----- Crates -------------------------------------------------------------
@@ -180,7 +311,7 @@ public final class LootBoxStorage {
 
     /** Appends to an hourly bucket so retention can drop whole buckets. */
     public CompletableFuture<Void> appendAudit(String bucket, JsonObject entry) {
-        return storage().update(AUDIT_NS, bucket, element -> {
+        return storage().updateShared(AUDIT_NS, bucket, element -> {
             JsonArray entries = element != null && element.isJsonArray() ? element.getAsJsonArray() : new JsonArray();
             entries.add(entry);
             return entries;
@@ -207,7 +338,7 @@ public final class LootBoxStorage {
     }
 
     private <T> CompletableFuture<T> update(String namespace, String key, Class<T> type, UnaryOperator<T> change) {
-        return storage().update(namespace, key, element -> {
+        return storage().updateShared(namespace, key, element -> {
             T current = element == null || element.isJsonNull() ? null : Json.gson().fromJson(element, type);
             T next = change.apply(current);
             return next == null ? null : Json.toTree(next);
@@ -273,7 +404,7 @@ public final class LootBoxStorage {
     /** Adds or removes {@code player} from the crate-effects opt-out list in one read-modify-write. */
     public CompletableFuture<Void> setCrateEffectsOff(UUID player, boolean off) {
         String id = player.toString();
-        return storage().update(CRATE_PREFS_NS, EFFECTS_OFF_KEY, element -> {
+        return storage().updateShared(CRATE_PREFS_NS, EFFECTS_OFF_KEY, element -> {
             JsonArray players = element != null && element.isJsonArray() ? element.getAsJsonArray() : new JsonArray();
             JsonArray next = new JsonArray();
             players.forEach(entry -> {

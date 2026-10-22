@@ -3,6 +3,7 @@ package org.hyzionstudios.mysticessentials.modules.lootbox.service;
 import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 
+import org.hyzionstudios.mysticessentials.modules.lootbox.api.RewardProvider;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.LootBoxDraft;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.Opening;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.PlayerLootState;
@@ -23,7 +24,12 @@ public final class DeliveryRules {
         /** Interrupted (or already in review) and not safe to repeat: hand it to staff. */
         REVIEW,
         /** Run it now. */
-        RUN
+        RUN,
+        /**
+         * Interrupted, and its provider can say whether it was applied (P3-WP1):
+         * ask it before deciding between settling, running again and review.
+         */
+        RECONCILE
     }
 
     /**
@@ -79,12 +85,30 @@ public final class DeliveryRules {
      * harmless or staff force it ({@code /lootbox reconcile … regrant}).
      */
     public static Step step(Opening.Fulfillment action, boolean replaySafe, boolean force) {
+        return step(action, replaySafe ? RewardProvider.Guarantee.IDEMPOTENT : RewardProvider.Guarantee.AT_MOST_ONCE,
+                force);
+    }
+
+    /**
+     * {@link #step(Opening.Fulfillment, boolean, boolean)} by the action's declared
+     * guarantee (P3-WP1): idempotent actions run again, a reconcilable action
+     * found ATTEMPTED is reconciled first, and everything else interrupted goes to
+     * review unless staff force it. One already in review stays there.
+     */
+    public static Step step(Opening.Fulfillment action, RewardProvider.Guarantee guarantee, boolean force) {
         if (action.isSettled()) {
             return Step.SETTLED;
         }
-        boolean interrupted = Opening.Fulfillment.ATTEMPTED.equals(action.state)
-                || Opening.Fulfillment.REVIEW.equals(action.state);
-        return interrupted && !force && !replaySafe ? Step.REVIEW : Step.RUN;
+        boolean attempted = Opening.Fulfillment.ATTEMPTED.equals(action.state);
+        boolean interrupted = attempted || Opening.Fulfillment.REVIEW.equals(action.state);
+        if (!interrupted || force) {
+            return Step.RUN;
+        }
+        return switch (guarantee) {
+            case IDEMPOTENT -> Step.RUN;
+            case RECONCILABLE -> attempted ? Step.RECONCILE : Step.REVIEW;
+            case AT_MOST_ONCE -> Step.REVIEW;
+        };
     }
 
     /** Replaying is harmless: inbox entries are keyed, nodes are idempotent, some commands are declared so. */

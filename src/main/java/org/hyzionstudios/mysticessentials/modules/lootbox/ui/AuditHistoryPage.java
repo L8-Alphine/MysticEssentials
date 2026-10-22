@@ -291,7 +291,7 @@ public final class AuditHistoryPage extends MysticPage {
         reopen(ref, store, page(next.withNotice("&7Exporting the matching records as " + format + "...")));
         actorIds(used.actor())
                 .thenCompose(ids -> module.audit().export(used.toQuery(System.currentTimeMillis(), ids), format,
-                        player.getUsername()))
+                        player.getUsername(), player.hasPermission(Permissions.LOOTBOX_AUDIT_IDENTIFIERS)))
                 .whenComplete((export, error) -> {
                     if (error != null) {
                         core.log(Level.WARNING, "[lootbox] audit export failed: " + error);

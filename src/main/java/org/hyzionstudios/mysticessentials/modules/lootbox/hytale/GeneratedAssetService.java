@@ -13,6 +13,7 @@ import java.util.stream.Stream;
 
 import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.CrateInstance;
+import org.hyzionstudios.mysticessentials.modules.lootbox.service.NativeKeyRules;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.VariantRules;
 
 import com.hypixel.hytale.assetstore.AssetLoadResult;
@@ -25,6 +26,7 @@ import com.hypixel.hytale.common.plugin.PluginManifest;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.server.core.asset.AssetModule;
 import com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType;
+import com.hypixel.hytale.server.core.asset.type.item.config.Item;
 import com.hypixel.hytale.server.core.plugin.PluginManager;
 import com.hypixel.hytale.server.core.universe.world.SetBlockSettings;
 import com.hypixel.hytale.server.core.universe.world.World;
@@ -189,6 +191,41 @@ public final class GeneratedAssetService {
                     + (result.hasFailed() ? " (the engine refused it; see the server log)" : ""));
         }
         return loaded;
+    }
+
+    // ----- Native key items (P3-WP8) -------------------------------------------
+
+    Path keyItemFile(String itemId) {
+        return packDir.resolve(NativeKeyRules.ITEM_STORE_PATH).resolve(NativeKeyRules.ITEM_FOLDER)
+                .resolve(itemId + ".json");
+    }
+
+    /**
+     * Makes the native key item {@code itemId} (a child of {@code baseItemId})
+     * live, the same way as a block variant: our own minimal document in the
+     * generated pack, loaded with {@code loadAssetsFromPaths}. Does nothing when
+     * the loaded asset already matches the document on disk. Never deletes an
+     * item: key items in inventories refer to it.
+     *
+     * @throws IOException when the file can't be written or the engine did not load it
+     */
+    public void ensureKeyItem(String itemId, String baseItemId) throws IOException {
+        String document = NativeKeyRules.document(baseItemId);
+        Path file = keyItemFile(itemId);
+        boolean current = Files.isRegularFile(file) && document.equals(Files.readString(file, StandardCharsets.UTF_8));
+        if (current && Item.getAssetMap().getAsset(itemId) != null) {
+            return;
+        }
+        AssetPack pack = ensurePack();
+        Files.createDirectories(file.getParent());
+        if (!current) {
+            Files.writeString(file, document, StandardCharsets.UTF_8);
+        }
+        AssetLoadResult<String, Item> result = Item.getAssetStore().loadAssetsFromPaths(pack.getName(), List.of(file));
+        if (Item.getAssetMap().getAsset(itemId) == null) {
+            throw new IOException("the key item " + itemId + " did not load"
+                    + (result.hasFailed() ? " (the engine refused it; see the server log)" : ""));
+        }
     }
 
     /** Variant keys with a document in the generated pack. */

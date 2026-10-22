@@ -14,6 +14,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 
 import org.hyzionstudios.mysticessentials.core.MysticCore;
@@ -57,9 +58,16 @@ public final class LootBoxRegistry {
     private final MysticCore core;
     private final LootBoxStorage storage;
     private final AuditService audit;
+    private final IntegrationRegistry integrations;
     private volatile LootBoxConfig config;
 
     private final Map<String, LootBoxRevision> active = new ConcurrentHashMap<>();
+    /** Published revisions waiting for their start (P3-WP5). */
+    private final Map<String, LootBoxRevision> scheduled = new ConcurrentHashMap<>();
+    /** Announces a changed pool to the other servers (P4-WP3); {@code null} on a single server. */
+    private volatile java.util.function.Consumer<String> changes;
+    /** Where key publications are announced to other servers (P4-WP3), or {@code null}. */
+    private volatile java.util.function.Consumer<String> keyChanges;
     private final Map<String, LootBoxRevision.State> states = new ConcurrentHashMap<>();
     private final Map<String, KeyDraft.Published> keys = new ConcurrentHashMap<>();
     private volatile Map<String, LootBoxDraft> drafts = Map.of();
@@ -69,10 +77,12 @@ public final class LootBoxRegistry {
     private final DraftStore<LootBoxDraft> poolStore;
     private final DraftStore<KeyDraft> keyStore;
 
-    public LootBoxRegistry(MysticCore core, LootBoxStorage storage, AuditService audit, LootBoxConfig config) {
+    public LootBoxRegistry(MysticCore core, LootBoxStorage storage, AuditService audit,
+            IntegrationRegistry integrations, LootBoxConfig config) {
         this.core = core;
         this.storage = storage;
         this.audit = audit;
+        this.integrations = integrations;
         this.config = config;
         DraftLifecycle<LootBoxDraft> pools = DraftLifecycle.pools(() -> environment(true), id -> {
             LootBoxRevision revision = active.get(id);
@@ -172,6 +182,13 @@ public final class LootBoxRegistry {
                         return CompletableFuture.completedFuture(null);
                     }
                     states.put(id, state);
+                    if (state.scheduledRevision > 0) {
+                        storage.loadRevision(id, state.scheduledRevision).thenAccept(revision -> {
+                            if (revision != null) {
+                                scheduled.put(id, revision);
+                            }
+                        });
+                    }
                     if (state.activeRevision <= 0) {
                         return CompletableFuture.completedFuture(null);
                     }
@@ -235,6 +252,11 @@ public final class LootBoxRegistry {
         return Optional.ofNullable(draft == null ? null : poolStore.status(draft));
     }
 
+    /** The registered reward and condition providers (P3-WP1). */
+    public IntegrationRegistry integrations() {
+        return integrations;
+    }
+
     public Optional<LootBoxRevision> active(String lootboxId) {
         return Optional.ofNullable(lootboxId == null ? null : active.get(lootboxId));
     }
@@ -285,28 +307,42 @@ public final class LootBoxRegistry {
             return CompletableFuture.completedFuture(PublishResult.failed(problems));
         }
         List<Long> weights = OddsEngine.resolveWeights(frozen);
+        List<LootBoxRevision.BonusWeights> bonusWeights = OddsEngine.resolveBonus(frozen);
         String contentHash = DraftLifecycle.poolContentHash(frozen, weights);
         LootBoxRevision current = active.get(lootboxId);
         if (current != null && contentHash.equals(current.contentHash)) {
             return CompletableFuture.completedFuture(
                     new PublishResult(true, current.revision, contentHash, List.of(), true));
         }
-        return freeze(lootboxId, frozen, weights, contentHash, actor, null);
+        LootBoxRevision waiting = scheduled.get(lootboxId);
+        if (waiting != null && contentHash.equals(waiting.contentHash)) {
+            return CompletableFuture.completedFuture(
+                    new PublishResult(true, waiting.revision, contentHash, List.of(), true));
+        }
+        long now = System.currentTimeMillis();
+        long startsAt = ScheduleRules.startsLater(frozen, now) ? ScheduleRules.instant(frozen.startsAt) : 0;
+        return freeze(lootboxId, frozen, weights, bonusWeights, contentHash, actor, null, startsAt);
     }
 
-    /** Republishes revision {@code from}'s content as a new revision. */
+    /** Republishes revision {@code from}'s content as a new revision, live now. */
     public CompletableFuture<PublishResult> rollback(String lootboxId, int from, String actor) {
         return storage.loadRevision(lootboxId, from).thenCompose(old -> {
             if (old == null) {
                 return CompletableFuture.completedFuture(
                         PublishResult.failed("revision " + from + " of '" + lootboxId + "' does not exist"));
             }
-            return freeze(lootboxId, old.spec, old.weights, old.contentHash, actor, from);
+            return freeze(lootboxId, old.spec, old.weights, old.bonusWeights, old.contentHash, actor, from, 0);
         });
     }
 
+    /**
+     * Freezes {@code spec} into a new immutable revision. With {@code startsAt}
+     * (epoch millis, &gt; 0) it is scheduled rather than made live (P3-WP5); the
+     * schedule sweep switches to it then.
+     */
     private CompletableFuture<PublishResult> freeze(String lootboxId, LootBoxDraft spec, List<Long> weights,
-            String contentHash, String actor, Integer rolledBackFrom) {
+            List<LootBoxRevision.BonusWeights> bonusWeights, String contentHash, String actor,
+            Integer rolledBackFrom, long startsAt) {
         AtomicInteger next = new AtomicInteger();
         return storage.updateState(lootboxId, state -> {
             LootBoxRevision.State s = state == null ? new LootBoxRevision.State() : state;
@@ -320,27 +356,260 @@ public final class LootBoxRegistry {
             revision.revision = next.get();
             revision.spec = spec;
             revision.weights = new ArrayList<>(weights);
+            revision.bonusWeights = new ArrayList<>(bonusWeights == null ? List.of() : bonusWeights);
             revision.contentHash = contentHash;
             revision.publishedBy = actor;
             revision.publishedAt = System.currentTimeMillis();
             revision.rolledBackFrom = rolledBackFrom;
             return storage.saveRevision(revision).thenCompose(saved -> storage.updateState(lootboxId, state -> {
                 LootBoxRevision.State s = state == null ? new LootBoxRevision.State() : state;
-                s.activeRevision = revision.revision;
+                if (startsAt > 0) {
+                    s.scheduledRevision = revision.revision;
+                    s.scheduledAt = startsAt;
+                } else {
+                    ScheduleRules.activate(s, revision, s.activeRevision, revision.publishedAt);
+                }
                 s.updatedBy = actor;
                 s.updatedAt = revision.publishedAt;
                 return s;
             })).thenApply(state -> {
                 states.put(lootboxId, state);
-                active.put(lootboxId, revision);
                 String hash = OddsEngine.table(revision, config.policyProfile).oddsId();
+                if (startsAt > 0) {
+                    scheduled.put(lootboxId, revision);
+                    audit.record(actor, "SCHEDULE", lootboxId, "revision " + revision.revision + " starts "
+                            + ScheduleRules.shown(startsAt) + " odds " + hash);
+                    broadcast(lootboxId);
+                    return new PublishResult(true, revision.revision, hash, List.of(), false);
+                }
+                active.put(lootboxId, revision);
                 audit.record(actor, rolledBackFrom == null ? "PUBLISH" : "ROLLBACK", lootboxId,
                         "revision " + revision.revision + (rolledBackFrom == null ? "" : " from " + rolledBackFrom)
                                 + " odds " + hash);
                 core.getEventBus().publish(new LootBoxRevisionPublishedEvent(lootboxId, revision.revision,
                         contentHash, actor, rolledBackFrom));
+                broadcast(lootboxId);
                 return new PublishResult(true, revision.revision, hash, List.of(), false);
             });
+        });
+    }
+
+    // ----- Schedule (P3-WP5) ----------------------------------------------------
+
+    /** The scheduled (not yet live) revision of a pool, if any. */
+    public Optional<LootBoxRevision> scheduled(String lootboxId) {
+        return Optional.ofNullable(lootboxId == null ? null : scheduled.get(lootboxId));
+    }
+
+    /**
+     * Performs whatever the pools' schedules make due at {@code now}: a scheduled
+     * revision starting, time-limited odds ending (revert or close), a scheduled
+     * rollback. Each action is claimed inside one update of the pool's state, so
+     * when several servers sweep the same pools only one performs it; the others
+     * refresh their caches from what it wrote.
+     */
+    public CompletableFuture<Void> runSchedule(long now) {
+        List<CompletableFuture<Void>> runs = new ArrayList<>();
+        for (Map.Entry<String, LootBoxRevision.State> entry : states.entrySet()) {
+            ScheduleRules.Due due = ScheduleRules.due(entry.getValue(), now);
+            if (due != ScheduleRules.Due.NONE) {
+                runs.add(runDue(entry.getKey(), due, now).exceptionally(error -> {
+                    core.log(Level.WARNING, "[lootbox] schedule of " + entry.getKey() + " failed: " + error);
+                    return null;
+                }));
+            }
+        }
+        return CompletableFuture.allOf(runs.toArray(CompletableFuture[]::new));
+    }
+
+    private CompletableFuture<Void> runDue(String lootboxId, ScheduleRules.Due due, long now) {
+        LootBoxRevision.State cached = states.get(lootboxId);
+        CompletableFuture<LootBoxRevision> activating = due == ScheduleRules.Due.ACTIVATE
+                ? storage.loadRevision(lootboxId, cached.scheduledRevision)
+                : CompletableFuture.completedFuture(null);
+        return activating.thenCompose(revision -> {
+            AtomicReference<ScheduleRules.Claim> claimed = new AtomicReference<>();
+            return storage.updateState(lootboxId, state -> {
+                ScheduleRules.Claim claim = ScheduleRules.claim(state, due, revision, now);
+                claimed.set(claim);
+                if (claim == null) {
+                    return null;
+                }
+                state.updatedBy = "schedule";
+                state.updatedAt = now;
+                return state;
+            }).thenCompose(state -> {
+                ScheduleRules.Claim claim = claimed.get();
+                if (claim == null) {
+                    // Another server acted first (or nothing is due any more): take what it wrote.
+                    return refreshPool(lootboxId);
+                }
+                states.put(lootboxId, state);
+                switch (claim.due()) {
+                    case ACTIVATE -> {
+                        active.put(lootboxId, revision);
+                        scheduled.remove(lootboxId);
+                        audit.record("schedule", "SCHEDULE_START", lootboxId, "revision " + revision.revision
+                                + " odds " + OddsEngine.table(revision, config.policyProfile).oddsId());
+                        core.getEventBus().publish(new LootBoxRevisionPublishedEvent(lootboxId, revision.revision,
+                                revision.contentHash, "schedule", null));
+                        broadcast(lootboxId);
+                        return CompletableFuture.completedFuture(null);
+                    }
+                    case END_CLOSE -> {
+                        audit.record("schedule", "SCHEDULE_END", lootboxId, "time-limited odds ended; pool closed");
+                        broadcast(lootboxId);
+                        return CompletableFuture.completedFuture(null);
+                    }
+                    case END_REVERT, ROLLBACK -> {
+                        audit.record("schedule", claim.due() == ScheduleRules.Due.END_REVERT ? "SCHEDULE_END"
+                                : "SCHEDULE_ROLLBACK", lootboxId, "republishing revision " + claim.revision());
+                        return rollback(lootboxId, claim.revision(), "schedule").thenAccept(result -> {
+                            if (!result.ok()) {
+                                core.log(Level.SEVERE, "[lootbox] scheduled rollback of " + lootboxId
+                                        + " to revision " + claim.revision() + " failed: " + result.problems());
+                            }
+                        });
+                    }
+                    default -> {
+                        scheduled.remove(lootboxId);
+                        core.log(Level.SEVERE, "[lootbox] scheduled revision " + claim.revision() + " of "
+                                + lootboxId + " is missing; the schedule was dropped.");
+                        broadcast(lootboxId);
+                        return CompletableFuture.completedFuture(null);
+                    }
+                }
+            });
+        });
+    }
+
+    /** {@code /lootbox rollback <id> <rev> at <instant>}: republish {@code to} at {@code at}. */
+    public CompletableFuture<Boolean> scheduleRollback(String lootboxId, int to, long at, String actor) {
+        if (!states.containsKey(lootboxId)) {
+            return CompletableFuture.completedFuture(false);
+        }
+        return storage.loadRevision(lootboxId, to).thenCompose(revision -> {
+            if (revision == null) {
+                return CompletableFuture.completedFuture(false);
+            }
+            return storage.updateState(lootboxId, state -> {
+                if (state == null) {
+                    return null;
+                }
+                state.rollbackTo = to;
+                state.rollbackAt = at;
+                state.updatedBy = actor;
+                state.updatedAt = System.currentTimeMillis();
+                return state;
+            }).thenApply(state -> {
+                if (state == null) {
+                    return false;
+                }
+                states.put(lootboxId, state);
+                audit.record(actor, "SCHEDULE", lootboxId, "rollback to revision " + to + " at "
+                        + ScheduleRules.shown(at));
+                broadcast(lootboxId);
+                return true;
+            });
+        });
+    }
+
+    /** Drops a pool's scheduled revision and scheduled rollback; the live odds and their end stay. */
+    public CompletableFuture<Boolean> cancelSchedule(String lootboxId, String actor) {
+        if (!states.containsKey(lootboxId)) {
+            return CompletableFuture.completedFuture(false);
+        }
+        return storage.updateState(lootboxId, state -> {
+            if (state == null) {
+                return null;
+            }
+            state.scheduledRevision = 0;
+            state.scheduledAt = 0;
+            state.rollbackTo = 0;
+            state.rollbackAt = 0;
+            state.updatedBy = actor;
+            state.updatedAt = System.currentTimeMillis();
+            return state;
+        }).thenApply(state -> {
+            if (state == null) {
+                return false;
+            }
+            states.put(lootboxId, state);
+            scheduled.remove(lootboxId);
+            audit.record(actor, "SCHEDULE_CANCEL", lootboxId, "");
+            broadcast(lootboxId);
+            return true;
+        });
+    }
+
+    /**
+     * Re-reads one pool's state and active (and scheduled) revision from storage
+     * into the caches: after another server changed it (P4-WP3), or after this
+     * server lost a schedule claim to another one.
+     */
+    public CompletableFuture<Void> refreshPool(String lootboxId) {
+        return storage.loadState(lootboxId).thenCompose(state -> {
+            if (state == null) {
+                states.remove(lootboxId);
+                active.remove(lootboxId);
+                scheduled.remove(lootboxId);
+                return CompletableFuture.completedFuture(null);
+            }
+            states.put(lootboxId, state);
+            CompletableFuture<Void> live = state.activeRevision <= 0 ? CompletableFuture.completedFuture(null)
+                    : cachedOrLoad(lootboxId, state.activeRevision, active.get(lootboxId))
+                            .thenAccept(revision -> {
+                                if (revision != null) {
+                                    active.put(lootboxId, revision);
+                                }
+                            });
+            if (state.scheduledRevision <= 0) {
+                scheduled.remove(lootboxId);
+            }
+            CompletableFuture<Void> waiting = state.scheduledRevision <= 0 ? CompletableFuture.completedFuture(null)
+                    : cachedOrLoad(lootboxId, state.scheduledRevision, scheduled.get(lootboxId))
+                            .thenAccept(revision -> {
+                                if (revision != null) {
+                                    scheduled.put(lootboxId, revision);
+                                }
+                            });
+            return CompletableFuture.allOf(live, waiting);
+        });
+    }
+
+    private CompletableFuture<LootBoxRevision> cachedOrLoad(String lootboxId, int revision, LootBoxRevision cached) {
+        return cached != null && cached.revision == revision ? CompletableFuture.completedFuture(cached)
+                : storage.loadRevision(lootboxId, revision);
+    }
+
+    /** Tells the other servers that this pool changed (P4-WP3); a no-op until a broadcaster is set. */
+    private void broadcast(String lootboxId) {
+        java.util.function.Consumer<String> sink = changes;
+        if (sink != null) {
+            try {
+                sink.accept(lootboxId);
+            } catch (RuntimeException e) {
+                core.log(Level.WARNING, "[lootbox] could not announce the change of " + lootboxId + ": " + e);
+            }
+        }
+    }
+
+    /** Where pool changes are announced to other servers (P4-WP3), or {@code null}. */
+    public void onPoolChange(java.util.function.Consumer<String> sink) {
+        this.changes = sink;
+    }
+
+    /** Where key publications are announced to other servers (P4-WP3), or {@code null}. */
+    public void onKeyChange(java.util.function.Consumer<String> sink) {
+        this.keyChanges = sink;
+    }
+
+    /** Re-reads one published key after another server published it (P4-WP3). */
+    public CompletableFuture<Void> refreshKey(String keyId) {
+        return storage.loadKeyDefinition(keyId).thenAccept(published -> {
+            if (published != null && published.spec != null && keyId.equals(published.spec.id)) {
+                keys.put(keyId, published);
+            }
         });
     }
 
@@ -362,6 +631,7 @@ public final class LootBoxRegistry {
             }
             states.put(lootboxId, state);
             audit.record(actor, disabled ? "DISABLE" : "ENABLE", lootboxId, "");
+            broadcast(lootboxId);
             return true;
         });
     }
@@ -392,6 +662,14 @@ public final class LootBoxRegistry {
         }).thenApply(published -> {
             keys.put(keyId, published);
             audit.record(actor, "KEY_PUBLISH", keyId, "version " + published.version);
+            java.util.function.Consumer<String> sink = keyChanges;
+            if (sink != null) {
+                try {
+                    sink.accept(keyId);
+                } catch (RuntimeException e) {
+                    core.log(Level.WARNING, "[lootbox] could not announce key " + keyId + ": " + e);
+                }
+            }
             return new PublishResult(true, published.version, "", List.of(), false);
         });
     }
@@ -414,7 +692,7 @@ public final class LootBoxRegistry {
         }
         boolean grants = core.getPermissionService() != null && core.getPermissionService().canGrant();
         return new DraftValidator.Environment(LootBoxRegistry::itemExists, keys::containsKey, patterns,
-                economy, grants, mayPublishCommands);
+                economy, grants, mayPublishCommands, integrations);
     }
 
     private static <T> Map<String, T> withDraft(Map<String, T> current, String id, T draft) {

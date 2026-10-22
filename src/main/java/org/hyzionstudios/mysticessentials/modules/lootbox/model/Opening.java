@@ -45,10 +45,30 @@ public final class Opening {
     public long createdAt;
     public long committedAt;
     public String note;
+    /** The highest network fencing token that wrote this opening (P4-WP2); 0 for local openings. */
+    public long fence;
     public List<Fulfillment> fulfillments = new ArrayList<>();
+    /** The bonus draws (P3-WP2), one per bonus roll of the revision; empty when it has none. */
+    public List<BonusDraw> bonus = new ArrayList<>();
 
     public boolean isTerminal() {
         return DELIVERED.equals(state) || ABORTED.equals(state);
+    }
+
+    /**
+     * One bonus roll's draw: {@code roll} uniform in {@code [0, total)} over its
+     * rewards and its "no bonus" weight. {@code outcomeId} is {@code null} when the
+     * roll landed on "no bonus".
+     */
+    public static final class BonusDraw {
+        public String rollId;
+        public String label;
+        public long roll;
+        public long total;
+        public String outcomeId;
+        public String outcomeName;
+        /** The exact chance of what it landed on, formatted when it was drawn. */
+        public String probability;
     }
 
     /** One delivery action, idempotency id {@code openingId#index}. */
@@ -64,6 +84,15 @@ public final class Opening {
 
         public String id;
         public String type;
+        /**
+         * The reward this action belongs to (P3-WP2) and its index among that
+         * reward's actions (a bundle has several). {@code null} on openings recorded
+         * before Phase 3: the main outcome's only action.
+         */
+        public String rewardId;
+        public int action;
+        /** The bonus roll that drew {@link #rewardId}; {@code null} for the main outcome. */
+        public String bonusRoll;
         public String state = PLANNED;
         public String detail;
         public int attempts;

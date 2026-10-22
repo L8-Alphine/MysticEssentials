@@ -5,7 +5,10 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -13,22 +16,30 @@ import java.util.logging.Level;
 
 import org.hyzionstudios.mysticessentials.api.Permissions;
 import org.hyzionstudios.mysticessentials.core.module.AbstractMysticModule;
+import org.hyzionstudios.mysticessentials.modules.lootbox.api.ConditionProvider;
 import org.hyzionstudios.mysticessentials.modules.lootbox.api.GrantSource;
 import org.hyzionstudios.mysticessentials.modules.lootbox.api.LootBoxApi;
+import org.hyzionstudios.mysticessentials.modules.lootbox.api.RewardProvider;
 import org.hyzionstudios.mysticessentials.modules.lootbox.command.LootBoxCommand;
 import org.hyzionstudios.mysticessentials.modules.lootbox.config.LootBoxConfig;
 import org.hyzionstudios.mysticessentials.modules.lootbox.hytale.BlockTargets;
 import org.hyzionstudios.mysticessentials.modules.lootbox.hytale.CrateSystems;
 import org.hyzionstudios.mysticessentials.modules.lootbox.hytale.CrateVisuals;
 import org.hyzionstudios.mysticessentials.modules.lootbox.hytale.GeneratedAssetService;
+import org.hyzionstudios.mysticessentials.modules.lootbox.hytale.NativeKeyItems;
+import org.hyzionstudios.mysticessentials.modules.lootbox.integration.LootBoxIntegrations;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.CrateInstance;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.LootBoxRevision;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.PlayerLootState;
 import org.hyzionstudios.mysticessentials.modules.lootbox.odds.SecureDraw;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.AuditService;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.CrateService;
+import org.hyzionstudios.mysticessentials.modules.lootbox.service.IntegrationRegistry;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.KeyService;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.LootBoxRegistry;
+import org.hyzionstudios.mysticessentials.modules.lootbox.service.NetworkAuthority;
+import org.hyzionstudios.mysticessentials.modules.lootbox.service.StatsService;
+import org.hyzionstudios.mysticessentials.modules.lootbox.api.event.OpeningCommittedEvent;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.OpeningService;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.PendingRewardService;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.PlayerLanes;
@@ -73,12 +84,35 @@ public final class LootBoxModule extends AbstractMysticModule implements LootBox
     private PendingRewardService pending;
     private OpeningService opening;
     private CrateService crates;
+    /** The generated pack: crate block variants (P2-J) and native key items (P3-WP8). */
+    private GeneratedAssetService generated;
     private CrateVisuals visuals;
     private LootBoxUi ui;
     /** Open in-game editors, one per player; the working copies never outlive a disconnect or a disable. */
     private final EditorSessions editors = new EditorSessions();
+    /**
+     * Reward and condition providers (P3-WP1). Kept for the plugin's lifetime:
+     * other plugins register once when they start, whether or not LootBox is on.
+     */
+    private final IntegrationRegistry integrations = new IntegrationRegistry();
+    /** The Mystic sibling bridges (P3-WP7); created on first enable, attached while enabled. */
+    private LootBoxIntegrations bridges;
     private ScheduledFuture<?> sweepTask;
+    private ScheduledFuture<?> scheduleTask;
+    /** How often scheduled revisions and time-limited odds are checked. */
+    private static final long SCHEDULE_CHECK_SECONDS = 30L;
     private ScheduledFuture<?> recoveryTask;
+    /** Observed-odds statistics and the retention sweep (P4-WP4/WP5). */
+    private StatsService stats;
+    private ScheduledFuture<?> anomalyTask;
+    private org.hyzionstudios.mysticessentials.api.event.EventBus.Subscription statsSubscription;
+    /** Network authority (P4); its blocking Redis calls run on {@link #networkThreads}. */
+    private NetworkAuthority network;
+    private ExecutorService networkThreads;
+    private ScheduledExecutorService networkRenewals;
+    /** The Redis channel pool and key changes travel on (P4-WP3). */
+    static final String CHANGES_CHANNEL = "lootbox:changes";
+    private java.util.function.Consumer<String> changesHandler;
 
     public LootBoxModule() {
         super("lootbox", "LootBox", "1.0.0");
@@ -98,7 +132,7 @@ public final class LootBoxModule extends AbstractMysticModule implements LootBox
         }
         storage = new LootBoxStorage(core);
         audit = new AuditService(core, storage, config);
-        registry = new LootBoxRegistry(core, storage, audit, config);
+        registry = new LootBoxRegistry(core, storage, audit, integrations, config);
         PlayerLanes lanes = new PlayerLanes();
         SecureDraw draw = new SecureDraw();
         keys = new KeyService(core, storage, registry, audit, lanes, draw, config);
@@ -108,13 +142,24 @@ public final class LootBoxModule extends AbstractMysticModule implements LootBox
             core.log(Level.SEVERE, "[lootbox] cannot read or create the key-signing secret; not enabling: " + e);
             return;
         }
-        rewards = new RewardService(core, storage, audit, config);
+        audit.pseudonymSalt(keys.secret());
+        rewards = new RewardService(core, storage, audit, integrations, config);
         pending = new PendingRewardService(core, storage, audit, lanes);
-        opening = new OpeningService(core, storage, registry, keys, rewards, audit, lanes, draw, config);
-        crates = new CrateService(core, storage, audit, new GeneratedAssetService(core),
-                () -> this.config.crates.generatedVariants);
+        opening = new OpeningService(core, storage, registry, keys, rewards, audit, lanes, draw, integrations, config);
+        startNetwork();
+        stats = new StatsService(storage, registry, audit, () -> this.config,
+                flag -> core.getEventBus().publish(flag),
+                (message, error) -> core.log(Level.WARNING,
+                        "[lootbox] " + message + (error == null ? "" : ": " + error)));
+        statsSubscription = core.getEventBus().subscribe(OpeningCommittedEvent.class,
+                event -> stats.onCommitted(event, System.currentTimeMillis()));
+        generated = new GeneratedAssetService(core);
+        crates = new CrateService(core, storage, audit, generated, () -> this.config.crates.generatedVariants);
         visuals = new CrateVisuals(core, this, storage);
         ui = new LootBoxUi(core, this);
+        if (bridges == null) {
+            bridges = new LootBoxIntegrations(core, integrations, () -> this.config);
+        }
 
         registry.writeExamplesIfMissing();
         registry.reloadDrafts();
@@ -132,6 +177,9 @@ public final class LootBoxModule extends AbstractMysticModule implements LootBox
         // Generated look-alikes must resolve before any crate is used; unused ones are only
         // cleaned up when the whole crate index is known.
         crates.startVariants(cratesLoaded);
+        syncNativeKeyItems();
+        bridges.enable(this, storage, audit, this::publishedKeyIds);
+        keys.paidGate(bridges::paidRefusal);
         registerCommand(new LootBoxCommand(core, this, config.command.name, config.command.aliases));
         if (!systemsRegistered) {
             boolean all = true;
@@ -147,12 +195,14 @@ public final class LootBoxModule extends AbstractMysticModule implements LootBox
             PlayerRef player = event.getPlayerRef();
             if (player != null) {
                 opening.recover(player);
+                bridges.playerJoined(player.getUuid());
             }
         });
         registerEvent(PlayerDisconnectEvent.class, (PlayerDisconnectEvent event) -> {
             PlayerRef player = event.getPlayerRef();
             if (player != null) {
                 editors.end(player.getUuid());
+                bridges.playerLeft(player.getUuid());
             }
         });
         // Openings left mid-saga by a crash or disconnect are finished on join; this
@@ -162,7 +212,20 @@ public final class LootBoxModule extends AbstractMysticModule implements LootBox
                 opening.recover(player);
             }
         }, 5, 5, TimeUnit.MINUTES);
-        sweepTask = core.scheduler().runRepeating(audit::sweep, 1, 24, TimeUnit.HOURS);
+        sweepTask = core.scheduler().runRepeating(() -> {
+            audit.sweep();
+            stats.sweep(System.currentTimeMillis());
+        }, 1, 24, TimeUnit.HOURS);
+        anomalyTask = core.scheduler().runRepeating(() -> stats.checkAnomalies(System.currentTimeMillis()),
+                1, 1, TimeUnit.HOURS);
+        // Scheduled revisions start, time-limited odds end, scheduled rollbacks run (P3-WP5).
+        // Also attaches integrations that started after this plugin, and new keys' placeholders.
+        scheduleTask = core.scheduler().runRepeating(() -> {
+            registry.runSchedule(System.currentTimeMillis());
+            bridges.tick();
+            bridges.keysChanged(publishedKeyIds());
+            syncNativeKeyItems();
+        }, SCHEDULE_CHECK_SECONDS, SCHEDULE_CHECK_SECONDS, TimeUnit.SECONDS);
 
         active = this;
         visuals.start();
@@ -207,6 +270,139 @@ public final class LootBoxModule extends AbstractMysticModule implements LootBox
         if (sweepTask != null) {
             sweepTask.cancel(false);
             sweepTask = null;
+        }
+        if (scheduleTask != null) {
+            scheduleTask.cancel(false);
+            scheduleTask = null;
+        }
+        if (bridges != null) {
+            bridges.disable();
+        }
+        NativeKeyItems.clear();
+        stopNetwork();
+        if (anomalyTask != null) {
+            anomalyTask.cancel(false);
+            anomalyTask = null;
+        }
+        if (statsSubscription != null) {
+            statsSubscription.close();
+            statsSubscription = null;
+        }
+    }
+
+    // ----- Network (P4) -------------------------------------------------------
+
+    /**
+     * The network authority NETWORK pools open under, and revision and key
+     * propagation over Redis. Built always (it answers "unavailable" while
+     * {@code network.enabled} is off); propagation only runs when it is on.
+     */
+    private void startNetwork() {
+        networkThreads = Executors.newCachedThreadPool(daemon("MysticEssentials-LootBox-Net"));
+        networkRenewals = Executors.newSingleThreadScheduledExecutor(daemon("MysticEssentials-LootBox-Lease"));
+        NetworkAuthority.Lock lock = new NetworkAuthority.Lock() {
+            @Override
+            public boolean available() {
+                return core.redis() != null && core.redis().isEnabled();
+            }
+
+            @Override
+            public boolean acquire(String key, String payload, long ttlSeconds) {
+                return available() && core.redis().lockAcquire(key, payload, ttlSeconds);
+            }
+
+            @Override
+            public boolean renew(String key, String payload, long ttlSeconds) {
+                return available() && core.redis().lockRenew(key, payload, ttlSeconds);
+            }
+
+            @Override
+            public boolean release(String key, String payload) {
+                return available() && core.redis().lockRelease(key, payload);
+            }
+        };
+        network = new NetworkAuthority(storage, lock, networkThreads, networkRenewals, () -> {
+            LootBoxConfig.Network n = config.network == null ? new LootBoxConfig.Network() : config.network;
+            long ttl = Math.max(5L, n.lockTtlSeconds);
+            return new NetworkAuthority.Timing(ttl, Math.max(1L, Math.min(n.renewSeconds, ttl / 2)),
+                    Math.max(0L, n.acquireTimeoutMs), Math.max(5L, n.retryMs));
+        }, () -> config.network != null && config.network.enabled,
+                () -> core.redis() == null ? null : core.redis().networkId(),
+                () -> core.redis() == null || core.redis().serverId() == null ? "local" : core.redis().serverId(),
+                System::currentTimeMillis);
+        opening.network(network);
+        if (config.network == null || !config.network.enabled) {
+            return;
+        }
+        String fingerprint = fingerprint(keys.secret());
+        storage.claimSecretFingerprint(fingerprint).whenComplete((recorded, error) -> {
+            boolean agreed = error == null && fingerprint.equals(recorded);
+            network.secretAgreed(agreed);
+            if (!agreed) {
+                core.log(Level.SEVERE, "[lootbox] network: this server's secret.key differs from the network's"
+                        + (error == null ? "" : " (or the shared store did not answer: " + error + ")")
+                        + ". Copy secret.key from the LootBox data folder of the first server to every server; "
+                        + "NETWORK pools stay closed here until then.");
+            }
+        });
+        if (core.redis() != null) {
+            changesHandler = this::onRemoteChange;
+            core.redis().subscribe(CHANGES_CHANNEL, changesHandler);
+            registry.onPoolChange(id -> core.redis().publish(CHANGES_CHANNEL, "pool:" + id));
+            registry.onKeyChange(id -> core.redis().publish(CHANGES_CHANNEL, "key:" + id));
+        }
+        String problem = network.unavailable();
+        log("LootBox network mode: " + (problem == null ? "ready" : "NETWORK pools closed (" + problem + ")") + ".");
+    }
+
+    /** Another server changed a pool or published a key: re-read it (never re-announced, so no echo loop). */
+    private void onRemoteChange(String payload) {
+        if (registry == null || payload == null) {
+            return;
+        }
+        if (payload.startsWith("pool:")) {
+            registry.refreshPool(payload.substring(5));
+        } else if (payload.startsWith("key:")) {
+            registry.refreshKey(payload.substring(4)).thenRun(this::syncNativeKeyItems);
+        }
+    }
+
+    private void stopNetwork() {
+        if (changesHandler != null && core.redis() != null) {
+            core.redis().unsubscribe(CHANGES_CHANNEL, changesHandler);
+        }
+        changesHandler = null;
+        if (registry != null) {
+            registry.onPoolChange(null);
+            registry.onKeyChange(null);
+        }
+        if (networkRenewals != null) {
+            networkRenewals.shutdownNow();
+            networkRenewals = null;
+        }
+        if (networkThreads != null) {
+            networkThreads.shutdown();
+            networkThreads = null;
+        }
+        network = null;
+    }
+
+    private static java.util.concurrent.ThreadFactory daemon(String name) {
+        java.util.concurrent.atomic.AtomicInteger count = new java.util.concurrent.atomic.AtomicInteger();
+        return runnable -> {
+            Thread thread = new Thread(runnable, name + "-" + count.incrementAndGet());
+            thread.setDaemon(true);
+            return thread;
+        };
+    }
+
+    /** SHA-256 of the key-signing secret, hex; the only form of it that leaves this server. */
+    static String fingerprint(byte[] secret) {
+        try {
+            return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(secret == null ? new byte[0] : secret));
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
         }
     }
 
@@ -311,6 +507,42 @@ public final class LootBoxModule extends AbstractMysticModule implements LootBox
         return editors;
     }
 
+    /** Statistics (P4-WP4), or {@code null} while disabled. */
+    public StatsService stats() {
+        return stats;
+    }
+
+    /** The network authority (P4), or {@code null} while disabled. */
+    public NetworkAuthority network() {
+        return network;
+    }
+
+    /** The Mystic sibling bridges, or {@code null} before the first enable. */
+    public LootBoxIntegrations bridges() {
+        return bridges;
+    }
+
+    /** Native key items (P3-WP8) for keys that ask for them, while {@code keys.nativeKeyItems} is on. */
+    private void syncNativeKeyItems() {
+        try {
+            NativeKeyItems.sync(registry.keys(), generated, config.keys.nativeKeyItems);
+        } catch (RuntimeException e) {
+            core.log(Level.WARNING, "[lootbox] native key items could not be prepared: " + e);
+        }
+    }
+
+    private java.util.List<String> publishedKeyIds() {
+        java.util.List<String> ids = new java.util.ArrayList<>();
+        if (registry != null) {
+            for (var key : registry.keys()) {
+                if (key.spec != null && key.spec.id != null) {
+                    ids.add(key.spec.id);
+                }
+            }
+        }
+        return ids;
+    }
+
     // ----- LootBoxApi ---------------------------------------------------------
 
     @Override
@@ -331,6 +563,31 @@ public final class LootBoxModule extends AbstractMysticModule implements LootBox
     @Override
     public CompletableFuture<java.util.List<PlayerLootState.Receipt>> receipts(UUID player) {
         return opening == null ? CompletableFuture.completedFuture(java.util.List.of()) : opening.history(player);
+    }
+
+    @Override
+    public IntegrationRegistry integrations() {
+        return integrations;
+    }
+
+    @Override
+    public void registerRewardProvider(RewardProvider provider) {
+        integrations.register(provider);
+    }
+
+    @Override
+    public boolean unregisterRewardProvider(RewardProvider provider) {
+        return integrations.unregister(provider);
+    }
+
+    @Override
+    public void registerConditionProvider(ConditionProvider provider) {
+        integrations.register(provider);
+    }
+
+    @Override
+    public boolean unregisterConditionProvider(ConditionProvider provider) {
+        return integrations.unregister(provider);
     }
 
     @Override
