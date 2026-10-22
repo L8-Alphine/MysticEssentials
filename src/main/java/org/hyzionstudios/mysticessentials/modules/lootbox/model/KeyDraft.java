@@ -29,6 +29,13 @@ public final class KeyDraft {
      * Off by default, which leaves serialized keys exactly as they were.
      */
     public boolean stackable = false;
+    /**
+     * {@code METADATA_TAG} (default: the base item with a marker) or
+     * {@code REGISTERED_CUSTOM_ASSET} (P3-WP8: a generated child item of the base,
+     * only while {@code keys.nativeKeyItems} is on and the asset has loaded). Left
+     * unset, a key keeps its earlier content hash.
+     */
+    public String identityMode;
 
     /** A published key definition ({@code lootbox_keydef/<id>}). */
     public static final class Published {

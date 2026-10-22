@@ -190,7 +190,7 @@ public final class LootBoxCommand extends MysticCommand {
                 }
                 sender.reply("&d&lPublished keys &7(" + module.registry().keys().size() + ")");
                 module.registry().keys().forEach(key -> sender.reply("&7- &f" + key.spec.id + " &8v" + key.version
-                        + " &7base &f" + key.spec.baseItemId + " &7uses &f" + key.spec.uses));
+                        + " &7base &f" + key.spec.baseItemId + " &7uses &f" + key.spec.uses + nativeItem(key)));
             }
             case "publish" -> {
                 if (!allowed(sender, Permissions.LOOTBOX_PUBLISH)) {
@@ -321,6 +321,22 @@ public final class LootBoxCommand extends MysticCommand {
             case PENDING, BUSY, DUPLICATE -> sender.reply("&e" + result.message());
             default -> sender.reply("&c" + result.message());
         }
+    }
+
+    /** The native item part of a key line (P3-WP8): reported only once the asset is loaded (LB-006). */
+    private String nativeItem(org.hyzionstudios.mysticessentials.modules.lootbox.model.KeyDraft.Published key) {
+        if (!org.hyzionstudios.mysticessentials.modules.lootbox.service.NativeKeyRules.wantsNative(key.spec)) {
+            return "";
+        }
+        if (!module.config().keys.nativeKeyItems) {
+            return " &8(native item off: keys.nativeKeyItems)";
+        }
+        String id = org.hyzionstudios.mysticessentials.modules.lootbox.hytale.NativeKeyItems.customItemId(key.spec.id);
+        if (id != null) {
+            return " &7native &f" + id;
+        }
+        String problem = org.hyzionstudios.mysticessentials.modules.lootbox.hytale.NativeKeyItems.problem(key.spec.id);
+        return " &c(no native item" + (problem == null ? " yet" : ": " + MysticText.stripMarkup(problem)) + ")";
     }
 
     private static String describeBatch(org.hyzionstudios.mysticessentials.modules.lootbox.model.KeyBatch batch,

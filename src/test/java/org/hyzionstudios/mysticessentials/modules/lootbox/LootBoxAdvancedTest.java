@@ -19,6 +19,7 @@ import org.hyzionstudios.mysticessentials.modules.lootbox.api.ConditionProvider;
 import org.hyzionstudios.mysticessentials.modules.lootbox.api.RewardProvider;
 import org.hyzionstudios.mysticessentials.modules.lootbox.integration.IntegrationRules;
 import org.hyzionstudios.mysticessentials.modules.lootbox.integration.PaidPolicy;
+import org.hyzionstudios.mysticessentials.modules.lootbox.model.KeyDraft;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.LootBoxDraft;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.LootBoxRevision;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.Opening;
@@ -34,6 +35,7 @@ import org.hyzionstudios.mysticessentials.modules.lootbox.service.DeliveryRules;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.DraftLifecycle;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.EligibilityRules;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.IntegrationRegistry;
+import org.hyzionstudios.mysticessentials.modules.lootbox.service.NativeKeyRules;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.OpeningRules;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.RewardActions;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.ScheduleRules;
@@ -75,6 +77,7 @@ public final class LootBoxAdvancedTest {
         phaseTwoPoolsKeepTheirHashes();
         validatorGatesPhaseThree();
         integrationsFailClosedAndParseSafely();
+        nativeKeyItemsAreNamedAndValidated();
         System.out.println("LootBoxAdvancedTest: all checks passed.");
     }
 
@@ -888,6 +891,37 @@ public final class LootBoxAdvancedTest {
         String reason = IntegrationRules.flagReason("pool", "key forged", "x".repeat(1000));
         require(reason.length() <= 480 && reason.startsWith("LootBox flag on pool: key forged"),
                 "flag text not bounded: " + reason.length());
+    }
+
+    // ----- P3-WP8 Native key items ---------------------------------------------
+
+    private static void nativeKeyItemsAreNamedAndValidated() {
+        String gold = NativeKeyRules.itemId("mystic:gold_key");
+        require(gold.matches("MysticLootBox_Mystic_Gold_Key_[0-9a-f]{6}"), "native item id: " + gold);
+        require(gold.equals(NativeKeyRules.itemId("mystic:gold_key")), "native item ids must be stable");
+        require(!NativeKeyRules.itemId("a_b:c").equals(NativeKeyRules.itemId("a:b_c")),
+                "keys that flatten alike must still get different items");
+        JsonObject doc = Json.gson().fromJson(NativeKeyRules.document("Ingredient_Bar_Gold"), JsonObject.class);
+        require("Ingredient_Bar_Gold".equals(doc.get("Parent").getAsString()), "the item must be a child of its base");
+        require(doc.get("Variant").getAsBoolean() && doc.getAsJsonArray("Categories").isEmpty(),
+                "the generated item must stay out of the creative library");
+        require(doc.keySet().equals(Set.of("Parent", "Variant", "Categories")),
+                "nothing else may be overridden (Recipe and BlockType are not inherited): " + doc.keySet());
+
+        KeyDraft key = new KeyDraft();
+        key.id = "mystic:gold_key";
+        key.baseItemId = "Ingredient_Bar_Gold";
+        key.name = "Gold Key";
+        require(NativeKeyRules.mode(key).equals(NativeKeyRules.METADATA_TAG), "unset identity must be METADATA_TAG");
+        String before = DraftLifecycle.keySpecHash(key);
+        key.identityMode = "registered_custom_asset";
+        require(NativeKeyRules.wantsNative(key), "identity mode must be case-insensitive");
+        require(DraftValidator.validateKey(key, id -> true).isEmpty(), "a native key must validate");
+        require(!before.equals(DraftLifecycle.keySpecHash(key)), "choosing native items is a content change");
+        key.identityMode = null;
+        require(before.equals(DraftLifecycle.keySpecHash(key)), "an unset identityMode must keep the old hash");
+        key.identityMode = "BLOCK";
+        require(!DraftValidator.validateKey(key, id -> true).isEmpty(), "an unknown identity mode must be refused");
     }
 
     private static void requireThrows(Runnable action, String message) {

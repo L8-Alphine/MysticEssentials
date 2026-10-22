@@ -431,6 +431,10 @@ public final class DraftValidator {
         if (key.expiresAfterDays < 0) {
             problems.add("expiresAfterDays cannot be negative");
         }
+        String identity = org.hyzionstudios.mysticessentials.modules.lootbox.service.NativeKeyRules.validate(key);
+        if (identity != null) {
+            problems.add(identity);
+        }
         return problems;
     }
 

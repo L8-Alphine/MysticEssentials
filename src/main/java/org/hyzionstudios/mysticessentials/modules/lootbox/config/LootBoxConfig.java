@@ -83,6 +83,15 @@ public final class LootBoxConfig {
          * ({@code /lootbox key deposit}) and back ({@code /lootbox key withdraw}).
          */
         public boolean allowConversion = true;
+        /**
+         * Hand out keys with {@code identityMode: REGISTERED_CUSTOM_ASSET} as their own
+         * generated Item ({@code MysticLootBox_...}, a child of the base item) in
+         * mods/MysticEssentialsGenerated/. UNVERIFIED in game: spike S1 (does the client
+         * render an Item registered mid-session, and keep it after a restart?) has not
+         * been run, so this is off and such keys use their base item. Generated key
+         * items are never deleted automatically: key items in inventories use them.
+         */
+        public boolean nativeKeyItems = false;
     }
 
     public static final class Crates {

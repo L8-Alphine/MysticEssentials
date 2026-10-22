@@ -23,6 +23,7 @@ import org.hyzionstudios.mysticessentials.modules.lootbox.hytale.BlockTargets;
 import org.hyzionstudios.mysticessentials.modules.lootbox.hytale.CrateSystems;
 import org.hyzionstudios.mysticessentials.modules.lootbox.hytale.CrateVisuals;
 import org.hyzionstudios.mysticessentials.modules.lootbox.hytale.GeneratedAssetService;
+import org.hyzionstudios.mysticessentials.modules.lootbox.hytale.NativeKeyItems;
 import org.hyzionstudios.mysticessentials.modules.lootbox.integration.LootBoxIntegrations;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.CrateInstance;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.LootBoxRevision;
@@ -77,6 +78,8 @@ public final class LootBoxModule extends AbstractMysticModule implements LootBox
     private PendingRewardService pending;
     private OpeningService opening;
     private CrateService crates;
+    /** The generated pack: crate block variants (P2-J) and native key items (P3-WP8). */
+    private GeneratedAssetService generated;
     private CrateVisuals visuals;
     private LootBoxUi ui;
     /** Open in-game editors, one per player; the working copies never outlive a disconnect or a disable. */
@@ -125,8 +128,8 @@ public final class LootBoxModule extends AbstractMysticModule implements LootBox
         rewards = new RewardService(core, storage, audit, integrations, config);
         pending = new PendingRewardService(core, storage, audit, lanes);
         opening = new OpeningService(core, storage, registry, keys, rewards, audit, lanes, draw, integrations, config);
-        crates = new CrateService(core, storage, audit, new GeneratedAssetService(core),
-                () -> this.config.crates.generatedVariants);
+        generated = new GeneratedAssetService(core);
+        crates = new CrateService(core, storage, audit, generated, () -> this.config.crates.generatedVariants);
         visuals = new CrateVisuals(core, this, storage);
         ui = new LootBoxUi(core, this);
         if (bridges == null) {
@@ -149,6 +152,7 @@ public final class LootBoxModule extends AbstractMysticModule implements LootBox
         // Generated look-alikes must resolve before any crate is used; unused ones are only
         // cleaned up when the whole crate index is known.
         crates.startVariants(cratesLoaded);
+        syncNativeKeyItems();
         bridges.enable(this, storage, audit, this::publishedKeyIds);
         keys.paidGate(bridges::paidRefusal);
         registerCommand(new LootBoxCommand(core, this, config.command.name, config.command.aliases));
@@ -190,6 +194,7 @@ public final class LootBoxModule extends AbstractMysticModule implements LootBox
             registry.runSchedule(System.currentTimeMillis());
             bridges.tick();
             bridges.keysChanged(publishedKeyIds());
+            syncNativeKeyItems();
         }, SCHEDULE_CHECK_SECONDS, SCHEDULE_CHECK_SECONDS, TimeUnit.SECONDS);
 
         active = this;
@@ -243,6 +248,7 @@ public final class LootBoxModule extends AbstractMysticModule implements LootBox
         if (bridges != null) {
             bridges.disable();
         }
+        NativeKeyItems.clear();
     }
 
     // ----- Crate callbacks (from the crate systems and interaction) -----------
@@ -349,6 +355,15 @@ public final class LootBoxModule extends AbstractMysticModule implements LootBox
     /** The Mystic sibling bridges, or {@code null} before the first enable. */
     public LootBoxIntegrations bridges() {
         return bridges;
+    }
+
+    /** Native key items (P3-WP8) for keys that ask for them, while {@code keys.nativeKeyItems} is on. */
+    private void syncNativeKeyItems() {
+        try {
+            NativeKeyItems.sync(registry.keys(), generated, config.keys.nativeKeyItems);
+        } catch (RuntimeException e) {
+            core.log(Level.WARNING, "[lootbox] native key items could not be prepared: " + e);
+        }
     }
 
     private java.util.List<String> publishedKeyIds() {
