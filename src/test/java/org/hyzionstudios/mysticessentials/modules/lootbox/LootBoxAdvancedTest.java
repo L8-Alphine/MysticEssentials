@@ -72,6 +72,7 @@ public final class LootBoxAdvancedTest {
         conditionsRenormaliseOrBlockAndFailClosed();
         personalOddsMatchTheDraw();
         hardPityGuaranteesWithinTheLimit();
+        duplicateReplacementTakesTheOwnedChance();
         itemChanceCombinesPathsExactly();
         schedulesStartEndAndRollBackOnce();
         phaseTwoPoolsKeepTheirHashes();
@@ -446,6 +447,44 @@ public final class LootBoxAdvancedTest {
         require(fresh.pools.get(draft.id).owned.contains("royal_cosmetic"), "a won unique reward was not owned");
     }
 
+    private static void duplicateReplacementTakesTheOwnedChance() {
+        LootBoxDraft draft = bibleDraft();
+        LootBoxDraft.RewardSpec companion = draft.rewards.stream()
+                .filter(r -> "guardian_companion".equals(r.id)).findFirst().orElseThrow();
+        companion.duplicates = "EXCLUDE_OWNED";
+        companion.duplicateReplacement = "gold_250";
+        DraftValidator.Environment env = env(new IntegrationRegistry());
+        require(DraftValidator.validate(draft, env).stream().noneMatch(p -> p.contains("replacement")),
+                "a valid duplicate replacement was refused: " + DraftValidator.validate(draft, env));
+        LootBoxRevision revision = revision(draft);
+        OddsTable fresh = OddsEngine.table(revision, PROFILE, PlayerOdds.NONE);
+        OddsTable owned = OddsEngine.table(revision, PROFILE,
+                new PlayerOdds(Map.of(), Set.of("guardian_companion"), 0, null));
+        long gold = weightOf(fresh, "gold_250");
+        long guardian = weightOf(fresh, "guardian_companion");
+        require(weightOf(owned, "gold_250") == gold + guardian && weightOf(owned, "guardian_companion") < 0,
+                "the owned reward's chance did not move to its replacement");
+        require(owned.total() == fresh.total(), "redirecting a chance changed the total weight");
+        require(!owned.hash().equals(fresh.hash()), "a redirected chance kept the same odds hash");
+        require(owned.personal().notes().stream().anyMatch(n -> n.contains("instead")), "the redirect is not explained: "
+                + owned.personal().notes());
+
+        companion.duplicateReplacement = "guardian_companion";
+        require(contains(DraftValidator.validate(draft, env), "its own duplicate replacement"), "a self-replacement passed");
+        companion.duplicateReplacement = "missing";
+        require(contains(DraftValidator.validate(draft, env), "not a reward of the main table"),
+                "an unknown replacement passed");
+        companion.duplicateReplacement = "gold_250";
+        companion.duplicates = "ALLOW";
+        require(contains(DraftValidator.validate(draft, env), "isn't EXCLUDE_OWNED"),
+                "a replacement without EXCLUDE_OWNED passed");
+    }
+
+    private static long weightOf(OddsTable table, String rewardId) {
+        return table.entries().stream().filter(e -> rewardId.equals(e.rewardId())).mapToLong(OddsTable.Entry::weight)
+                .findFirst().orElse(-1L);
+    }
+
     // ----- P3-WP6 Chance of getting X -------------------------------------------
 
     private static void itemChanceCombinesPathsExactly() {
@@ -586,7 +625,8 @@ public final class LootBoxAdvancedTest {
         JsonArray rewards = phaseTwo.getAsJsonArray("rewards");
         for (JsonElement element : rewards) {
             JsonObject reward = element.getAsJsonObject();
-            for (String key : List.of("provider", "params", "bundle", "currency", "conditions", "duplicates")) {
+            for (String key : List.of("provider", "params", "bundle", "currency", "conditions", "duplicates",
+                    "duplicateReplacement")) {
                 reward.remove(key);
             }
         }

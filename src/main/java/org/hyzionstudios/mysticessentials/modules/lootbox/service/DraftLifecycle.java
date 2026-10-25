@@ -137,7 +137,7 @@ public record DraftLifecycle<T>(
             "conditions", "ineligibleRewards", "bonusRolls", "pity", "startsAt", "endsAt", "afterEnd", "scope",
             "paidDisclosure",
             // rewards (P3)
-            "provider", "params", "bundle", "duplicates", "currency",
+            "provider", "params", "bundle", "duplicates", "duplicateReplacement", "currency",
             // keys (P3-WP8)
             "identityMode");
 

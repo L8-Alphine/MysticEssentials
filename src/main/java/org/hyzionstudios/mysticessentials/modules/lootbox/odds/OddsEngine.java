@@ -8,9 +8,11 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.HexFormat;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -157,6 +159,9 @@ public final class OddsEngine {
         List<OddsTable.Entry> entries = new ArrayList<>();
         int ineligible = 0;
         int owned = 0;
+        // Owned rewards' weight, by the reward that takes it over (duplicateReplacement).
+        Map<String, Long> redirected = new LinkedHashMap<>();
+        List<String> redirectNotes = new ArrayList<>();
         for (int i = 0; i < spec.rewards.size(); i++) {
             LootBoxDraft.RewardSpec reward = spec.rewards.get(i);
             long weight = revision.weights.get(i);
@@ -176,9 +181,31 @@ public final class OddsEngine {
             if (reward.excludesOwned() && player.owned().contains(reward.id)) {
                 excluded.add(new OddsTable.Excluded(reward.id, i, null, "already owned"));
                 owned++;
+                String to = reward.duplicateReplacement;
+                if (to != null && !to.isBlank() && !to.equals(reward.id)) {
+                    redirected.merge(to, weight, Math::addExact);
+                    redirectNotes.add(plain(reward.name) + "'s chance goes to " + names(spec, List.of(to)) + " instead.");
+                }
                 continue;
             }
             entries.add(new OddsTable.Entry(reward.id, i, weight));
+        }
+        // A replacement only takes the weight when it is itself in the player's
+        // table; one that is excluded too leaves the weight spread, as before.
+        if (!redirected.isEmpty()) {
+            for (int e = 0; e < entries.size(); e++) {
+                OddsTable.Entry entry = entries.get(e);
+                Long extra = redirected.get(entry.rewardId());
+                if (extra != null) {
+                    entries.set(e, new OddsTable.Entry(entry.rewardId(), entry.index(),
+                            Math.addExact(entry.weight(), extra)));
+                }
+            }
+            Set<String> present = new HashSet<>();
+            entries.forEach(entry -> present.add(entry.rewardId()));
+            if (present.containsAll(redirected.keySet())) {
+                notes.addAll(redirectNotes);
+            }
         }
 
         // Pity (main table only).

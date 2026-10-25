@@ -147,6 +147,14 @@ public final class LootBoxDraft {
          * COSMETIC rewards must say which.
          */
         public String duplicates;
+        /**
+         * With {@code EXCLUDE_OWNED}: the id of another main-table reward that
+         * takes this reward's chance once the player owns it, instead of the
+         * chance being spread over every other reward. {@code null} or blank:
+         * spread it (the P3-WP4 behaviour). Applied to the player's odds before
+         * the preview, so the confirmation shows and pins it.
+         */
+        public String duplicateReplacement;
 
         /** Provider parameters, never {@code null}. */
         public Map<String, String> params() {

@@ -124,6 +124,7 @@ public final class DraftValidator {
         validateBonusRolls(draft, env, problems);
         validateConditions(draft, env, problems);
         validatePity(draft, problems);
+        validateReplacements(draft, problems);
         problems.addAll(ScheduleRules.validate(draft, System.currentTimeMillis()));
         String scope = org.hyzionstudios.mysticessentials.modules.lootbox.service.NetworkRules.validateScope(draft.scope);
         if (scope != null) {
@@ -355,6 +356,47 @@ public final class DraftValidator {
         if (anyConditional && !anyOpen && !draft.blocksIneligible()) {
             problems.add("every reward has conditions: give at least one reward no conditions, so a player who "
                     + "fails them all still has odds (or set ineligibleRewards BLOCK)");
+        }
+    }
+
+    /**
+     * A duplicate replacement must name another main-table reward, only makes
+     * sense with EXCLUDE_OWNED, and must not be EXCLUDE_OWNED itself (the player
+     * could own both, and the chance would silently spread after all).
+     */
+    private static void validateReplacements(LootBoxDraft draft, List<String> problems) {
+        java.util.Map<String, LootBoxDraft.RewardSpec> main = new java.util.HashMap<>();
+        for (LootBoxDraft.RewardSpec reward : draft.rewards) {
+            if (reward.id != null) {
+                main.put(reward.id, reward);
+            }
+        }
+        for (LootBoxDraft.RewardSpec reward : draft.rewards) {
+            String to = reward.duplicateReplacement;
+            if (to == null || to.isBlank()) {
+                continue;
+            }
+            String label = "reward '" + reward.id + "'";
+            if (!reward.excludesOwned()) {
+                problems.add(label + " names a duplicate replacement but its duplicates isn't EXCLUDE_OWNED");
+            }
+            LootBoxDraft.RewardSpec target = main.get(to);
+            if (to.equals(reward.id)) {
+                problems.add(label + " can't be its own duplicate replacement");
+            } else if (target == null) {
+                problems.add(label + " duplicate replacement '" + to + "' is not a reward of the main table");
+            } else if (target.excludesOwned()) {
+                problems.add(label + " duplicate replacement '" + to + "' is EXCLUDE_OWNED too; pick a reward "
+                        + "players can always win");
+            }
+        }
+        for (LootBoxDraft.BonusRoll roll : draft.bonusRolls()) {
+            for (LootBoxDraft.RewardSpec reward : roll.rewards) {
+                if (reward.duplicateReplacement != null && !reward.duplicateReplacement.isBlank()) {
+                    problems.add("bonus roll '" + roll.id + "' reward '" + reward.id
+                            + "': duplicate replacement only applies to the main table");
+                }
+            }
         }
     }
 
