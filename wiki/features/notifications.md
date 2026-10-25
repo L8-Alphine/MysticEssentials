@@ -58,7 +58,9 @@ modules/core/notifications.json
 | `history.defaultExpirationHours` | `24` | Routine record lifetime |
 | `critical.allowPlayerDisable` | `false` | Allow players to suppress critical alerts |
 
-Each profile selects `chat`, `title`, `subtitle`, `actionbar`, `toast`, `banner`, `sound`, and `history`, plus title fade/stay timing and banner `durationSeconds`/`dismissible`. Each category supplies `displayName`, `icon`, `accent`, `sound`, `defaultProfile`, `minimumPriority`, `chatPrefix`, and `playerDisableable`.
+Each profile selects `chat`, `title`, `subtitle`, `actionbar`, `toast`, `banner`, `sound`, and `history`, plus title fade/stay timing and banner `durationSeconds`/`dismissible`. The `subtitle` switch is kept for older configs and no longer does anything: a title always carries its second line.
+
+The event title's large line is the notification's title (for broadcasts, `broadcastTitle` or `alertTitle`) and the smaller line is its text. Both are sent as plain text, one line each, cut at 48 and 110 characters; chat still gets the full text. Only `critical` uses the large **Major** style; everything else uses **Default**. The banner shows the title and the text together. Each category supplies `displayName`, `icon`, `accent`, `sound`, `defaultProfile`, `minimumPriority`, `chatPrefix`, and `playerDisableable`.
 
 See [Announcements](announcements-module) for `/broadcast` and `/alert` syntax,
 or [Developer API](developer-api) to send notifications from another mod.

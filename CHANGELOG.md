@@ -1,5 +1,40 @@
 # Mystic Essentials Changelog
 
+## Unreleased — Notifications fix and LootBox presentation v2
+
+Server-side checks only (build, verify tasks, engine source); nothing here has
+been seen in a game client yet.
+
+### Notifications
+
+- **Announcements show their text again.** The event title's second line was lost
+  two ways: a one-line title passed a null secondary that the engine dereferences,
+  and coloured text became an empty message with children. Both lines now go out
+  as plain single-line text, cut at 48 / 110 characters (chat keeps the full text).
+- The title's stay and fade times were passed in the wrong order, so it showed for
+  the fade-in time only. Fixed.
+- Only `critical` notices use the large Major title; everything else uses Default.
+- The banner shows the title and the text, not the bare title.
+- **AFK notices are chat-only** (no title, toast, banner, action bar or sound).
+
+### LootBox
+
+- **Reveal:** presentation adapters with a **horizontal reel** (default),
+  **grid roulette** and **quick reveal** (`opening.presentation`; reduced motion is
+  always quick). The result is drawn and recorded before the reveal starts; the
+  reel is planned around it, its filler is not weighted, and it pushes at most
+  8 updates a second. Every reward's exact chance stays on screen beside it.
+- **Pity & Duplicates** tab in the pool editor, plus `duplicateReplacement`: an
+  owned EXCLUDE_OWNED reward's chance can go to a chosen reward instead of being
+  spread. The pool editor is now 1050 wide.
+- **Crate effect stack:** any number of extra particles and sounds per crate, with
+  phase, height, scale and interval, picked from the server's loaded ids, under a
+  per-world and per-player idle particle budget.
+- **Floating crate names:** the holder entity now has vanilla's empty model, and
+  `crates.nameplates` defaults to on. Still unconfirmed in a client.
+- **Tab completion** for `/lootbox` and `/lb`: subcommands and the ids after them.
+- Not in this update: multi-line glyph / PNG crate holograms.
+
 ## Unreleased — LootBox Advanced Behaviour and Network (Phases 3–4)
 
 Everything here is checked on the server side only; none of it has been tried in

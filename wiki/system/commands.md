@@ -198,7 +198,7 @@ See the [Player Vaults](playervaults-module) page. The module is disabled by def
 ## LootBox
 
 See the [LootBox](lootbox-module) page for the full command tree. The module is
-disabled by default. Every subcommand also needs `mysticessentials.lootbox.use`.
+disabled by default. Every subcommand also needs `mysticessentials.lootbox.use`. `/lootbox` and `/lb` tab-complete their subcommands and the ids that follow (pools, keys, crates, player names).
 
 | Command | Description | Permission |
 | --- | --- | --- |

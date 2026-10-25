@@ -26,7 +26,11 @@ config's `modules` map **and** `enabled: true` in `modules/lootbox/config.json`.
    pool's rules. Nothing is spent yet.
 3. **Open** goes to a confirmation screen that repeats what will be spent.
 4. **Confirm** spends one key and draws the result in a single server-side write,
-   then plays the reveal (skippable) and delivers the reward.
+   then plays the reveal (skippable) and delivers the reward. The reveal only
+   shows a result that is already recorded: by default a **horizontal reel** that
+   stops on it under a gold marker (`opening.presentation`; also `GRID_ROULETTE`
+   and `QUICK_REVEAL`), with every reward's exact chance listed beside it the whole
+   time. Reel spacing is decorative and never reflects the odds.
 5. Items that do not fit in the inventory, and rewards for offline players, go to
    the **pending inbox** (`/lootbox pending`), where they can be claimed later.
 
@@ -248,9 +252,22 @@ show only to players within `crates.effectRadius` who haven't turned them off wi
 `/lootbox crate effects off`. New crates get the `crates.default*` effects;
 crates placed before this update keep none until you choose some.
 
-**Floating names** (`crates.nameplates`, off by default and not yet tested in a
-game client) show the crate's name, or its pool's, above it. They are the same for
-every player, and the effects switch doesn't hide them. Glow is not supported.
+**Effect stack.** **Effect Stack** on step 6 opens a sub-page where a crate can
+carry more particles and sounds on top of those three slots, each with its own
+phase (idle or on open), height, scale and, for idle particles, how often it
+repeats. The id list comes from what the server has loaded (search to narrow
+it: there are about 3000 particle systems). A stack holds at most
+`crates.maxStackedEffects`. Idle particles share a budget per idle tick:
+`crates.particleBudgetPerWorld` spawns per world and
+`crates.particleBudgetPerClient` per player; past it, effects skip that tick
+rather than load the server. **Preview Effects** plays the whole stack, to you only.
+
+**Floating names** (`crates.nameplates`, now on by default; a config saved
+earlier keeps its value) show the crate's name, or its pool's, above it. The
+holder entity wears vanilla's empty model, as every vanilla entity with a
+nameplate has a model; this is still not confirmed in a game client. Names are
+the same for every player, and the effects switch doesn't hide them. Glow is not
+supported.
 
 ### Plain blocks (generated variants)
 
@@ -329,6 +346,7 @@ before, so published pools don't ask to be republished.
 | `ineligibleRewards: RENORMALIZE\|BLOCK` | Rewards a player isn't eligible for are dropped from that player's odds (shown as "Not available") or block the opening |
 | `pity: {targets, hardAfter, softAfter, softStepPercent}` | Guarantees: after `hardAfter` openings without a target, the next one is a target; soft pity raises the targets' weight step by step. The player's next-opening odds show it |
 | reward `duplicates: ALLOW\|EXCLUDE_OWNED` | Leave out rewards the player already owns (won from this pool, or reported by the provider). Required on COSMETIC rewards |
+| reward `duplicateReplacement: <rewardId>` | With `EXCLUDE_OWNED`: once the player owns this reward, its chance goes to that main-table reward instead of being spread over the rest. The replacement can't itself be `EXCLUDE_OWNED` |
 | reward `type: EXTENSION\|COSMETIC\|RPG`, `provider`, `params` | Delivered by a registered provider. A missing provider makes the pool unopenable; nothing is ever substituted |
 | `startsAt`, `endsAt`, `afterEnd: REVERT\|CLOSE` | Scheduled and time-limited odds. Publishing before `startsAt` schedules the revision; at `endsAt` the earlier odds return or the pool closes. The preview shows the dates |
 | `scope: LOCAL\|NETWORK` | NETWORK pools open under the network lock (see [Network](#network)) |
@@ -336,6 +354,11 @@ before, so published pools don't ask to be republished.
 Every player sees their own "your next opening" odds before they confirm, with a
 plain-language note for pity, conditions and excluded duplicates. The confirmation
 is bound to that exact table.
+
+Pity and duplicates are edited in game on the pool editor's **Pity & Duplicates**
+tab: turn pity on, pick target rewards from the list, set "guaranteed by opening",
+"soft pity after" and the soft step, and read the plain-language summary; per
+reward, choose whether an owned reward can be won again and where its chance goes.
 
 ### Mystic integrations
 
@@ -428,7 +451,8 @@ modules/lootbox/config.json
 | `command.name` / `command.aliases` | `lootbox` / `["lb"]` | Command name and aliases |
 | `opening.minIntervalMs` | `1500` | Minimum gap between two openings by one player |
 | `opening.requestDedupeMinutes` | `1440` | How long confirm requests are remembered |
-| `opening.revealDurationMs` / `revealFramesPerSecond` | `4000` / `10` | Reveal animation; 0 ms reveals immediately |
+| `opening.revealDurationMs` / `revealFramesPerSecond` | `4000` / `10` | Reveal length; 0 ms reveals immediately. The reel pushes at most min(`revealFramesPerSecond`, 8) updates a second |
+| `opening.presentation` | `HORIZONTAL_REEL` | `HORIZONTAL_REEL`, `GRID_ROULETTE` or `QUICK_REVEAL`. Reduced motion always gets `QUICK_REVEAL` |
 | `opening.allowSkip` | `true` | Show the Skip button on the reveal |
 | `opening.historySize` | `50` | Receipts kept per player |
 | `opening.reducedMotionDefault` | `false` | Reduced motion for players who never chose |
@@ -443,7 +467,9 @@ modules/lootbox/config.json
 | `crates.idleEffectIntervalMs` | `2000` | How often idle particles play while players are near |
 | `crates.effectRadius` | `24` | How near a player must be to see crate effects |
 | `crates.defaultIdleParticle` / `defaultOpenParticle` / `defaultOpenSound` | `Block_Treasure_Sparks` / `Block_Break_Treasure` / `SFX_Chest_Legendary_Open` | Effects new crates start with |
-| `crates.nameplates` / `nameplateHeight` | `false` / `1.25` | Floating crate names, and how high above the block |
+| `crates.maxStackedEffects` | `8` | Most effects in one crate's effect stack |
+| `crates.particleBudgetPerWorld` / `particleBudgetPerClient` | `64` / `24` | Idle particle spawns per idle tick, per world and per player |
+| `crates.nameplates` / `nameplateHeight` | `true` / `1.25` | Floating crate names, and how high above the block |
 | `crates.generatedVariants` | `false` | Let plain blocks become crates through generated look-alikes |
 | `rewards.itemOverflow` | `PENDING_INBOX` | Where items that do not fit go |
 | `rewards.pendingExpiryDays` | `30` | Pending rewards expire after this many days |

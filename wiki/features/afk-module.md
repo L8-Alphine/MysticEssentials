@@ -10,7 +10,7 @@ The AFK module tracks when players are away from keyboard, both manually and aut
 
 Players are also marked AFK automatically after `autoAfkSeconds` of no movement, chat, or interaction. Idle and zone state is checked once per second. Any activity clears the AFK state, except configured movement inside a reward zone. Players with `mysticessentials.afk.bypass.auto` are never auto-marked.
 
-When `announce` is on, entering and leaving AFK is broadcast to the server.
+When `announce` is on, entering and leaving AFK is announced to the server as a single chat line. It never uses the event title, toast, banner, action bar or sound that real broadcasts use.
 
 ## AFK rewards
 
