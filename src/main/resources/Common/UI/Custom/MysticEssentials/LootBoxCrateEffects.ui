@@ -93,9 +93,19 @@ $C.@Container {
           }
 
           $M.@FieldLabel { @Text = "Search the ids this server has loaded"; }
-          $C.@TextField #EffectSearchInput {
+          Group {
+            LayoutMode: Left;
             Anchor: (Height: 38, Bottom: 6);
-            PlaceholderText: "sparks";
+
+            $C.@TextField #EffectSearchInput {
+              FlexWeight: 1;
+              PlaceholderText: "sparks";
+            }
+
+            $C.@SecondaryTextButton #EffectSearchButton {
+              @Text = "Search";
+              @Anchor = (Width: 120, Left: 6);
+            }
           }
 
           $C.@DropdownBox #EffectIdDropdown {

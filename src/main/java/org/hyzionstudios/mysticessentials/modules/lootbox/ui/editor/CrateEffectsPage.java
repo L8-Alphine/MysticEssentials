@@ -125,7 +125,9 @@ public final class CrateEffectsPage extends MysticPage {
 
         String query = session.input(SEARCH.key());
         FormFields.fill(cmd, SEARCH, session, "");
-        event.addEventBinding(CustomUIEventBindingType.ValueChanged, "#" + SEARCH.elementId(), INPUTS.event("search"));
+        // A button, not ValueChanged: rebuilding the page on every keystroke would
+        // drop the text field's focus after each character.
+        event.addEventBinding(CustomUIEventBindingType.Activating, "#EffectSearchButton", INPUTS.event("search"));
         List<String> matches = sound ? CrateVisuals.soundIds(query, MATCH_LIMIT)
                 : CrateVisuals.particleIds(query, MATCH_LIMIT);
         List<DropdownEntryInfo> ids = new ArrayList<>();

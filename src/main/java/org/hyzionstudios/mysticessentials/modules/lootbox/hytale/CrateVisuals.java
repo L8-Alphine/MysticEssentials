@@ -259,6 +259,14 @@ public final class CrateVisuals {
         for (CrateInstance crate : module.crates().list()) {
             byWorld.computeIfAbsent(worldKey(crate), k -> new ArrayList<>()).add(crate);
         }
+        // Forget timers of removed crates and of stack entries that no longer exist.
+        Set<String> slots = new java.util.HashSet<>();
+        for (CrateInstance crate : module.crates().list()) {
+            for (int i = 0; i < crate.visuals.extras.size(); i++) {
+                slots.add(crate.crateId + "#" + i);
+            }
+        }
+        lastIdle.keySet().retainAll(slots);
         nameplates.values().forEach(holder -> byWorld.computeIfAbsent(holder.worldKey(), k -> new ArrayList<>()));
         byWorld.forEach((worldKey, crates) -> {
             World world = core.platform().world(worldKey).orElse(null);
@@ -322,8 +330,11 @@ public final class CrateVisuals {
                     continue;
                 }
                 String slot = crate.crateId + "#" + i;
+                // Repeats can't be faster than the idle tick, so the particle lives
+                // for the effective gap rather than going dark between ticks.
+                long every = Math.max(effect.intervalMs, (long) (duration * 1000f));
                 Long last = lastIdle.get(slot);
-                if (last != null && now - last < effect.intervalMs) {
+                if (last != null && now - last < every) {
                     continue;
                 }
                 List<Ref<EntityStore>> to = budget.take(viewers);
@@ -332,7 +343,7 @@ public final class CrateVisuals {
                 }
                 lastIdle.put(slot, now);
                 ParticleUtil.spawnParticleEffect(effect.id, crate.x + 0.5, crate.y + effect.height, crate.z + 0.5,
-                        0f, 0f, 0f, (float) effect.scale, null, null, to, store, effect.intervalMs / 1000f);
+                        0f, 0f, 0f, (float) effect.scale, null, null, to, store, every / 1000f);
             }
         }
         for (Map.Entry<String, Holder> entry : List.copyOf(nameplates.entrySet())) {

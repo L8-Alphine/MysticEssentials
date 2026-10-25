@@ -210,7 +210,7 @@ public final class LootBoxCommand extends MysticCommand {
         String first = tokens[0].startsWith("/") ? tokens[0].substring(1) : tokens[0];
         boolean root = first.equalsIgnoreCase(getName())
                 || Stream.of(getAliases().toArray(String[]::new)).anyMatch(first::equalsIgnoreCase);
-        return root ? java.util.Arrays.copyOfRange(tokens, 1, tokens.length) : tokens;
+        return root ? java.util.Arrays.copyOfRange(tokens, 1, tokens.length) : sender.args();
     }
 
     @Override

@@ -524,6 +524,8 @@ public final class LootBoxPages {
         private PresentationAdapter adapter;
         private PresentationAdapter.Stage stage;
         private int shown;
+        /** The entity store of the world the reveal was opened in. */
+        private Store<EntityStore> store;
 
         RevealPage(MysticCore core, PlayerRef player, LootBoxModule module, OpeningService.OpenResult result,
                 boolean reducedMotion) {
@@ -595,10 +597,11 @@ public final class LootBoxPages {
             adapter.build(cmd, stage);
 
             World world = store.getExternalData().getWorld();
+            this.store = store;
             result.delivery().thenAccept(delivery -> {
                 status = delivery.label();
                 if (landed && !dismissed) {
-                    world.execute(this::pushStatus);
+                    run(world, this::pushStatus);
                 }
             });
             schedule(world);
@@ -611,14 +614,34 @@ public final class LootBoxPages {
             }
             List<Long> times = stage.plan().stepAtMs();
             if (times.isEmpty()) {
-                world.execute(this::land);
+                run(world, this::land);
                 return;
             }
             for (int i = 0; i < times.size(); i++) {
                 int step = i + 1;
-                steps.add(core.scheduler().runLater(() -> world.execute(() -> step(step)), times.get(i),
+                steps.add(core.scheduler().runLater(() -> run(world, () -> step(step)), times.get(i),
                         TimeUnit.MILLISECONDS));
             }
+        }
+
+        /**
+         * Runs {@code task} on the reveal's world thread, only while the player is
+         * still in that world: sendUpdate reads the player's components, so after a
+         * world change the reveal stops instead of touching another world's store.
+         */
+        private void run(World world, Runnable task) {
+            if (!world.isAlive()) {
+                stop();
+                return;
+            }
+            world.execute(() -> {
+                Ref<EntityStore> ref = player.getReference();
+                if (ref == null || !ref.isValid() || ref.getStore() != store) {
+                    stop();
+                    return;
+                }
+                task.run();
+            });
         }
 
         private void step(int step) {
