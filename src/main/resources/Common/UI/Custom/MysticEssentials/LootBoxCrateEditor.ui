@@ -383,7 +383,7 @@ $C.@Container {
           Label {
             Anchor: (Height: 44);
             Style: $M.@CaptionWarnStyle;
-            Text: "Not yet tested in game. Names are the same for everyone (they can't be shown per player) and need crates.nameplates on in the module config.";
+            Text: "Names are the same for everyone (engine nameplates can't be shown per player). The server switch crates.nameplates is on by default. Not yet confirmed in a client: tell staff if no name appears.";
           }
         }
 

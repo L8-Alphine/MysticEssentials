@@ -114,11 +114,14 @@ public final class LootBoxConfig {
         public String defaultOpenParticle = "Block_Break_Treasure";
         public String defaultOpenSound = "SFX_Chest_Legendary_Open";
         /**
-         * Floating crate names through a nameplate holder entity. UNVERIFIED in game:
-         * the nameplate spike (S4) was never run, so this is off until someone has
-         * seen it work. Nameplates are global; they can't be shown per player.
+         * Server-wide switch for floating crate names; each crate still opts in on
+         * step 6 of the crate editor. On by default so the editor toggle works on
+         * its own; an existing config keeps whatever it saved. The holder entity
+         * now wears vanilla's empty model like every vanilla nameplate entity, but
+         * the result is still UNVERIFIED in a client. Nameplates are global; they
+         * can't be shown per player.
          */
-        public boolean nameplates = false;
+        public boolean nameplates = true;
         /** Height of the floating name above the crate block's base, in blocks. */
         public double nameplateHeight = 1.25;
         /**

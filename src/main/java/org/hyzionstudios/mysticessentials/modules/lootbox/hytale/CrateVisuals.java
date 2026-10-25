@@ -31,12 +31,16 @@ import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.vector.Rotation3f;
 import com.hypixel.hytale.protocol.SoundCategory;
 import com.hypixel.hytale.server.core.Message;
+import com.hypixel.hytale.server.core.asset.type.model.config.Model;
+import com.hypixel.hytale.server.core.asset.type.model.config.ModelAsset;
 import com.hypixel.hytale.server.core.asset.type.particle.config.ParticleSystem;
 import com.hypixel.hytale.server.core.asset.type.soundevent.config.SoundEvent;
 import com.hypixel.hytale.server.core.entity.nameplate.Nameplate;
 import com.hypixel.hytale.server.core.modules.entity.EntityModule;
+import com.hypixel.hytale.server.core.modules.entity.component.BoundingBox;
 import com.hypixel.hytale.server.core.modules.entity.component.DisplayNameComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.Intangible;
+import com.hypixel.hytale.server.core.modules.entity.component.ModelComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.entity.tracker.NetworkId;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
@@ -75,6 +79,9 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
  * {@link World#execute}.</p>
  */
 public final class CrateVisuals {
+
+    /** Vanilla model asset whose geometry is NPC/MISC/Empty.blockymodel. */
+    private static final String HOLDER_MODEL_ID = "Invisible_Projectile";
 
     /** Particle systems (not spawners) checked in the 0.7.2 registry, offered in the crate editor. */
     public static final List<String> IDLE_PARTICLES = List.of("Block_Treasure_Sparks", "Dust_Sparkles",
@@ -375,6 +382,17 @@ public final class CrateVisuals {
                 new Vector3d(crate.x + 0.5, crate.y + height, crate.z + 0.5), Rotation3f.IDENTITY));
         holder.addComponent(NetworkId.getComponentType(), new NetworkId(store.getExternalData().takeNextNetworkId()));
         holder.ensureComponent(Intangible.getComponentType());
+        // Every vanilla entity that floats a name also carries a model (the warp
+        // marker in TeleportPlugin#createWarp, spawn markers in
+        // CompanionBlockSpawnerSupport#createMarkerEntity). The server already
+        // replicates a model-less Nameplate (NameplateSystems.EntityTrackerUpdate),
+        // so the missing model is the client-side suspect. Invisible_Projectile is
+        // vanilla's empty model (NPC/MISC/Empty.blockymodel), so nothing is drawn.
+        Model model = holderModel();
+        if (model != null) {
+            holder.addComponent(BoundingBox.getComponentType(), new BoundingBox(model.getBoundingBox()));
+            holder.addComponent(ModelComponent.getComponentType(), new ModelComponent(model));
+        }
         holder.addComponent(Nameplate.getComponentType(), new Nameplate(text));
         holder.addComponent(DisplayNameComponent.getComponentType(), new DisplayNameComponent(Message.raw(text)));
         holder.ensureComponent(EntityStore.REGISTRY.getNonSerializedComponentType());
@@ -382,6 +400,12 @@ public final class CrateVisuals {
         if (ref != null) {
             nameplates.put(crate.crateId, new Holder(worldKey, ref, text));
         }
+    }
+
+    /** The empty vanilla model the nameplate holder wears; null if this build lacks it. */
+    private static Model holderModel() {
+        ModelAsset asset = ModelAsset.getAssetMap().getAsset(HOLDER_MODEL_ID);
+        return asset == null ? null : Model.createUnitScaleModel(asset);
     }
 
     private static void remove(Store<EntityStore> store, Holder holder) {
