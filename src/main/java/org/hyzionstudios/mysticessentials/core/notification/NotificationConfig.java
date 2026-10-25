@@ -52,6 +52,11 @@ public final class NotificationConfig {
     public static final class Profile {
         public boolean chat = true;
         public boolean title = false;
+        /**
+         * Kept for config compatibility only. Delivery never consults it: the
+         * event title always carries its second line when the notification has
+         * one, because a title without its text is the blank-title bug.
+         */
         public boolean subtitle = false;
         public boolean actionbar = false;
         public boolean toast = false;

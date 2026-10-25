@@ -44,6 +44,10 @@ import com.hypixel.hytale.server.core.util.NotificationUtil;
  */
 final class NotificationDelivery {
 
+    /** Event-title lines longer than this are cut; chat still carries the full text. */
+    private static final int TITLE_MAX_CHARS = 48;
+    private static final int SUBTITLE_MAX_CHARS = 110;
+
     private final MysticCore core;
     /** Latest push per player and HUD key; an older push's timer must not remove a newer HUD. */
     private final Map<String, Object> hudTokens = new ConcurrentHashMap<>();
@@ -137,26 +141,58 @@ final class NotificationDelivery {
     private void title(PlayerRef player, Notification notification,
             NotificationConfig.Profile profile) {
         try {
-            Message primary = messageOrNull(notification.title().orElse(null));
-            Message secondary = messageOrNull(notification.subtitle().orElse(null));
-            if (primary == null && secondary == null) {
+            String primary = titleLine(notification.title().orElse(null), TITLE_MAX_CHARS);
+            String secondary = titleLine(
+                    notification.subtitle().or(notification::message).orElse(null),
+                    SUBTITLE_MAX_CHARS);
+            if (primary.isEmpty() && secondary.isEmpty()) {
                 // Nothing headline-worthy; a title with no text is just a flash.
                 return;
             }
-            if (primary == null) {
+            if (primary.isEmpty()) {
                 primary = secondary;
-                secondary = null;
+                secondary = "";
             }
-            EventTitleUtil.showEventTitleToPlayer(player, primary, secondary,
-                    notification.priority().atLeast(NotificationPriority.IMPORTANT)
-                            ? EventTitleStyle.Major : EventTitleStyle.Default,
+            // Both lines go out as single plain raw messages. Two engine facts
+            // (0.7.2) force this: showEventTitleToPlayer calls
+            // secondaryTitle.getFormattedMessage() unguarded, so a null secondary
+            // throws and the whole title is lost; and vanilla only ever sends one
+            // flat Message per line (WorldMapTracker#onZoneDiscovered), while
+            // MysticText renders coloured markup as an empty root with children,
+            // which is the line that came out blank in game.
+            EventTitleUtil.showEventTitleToPlayer(player, Message.raw(primary),
+                    Message.raw(secondary), titleStyle(notification.priority()),
                     notification.icon().orElse(EventTitleUtil.DEFAULT_ZONE),
-                    profile.fadeInMillis / 1000f,
                     profile.stayMillis / 1000f,
+                    profile.fadeInMillis / 1000f,
                     profile.fadeOutMillis / 1000f);
         } catch (Throwable t) {
             logSurfaceFailure("title", t);
         }
+    }
+
+    /**
+     * Only a critical notice earns the large Major presentation; everything up
+     * to important reads at the Default size. GoblinBreach and VoidEviction are
+     * themed for those vanilla world events and are not used for server text.
+     */
+    private static EventTitleStyle titleStyle(NotificationPriority priority) {
+        return priority.atLeast(NotificationPriority.CRITICAL)
+                ? EventTitleStyle.Major : EventTitleStyle.Default;
+    }
+
+    /** One plain line: markup stripped, line breaks folded, overlong text cut. */
+    private static String titleLine(String markup, int maxChars) {
+        if (markup == null) {
+            return "";
+        }
+        String text = MysticText.stripMarkup(markup)
+                .replaceAll("\\s*\\R\\s*", " ")
+                .trim();
+        if (text.length() > maxChars) {
+            text = text.substring(0, maxChars - 1).trim() + "\u2026";
+        }
+        return text;
     }
 
     private void actionBar(PlayerRef player, Notification notification,
@@ -233,8 +269,14 @@ final class NotificationDelivery {
      */
     private void banner(PlayerRef player, Notification notification,
             NotificationConfig.Category category, NotificationConfig.Profile profile) {
-        String text = MysticText.stripMarkup(
-                notification.title().orElse(notification.bestText()));
+        // The banner carries the notice itself. Showing only the title is what put
+        // a bare server name on an otherwise empty bar.
+        String title = titleLine(notification.title().orElse(null), TITLE_MAX_CHARS);
+        String body = titleLine(notification.message().or(notification::subtitle).orElse(null),
+                SUBTITLE_MAX_CHARS);
+        String text = title.isEmpty() || body.isEmpty() || body.equals(title)
+                ? (body.isEmpty() ? title : body)
+                : title + " \u2014 " + body;
         if (text.isBlank()) {
             return;
         }
