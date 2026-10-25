@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.BiConsumer;
+import java.util.stream.Stream;
 
 import org.hyzionstudios.mysticessentials.api.Permissions;
 import org.hyzionstudios.mysticessentials.core.MysticCore;
@@ -22,9 +23,12 @@ import org.hyzionstudios.mysticessentials.modules.lootbox.service.MotionRules;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.ScheduleRules;
 import org.hyzionstudios.mysticessentials.modules.lootbox.ui.editor.CrateEditorPage;
 import org.hyzionstudios.mysticessentials.modules.lootbox.validate.DraftValidator;
+import org.hyzionstudios.mysticessentials.platform.command.MysticArgTypes;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommand;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommandSender;
 
+import com.hypixel.hytale.server.core.command.system.arguments.types.ArgTypes;
+import com.hypixel.hytale.server.core.command.system.arguments.types.SingleArgumentType;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 
 /**
@@ -44,13 +48,36 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
  * </ul>
  *
  * <p>Every staff branch checks its own node here, on the server.</p>
+ *
+ * <p><b>Completion.</b> The client completes from the command tree it is sent,
+ * and a free-form command sends none. So the literals are also registered as
+ * thin subcommands ({@link Node}), and each argument worth completing as a typed
+ * usage variant, but every one of them hands the raw tokens straight back to
+ * {@link #dispatch}: parsing, permissions and messages stay exactly where they
+ * were. Verified on 0.7.2 ({@code AbstractCommand#checkForExecutingSubcommands}):
+ * a subcommand is matched on the first token, and a variant only runs when the
+ * token count equals its required-argument count, so any other count still
+ * reaches the free-form node.</p>
  */
 public final class LootBoxCommand extends MysticCommand {
 
     private static final String USAGE =
             "/lootbox [preview <id>|history|pending|motion|key …|publish <id>|crate …|stats <id>|admin|audit]";
 
+    private static final SingleArgumentType<String> MOTION = MysticArgTypes.choices("reduced", "full", "default");
+    private static final SingleArgumentType<String> ON_OFF = MysticArgTypes.choices("on", "off");
+    private static final SingleArgumentType<String> RECONCILE = MysticArgTypes.choices("regrant", "dismiss");
+
     private final LootBoxModule module;
+    /** Pool draft ids (staff commands act on drafts). */
+    private final SingleArgumentType<String> poolIds;
+    /** Published pool ids (what a player can preview). */
+    private final SingleArgumentType<String> publishedIds;
+    /** Published key ids. */
+    private final SingleArgumentType<String> keyIds;
+    /** Key draft ids (what can be published). */
+    private final SingleArgumentType<String> keyDraftIds;
+    private final SingleArgumentType<String> crateIds;
 
     public LootBoxCommand(MysticCore core, LootBoxModule module, String name, java.util.List<String> aliases) {
         super(core, name, "Open loot boxes, see their exact odds, and manage them.");
@@ -60,11 +87,138 @@ public final class LootBoxCommand extends MysticCommand {
         }
         requirePermission(Permissions.LOOTBOX_USE);
         allowExtraArguments();
+        poolIds = MysticArgTypes.dynamic(sender -> module.registry().drafts().keySet());
+        publishedIds = MysticArgTypes.dynamic(sender -> module.registry().publishedPools().stream()
+                .map(revision -> revision.lootboxId).toList());
+        keyIds = MysticArgTypes.dynamic(sender -> module.registry().keys().stream()
+                .map(key -> key.spec.id).toList());
+        keyDraftIds = MysticArgTypes.dynamic(sender -> module.registry().keyDrafts().keySet());
+        crateIds = MysticArgTypes.dynamic(sender -> module.crates().list().stream()
+                .map(crate -> crate.crateId).toList());
+        registerCompletion();
+    }
+
+    // ----- Completion tree ----------------------------------------------------
+
+    /**
+     * Builds each branch bottom-up. On 0.7.2 {@code addSubCommand} copies the
+     * child's aliases at that moment and marks the child registered, after which
+     * the child takes no more subcommands or variants, so aliases and children
+     * come first.
+     */
+    private void registerCompletion() {
+        add(this, node("preview", "See a pool's rewards and exact odds.", publishedIds));
+        add(this, node("history", "Your recent openings.", MysticArgTypes.PLAYER_NAME));
+        add(this, node("pending", "Rewards waiting for you."));
+        add(this, node("motion", "Reduced or full reveal animation.", MOTION));
+        Node key = node("key", "Keys: give, revoke, deposit, withdraw...");
+        key.addAliases("keys");
+        add(key, node("give", "Give keys to a player.", MysticArgTypes.PLAYER_NAME, keyIds));
+        add(key, node("revoke", "Revoke a key by serial."));
+        add(key, node("info", "Look up a key serial."));
+        add(key, node("list", "List published keys."));
+        add(key, node("publish", "Publish a key draft.", keyDraftIds));
+        add(key, node("grants", "Recent grants of a key.", keyIds));
+        add(key, node("deposit", "Store the held key item."));
+        add(key, node("withdraw", "Take stored keys out as items.", keyIds));
+        add(this, key);
+        add(this, node("publish", "Publish a pool draft.", poolIds));
+        add(this, node("rollback", "Roll a pool back to a revision.", poolIds));
+        add(this, node("disable", "Turn a pool off.", poolIds));
+        add(this, node("enable", "Turn a pool back on.", poolIds));
+        add(this, node("simulate", "Simulate draws of a pool.", poolIds));
+        add(this, node("chance", "Chance of getting an item from a pool.", poolIds));
+        add(this, node("schedule", "A pool's scheduled start.", poolIds));
+        add(this, node("providers", "Installed reward providers."));
+        add(this, node("stats", "Opening statistics of a pool.", poolIds));
+        Node crate = node("crate", "Crates: convert, edit, rebind, remove...");
+        crate.addAliases("crates");
+        add(crate, node("select", "Select the block you look at."));
+        add(crate, node("convert", "Make the looked-at block a crate.", poolIds));
+        add(crate, node("edit", "Open the crate editor.", crateIds));
+        add(crate, node("rebind", "Bind a crate to another pool.", crateIds, poolIds));
+        add(crate, node("remove", "Remove a crate.", crateIds));
+        add(crate, node("enable", "Turn a crate back on.", crateIds));
+        add(crate, node("verify", "Check a crate's block.", crateIds));
+        add(crate, node("info", "Details of a crate.", crateIds));
+        add(crate, node("list", "List crates."));
+        add(crate, node("effects", "Crate particles and sounds for you.", ON_OFF));
+        add(this, crate);
+        add(this, node("reconcile", "Resolve a stuck opening.", ArgTypes.STRING, RECONCILE));
+        add(this, node("admin", "Open the LootBox manager."));
+        add(this, node("audit", "Open the audit history."));
+        add(this, node("reload", "Reload the LootBox module."));
+    }
+
+    /** Literal {@code name}, with a variant that completes {@code args}; not yet attached to a parent. */
+    private Node node(String name, String description, SingleArgumentType<?>... args) {
+        Node node = new Node(name, description);
+        if (args.length > 0) {
+            node.addUsageVariant(new Typed(description, args));
+        }
+        return node;
+    }
+
+    private static void add(com.hypixel.hytale.server.core.command.system.AbstractCommand parent, Node child) {
+        parent.addSubCommand(child);
+    }
+
+    /** A completable literal; it parses nothing and dispatches the raw tokens. */
+    private final class Node extends MysticCommand {
+        Node(String name, String description) {
+            super(LootBoxCommand.this.core, name, description);
+            requirePermission(Permissions.LOOTBOX_USE);
+            allowExtraArguments();
+        }
+
+        @Override
+        protected void run(MysticCommandSender sender) {
+            dispatch(sender, rootArgs(sender));
+        }
+    }
+
+    /** A literal's typed arguments, there only so the client can complete them. */
+    private final class Typed extends MysticCommand {
+        Typed(String description, SingleArgumentType<?>... args) {
+            super(LootBoxCommand.this.core, description);
+            requirePermission(Permissions.LOOTBOX_USE);
+            allowExtraArguments();
+            for (int i = 0; i < args.length; i++) {
+                withRequiredArg("arg" + (i + 1), description, args[i]);
+            }
+        }
+
+        @Override
+        protected void run(MysticCommandSender sender) {
+            dispatch(sender, rootArgs(sender));
+        }
+    }
+
+    /**
+     * The tokens after {@code /lootbox} (or an alias), whichever node ran. The
+     * engine keeps the whole command line in the input string whatever the
+     * subcommand depth ({@code ParserContext#convertToSubCommand} only moves an
+     * index), so drop the root token when it is the root's name, as
+     * {@link MysticCommandSender#args()} does at depth 1.
+     */
+    private String[] rootArgs(MysticCommandSender sender) {
+        String input = sender.raw().getInputString();
+        if (input == null || input.isBlank()) {
+            return new String[0];
+        }
+        String[] tokens = input.trim().split("\\s+");
+        String first = tokens[0].startsWith("/") ? tokens[0].substring(1) : tokens[0];
+        boolean root = first.equalsIgnoreCase(getName())
+                || Stream.of(getAliases().toArray(String[]::new)).anyMatch(first::equalsIgnoreCase);
+        return root ? java.util.Arrays.copyOfRange(tokens, 1, tokens.length) : tokens;
     }
 
     @Override
     protected void run(MysticCommandSender sender) {
-        String[] args = sender.args();
+        dispatch(sender, sender.args());
+    }
+
+    private void dispatch(MysticCommandSender sender, String[] args) {
         String sub = args.length == 0 ? "" : args[0].toLowerCase(Locale.ROOT);
         switch (sub) {
             case "" -> player(sender).ifPresent(player -> module.ui().openCatalog(player));

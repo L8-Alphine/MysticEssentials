@@ -87,6 +87,16 @@ public final class MysticArgTypes {
         return new DynamicString(STRING_NAME_KEY, STRING_USAGE_KEY, values);
     }
 
+    /**
+     * A string argument that completes to a fixed set of words, such as
+     * {@code reduced|full|default}. Like {@link #dynamic}, each call is a new type
+     * with its own suggestion id: keep the result in a {@code static final} field.
+     */
+    public static SingleArgumentType<String> choices(String... values) {
+        List<String> words = List.of(values);
+        return new DynamicString(STRING_NAME_KEY, STRING_USAGE_KEY, sender -> words);
+    }
+
     /** Online player usernames the sender is allowed to see. */
     public static List<String> visiblePlayerNames(CommandSender sender) {
         MysticCore instance = core;
