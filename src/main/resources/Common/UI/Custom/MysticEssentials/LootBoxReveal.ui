@@ -1,13 +1,16 @@
-// LootBox reveal. The server moves the #Hl highlight down the reward list with
-// live updates and lands on the outcome it already committed; the odds stay on
-// screen the whole time, and Skip only jumps to the end.
+// LootBox reveal (Bible v2.0 presentation adapters). The outcome is committed
+// server-side before this page opens; the stage only shows it. Exactly one of
+// #ReelStage, #GridStage and #QuickStage is visible. The reel's middle cell
+// (#Reel3) is the marker; the server rewrites #Reel0-#Reel6 one step at a time.
+// The grid lights #CellN #Hl. #RevealList is the odds catalog: every reward and
+// its exact chance (LootBoxRevealRow.ui), on screen in every phase.
 $C = "../Common.ui";
 $M = "MysticTheme.ui";
 
 $C.@PageOverlay {}
 
 $C.@Container {
-  Anchor: (Width: 760, Height: 640);
+  Anchor: (Width: 1000, Height: 660);
 
   #Title {
     Group {
@@ -25,34 +28,605 @@ $C.@Container {
       Style: $M.@DisplayStyle;
     }
 
-    $M.@Well {
+    Group {
+      LayoutMode: Left;
       FlexWeight: 1;
 
-      Group #RevealList {
+      // ----- Stage and result -------------------------------------------------
+      Group {
+        LayoutMode: Top;
         FlexWeight: 1;
-        LayoutMode: TopScrolling;
-        Padding: (Right: 6);
-        ScrollbarStyle: $C.@DefaultScrollbarStyle;
+        Anchor: (Right: 14);
+
+        $M.@Panel {
+          @Padding = 14;
+
+          Anchor: (Height: 230);
+
+          Group #ReelStage {
+            LayoutMode: Top;
+            Visible: false;
+
+            Label {
+              Anchor: (Height: 18, Bottom: 6);
+              Style: $M.@HintStyle;
+              Text: "The reward under the gold marker is yours. Reel spacing is not the odds; the list on the right is.";
+            }
+
+            Group {
+              LayoutMode: Left;
+              Anchor: (Height: 112);
+
+            Group #Reel0 {
+              Anchor: (Width: 70, Height: 112, Right: 5);
+              LayoutMode: Top;
+              Padding: (Left: 4, Right: 4, Top: 8, Bottom: 6);
+              Background: #0a0f16(0.45);
+
+              Group {
+                Anchor: (Height: 44, Bottom: 6);
+                LayoutMode: CenterMiddle;
+
+                ItemSlot #Icon {
+                  Anchor: (Width: 40, Height: 40);
+                  ShowQualityBackground: true;
+                  ShowQuantity: false;
+                }
+              }
+
+              Label #Name {
+                Anchor: (Height: 36);
+                Style: $M.@RowMetaFitStyle;
+              }
+            }
+            Group #Reel1 {
+              Anchor: (Width: 70, Height: 112, Right: 5);
+              LayoutMode: Top;
+              Padding: (Left: 4, Right: 4, Top: 8, Bottom: 6);
+              Background: #0a0f16(0.45);
+
+              Group {
+                Anchor: (Height: 44, Bottom: 6);
+                LayoutMode: CenterMiddle;
+
+                ItemSlot #Icon {
+                  Anchor: (Width: 40, Height: 40);
+                  ShowQualityBackground: true;
+                  ShowQuantity: false;
+                }
+              }
+
+              Label #Name {
+                Anchor: (Height: 36);
+                Style: $M.@RowMetaFitStyle;
+              }
+            }
+            Group #Reel2 {
+              Anchor: (Width: 70, Height: 112, Right: 5);
+              LayoutMode: Top;
+              Padding: (Left: 4, Right: 4, Top: 8, Bottom: 6);
+              Background: #0a0f16(0.45);
+
+              Group {
+                Anchor: (Height: 44, Bottom: 6);
+                LayoutMode: CenterMiddle;
+
+                ItemSlot #Icon {
+                  Anchor: (Width: 40, Height: 40);
+                  ShowQualityBackground: true;
+                  ShowQuantity: false;
+                }
+              }
+
+              Label #Name {
+                Anchor: (Height: 36);
+                Style: $M.@RowMetaFitStyle;
+              }
+            }
+            Group #Reel3 {
+              Anchor: (Width: 70, Height: 112, Right: 5);
+              LayoutMode: Top;
+              Padding: (Left: 4, Right: 4, Top: 8, Bottom: 6);
+              Background: #3a2a10(0.85);
+
+              Group {
+                Anchor: (Height: 44, Bottom: 6);
+                LayoutMode: CenterMiddle;
+
+                ItemSlot #Icon {
+                  Anchor: (Width: 40, Height: 40);
+                  ShowQualityBackground: true;
+                  ShowQuantity: false;
+                }
+              }
+
+              Label #Name {
+                Anchor: (Height: 36);
+                Style: $M.@RowMetaFitStyle;
+              }
+            }
+            Group #Reel4 {
+              Anchor: (Width: 70, Height: 112, Right: 5);
+              LayoutMode: Top;
+              Padding: (Left: 4, Right: 4, Top: 8, Bottom: 6);
+              Background: #0a0f16(0.45);
+
+              Group {
+                Anchor: (Height: 44, Bottom: 6);
+                LayoutMode: CenterMiddle;
+
+                ItemSlot #Icon {
+                  Anchor: (Width: 40, Height: 40);
+                  ShowQualityBackground: true;
+                  ShowQuantity: false;
+                }
+              }
+
+              Label #Name {
+                Anchor: (Height: 36);
+                Style: $M.@RowMetaFitStyle;
+              }
+            }
+            Group #Reel5 {
+              Anchor: (Width: 70, Height: 112, Right: 5);
+              LayoutMode: Top;
+              Padding: (Left: 4, Right: 4, Top: 8, Bottom: 6);
+              Background: #0a0f16(0.45);
+
+              Group {
+                Anchor: (Height: 44, Bottom: 6);
+                LayoutMode: CenterMiddle;
+
+                ItemSlot #Icon {
+                  Anchor: (Width: 40, Height: 40);
+                  ShowQualityBackground: true;
+                  ShowQuantity: false;
+                }
+              }
+
+              Label #Name {
+                Anchor: (Height: 36);
+                Style: $M.@RowMetaFitStyle;
+              }
+            }
+            Group #Reel6 {
+              Anchor: (Width: 70, Height: 112, Right: 5);
+              LayoutMode: Top;
+              Padding: (Left: 4, Right: 4, Top: 8, Bottom: 6);
+              Background: #0a0f16(0.45);
+
+              Group {
+                Anchor: (Height: 44, Bottom: 6);
+                LayoutMode: CenterMiddle;
+
+                ItemSlot #Icon {
+                  Anchor: (Width: 40, Height: 40);
+                  ShowQualityBackground: true;
+                  ShowQuantity: false;
+                }
+              }
+
+              Label #Name {
+                Anchor: (Height: 36);
+                Style: $M.@RowMetaFitStyle;
+              }
+            }
+            }
+          }
+
+          Group #GridStage {
+            LayoutMode: Top;
+            Visible: false;
+
+            Group {
+              LayoutMode: Left;
+              Anchor: (Height: 52, Bottom: 6);
+
+              Group #Cell0 {
+                Anchor: (Width: 124, Height: 52, Right: 6);
+                LayoutMode: Full;
+                Background: #0a0f16(0.45);
+
+                Group #Hl {
+                  Anchor: (Full: 0);
+                  Background: #E8A93B(0.45);
+                  Visible: false;
+                }
+
+                Group {
+                  Anchor: (Full: 0);
+                  LayoutMode: Left;
+                  Padding: (Left: 6, Right: 6, Top: 6, Bottom: 6);
+
+                  ItemSlot #Icon {
+                    Anchor: (Width: 36, Height: 36, Right: 6);
+                    ShowQualityBackground: true;
+                    ShowQuantity: false;
+                  }
+
+                  Label #Name {
+                    FlexWeight: 1;
+                    Style: $M.@RowMetaFitStyle;
+                  }
+                }
+              }
+              Group #Cell1 {
+                Anchor: (Width: 124, Height: 52, Right: 6);
+                LayoutMode: Full;
+                Background: #0a0f16(0.45);
+
+                Group #Hl {
+                  Anchor: (Full: 0);
+                  Background: #E8A93B(0.45);
+                  Visible: false;
+                }
+
+                Group {
+                  Anchor: (Full: 0);
+                  LayoutMode: Left;
+                  Padding: (Left: 6, Right: 6, Top: 6, Bottom: 6);
+
+                  ItemSlot #Icon {
+                    Anchor: (Width: 36, Height: 36, Right: 6);
+                    ShowQualityBackground: true;
+                    ShowQuantity: false;
+                  }
+
+                  Label #Name {
+                    FlexWeight: 1;
+                    Style: $M.@RowMetaFitStyle;
+                  }
+                }
+              }
+              Group #Cell2 {
+                Anchor: (Width: 124, Height: 52, Right: 6);
+                LayoutMode: Full;
+                Background: #0a0f16(0.45);
+
+                Group #Hl {
+                  Anchor: (Full: 0);
+                  Background: #E8A93B(0.45);
+                  Visible: false;
+                }
+
+                Group {
+                  Anchor: (Full: 0);
+                  LayoutMode: Left;
+                  Padding: (Left: 6, Right: 6, Top: 6, Bottom: 6);
+
+                  ItemSlot #Icon {
+                    Anchor: (Width: 36, Height: 36, Right: 6);
+                    ShowQualityBackground: true;
+                    ShowQuantity: false;
+                  }
+
+                  Label #Name {
+                    FlexWeight: 1;
+                    Style: $M.@RowMetaFitStyle;
+                  }
+                }
+              }
+              Group #Cell3 {
+                Anchor: (Width: 124, Height: 52, Right: 6);
+                LayoutMode: Full;
+                Background: #0a0f16(0.45);
+
+                Group #Hl {
+                  Anchor: (Full: 0);
+                  Background: #E8A93B(0.45);
+                  Visible: false;
+                }
+
+                Group {
+                  Anchor: (Full: 0);
+                  LayoutMode: Left;
+                  Padding: (Left: 6, Right: 6, Top: 6, Bottom: 6);
+
+                  ItemSlot #Icon {
+                    Anchor: (Width: 36, Height: 36, Right: 6);
+                    ShowQualityBackground: true;
+                    ShowQuantity: false;
+                  }
+
+                  Label #Name {
+                    FlexWeight: 1;
+                    Style: $M.@RowMetaFitStyle;
+                  }
+                }
+              }
+            }
+
+            Group {
+              LayoutMode: Left;
+              Anchor: (Height: 52, Bottom: 6);
+
+              Group #Cell4 {
+                Anchor: (Width: 124, Height: 52, Right: 6);
+                LayoutMode: Full;
+                Background: #0a0f16(0.45);
+
+                Group #Hl {
+                  Anchor: (Full: 0);
+                  Background: #E8A93B(0.45);
+                  Visible: false;
+                }
+
+                Group {
+                  Anchor: (Full: 0);
+                  LayoutMode: Left;
+                  Padding: (Left: 6, Right: 6, Top: 6, Bottom: 6);
+
+                  ItemSlot #Icon {
+                    Anchor: (Width: 36, Height: 36, Right: 6);
+                    ShowQualityBackground: true;
+                    ShowQuantity: false;
+                  }
+
+                  Label #Name {
+                    FlexWeight: 1;
+                    Style: $M.@RowMetaFitStyle;
+                  }
+                }
+              }
+              Group #Cell5 {
+                Anchor: (Width: 124, Height: 52, Right: 6);
+                LayoutMode: Full;
+                Background: #0a0f16(0.45);
+
+                Group #Hl {
+                  Anchor: (Full: 0);
+                  Background: #E8A93B(0.45);
+                  Visible: false;
+                }
+
+                Group {
+                  Anchor: (Full: 0);
+                  LayoutMode: Left;
+                  Padding: (Left: 6, Right: 6, Top: 6, Bottom: 6);
+
+                  ItemSlot #Icon {
+                    Anchor: (Width: 36, Height: 36, Right: 6);
+                    ShowQualityBackground: true;
+                    ShowQuantity: false;
+                  }
+
+                  Label #Name {
+                    FlexWeight: 1;
+                    Style: $M.@RowMetaFitStyle;
+                  }
+                }
+              }
+              Group #Cell6 {
+                Anchor: (Width: 124, Height: 52, Right: 6);
+                LayoutMode: Full;
+                Background: #0a0f16(0.45);
+
+                Group #Hl {
+                  Anchor: (Full: 0);
+                  Background: #E8A93B(0.45);
+                  Visible: false;
+                }
+
+                Group {
+                  Anchor: (Full: 0);
+                  LayoutMode: Left;
+                  Padding: (Left: 6, Right: 6, Top: 6, Bottom: 6);
+
+                  ItemSlot #Icon {
+                    Anchor: (Width: 36, Height: 36, Right: 6);
+                    ShowQualityBackground: true;
+                    ShowQuantity: false;
+                  }
+
+                  Label #Name {
+                    FlexWeight: 1;
+                    Style: $M.@RowMetaFitStyle;
+                  }
+                }
+              }
+              Group #Cell7 {
+                Anchor: (Width: 124, Height: 52, Right: 6);
+                LayoutMode: Full;
+                Background: #0a0f16(0.45);
+
+                Group #Hl {
+                  Anchor: (Full: 0);
+                  Background: #E8A93B(0.45);
+                  Visible: false;
+                }
+
+                Group {
+                  Anchor: (Full: 0);
+                  LayoutMode: Left;
+                  Padding: (Left: 6, Right: 6, Top: 6, Bottom: 6);
+
+                  ItemSlot #Icon {
+                    Anchor: (Width: 36, Height: 36, Right: 6);
+                    ShowQualityBackground: true;
+                    ShowQuantity: false;
+                  }
+
+                  Label #Name {
+                    FlexWeight: 1;
+                    Style: $M.@RowMetaFitStyle;
+                  }
+                }
+              }
+            }
+
+            Group {
+              LayoutMode: Left;
+              Anchor: (Height: 52, Bottom: 6);
+
+              Group #Cell8 {
+                Anchor: (Width: 124, Height: 52, Right: 6);
+                LayoutMode: Full;
+                Background: #0a0f16(0.45);
+
+                Group #Hl {
+                  Anchor: (Full: 0);
+                  Background: #E8A93B(0.45);
+                  Visible: false;
+                }
+
+                Group {
+                  Anchor: (Full: 0);
+                  LayoutMode: Left;
+                  Padding: (Left: 6, Right: 6, Top: 6, Bottom: 6);
+
+                  ItemSlot #Icon {
+                    Anchor: (Width: 36, Height: 36, Right: 6);
+                    ShowQualityBackground: true;
+                    ShowQuantity: false;
+                  }
+
+                  Label #Name {
+                    FlexWeight: 1;
+                    Style: $M.@RowMetaFitStyle;
+                  }
+                }
+              }
+              Group #Cell9 {
+                Anchor: (Width: 124, Height: 52, Right: 6);
+                LayoutMode: Full;
+                Background: #0a0f16(0.45);
+
+                Group #Hl {
+                  Anchor: (Full: 0);
+                  Background: #E8A93B(0.45);
+                  Visible: false;
+                }
+
+                Group {
+                  Anchor: (Full: 0);
+                  LayoutMode: Left;
+                  Padding: (Left: 6, Right: 6, Top: 6, Bottom: 6);
+
+                  ItemSlot #Icon {
+                    Anchor: (Width: 36, Height: 36, Right: 6);
+                    ShowQualityBackground: true;
+                    ShowQuantity: false;
+                  }
+
+                  Label #Name {
+                    FlexWeight: 1;
+                    Style: $M.@RowMetaFitStyle;
+                  }
+                }
+              }
+              Group #Cell10 {
+                Anchor: (Width: 124, Height: 52, Right: 6);
+                LayoutMode: Full;
+                Background: #0a0f16(0.45);
+
+                Group #Hl {
+                  Anchor: (Full: 0);
+                  Background: #E8A93B(0.45);
+                  Visible: false;
+                }
+
+                Group {
+                  Anchor: (Full: 0);
+                  LayoutMode: Left;
+                  Padding: (Left: 6, Right: 6, Top: 6, Bottom: 6);
+
+                  ItemSlot #Icon {
+                    Anchor: (Width: 36, Height: 36, Right: 6);
+                    ShowQualityBackground: true;
+                    ShowQuantity: false;
+                  }
+
+                  Label #Name {
+                    FlexWeight: 1;
+                    Style: $M.@RowMetaFitStyle;
+                  }
+                }
+              }
+              Group #Cell11 {
+                Anchor: (Width: 124, Height: 52, Right: 6);
+                LayoutMode: Full;
+                Background: #0a0f16(0.45);
+
+                Group #Hl {
+                  Anchor: (Full: 0);
+                  Background: #E8A93B(0.45);
+                  Visible: false;
+                }
+
+                Group {
+                  Anchor: (Full: 0);
+                  LayoutMode: Left;
+                  Padding: (Left: 6, Right: 6, Top: 6, Bottom: 6);
+
+                  ItemSlot #Icon {
+                    Anchor: (Width: 36, Height: 36, Right: 6);
+                    ShowQualityBackground: true;
+                    ShowQuantity: false;
+                  }
+
+                  Label #Name {
+                    FlexWeight: 1;
+                    Style: $M.@RowMetaFitStyle;
+                  }
+                }
+              }
+            }
+
+          }
+
+          Group #QuickStage {
+            LayoutMode: Top;
+            Visible: false;
+
+            Label #QuickLine {
+              Anchor: (Height: 40, Top: 60);
+              Style: $M.@DisplaySmallStyle;
+            }
+          }
+        }
+
+        $M.@Panel {
+          @Padding = 14;
+
+          Anchor: (Top: 12);
+
+          Label #ResultName {
+            Anchor: (Height: 26, Bottom: 4);
+            Style: $M.@DisplaySmallStyle;
+          }
+
+          Label #ResultMeta {
+            Anchor: (Bottom: 2);
+            Style: $M.@MetaWrapStyle;
+          }
+
+          Label #Status {
+            Anchor: (Height: 18);
+            Style: $M.@MetaGoldStyle;
+          }
+        }
       }
-    }
 
-    $M.@Panel {
-      @Padding = 14;
-      Anchor: (Top: 12);
+      // ----- Odds catalog: always shown, never hidden -------------------------
+      Group {
+        LayoutMode: Top;
+        Anchor: (Width: 360);
 
-      Label #ResultName {
-        Anchor: (Height: 26, Bottom: 4);
-        Style: $M.@DisplaySmallStyle;
-      }
+        $M.@Section {
+          @Text = "Every reward and its chance";
+          @Anchor = (Bottom: 6);
+        }
 
-      Label #ResultMeta {
-        Anchor: (Bottom: 2);
-        Style: $M.@MetaWrapStyle;
-      }
+        $M.@Well {
+          FlexWeight: 1;
 
-      Label #Status {
-        Anchor: (Height: 18);
-        Style: $M.@MetaGoldStyle;
+          Group #RevealList {
+            FlexWeight: 1;
+            LayoutMode: TopScrolling;
+            Padding: (Right: 6);
+            ScrollbarStyle: $C.@DefaultScrollbarStyle;
+          }
+        }
       }
     }
 

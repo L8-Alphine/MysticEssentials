@@ -61,6 +61,13 @@ public final class LootBoxConfig {
         public int revealFramesPerSecond = 10;
         public boolean allowSkip = true;
         /**
+         * How openings are shown: HORIZONTAL_REEL, GRID_ROULETTE or QUICK_REVEAL.
+         * Every mode lands on the result the server already drew; players with
+         * reduced motion always get QUICK_REVEAL. The reel and the roulette push
+         * at most min(revealFramesPerSecond, 8) updates a second (Bible v2.0 §09).
+         */
+        public String presentation = "HORIZONTAL_REEL";
+        /**
          * Reduced motion for players who never chose (P2-L): true shows every
          * reveal's result at once. Each player can override it with
          * {@code /lootbox motion} or the Catalog's Motion button.

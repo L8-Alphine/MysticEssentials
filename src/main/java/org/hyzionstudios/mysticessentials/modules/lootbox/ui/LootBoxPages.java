@@ -24,6 +24,8 @@ import org.hyzionstudios.mysticessentials.modules.lootbox.model.PlayerLootState;
 import org.hyzionstudios.mysticessentials.modules.lootbox.odds.ItemChance;
 import org.hyzionstudios.mysticessentials.modules.lootbox.odds.OddsFormatter;
 import org.hyzionstudios.mysticessentials.modules.lootbox.odds.OddsTable;
+import org.hyzionstudios.mysticessentials.modules.lootbox.presentation.PresentationMode;
+import org.hyzionstudios.mysticessentials.modules.lootbox.presentation.TimelinePlanner;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.MotionRules;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.OpeningService;
 import org.hyzionstudios.mysticessentials.modules.lootbox.service.RewardService;
@@ -501,18 +503,27 @@ public final class LootBoxPages {
 
     // ----- Reveal -------------------------------------------------------------
 
+    /**
+     * The reveal (Bible v2.0 §05/§08). The outcome was drawn and recorded by
+     * {@code OpeningService} before this page was built; the page plans a
+     * cosmetic timeline around it ({@link TimelinePlanner}) and hands each step
+     * to the mode's {@link PresentationAdapter}. The odds catalog is drawn once
+     * and never hidden. Steps are scheduled at the planner's times, each one a
+     * single push, so an opening never exceeds the Bible §09 rate.
+     */
     static final class RevealPage extends MysticPage {
 
         private final LootBoxModule module;
         private final OpeningService.OpenResult result;
-        /** Reduced motion (P2-L): land on the result without animating. */
+        /** Reduced motion (P2-L): Quick Reveal, whatever the server's mode. */
         private final boolean reducedMotion;
+        private final List<ScheduledFuture<?>> steps = new ArrayList<>();
         private volatile boolean landed;
         private volatile boolean dismissed;
         private volatile String status = "Delivering...";
-        private ScheduledFuture<?> animation;
-        private int highlighted = -1;
-        private int frames;
+        private PresentationAdapter adapter;
+        private PresentationAdapter.Stage stage;
+        private int shown;
 
         RevealPage(MysticCore core, PlayerRef player, LootBoxModule module, OpeningService.OpenResult result,
                 boolean reducedMotion) {
@@ -529,12 +540,14 @@ public final class LootBoxPages {
             OddsTable table = result.table();
             OddsFormatter formatter = module.opening().formatter();
             cmd.set("#PreviewTitle.TextSpans", uiText("#PreviewTitle.TextSpans", revision.spec.displayName));
+            List<LootBoxDraft.RewardSpec> rewards = new ArrayList<>(table.entries().size());
             for (int i = 0; i < table.entries().size(); i++) {
                 OddsTable.Entry entry = table.entries().get(i);
+                LootBoxDraft.RewardSpec reward = revision.spec.rewards.get(entry.index());
+                rewards.add(reward);
                 String row = "#RevealList[" + i + "]";
                 cmd.append("#RevealList", REVEAL_ROW_UI);
-                cmd.set(row + " #Name.TextSpans", uiText(row + " #Name.TextSpans",
-                        rewardName(revision.spec.rewards.get(entry.index()))));
+                cmd.set(row + " #Name.TextSpans", uiText(row + " #Name.TextSpans", rewardName(reward)));
                 cmd.set(row + " #Odds.TextSpans", uiText(row + " #Odds.TextSpans",
                         formatter.percent(entry.weight(), table.total())));
             }
@@ -563,6 +576,24 @@ public final class LootBoxPages {
                     new EventData().put("action", "skip"));
             event.addEventBinding(CustomUIEventBindingType.Activating, "#CloseButton",
                     new EventData().put("action", "close"));
+
+            LootBoxConfig.Opening opening = module.config().opening;
+            PresentationMode mode = reducedMotion ? PresentationMode.QUICK_REVEAL
+                    : PresentationMode.parse(opening.presentation, PresentationMode.HORIZONTAL_REEL);
+            int winner = table.entries().indexOf(result.entry());
+            if (winner < 0) {
+                // Never animate towards a guess: show only the committed reward.
+                mode = PresentationMode.QUICK_REVEAL;
+                rewards = List.of(revision.spec.rewards.get(result.entry().index()));
+                winner = 0;
+            }
+            TimelinePlanner.Timeline plan = TimelinePlanner.plan(mode, rewards.size(), winner,
+                    opening.revealDurationMs, MotionRules.framesPerSecond(opening.revealFramesPerSecond),
+                    String.valueOf(result.opening().openingId).hashCode());
+            adapter = PresentationAdapters.of(plan.mode());
+            stage = new PresentationAdapter.Stage(plan, List.copyOf(rewards));
+            adapter.build(cmd, stage);
+
             World world = store.getExternalData().getWorld();
             result.delivery().thenAccept(delivery -> {
                 status = delivery.label();
@@ -570,32 +601,38 @@ public final class LootBoxPages {
                     world.execute(this::pushStatus);
                 }
             });
-            startAnimation(world);
+            schedule(world);
         }
 
-        private void startAnimation(World world) {
-            LootBoxConfig.Opening opening = module.config().opening;
-            int fps = MotionRules.framesPerSecond(opening.revealFramesPerSecond);
-            int total = MotionRules.revealFrames(opening.revealDurationMs, fps, reducedMotion);
-            if (total == 0 || animation != null) {
+        /** One scheduled task per step, at the planner's times; none for Quick Reveal. */
+        private void schedule(World world) {
+            if (!steps.isEmpty() || landed) {
+                return;
+            }
+            List<Long> times = stage.plan().stepAtMs();
+            if (times.isEmpty()) {
                 world.execute(this::land);
                 return;
             }
-            long period = Math.max(1L, 1000L / fps);
-            animation = core.scheduler().runRepeating(() -> world.execute(() -> frame(total)), period, period,
-                    TimeUnit.MILLISECONDS);
+            for (int i = 0; i < times.size(); i++) {
+                int step = i + 1;
+                steps.add(core.scheduler().runLater(() -> world.execute(() -> step(step)), times.get(i),
+                        TimeUnit.MILLISECONDS));
+            }
         }
 
-        private void frame(int total) {
-            if (landed || dismissed) {
+        private void step(int step) {
+            if (landed || dismissed || step <= shown) {
                 return;
             }
-            frames++;
-            if (frames >= total) {
+            shown = step;
+            if (step >= stage.plan().steps()) {
                 land();
                 return;
             }
-            highlight(frames % result.table().entries().size(), null);
+            UICommandBuilder cmd = new UICommandBuilder();
+            adapter.step(cmd, stage, step);
+            sendUpdate(cmd);
         }
 
         private void land() {
@@ -603,17 +640,21 @@ public final class LootBoxPages {
                 return;
             }
             landed = true;
-            if (animation != null) {
-                animation.cancel(false);
-            }
+            steps.forEach(task -> task.cancel(false));
             UICommandBuilder cmd = new UICommandBuilder();
+            adapter.land(cmd, stage);
             LootBoxDraft.RewardSpec reward = result.revision().spec.rewards.get(result.entry().index());
             cmd.set("#ResultName.TextSpans", uiText("#ResultName.TextSpans", "You won " + rewardName(reward)));
             cmd.set("#ResultMeta.TextSpans", uiText("#ResultMeta.TextSpans", "Chance " + result.opening().probability
                     + " · " + module.opening().formatter().oneIn(result.entry().weight(), result.table().total())
                     + bonusLine(result.opening()) + " · Receipt " + result.opening().openingId));
             cmd.set("#Status.TextSpans", uiText("#Status.TextSpans", status));
-            highlight(result.table().entries().indexOf(result.entry()), cmd);
+            int row = result.table().entries().indexOf(result.entry());
+            if (row >= 0) {
+                cmd.set("#RevealList[" + row + "] #Hl.Visible", true);
+            }
+            cmd.set("#SkipButton.Visible", false);
+            sendUpdate(cmd);
         }
 
         /** What each bonus roll landed on, with the exact chance it had. */
@@ -637,16 +678,6 @@ public final class LootBoxPages {
             sendUpdate(cmd);
         }
 
-        private void highlight(int next, UICommandBuilder existing) {
-            UICommandBuilder cmd = existing == null ? new UICommandBuilder() : existing;
-            if (highlighted >= 0 && highlighted != next) {
-                cmd.set("#RevealList[" + highlighted + "] #Hl.Visible", false);
-            }
-            cmd.set("#RevealList[" + next + "] #Hl.Visible", true);
-            highlighted = next;
-            sendUpdate(cmd);
-        }
-
         @Override
         public void handleDataEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
             if ("skip".equals(string(parse(data), "action"))) {
@@ -655,19 +686,18 @@ public final class LootBoxPages {
                 }
                 return;
             }
-            dismissed = true;
-            if (animation != null) {
-                animation.cancel(false);
-            }
+            stop();
             close(ref, store);
         }
 
         @Override
         public void onDismiss(Ref<EntityStore> ref, Store<EntityStore> store) {
+            stop();
+        }
+
+        private void stop() {
             dismissed = true;
-            if (animation != null) {
-                animation.cancel(false);
-            }
+            steps.forEach(task -> task.cancel(false));
         }
     }
 

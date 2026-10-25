@@ -636,6 +636,14 @@ tasks.register<JavaExec>("verifyLootBoxScreens") {
     mainClass.set("org.hyzionstudios.mysticessentials.modules.lootbox.LootBoxScreensTest")
 }
 
+tasks.register<JavaExec>("verifyLootBoxPresentation") {
+    group = "verification"
+    description = "Checks the LootBox presentation planner: the stop slot is the committed result, and pushes stay within budget."
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets.test.get().runtimeClasspath + configurations.compileClasspath.get()
+    mainClass.set("org.hyzionstudios.mysticessentials.modules.lootbox.LootBoxPresentationTest")
+}
+
 tasks.register<JavaExec>("verifyLootBoxAccessibility") {
     group = "verification"
     description = "Checks the LootBox accessibility pass: reduced motion, readable contrast, wrapping text, window sizes and focus."
@@ -703,6 +711,7 @@ tasks.named("check") {
         "verifyLootBoxCrates",
         "verifyLootBoxScreens",
         "verifyLootBoxAccessibility",
+        "verifyLootBoxPresentation",
         "verifyLootBoxAdvanced",
         "verifyLootBoxNetwork"
     )
