@@ -9,7 +9,7 @@ $M = "MysticTheme.ui";
 $C.@PageOverlay {}
 
 $C.@Container {
-  Anchor: (Width: 960, Height: 700);
+  Anchor: (Width: 1050, Height: 700);
 
   #Title {
     Group {
@@ -483,6 +483,172 @@ $C.@Container {
       Label #RulesNote {
         Anchor: (Top: 6);
         Style: $M.@HintStyle;
+      }
+    }
+
+    // ----- Pity & Duplicates ------------------------------------------------------
+    // Pool-level, so it is its own tab: pity counts openings of this pool, and a
+    // reward's duplicate rule moves its chance within this pool's main table.
+    $M.@Panel #PityPanel {
+      @Padding = 14;
+
+      FlexWeight: 1;
+      Visible: false;
+
+      Group {
+        LayoutMode: Left;
+        FlexWeight: 1;
+
+        Group {
+          LayoutMode: Top;
+          Anchor: (Width: 400, Right: 16);
+
+          $M.@Section {
+            @Text = "Main-table rewards";
+            @Anchor = (Bottom: 6);
+          }
+
+          Label #PityRewardsHint {
+            Anchor: (Bottom: 6);
+            Style: $M.@HintStyle;
+          }
+
+          $M.@Well {
+            FlexWeight: 1;
+
+            Group #PityRewardList {
+              FlexWeight: 1;
+              LayoutMode: TopScrolling;
+              Padding: (Right: 6);
+              ScrollbarStyle: $C.@DefaultScrollbarStyle;
+            }
+          }
+        }
+
+        Group {
+          LayoutMode: Top;
+          FlexWeight: 1;
+
+          $M.@Section {
+            @Text = "Pity";
+            @Anchor = (Bottom: 6);
+          }
+
+          Group {
+            LayoutMode: Left;
+            Anchor: (Height: 44, Bottom: 6);
+
+            Label #PityState {
+              FlexWeight: 1;
+              Style: $M.@BodyStyle;
+            }
+
+            $C.@SecondaryTextButton #PityOnButton {
+              @Text = "Turn Pity On";
+              @Anchor = (Width: 170, Left: 8);
+            }
+
+            $C.@SecondaryTextButton #PityOffButton {
+              @Text = "Turn Pity Off";
+              @Anchor = (Width: 170, Left: 8);
+            }
+          }
+
+          Group #PityFields {
+            LayoutMode: Left;
+            Anchor: (Height: 58, Bottom: 6);
+
+            Group {
+              LayoutMode: Top;
+              Anchor: (Width: 165, Right: 10);
+
+              $M.@FieldLabel { @Text = "Guaranteed by opening"; }
+              $C.@TextField #PityHardInput {
+                PlaceholderText: "0 = no guarantee";
+              }
+            }
+
+            Group {
+              LayoutMode: Top;
+              Anchor: (Width: 165, Right: 10);
+
+              $M.@FieldLabel { @Text = "Soft pity after"; }
+              $C.@TextField #PitySoftInput {
+                PlaceholderText: "0 = no soft pity";
+              }
+            }
+
+            Group {
+              LayoutMode: Top;
+              FlexWeight: 1;
+
+              $M.@FieldLabel { @Text = "Soft step (%)"; }
+              $C.@TextField #PityStepInput {
+                PlaceholderText: "25";
+              }
+            }
+          }
+
+          Label #PityPreview {
+            Anchor: (Height: 64, Bottom: 8);
+            Style: $M.@BodyMutedStyle;
+          }
+
+          $M.@Section {
+            @Text = "Selected reward";
+            @Anchor = (Bottom: 6);
+          }
+
+          Label #DupRewardName {
+            Anchor: (Height: 24, Bottom: 6);
+            Style: $M.@SubheadingStyle;
+          }
+
+          Group {
+            LayoutMode: Left;
+            Anchor: (Height: 44, Bottom: 6);
+
+            $C.@SecondaryTextButton #TargetOnButton {
+              @Text = "Make It a Pity Target";
+              @Anchor = (Width: 230);
+            }
+
+            $C.@SecondaryTextButton #TargetOffButton {
+              @Text = "Not a Pity Target";
+              @Anchor = (Width: 230);
+            }
+          }
+
+          Group {
+            LayoutMode: Left;
+            Anchor: (Height: 58, Bottom: 6);
+
+            Group {
+              LayoutMode: Top;
+              Anchor: (Width: 230, Right: 10);
+
+              $M.@FieldLabel { @Text = "If the player owns it"; }
+              $C.@DropdownBox #DuplicatesDropdown {
+                Anchor: (Width: 230, Height: 32);
+              }
+            }
+
+            Group #ReplacementGroup {
+              LayoutMode: Top;
+              FlexWeight: 1;
+
+              $M.@FieldLabel { @Text = "Its chance goes to"; }
+              $C.@DropdownBox #ReplacementDropdown {
+                Anchor: (Height: 32);
+              }
+            }
+          }
+
+          Label #DupHint {
+            Anchor: (Height: 48);
+            Style: $M.@HintStyle;
+          }
+        }
       }
     }
 

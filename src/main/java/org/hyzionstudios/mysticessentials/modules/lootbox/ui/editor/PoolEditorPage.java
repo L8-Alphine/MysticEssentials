@@ -60,21 +60,27 @@ public final class PoolEditorPage extends MysticPage {
     static final String TAB_GENERAL = "general";
     static final String TAB_REWARDS = "rewards";
     static final String TAB_RULES = "rules";
+    static final String TAB_PITY = "pity";
     static final String TAB_PUBLISH = "publish";
     static final List<EditorTabs.Tab> TABS = List.of(
             new EditorTabs.Tab(TAB_GENERAL, "General"),
             new EditorTabs.Tab(TAB_REWARDS, "Rewards"),
             new EditorTabs.Tab(TAB_RULES, "Keys & Rules"),
+            new EditorTabs.Tab(TAB_PITY, "Pity & Duplicates"),
             new EditorTabs.Tab(TAB_PUBLISH, "Publish"));
 
     static final FormFields.Field NAME = FormFields.Field.text("name", "#NameInput", "Display name");
     static final FormFields.Field DESCRIPTION = FormFields.Field.text("description", "#DescriptionInput", "Description");
     static final FormFields.Field COOLDOWN = FormFields.Field.text("cooldown", "#CooldownInput", "Cooldown");
     static final FormFields.Field PERMISSION = FormFields.Field.text("permission", "#PermissionInput", "Permission");
+    static final FormFields.Field PITY_HARD = FormFields.Field.text("pityHard", "#PityHardInput", "Guaranteed by opening");
+    static final FormFields.Field PITY_SOFT = FormFields.Field.text("pitySoft", "#PitySoftInput", "Soft pity after");
+    static final FormFields.Field PITY_STEP = FormFields.Field.text("pityStep", "#PityStepInput", "Soft step (%)");
     static final FormFields INPUTS = FormFields.of(fields());
 
     private static FormFields.Field[] fields() {
-        List<FormFields.Field> all = new ArrayList<>(List.of(NAME, DESCRIPTION, COOLDOWN, PERMISSION));
+        List<FormFields.Field> all = new ArrayList<>(List.of(NAME, DESCRIPTION, COOLDOWN, PERMISSION, PITY_HARD,
+                PITY_SOFT, PITY_STEP));
         all.addAll(RewardsTab.FIELDS);
         return all.toArray(FormFields.Field[]::new);
     }
@@ -84,6 +90,11 @@ public final class PoolEditorPage extends MysticPage {
     /** A year; longer cooldowns are almost certainly a typo. */
     private static final long MAX_COOLDOWN = 31_536_000L;
     private static final Pattern NODE = Pattern.compile("[A-Za-z0-9_.\\-]{1,128}");
+    /** The pity counters the validator accepts (DraftValidator.MAX_PITY). */
+    private static final long MAX_PITY = 10_000L;
+    private static final String ALLOW = "ALLOW";
+    private static final String EXCLUDE_OWNED = "EXCLUDE_OWNED";
+    private static final String NO_REPLACEMENT = "none";
 
     /**
      * What the page shows besides the session.
@@ -134,10 +145,12 @@ public final class PoolEditorPage extends MysticPage {
         cmd.set("#GeneralPanel.Visible", TAB_GENERAL.equals(tab));
         cmd.set("#RewardsPanel.Visible", TAB_REWARDS.equals(tab));
         cmd.set("#RulesPanel.Visible", TAB_RULES.equals(tab));
+        cmd.set("#PityPanel.Visible", TAB_PITY.equals(tab));
         cmd.set("#PublishPanel.Visible", TAB_PUBLISH.equals(tab));
         // The form's inputs exist on every tab (hidden ones too), so every event can carry them.
         buildGeneral(cmd, event, draft);
         buildRules(cmd, event, draft);
+        buildPity(cmd, event, draft);
         RewardsTab.build(cmd, event, rewards(), INPUTS::event);
         if (TAB_PUBLISH.equals(tab)) {
             buildPublish(cmd, draft, problems);
@@ -221,6 +234,129 @@ public final class PoolEditorPage extends MysticPage {
     private record KeyRow(String id, KeyDraft.Published published, boolean linked) {
     }
 
+    /**
+     * Pity & Duplicates. The rows are the main-table rewards; selecting one is
+     * the same selection as on the Rewards tab. Both settings feed the odds
+     * engine's personal table, which the preview shows and the confirmation
+     * pins by hash, so a change between preview and commit asks again.
+     */
+    private void buildPity(UICommandBuilder cmd, UIEventBuilder event, LootBoxDraft draft) {
+        LootBoxDraft.Pity pity = draft.pity;
+        boolean on = pity != null;
+        List<String> targets = on && pity.targets != null ? pity.targets : List.of();
+        int selected = RewardsTab.selected(session);
+
+        cmd.set("#PityRewardsHint.TextSpans", uiText("#PityRewardsHint.TextSpans", draft.rewards.isEmpty()
+                ? "&eAdd rewards on the Rewards tab first."
+                : "Select a reward to make it a pity target or change what happens when a player owns it."));
+        for (int i = 0; i < draft.rewards.size(); i++) {
+            LootBoxDraft.RewardSpec reward = draft.rewards.get(i);
+            String sel = "#PityRewardList[" + i + "]";
+            cmd.append("#PityRewardList", TOGGLE_ROW_UI);
+            cmd.set(sel + " #Selected.Visible", i == selected);
+            cmd.set(sel + " #Name.TextSpans", uiText(sel + " #Name.TextSpans",
+                    MysticText.stripMarkup(blankTo(reward.name, reward.id)) + " &8(" + reward.id + ")"));
+            cmd.set(sel + " #Meta.TextSpans", uiText(sel + " #Meta.TextSpans", duplicateLabel(draft, reward)));
+            cmd.set(sel + " #State.TextSpans", uiText(sel + " #State.TextSpans",
+                    targets.contains(reward.id) ? "&6Pity target" : ""));
+            event.addEventBinding(CustomUIEventBindingType.Activating, sel,
+                    INPUTS.event("selectReward").put("row", Integer.toString(i)));
+        }
+
+        cmd.set("#PityState.TextSpans", uiText("#PityState.TextSpans", on ? "&aOn for this pool" : "&7Off"));
+        cmd.set("#PityOnButton.Visible", !on);
+        cmd.set("#PityOffButton.Visible", on);
+        cmd.set("#PityFields.Visible", on);
+        FormFields.fill(cmd, PITY_HARD, session, on ? Integer.toString(pity.hardAfter) : "0");
+        FormFields.fill(cmd, PITY_SOFT, session, on ? Integer.toString(pity.softAfter) : "0");
+        FormFields.fill(cmd, PITY_STEP, session, on ? Integer.toString(pity.softStepPercent) : "0");
+        cmd.set("#PityPreview.TextSpans", uiText("#PityPreview.TextSpans", pityPreview(draft)));
+        event.addEventBinding(CustomUIEventBindingType.Activating, "#PityOnButton", INPUTS.event("pityOn"));
+        event.addEventBinding(CustomUIEventBindingType.Activating, "#PityOffButton", INPUTS.event("pityOff"));
+
+        LootBoxDraft.RewardSpec reward = selected >= 0 ? draft.rewards.get(selected) : null;
+        cmd.set("#DupRewardName.TextSpans", uiText("#DupRewardName.TextSpans", reward == null ? "&8No reward selected"
+                : MysticText.stripMarkup(blankTo(reward.name, reward.id))));
+        boolean target = reward != null && targets.contains(reward.id);
+        cmd.set("#TargetOnButton.Visible", reward != null && on && !target);
+        cmd.set("#TargetOffButton.Visible", reward != null && on && target);
+        event.addEventBinding(CustomUIEventBindingType.Activating, "#TargetOnButton", INPUTS.event("pityTargetOn"));
+        event.addEventBinding(CustomUIEventBindingType.Activating, "#TargetOffButton", INPUTS.event("pityTargetOff"));
+
+        boolean exclude = reward != null && reward.excludesOwned();
+        cmd.set("#DuplicatesDropdown.Entries", List.of(
+                new DropdownEntryInfo(LocalizableString.fromString("Can win it again"), ALLOW),
+                new DropdownEntryInfo(LocalizableString.fromString("Leave it out of their odds"), EXCLUDE_OWNED)));
+        cmd.set("#DuplicatesDropdown.Value", exclude ? EXCLUDE_OWNED : ALLOW);
+        event.addEventBinding(CustomUIEventBindingType.ValueChanged, "#DuplicatesDropdown",
+                INPUTS.event("dupMode").append("@dup", "#DuplicatesDropdown.Value"));
+        List<DropdownEntryInfo> replacements = new ArrayList<>();
+        replacements.add(new DropdownEntryInfo(LocalizableString.fromString("Spread over every other reward"),
+                NO_REPLACEMENT));
+        if (reward != null) {
+            for (LootBoxDraft.RewardSpec other : draft.rewards) {
+                if (other != reward && other.id != null && !other.excludesOwned()) {
+                    replacements.add(new DropdownEntryInfo(LocalizableString.fromString(
+                            MysticText.stripMarkup(blankTo(other.name, other.id))), other.id));
+                }
+            }
+        }
+        cmd.set("#ReplacementGroup.Visible", exclude);
+        cmd.set("#ReplacementDropdown.Entries", replacements);
+        cmd.set("#ReplacementDropdown.Value", reward == null || reward.duplicateReplacement == null
+                || reward.duplicateReplacement.isBlank() ? NO_REPLACEMENT : reward.duplicateReplacement);
+        event.addEventBinding(CustomUIEventBindingType.ValueChanged, "#ReplacementDropdown",
+                INPUTS.event("dupReplacement").append("@replacement", "#ReplacementDropdown.Value"));
+        cmd.set("#DupHint.TextSpans", uiText("#DupHint.TextSpans", !exclude
+                ? "Players can win this reward any number of times."
+                : "Once a player owns it, it leaves their odds before the preview, and the confirmation shows "
+                        + "the odds they really have."));
+    }
+
+    /** e.g. {@code duplicates: leave out once owned, chance to 250 Gold}. */
+    private static String duplicateLabel(LootBoxDraft draft, LootBoxDraft.RewardSpec reward) {
+        if (!reward.excludesOwned()) {
+            return "can be won again";
+        }
+        String to = reward.duplicateReplacement;
+        if (to == null || to.isBlank()) {
+            return "left out once owned; chance spread";
+        }
+        String name = draft.rewards.stream().filter(r -> to.equals(r.id)).findFirst()
+                .map(r -> MysticText.stripMarkup(blankTo(r.name, r.id))).orElse("&c" + to + " (missing)");
+        return "left out once owned; chance to " + name;
+    }
+
+    /** The plain-language summary the bible asks for, e.g. "guaranteed by opening 90". */
+    static String pityPreview(LootBoxDraft draft) {
+        LootBoxDraft.Pity pity = draft.pity;
+        if (pity == null) {
+            return "Off. Every opening uses the pool's normal odds.";
+        }
+        List<String> names = new ArrayList<>();
+        for (String id : pity.targets == null ? List.<String>of() : pity.targets) {
+            names.add(draft.rewards.stream().filter(r -> id.equals(r.id)).findFirst()
+                    .map(r -> MysticText.stripMarkup(blankTo(r.name, r.id))).orElse(id));
+        }
+        if (names.isEmpty()) {
+            return "&ePick at least one target reward from the list.";
+        }
+        String who = names.size() == 1 ? names.get(0) : "one of " + String.join(", ", names);
+        List<String> parts = new ArrayList<>();
+        if (pity.hardAfter > 0) {
+            parts.add("A player is guaranteed " + who + " by opening " + pity.hardAfter + ".");
+        }
+        if (pity.softAfter > 0 && pity.softStepPercent > 0) {
+            parts.add("After " + pity.softAfter + " openings without one, each opening makes "
+                    + (names.size() == 1 ? "it " : "them ") + pity.softStepPercent + "% more likely.");
+        }
+        if (parts.isEmpty()) {
+            return "&eSet a guarantee, a soft pity, or both.";
+        }
+        parts.add("Winning a target resets the count. Players see their own count and odds before opening.");
+        return String.join(" ", parts);
+    }
+
     private void buildPublish(UICommandBuilder cmd, LootBoxDraft draft, List<String> problems) {
         List<String> problemLines = new ArrayList<>();
         if (problems.isEmpty()) {
@@ -286,6 +422,16 @@ public final class PoolEditorPage extends MysticPage {
         String name = session.input(NAME.key());
         if (name != null) {
             FormFields.nonBlank(NAME, name, MAX_NAME).collect(problems);
+        }
+        for (FormFields.Field field : new FormFields.Field[] {PITY_HARD, PITY_SOFT}) {
+            String raw = session.input(field.key());
+            if (raw != null && !raw.isBlank()) {
+                FormFields.longInRange(field, raw, 0, MAX_PITY).collect(problems);
+            }
+        }
+        String step = session.input(PITY_STEP.key());
+        if (step != null && !step.isBlank()) {
+            FormFields.longInRange(PITY_STEP, step, 0, 10_000).collect(problems);
         }
         problems.addAll(RewardsTab.unparsed(rewards()));
         return problems;
@@ -363,6 +509,8 @@ public final class PoolEditorPage extends MysticPage {
                 reward.commandIdempotent = "idempotentOn".equals(action);
                 return null;
             });
+            case "pityOn", "pityOff", "pityTargetOn", "pityTargetOff", "dupMode", "dupReplacement" ->
+                    editPity(ref, store, action, payload);
             case "save" -> save(ref, store, null);
             case "revert" -> confirmRevert(ref, store);
             case "reloadDisk" -> loadFromDisk(ref, store, "&7Loaded the draft file; your unsaved changes were dropped.");
@@ -407,9 +555,102 @@ public final class PoolEditorPage extends MysticPage {
                 session.forgetInput(PERMISSION.key());
             }
         }
+        LootBoxDraft.Pity pity = draft.pity;
+        if (pity != null) {
+            Long hard = pityInput(PITY_HARD, 0, MAX_PITY);
+            if (hard != null) {
+                change(hard.intValue() != pity.hardAfter, () -> pity.hardAfter = hard.intValue());
+            }
+            Long soft = pityInput(PITY_SOFT, 0, MAX_PITY);
+            if (soft != null) {
+                change(soft.intValue() != pity.softAfter, () -> pity.softAfter = soft.intValue());
+            }
+            Long step = pityInput(PITY_STEP, 0, 10_000);
+            if (step != null) {
+                change(step.intValue() != pity.softStepPercent, () -> pity.softStepPercent = step.intValue());
+            }
+        } else {
+            session.forgetInput(PITY_HARD.key());
+            session.forgetInput(PITY_SOFT.key());
+            session.forgetInput(PITY_STEP.key());
+        }
         if (RewardsTab.apply(rewards())) {
             session.markDirty();
         }
+    }
+
+    /** One pity number that parses and is in range, forgetting its text; {@code null} leaves the text as typed. */
+    private Long pityInput(FormFields.Field field, long min, long max) {
+        String raw = session.input(field.key());
+        if (raw == null) {
+            return null;
+        }
+        FormFields.Result<Long> parsed = FormFields.longInRange(field, raw.isBlank() ? "0" : raw, min, max);
+        if (!parsed.ok()) {
+            return null;
+        }
+        session.forgetInput(field.key());
+        return parsed.value();
+    }
+
+    private void editPity(Ref<EntityStore> ref, Store<EntityStore> store, String action, JsonObject payload) {
+        LootBoxDraft draft = session.working();
+        int selected = RewardsTab.selected(session);
+        LootBoxDraft.RewardSpec reward = selected >= 0 ? draft.rewards.get(selected) : null;
+        switch (action) {
+            case "pityOn" -> {
+                if (draft.pity == null) {
+                    draft.pity = new LootBoxDraft.Pity();
+                    if (reward != null) {
+                        draft.pity.targets.add(reward.id);
+                    }
+                    session.markDirty();
+                }
+            }
+            case "pityOff" -> {
+                if (draft.pity != null) {
+                    draft.pity = null;
+                    session.markDirty();
+                }
+            }
+            case "pityTargetOn", "pityTargetOff" -> {
+                if (draft.pity != null && reward != null && reward.id != null) {
+                    if (draft.pity.targets == null) {
+                        draft.pity.targets = new ArrayList<>();
+                    }
+                    boolean add = "pityTargetOn".equals(action);
+                    if (add != draft.pity.targets.contains(reward.id)) {
+                        if (add) {
+                            draft.pity.targets.add(reward.id);
+                        } else {
+                            draft.pity.targets.remove(reward.id);
+                        }
+                        session.markDirty();
+                    }
+                }
+            }
+            case "dupMode" -> {
+                String mode = EXCLUDE_OWNED.equals(string(payload, "@dup")) ? EXCLUDE_OWNED : ALLOW;
+                if (reward != null && !mode.equalsIgnoreCase(blankTo(reward.duplicates, ALLOW))) {
+                    reward.duplicates = mode;
+                    if (ALLOW.equals(mode)) {
+                        reward.duplicateReplacement = null;
+                    }
+                    session.markDirty();
+                }
+            }
+            case "dupReplacement" -> {
+                String to = string(payload, "@replacement");
+                String next = NO_REPLACEMENT.equals(to) || to.isBlank() ? null : to;
+                if (reward != null && !java.util.Objects.equals(next, blankToNull(reward.duplicateReplacement))) {
+                    reward.duplicateReplacement = next;
+                    session.markDirty();
+                }
+            }
+            default -> {
+            }
+        }
+        reopen(ref, store, page(View.of(null)));
     }
 
     private void change(boolean differs, Runnable apply) {
