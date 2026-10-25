@@ -347,7 +347,8 @@ public final class CrateEditorPage extends MysticPage {
         cmd.set("#NameplateOnButton.Visible", !crate.visuals.nameplate);
         cmd.set("#NameplateOffButton.Visible", crate.visuals.nameplate);
         for (String[] button : new String[][] {{"#NameplateOnButton", "nameplateOn"},
-                {"#NameplateOffButton", "nameplateOff"}, {"#PreviewEffectsButton", "previewEffects"}}) {
+                {"#NameplateOffButton", "nameplateOff"}, {"#PreviewEffectsButton", "previewEffects"},
+                {"#EffectStackButton", "effectStack"}}) {
             event.addEventBinding(CustomUIEventBindingType.Activating, button[0], INPUTS.event(button[1]));
         }
     }
@@ -476,6 +477,7 @@ public final class CrateEditorPage extends MysticPage {
             case "nameplateOn", "nameplateOff" -> edit(ref, store,
                     () -> crate.visuals.nameplate = "nameplateOn".equals(action));
             case "previewEffects" -> previewEffects(ref, store);
+            case "effectStack" -> reopen(ref, store, new CrateEffectsPage(core, player, module, session, null));
             case "create" -> create(ref, store);
             case "save" -> save(ref, store, session.loadedHash());
             case "reload" -> reload(ref, store, "&7Loaded the crate as it is now; your unsaved changes were dropped.");
@@ -820,6 +822,9 @@ public final class CrateEditorPage extends MysticPage {
         }
         if (!v.openSound.isBlank()) {
             parts.add("sound " + v.openSound);
+        }
+        if (!v.extras.isEmpty()) {
+            parts.add(v.extras.size() + " stacked");
         }
         if (v.nameplate) {
             parts.add(module.config().crates.nameplates ? "floating name" : "floating name (server switch off)");

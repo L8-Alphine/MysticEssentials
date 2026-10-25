@@ -1,0 +1,29 @@
+// One effect in the crate effect stack: what it is, and when and how it plays.
+// #Selected marks the effect whose fields are shown on the right.
+$M = "MysticTheme.ui";
+
+Button #Row {
+  Anchor: (Height: 44, Bottom: 4);
+  Style: $M.@RowStyle;
+  LayoutMode: Full;
+
+  $M.@RowSelection #Selected {
+    @Height = 44;
+  }
+
+  Group {
+    Anchor: (Full: 0);
+    LayoutMode: Top;
+    Padding: (Left: 10, Right: 10, Top: 5, Bottom: 5);
+
+    Label #Name {
+      Anchor: (Height: 18);
+      Style: $M.@RowNameFitStyle;
+    }
+
+    Label #Meta {
+      Anchor: (Height: 14);
+      Style: $M.@RowMetaFitStyle;
+    }
+  }
+}

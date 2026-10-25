@@ -256,13 +256,19 @@ public final class CrateRules {
         String text = String.join("\u0000", String.valueOf(c.lootboxId), String.valueOf(c.name),
                 String.valueOf(c.openBehavior), Boolean.toString(c.protection.preventPlayerBreak),
                 Boolean.toString(c.protection.preventDamage), c.visuals.idleParticle, c.visuals.openParticle,
-                c.visuals.openSound, Boolean.toString(c.visuals.nameplate));
+                c.visuals.openSound, Boolean.toString(c.visuals.nameplate), CrateRules.extrasKey(c.visuals));
         try {
             byte[] digest = MessageDigest.getInstance("SHA-256").digest(text.getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(digest, 0, 12);
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("SHA-256 is unavailable", e);
         }
+    }
+
+    /** The effect stack as one comparable string, for the settings hash and the change log. */
+    public static String extrasKey(CrateInstance.Visuals visuals) {
+        return visuals.extras.stream().map(CrateInstance.Effect::label)
+                .collect(java.util.stream.Collectors.joining(", "));
     }
 
     /** A free crate id for {@code lootboxId}: {@code <pool>_<n>} with the lowest unused n from 1. */

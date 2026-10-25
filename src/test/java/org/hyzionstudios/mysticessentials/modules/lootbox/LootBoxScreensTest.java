@@ -401,6 +401,14 @@ public final class LootBoxScreensTest {
         source.visuals.openSound = "SFX_Chest_Legendary_Open";
         source.visuals.nameplate = true;
         LootBoxTemplate look = TemplateLibrary.crateLook("spawn_look", "Spawn look", source, "alice", 1L);
+        require(look.crate.extras.isEmpty(), "a crate without a stack gave its look one");
+        CrateInstance.Effect stacked = new CrateInstance.Effect();
+        stacked.id = "Block_Gem_Sparks";
+        source.visuals.extras.add(stacked);
+        LootBoxTemplate stackedLook = TemplateLibrary.crateLook("stacked", "Stacked", source, "alice", 1L);
+        require(stackedLook.crate.extras.size() == 1 && TemplateApply.crateLook(stackedLook, new CrateInstance())
+                .visuals.extras.size() == 1, "a crate look did not carry the effect stack");
+        source.visuals.extras.clear();
         require(TemplateLibrary.problems(look).isEmpty(), "a crate look has problems: " + TemplateLibrary.problems(look));
         require("crate spawn_crate".equals(look.source) && LootBoxTemplate.CRATE_LOOK.equals(look.kind),
                 "a crate look doesn't say where it came from");

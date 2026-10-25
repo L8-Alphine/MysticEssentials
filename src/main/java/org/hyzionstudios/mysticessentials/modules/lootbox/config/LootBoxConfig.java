@@ -109,6 +109,16 @@ public final class LootBoxConfig {
         public long idleEffectIntervalMs = 2000L;
         /** How far from a crate players see its particles. */
         public double effectRadius = 24.0;
+        /** Most effects one crate's stack may hold, on top of its three effect slots. */
+        public int maxStackedEffects = 8;
+        /**
+         * Idle particle spawns one world may send per idle tick, across all its
+         * crates. Past it, the remaining crates skip that tick: effects degrade
+         * before the server does (Bible v2.0 §09).
+         */
+        public int particleBudgetPerWorld = 64;
+        /** Idle particle spawns any one player may receive per idle tick. */
+        public int particleBudgetPerClient = 24;
         /** Effects a crate starts with when it is made in the crate editor; blank means none. */
         public String defaultIdleParticle = "Block_Treasure_Sparks";
         public String defaultOpenParticle = "Block_Break_Treasure";

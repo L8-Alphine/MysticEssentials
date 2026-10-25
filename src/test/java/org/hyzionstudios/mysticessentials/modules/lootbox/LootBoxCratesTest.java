@@ -36,6 +36,7 @@ public final class LootBoxCratesTest {
         variantNamesAndDocuments();
         plainBlocksNeedTheSwitchAndASimpleBlock();
         unusedVariantsAreFound();
+        effectStackLoadsClampsAndCopies();
         System.out.println("LootBoxCratesTest: all checks passed.");
     }
 
@@ -168,11 +169,39 @@ public final class LootBoxCratesTest {
                 c -> c.lootboxId = "other_pool", c -> c.name = "Royal", c -> c.openBehavior = CrateInstance.OPEN_DIRECT_CONFIRM,
                 c -> c.protection.preventPlayerBreak = true, c -> c.protection.preventDamage = true,
                 c -> c.visuals.idleParticle = "Dust_Sparkles", c -> c.visuals.openParticle = "Block_Break_Treasure",
-                c -> c.visuals.openSound = "SFX_Chest_Wooden_Open", c -> c.visuals.nameplate = true)) {
+                c -> c.visuals.openSound = "SFX_Chest_Wooden_Open", c -> c.visuals.nameplate = true,
+                c -> c.visuals.extras.add(new CrateInstance.Effect()))) {
             CrateInstance edited = crate.copy();
             change.accept(edited);
             require(!hash.equals(CrateRules.settingsHash(edited)), "an editable change kept the same hash");
         }
+    }
+
+    private static void effectStackLoadsClampsAndCopies() {
+        CrateInstance old = Json.gson().fromJson(Json.parse(
+                "{\"schema\":4,\"crateId\":\"old_crate\",\"visuals\":{\"idleParticle\":\"Dust_Sparkles\"}}"),
+                CrateInstance.class).normalise();
+        require(old.visuals.extras != null && old.visuals.extras.isEmpty() && old.schema == CrateInstance.SCHEMA,
+                "a schema 4 crate did not load with an empty effect stack");
+
+        CrateInstance odd = Json.gson().fromJson(Json.parse(
+                "{\"crateId\":\"odd\",\"visuals\":{\"extras\":[null,{\"phase\":\"idle\",\"kind\":\"sound\","
+                        + "\"id\":\" SFX_Chest_Wooden_Open \",\"height\":99,\"scale\":-1,\"intervalMs\":1}]}}"),
+                CrateInstance.class).normalise();
+        require(odd.visuals.extras.size() == 1, "a null stacked effect was kept");
+        CrateInstance.Effect sound = odd.visuals.extras.get(0);
+        require(CrateInstance.Effect.KIND_SOUND.equals(sound.kind)
+                && CrateInstance.Effect.PHASE_OPEN.equals(sound.phase), "a sound was allowed to play while idle");
+        require("SFX_Chest_Wooden_Open".equals(sound.id) && sound.height == 4.0 && sound.scale == 0.1
+                && sound.intervalMs == 500L, "stacked effect values were not cleaned: " + sound.label());
+
+        CrateInstance.Effect particle = new CrateInstance.Effect();
+        particle.phase = CrateInstance.Effect.PHASE_IDLE;
+        particle.id = "Dust_Sparkles";
+        List<CrateInstance.Effect> copy = CrateInstance.copyEffects(List.of(particle));
+        particle.id = "changed";
+        require(copy.size() == 1 && "Dust_Sparkles".equals(copy.get(0).id), "copyEffects shares its effects");
+        require(CrateInstance.copyEffects(null).isEmpty(), "copyEffects(null) is not empty");
     }
 
     private static void crateIdsAreSuggestedAndChecked() {

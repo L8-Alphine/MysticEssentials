@@ -137,6 +137,7 @@ public final class TemplateLibrary {
         look.openParticle = blank(visuals.openParticle, "");
         look.openSound = blank(visuals.openSound, "");
         look.nameplate = visuals.nameplate;
+        look.extras = CrateInstance.copyEffects(visuals.extras);
         template.crate = look;
         return template;
     }
@@ -204,6 +205,9 @@ public final class TemplateLibrary {
         }
         if (look.nameplate) {
             parts.add("floating name");
+        }
+        if (look.extras != null && !look.extras.isEmpty()) {
+            parts.add(look.extras.size() + " stacked");
         }
         return parts.isEmpty() ? "no effects" : String.join(" · ", parts);
     }

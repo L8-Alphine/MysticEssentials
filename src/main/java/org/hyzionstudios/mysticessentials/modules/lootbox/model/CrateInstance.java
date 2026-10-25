@@ -1,5 +1,7 @@
 package org.hyzionstudios.mysticessentials.modules.lootbox.model;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 
 import org.hyzionstudios.mysticessentials.core.util.Json;
@@ -11,7 +13,8 @@ import org.hyzionstudios.mysticessentials.core.util.Json;
  * odds.
  *
  * <p><b>Schema.</b> Version 1 (Phase 1) had no behaviour or protection fields;
- * version 2 had no visuals; version 3 had no generated variants. Gson keeps the field initialisers for anything a
+ * version 2 had no visuals; version 3 had no generated variants; version 4 had no
+ * effect stack ({@link Visuals#extras}). Gson keeps the field initialisers for anything a
  * stored document lacks, and {@link #normalise()} fills what an explicit
  * {@code null} cleared, so an older document loads with the defaults: preview
  * first, the server's protection, and no effects (an existing crate never
@@ -31,7 +34,7 @@ public final class CrateInstance {
     /** Use goes straight to the confirm screen, which still lists every reward with its odds. */
     public static final String OPEN_DIRECT_CONFIRM = "DIRECT_CONFIRM";
 
-    public static final int SCHEMA = 4;
+    public static final int SCHEMA = 5;
 
     public int schema = SCHEMA;
     public String crateId;
@@ -92,6 +95,73 @@ public final class CrateInstance {
         public String openSound = "";
         /** Float the crate's name (or its pool's) above it. */
         public boolean nameplate;
+        /**
+         * The effect stack: more particles and sounds on top of the three slots
+         * above, each with its own phase, height, scale and (idle particles)
+         * interval. Schema 5; empty for every older crate.
+         */
+        public List<Effect> extras = new ArrayList<>();
+    }
+
+    /** A deep, normalised copy of {@code effects}; {@code null} gives an empty list. */
+    public static List<Effect> copyEffects(List<Effect> effects) {
+        List<Effect> copy = new ArrayList<>();
+        if (effects != null) {
+            for (Effect effect : effects) {
+                if (effect != null) {
+                    copy.add(Json.gson().fromJson(Json.toTree(effect), Effect.class).normalise());
+                }
+            }
+        }
+        return copy;
+    }
+
+    /** One stacked effect. Ids are checked against the live registries when played, never trusted. */
+    public static final class Effect {
+        public static final String PHASE_IDLE = "IDLE";
+        public static final String PHASE_OPEN = "OPEN";
+        public static final String KIND_PARTICLE = "PARTICLE";
+        public static final String KIND_SOUND = "SOUND";
+
+        /** {@link #PHASE_IDLE} repeats while players are near; {@link #PHASE_OPEN} plays once per opening. */
+        public String phase = PHASE_OPEN;
+        /** {@link #KIND_PARTICLE} or {@link #KIND_SOUND}. Sounds only play on opening. */
+        public String kind = KIND_PARTICLE;
+        public String id = "";
+        /** Height above the crate block's base, in blocks. */
+        public double height = 0.5;
+        /** Particle scale; ignored for sounds. */
+        public double scale = 1.0;
+        /** Idle particles: how often this one repeats, at least the module's idle tick. */
+        public long intervalMs = 2000L;
+
+        /** Clamps every number into the range the editor offers. @return this effect */
+        public Effect normalise() {
+            phase = PHASE_IDLE.equalsIgnoreCase(phase == null ? "" : phase.trim()) ? PHASE_IDLE : PHASE_OPEN;
+            kind = KIND_SOUND.equalsIgnoreCase(kind == null ? "" : kind.trim()) ? KIND_SOUND : KIND_PARTICLE;
+            if (KIND_SOUND.equals(kind)) {
+                phase = PHASE_OPEN;
+            }
+            id = id == null ? "" : id.trim();
+            height = Double.isFinite(height) ? Math.max(-1.0, Math.min(4.0, height)) : 0.5;
+            scale = Double.isFinite(scale) ? Math.max(0.1, Math.min(4.0, scale)) : 1.0;
+            intervalMs = Math.max(500L, Math.min(60_000L, intervalMs));
+            return this;
+        }
+
+        /** A short label for lists and change logs, e.g. {@code idle Dust_Sparkles @1.0 x1.5 /2s}. */
+        public String label() {
+            StringBuilder text = new StringBuilder(PHASE_IDLE.equals(phase) ? "idle " : "open ")
+                    .append(KIND_SOUND.equals(kind) ? "sound " : "").append(id.isEmpty() ? "(none)" : id)
+                    .append(" @").append(height);
+            if (KIND_PARTICLE.equals(kind)) {
+                text.append(" x").append(scale);
+                if (PHASE_IDLE.equals(phase)) {
+                    text.append(" /").append(intervalMs / 1000.0).append('s');
+                }
+            }
+            return text.toString();
+        }
     }
 
     public String position() {
@@ -128,6 +198,11 @@ public final class CrateInstance {
         visuals.idleParticle = visuals.idleParticle == null ? "" : visuals.idleParticle.trim();
         visuals.openParticle = visuals.openParticle == null ? "" : visuals.openParticle.trim();
         visuals.openSound = visuals.openSound == null ? "" : visuals.openSound.trim();
+        if (visuals.extras == null) {
+            visuals.extras = new ArrayList<>();
+        }
+        visuals.extras.removeIf(java.util.Objects::isNull);
+        visuals.extras.forEach(Effect::normalise);
         if (lootboxId != null) {
             lootboxId = lootboxId.toLowerCase(Locale.ROOT);
         }

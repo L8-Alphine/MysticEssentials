@@ -9,6 +9,7 @@ import java.util.Map;
 
 import org.hyzionstudios.mysticessentials.core.message.MysticText;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.CrateInstance;
+import org.hyzionstudios.mysticessentials.modules.lootbox.service.CrateRules;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.KeyDraft;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.LootBoxDraft;
 import org.hyzionstudios.mysticessentials.modules.lootbox.model.LootBoxTemplate;
@@ -121,6 +122,7 @@ public final class TemplateApply {
         visuals.openParticle = look.openParticle == null ? "" : look.openParticle;
         visuals.openSound = look.openSound == null ? "" : look.openSound;
         visuals.nameplate = look.nameplate;
+        visuals.extras = CrateInstance.copyEffects(look.extras);
         result.visuals = visuals;
         return result;
     }
@@ -133,6 +135,7 @@ public final class TemplateApply {
         change(lines, "Idle particles", was.idleParticle, now.idleParticle);
         change(lines, "Opening particles", was.openParticle, now.openParticle);
         change(lines, "Opening sound", was.openSound, now.openSound);
+        change(lines, "Effect stack", CrateRules.extrasKey(was), CrateRules.extrasKey(now));
         if (was.nameplate != now.nameplate) {
             lines.add("&7Floating name: &f" + (was.nameplate ? "on" : "off") + " &7→ &f" + (now.nameplate ? "on" : "off"));
         }

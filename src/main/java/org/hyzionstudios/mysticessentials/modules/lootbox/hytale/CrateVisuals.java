@@ -3,6 +3,7 @@ package org.hyzionstudios.mysticessentials.modules.lootbox.hytale;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -108,6 +109,8 @@ public final class CrateVisuals {
     private final Set<UUID> effectsOff = ConcurrentHashMap.newKeySet();
     private final Map<UUID, PendingOpen> pending = new ConcurrentHashMap<>();
     private final Map<String, Holder> nameplates = new ConcurrentHashMap<>();
+    /** When each idle stacked effect last played, by {@code crateId#index}. */
+    private final Map<String, Long> lastIdle = new ConcurrentHashMap<>();
     private final List<EventBus.Subscription> subscriptions = new ArrayList<>();
     private ScheduledFuture<?> idleTask;
     private volatile boolean running;
@@ -166,6 +169,7 @@ public final class CrateVisuals {
         subscriptions.forEach(EventBus.Subscription::close);
         subscriptions.clear();
         pending.clear();
+        lastIdle.clear();
         Map<String, List<Holder>> byWorld = new HashMap<>();
         nameplates.values().forEach(holder -> byWorld.computeIfAbsent(holder.worldKey(), k -> new ArrayList<>())
                 .add(holder));
@@ -221,6 +225,30 @@ public final class CrateVisuals {
         return index == SoundEvent.EMPTY_ID ? -1 : index;
     }
 
+    /**
+     * Loaded particle system ids containing {@code query} (any case), sorted, at
+     * most {@code limit}. Read from the live asset map, so the editor offers what
+     * this server actually has (3070 systems on 0.7.2), the way vanilla's
+     * {@code ParticleSpawnPage#buildParticleList} does.
+     */
+    public static List<String> particleIds(String query, int limit) {
+        return matching(ParticleSystem.getAssetMap().getAssetMap().keySet(), query, limit);
+    }
+
+    /** Loaded sound event ids containing {@code query}, sorted, at most {@code limit}. */
+    public static List<String> soundIds(String query, int limit) {
+        return matching(SoundEvent.getAssetMap().getAssetMap().keySet(), query, limit);
+    }
+
+    private static List<String> matching(Set<String> ids, String query, int limit) {
+        String needle = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
+        return ids.stream()
+                .filter(id -> needle.isEmpty() || id.toLowerCase(Locale.ROOT).contains(needle))
+                .sorted()
+                .limit(Math.max(0, limit))
+                .toList();
+    }
+
     // ----- Idle tick ----------------------------------------------------------
 
     private void tick() {
@@ -257,6 +285,8 @@ public final class CrateVisuals {
         LootBoxConfig.Crates config = module.config().crates;
         float duration = Math.max(MIN_INTERVAL_MS, config.idleEffectIntervalMs) / 1000f;
         Set<String> keep = ConcurrentHashMap.newKeySet();
+        Budget budget = new Budget(config.particleBudgetPerWorld, config.particleBudgetPerClient);
+        long now = System.currentTimeMillis();
         for (CrateInstance crate : crates) {
             if (crate.disabled) {
                 continue;
@@ -272,13 +302,37 @@ public final class CrateVisuals {
             if (floating) {
                 ensureNameplate(store, worldKey, crate, config.nameplateHeight);
             }
+            List<Ref<EntityStore>> viewers = withEffects(store, near);
+            if (viewers.isEmpty()) {
+                continue;
+            }
             if (particleExists(crate.visuals.idleParticle)) {
-                List<Ref<EntityStore>> viewers = withEffects(store, near);
-                if (!viewers.isEmpty()) {
-                    Vector3d at = center(crate);
+                Vector3d at = center(crate);
+                List<Ref<EntityStore>> to = budget.take(viewers);
+                if (!to.isEmpty()) {
                     ParticleUtil.spawnParticleEffect(crate.visuals.idleParticle, at.x, at.y, at.z, 0f, 0f, 0f, 1f,
-                            null, null, viewers, store, duration);
+                            null, null, to, store, duration);
                 }
+            }
+            List<CrateInstance.Effect> extras = stack(crate);
+            for (int i = 0; i < extras.size(); i++) {
+                CrateInstance.Effect effect = extras.get(i);
+                if (!CrateInstance.Effect.PHASE_IDLE.equals(effect.phase)
+                        || !CrateInstance.Effect.KIND_PARTICLE.equals(effect.kind) || !particleExists(effect.id)) {
+                    continue;
+                }
+                String slot = crate.crateId + "#" + i;
+                Long last = lastIdle.get(slot);
+                if (last != null && now - last < effect.intervalMs) {
+                    continue;
+                }
+                List<Ref<EntityStore>> to = budget.take(viewers);
+                if (to.isEmpty()) {
+                    continue;
+                }
+                lastIdle.put(slot, now);
+                ParticleUtil.spawnParticleEffect(effect.id, crate.x + 0.5, crate.y + effect.height, crate.z + 0.5,
+                        0f, 0f, 0f, (float) effect.scale, null, null, to, store, effect.intervalMs / 1000f);
             }
         }
         for (Map.Entry<String, Holder> entry : List.copyOf(nameplates.entrySet())) {
@@ -323,6 +377,68 @@ public final class CrateVisuals {
         if (sound >= 0) {
             SoundUtil.playSoundEvent3d(sound, SoundCategory.SFX, at.x, at.y, at.z, ref -> hasEffects(store, ref), store);
         }
+        List<Ref<EntityStore>> viewers = null;
+        for (CrateInstance.Effect effect : stack(crate)) {
+            if (!CrateInstance.Effect.PHASE_OPEN.equals(effect.phase)) {
+                continue;
+            }
+            double y = crate.y + effect.height;
+            if (CrateInstance.Effect.KIND_SOUND.equals(effect.kind)) {
+                int index = soundIndex(effect.id);
+                if (index >= 0) {
+                    SoundUtil.playSoundEvent3d(index, SoundCategory.SFX, crate.x + 0.5, y, crate.z + 0.5,
+                            ref -> hasEffects(store, ref), store);
+                }
+            } else if (particleExists(effect.id)) {
+                if (viewers == null) {
+                    viewers = withEffects(store, nearby(store, at, module.config().crates.effectRadius));
+                }
+                if (!viewers.isEmpty()) {
+                    ParticleUtil.spawnParticleEffect(effect.id, crate.x + 0.5, y, crate.z + 0.5, 0f, 0f, 0f,
+                            (float) effect.scale, null, null, viewers, store);
+                }
+            }
+        }
+    }
+
+    /** The crate's stacked effects, cut to {@code crates.maxStackedEffects}. */
+    private List<CrateInstance.Effect> stack(CrateInstance crate) {
+        List<CrateInstance.Effect> extras = crate.visuals.extras;
+        int max = Math.max(0, module.config().crates.maxStackedEffects);
+        return extras.size() <= max ? extras : extras.subList(0, max);
+    }
+
+    /**
+     * One world's idle particle allowance for one tick: a world-wide cap and a
+     * per-player cap. A spawn goes to the viewers still under their cap; once the
+     * world cap is spent, nothing more spawns this tick.
+     */
+    private static final class Budget {
+        private int world;
+        private final int perClient;
+        private final Map<Ref<EntityStore>, Integer> spent = new HashMap<>();
+
+        Budget(int world, int perClient) {
+            this.world = Math.max(0, world);
+            this.perClient = Math.max(0, perClient);
+        }
+
+        List<Ref<EntityStore>> take(List<Ref<EntityStore>> viewers) {
+            if (world <= 0) {
+                return List.of();
+            }
+            List<Ref<EntityStore>> allowed = new ArrayList<>(viewers.size());
+            for (Ref<EntityStore> viewer : viewers) {
+                if (spent.getOrDefault(viewer, 0) < perClient) {
+                    allowed.add(viewer);
+                }
+            }
+            if (!allowed.isEmpty()) {
+                world--;
+                allowed.forEach(viewer -> spent.merge(viewer, 1, Integer::sum));
+            }
+            return allowed;
+        }
     }
 
     /**
@@ -349,6 +465,21 @@ public final class CrateVisuals {
         if (sound >= 0) {
             SoundUtil.playSoundEvent3dToPlayer(viewer, sound, SoundCategory.SFX, at.x, at.y, at.z, store);
             played.add("sound " + crate.visuals.openSound);
+        }
+        for (CrateInstance.Effect effect : stack(crate)) {
+            double y = crate.y + effect.height;
+            if (CrateInstance.Effect.KIND_SOUND.equals(effect.kind)) {
+                int index = soundIndex(effect.id);
+                if (index >= 0) {
+                    SoundUtil.playSoundEvent3dToPlayer(viewer, index, SoundCategory.SFX, crate.x + 0.5, y,
+                            crate.z + 0.5, store);
+                    played.add(effect.label());
+                }
+            } else if (particleExists(effect.id)) {
+                ParticleUtil.spawnParticleEffect(effect.id, crate.x + 0.5, y, crate.z + 0.5, 0f, 0f, 0f,
+                        (float) effect.scale, null, null, only, store, 3f);
+                played.add(effect.label());
+            }
         }
         return played.isEmpty() ? "nothing (no effects chosen, or their ids aren't loaded)" : String.join(", ", played);
     }

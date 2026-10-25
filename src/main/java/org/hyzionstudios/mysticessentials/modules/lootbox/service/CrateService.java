@@ -312,9 +312,11 @@ public final class CrateService {
             CrateInstance.Visuals was = live.visuals;
             CrateInstance.Visuals now = next.visuals;
             if (!was.idleParticle.equals(now.idleParticle) || !was.openParticle.equals(now.openParticle)
-                    || !was.openSound.equals(now.openSound) || was.nameplate != now.nameplate) {
+                    || !was.openSound.equals(now.openSound) || was.nameplate != now.nameplate
+                    || !CrateRules.extrasKey(was).equals(CrateRules.extrasKey(now))) {
                 changes.add("visuals idle=" + now.idleParticle + " open=" + now.openParticle + " sound="
-                        + now.openSound + " nameplate=" + now.nameplate);
+                        + now.openSound + " nameplate=" + now.nameplate + " stack=["
+                        + CrateRules.extrasKey(now) + "]");
                 live.visuals = now;
             }
             if (changes.isEmpty()) {

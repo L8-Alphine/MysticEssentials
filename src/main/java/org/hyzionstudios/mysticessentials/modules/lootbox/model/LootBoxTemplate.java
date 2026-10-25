@@ -54,5 +54,7 @@ public final class LootBoxTemplate {
         public String openParticle = "";
         public String openSound = "";
         public boolean nameplate;
+        /** The crate's effect stack (crate schema 5); empty in older templates. */
+        public List<CrateInstance.Effect> extras = new ArrayList<>();
     }
 }

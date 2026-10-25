@@ -349,9 +349,14 @@ $C.@Container {
               Text: "Effects go only to players near the crate who haven't turned them off with /lootbox crate effects off.";
             }
 
+            $C.@SecondaryTextButton #EffectStackButton {
+              @Text = "Effect Stack";
+              @Anchor = (Width: 160, Left: 8);
+            }
+
             $C.@SecondaryTextButton #PreviewEffectsButton {
               @Text = "Preview Effects";
-              @Anchor = (Width: 190, Left: 8);
+              @Anchor = (Width: 180, Left: 6);
             }
           }
 
