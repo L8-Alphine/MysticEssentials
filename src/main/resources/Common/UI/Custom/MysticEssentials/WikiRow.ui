@@ -1,0 +1,42 @@
+// Row template for the wiki page list. Appended per page:
+//   cmd.append("#ArticleList", "MysticEssentials/WikiRow.ui")
+//
+// #WikiRowSource marks a page another mod supplied, so a reader can tell what
+// staff wrote from what a mod generates — they are edited in different places.
+$M = "MysticTheme.ui";
+
+Button #Row {
+  Anchor: (Height: 54, Bottom: 4);
+  Style: $M.@RowStyle;
+  LayoutMode: Full;
+
+  $M.@RowSelection #WikiRowSelected {
+    @Height = 54;
+  }
+
+  Group {
+    Anchor: (Full: 0);
+    LayoutMode: Left;
+    Padding: (Left: 12, Right: 12, Top: 9, Bottom: 9);
+
+    Group {
+      LayoutMode: Top;
+      FlexWeight: 1;
+
+      Label #WikiRowTitle {
+        Anchor: (Height: 20, Bottom: 2);
+        Style: $M.@RowNameFitStyle;
+      }
+
+      Label #WikiRowSummary {
+        Anchor: (Height: 14);
+        Style: $M.@RowMetaFitStyle;
+      }
+    }
+
+    Label #WikiRowSource {
+      Anchor: (Width: 90);
+      Style: $M.@RowSideStyle;
+    }
+  }
+}

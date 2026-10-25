@@ -7,11 +7,11 @@ Group #Row {
   Anchor: (Height: 52, Bottom: 4);
   LayoutMode: Left;
   Padding: (Left: 12, Right: 10, Top: 10, Bottom: 10);
-  Background: #0a0f16(0.38);
+  Background: #0b1422(0.38);
 
   Label #Cause {
     Anchor: (Width: 110);
-    Style: (...$M.@PillStyle, FontSize: 11, TextColor: #e8c97a, HorizontalAlignment: Start);
+    Style: (...$M.@PillStyle, FontSize: 11, TextColor: #e7ce9b, HorizontalAlignment: Start);
   }
 
   Label #Time {

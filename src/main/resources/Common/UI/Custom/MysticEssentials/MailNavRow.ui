@@ -16,7 +16,7 @@ Button #Row {
 
     Group #Accent {
       Anchor: (Width: 3, Height: 34, Right: 11);
-      Background: #E8A93B;
+      Background: #d9b572;
       Visible: false;
     }
 

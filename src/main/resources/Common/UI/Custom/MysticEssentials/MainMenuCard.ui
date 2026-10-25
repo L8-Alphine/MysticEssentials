@@ -1,0 +1,59 @@
+// Destination card for the Main Menu grid. Appended per destination into
+// #MenuCardsLeft / #MenuCardsRight.
+//
+// States the server drives, per the bible's ContentCard contract:
+//   normal      — #CardStatus hidden
+//   locked      — #CardStatus names the permission or missing module, the
+//                 glyph and title drop to the muted colour
+//   unavailable — module installed but disabled, or provider offline
+//
+// The card stays a Button in every state so it can explain itself when
+// pressed; authorisation is enforced server-side when the action runs, never
+// by hiding the tile.
+$M = "MysticTheme.ui";
+
+Button #Row {
+  Anchor: (Height: 74, Bottom: 8);
+  Style: $M.@RowStyle;
+  LayoutMode: Full;
+
+  $M.@RowSelection #CardSelected {
+    @Height = 74;
+  }
+
+  Group {
+    Anchor: (Full: 0);
+    LayoutMode: Left;
+    Padding: (Left: 12, Right: 12, Top: 10, Bottom: 10);
+
+    $M.@IconWell {
+      @Size = 42;
+      @Anchor = (Right: 12);
+
+      Label #CardGlyph {
+        Style: $M.@HeadingStyle;
+      }
+    }
+
+    Group {
+      LayoutMode: Top;
+      FlexWeight: 1;
+
+      Label #CardTitle {
+        Anchor: (Height: 20, Bottom: 2);
+        Style: $M.@RowNameFitStyle;
+      }
+
+      Label #CardBlurb {
+        Anchor: (Height: 16, Bottom: 2);
+        Style: $M.@RowMetaFitStyle;
+      }
+
+      Label #CardStatus {
+        Anchor: (Height: 14);
+        Style: $M.@MetaFitStyle;
+        Visible: false;
+      }
+    }
+  }
+}

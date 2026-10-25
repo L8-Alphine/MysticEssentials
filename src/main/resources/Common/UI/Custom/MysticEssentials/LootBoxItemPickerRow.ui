@@ -11,9 +11,9 @@ ItemSlotButton #Row {
   Anchor: (Height: 48, Bottom: 4);
   LayoutMode: Full;
   Style: (
-    Default: (Background: #0a0f16(0.38)),
-    Hovered: (Background: #7a9cc6(0.16)),
-    Pressed: (Background: #7a9cc6(0.26)),
+    Default: (Background: #0b1422(0.38)),
+    Hovered: (Background: #67a5da(0.16)),
+    Pressed: (Background: #67a5da(0.26)),
     Sounds: $C.@ButtonSounds
   );
 

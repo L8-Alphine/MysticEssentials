@@ -7,11 +7,11 @@ Group #Row {
   Anchor: (Height: 104, Bottom: 6);
   LayoutMode: Left;
   Padding: (Left: 0, Right: 14, Top: 12, Bottom: 12);
-  Background: #0a0f16(0.38);
+  Background: #0b1422(0.38);
 
   Group {
     Anchor: (Width: 3, Height: 80, Right: 13);
-    Background: #7a9cc6;
+    Background: #67a5da;
   }
 
   Group {
@@ -35,7 +35,7 @@ Group #Row {
 
     Label #Status {
       Anchor: (Height: 16);
-      Style: (...$M.@RowMetaStyle, TextColor: #6fd08c);
+      Style: (...$M.@RowMetaStyle, TextColor: #64c995);
     }
   }
 

@@ -33,6 +33,8 @@ Developers should start with [Developer API](developer-api). Mystic Essentials e
 | Inventory | Clear self/others/all, protected players, automatic snapshots, snapshot restore UI |
 | Nicknames | Nickname UI, color-gated nicks, blocked names, staff-visible nickname marker |
 | Player Vaults | Per-rank personal storage, customizable metadata, item blacklists, cross-server locking, admin tooling |
+| Navigation Shell | A shortcut rail beside chat (`/1`–`/9`), an `/menu` shell that discovers the installed Mystic Ecosystem mods, and a registration API so other mods can add their own cards |
+| Server Wiki | An in-game, editable wiki with categories, search, `[[links]]` and per-article permissions, plus an API for other mods to contribute their own live pages |
 | LootBox | Reward pools with exact, always-visible odds, signed physical and virtual keys, block crates, crash-safe openings, receipts, a pending-reward inbox, and an in-game creator for pools, keys and crates |
 | Patch Notes | In-game changelog viewer, categories and filters, join notices and auto-open |
 | Tutorial | Scripted first-join tutorial with scenes and pages |

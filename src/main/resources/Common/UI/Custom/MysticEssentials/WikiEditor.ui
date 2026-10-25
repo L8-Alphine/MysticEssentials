@@ -1,0 +1,147 @@
+// Server Wiki — editor. Staff write pages here rather than in a file on the
+// host, which is the point of a wiki that can be edited in game.
+//
+// Deliberately one screen with no tabs: a page is a title, where it files, a
+// summary line and a body, and splitting four fields across tabs would hide
+// half of what someone is writing.
+$C = "../Common.ui";
+$M = "MysticTheme.ui";
+
+$C.@PageOverlay {}
+
+$C.@Container {
+  Anchor: (Width: 900, Height: 660);
+
+  #Title {
+    Group {
+      $C.@Title {
+        @Text = "Edit Wiki Page";
+      }
+
+      $M.@HeaderMeta #EditorId {}
+    }
+  }
+
+  #Content {
+    LayoutMode: Top;
+
+    Group {
+      LayoutMode: Left;
+      Anchor: (Height: 62, Bottom: 6);
+
+      Group {
+        FlexWeight: 2;
+        LayoutMode: Top;
+        Padding: (Right: 10);
+
+        $M.@FieldLabel {
+          @Text = "Title";
+        }
+
+        $C.@TextField #TitleInput {
+          @Anchor = (Height: 34);
+          PlaceholderText: "What this page is called";
+        }
+      }
+
+      Group {
+        FlexWeight: 1;
+        LayoutMode: Top;
+
+        $M.@FieldLabel {
+          @Text = "Category";
+        }
+
+        $C.@TextField #CategoryInput {
+          @Anchor = (Height: 34);
+          PlaceholderText: "Getting Started";
+        }
+      }
+    }
+
+    Group {
+      LayoutMode: Top;
+      Anchor: (Height: 62, Bottom: 6);
+
+      $M.@FieldLabel {
+        @Text = "Summary";
+      }
+
+      $C.@TextField #SummaryInput {
+        @Anchor = (Height: 34);
+        PlaceholderText: "One line shown in the page list";
+      }
+    }
+
+    Group {
+      LayoutMode: Left;
+      Anchor: (Height: 62, Bottom: 6);
+
+      Group {
+        FlexWeight: 2;
+        LayoutMode: Top;
+        Padding: (Right: 10);
+
+        $M.@FieldLabel {
+          @Text = "Tags";
+        }
+
+        $C.@TextField #TagsInput {
+          @Anchor = (Height: 34);
+          PlaceholderText: "Comma separated, for search";
+        }
+      }
+
+      Group {
+        FlexWeight: 1;
+        LayoutMode: Top;
+
+        $M.@FieldLabel {
+          @Text = "View Permission";
+        }
+
+        $C.@TextField #PermissionInput {
+          @Anchor = (Height: 34);
+          PlaceholderText: "Blank for everyone";
+        }
+      }
+    }
+
+    $M.@FieldLabel {
+      @Text = "Body";
+    }
+
+    $C.@MultilineTextField #BodyInput {
+      @Anchor = (Bottom: 6);
+      FlexWeight: 1;
+      PlaceholderText: "## A heading\nA paragraph.\n- A bullet\n[[another-page]] links to another page.";
+    }
+
+    Label #EditorStatus {
+      Anchor: (Height: 18, Bottom: 2);
+      Style: $M.@HintStyle;
+    }
+
+    $M.@ActionBar {
+      @Anchor = (Height: 44, Top: 6);
+
+      $C.@TextButton #SaveButton {
+        @Text = "Save";
+        @Anchor = (Width: 140, Right: 8);
+      }
+
+      $C.@SecondaryTextButton #CancelButton {
+        @Text = "Back";
+        @Anchor = (Width: 130);
+      }
+
+      $M.@Spacer {}
+
+      $C.@CancelTextButton #DeleteButton {
+        @Text = "Delete";
+        @Anchor = (Width: 130);
+        Visible: false;
+      }
+    }
+  }
+}

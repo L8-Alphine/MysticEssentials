@@ -24,30 +24,39 @@
 $C = "../Common.ui";
 
 // ---------------------------------------------------------------- Palette --
-@Ink0 = #0a0f16;            // deepest: icon wells, list wells
-@Ink1 = #10171f;            // inset surfaces
-@Ink2 = #161f2a;            // raised cards
-@LineSoft = #ffffff(0.06);  // hairlines between rows / sections
-@LineStrong = #ffffff(0.12);
+// Hyzion palette (Mystic Ecosystem Master UI/UX Design Bible v1.0 §3). The
+// bible's canvas/panel/card navies replace the old neutral inks, and its warm
+// parchment text replaces plain white, so every page in the ecosystem reads as
+// one product. The game's own window fill (#16212f, ContainerFullPatch) stays
+// the outermost surface -- a mod cannot repaint it -- but it is already within
+// a few points of the bible's surface.panel, so the seam does not show.
+@Ink0 = #0b1422;            // deepest: icon wells, list wells (below canvas)
+@Ink1 = #101b2c;            // surface.canvas
+@Ink2 = #16263b;            // surface.panel
+@Card = #203550;            // surface.card: interactive tile / container
+@LineSoft = #3a506b(0.55);  // border.standard, softened for row hairlines
+@LineStrong = #3a506b;      // border.standard
 
 // Every text colour that carries information reads at 4.5:1 or better on the
 // window (#16212f, ContainerFullPatch), and row text does under the row hover
-// tint too. TextDim is the game's section-title colour lifted 10% to get there.
-// TextFaint does not pass: keep it for decoration, never for hints, odds or
-// anything to act on. verifyLootBoxAccessibility checks this.
-@TextHi = #ffffff;
-@TextBody = #dee2ef;        // the game's value-text colour
-@TextMuted = #96a9be;       // the game's default label colour
-@TextDim = #858e9d;
-@TextFaint = #5a6a7a;
+// tint too. TextBody is the bible's text.primary, TextMuted its text.secondary;
+// TextDim is text.secondary darkened to separate labels from values while
+// still passing. TextFaint does not pass: keep it for decoration, never for
+// hints, odds or anything to act on. verifyLootBoxAccessibility checks this.
+@TextHi = #f8f3ea;
+@TextBody = #f3ebdd;        // text.primary
+@TextMuted = #aec1d5;       // text.secondary
+@TextDim = #93a8c0;
+@TextFaint = #6e829b;
 
-@Gold = #E8A93B;            // the game's highlight gold
-@GoldSoft = #e8c97a;
-@Blue = #7a9cc6;            // the game's blue accent
-@BlueBright = #96b8e0;
-@Success = #6fd08c;
-@Warn = #ffca3a;
-@Danger = #d46a6a;
+@Gold = #d9b572;            // accent.gold: section titles, "this one"
+@GoldSoft = #e7ce9b;
+@GoldBorder = #b38a4e;      // border.royal: focus / selected / primary perimeter
+@Blue = #67a5da;            // accent.blue: selection, accessible focus
+@BlueBright = #8fc2ec;
+@Success = #64c995;
+@Warn = #e8bc63;
+@Danger = #e48786;
 
 // ------------------------------------------------------------- Type scale --
 @DisplayStyle = LabelStyle(
@@ -146,29 +155,29 @@ $C = "../Common.ui";
 @PanelBackground = PatchStyle(TexturePath: "../Common/HeaderTabBackground.png", Border: 7);
 // Gold-rimmed card: the game's selected-tab frame. Reserved for "this one".
 @PanelSelectedBackground = PatchStyle(TexturePath: "../Common/HeaderTabSelectedBackground.png", Border: 7);
-@WellBackground = #0a0f16(0.42);
+@WellBackground = #0b1422(0.42);
 
 // Row button states. Flat like the game's own list rows; hover tints blue.
 @RowStyle = ButtonStyle(
-  Default: (Background: #0a0f16(0.38)),
-  Hovered: (Background: #7a9cc6(0.16)),
-  Pressed: (Background: #7a9cc6(0.26)),
+  Default: (Background: #0b1422(0.38)),
+  Hovered: (Background: #67a5da(0.16)),
+  Pressed: (Background: #67a5da(0.26)),
   Sounds: $C.@ButtonSounds
 );
 
 // Quiet in-row action (Edit / Select). Sits inside a row without shouting.
 @InlineButtonStyle = ButtonStyle(
-  Default: (Background: #7a9cc6(0.18)),
-  Hovered: (Background: #7a9cc6(0.32)),
-  Pressed: (Background: #7a9cc6(0.46)),
+  Default: (Background: #67a5da(0.18)),
+  Hovered: (Background: #67a5da(0.32)),
+  Pressed: (Background: #67a5da(0.46)),
   Sounds: $C.@ButtonSounds
 );
 
 // Tab strip button: flat, the active tab shows a gold rule underneath.
 @TabStyle = ButtonStyle(
-  Default: (Background: #0a0f16(0.30)),
-  Hovered: (Background: #7a9cc6(0.16)),
-  Pressed: (Background: #7a9cc6(0.26)),
+  Default: (Background: #0b1422(0.30)),
+  Hovered: (Background: #67a5da(0.16)),
+  Pressed: (Background: #67a5da(0.26)),
   Sounds: $C.@ButtonSounds
 );
 
@@ -184,17 +193,17 @@ $C = "../Common.ui";
 
 // Text-button variants whose label the server writes at runtime.
 @TabTextButtonStyle = TextButtonStyle(
-  Default: (Background: #0a0f16(0.30), LabelStyle: @TabLabelStyle),
-  Hovered: (Background: #7a9cc6(0.16), LabelStyle: @TabLabelStyle),
-  Pressed: (Background: #7a9cc6(0.26), LabelStyle: @TabLabelStyle),
+  Default: (Background: #0b1422(0.30), LabelStyle: @TabLabelStyle),
+  Hovered: (Background: #67a5da(0.16), LabelStyle: @TabLabelStyle),
+  Pressed: (Background: #67a5da(0.26), LabelStyle: @TabLabelStyle),
   Sounds: $C.@ButtonSounds
 );
 
 @SettingLabelStyle = LabelStyle(FontSize: 14, RenderBold: true, TextColor: @TextBody, VerticalAlignment: Center);
 @SettingTextButtonStyle = TextButtonStyle(
-  Default: (Background: #0a0f16(0.38), LabelStyle: @SettingLabelStyle),
-  Hovered: (Background: #7a9cc6(0.16), LabelStyle: @SettingLabelStyle),
-  Pressed: (Background: #7a9cc6(0.26), LabelStyle: @SettingLabelStyle),
+  Default: (Background: #0b1422(0.38), LabelStyle: @SettingLabelStyle),
+  Hovered: (Background: #67a5da(0.16), LabelStyle: @SettingLabelStyle),
+  Pressed: (Background: #67a5da(0.26), LabelStyle: @SettingLabelStyle),
   Sounds: $C.@ButtonSounds
 );
 
@@ -284,7 +293,7 @@ $C = "../Common.ui";
   @Height = 56;
 
   Anchor: (Full: 0);
-  Background: #E8A93B(0.10);
+  Background: #d9b572(0.10);
   Visible: false;
 
   Group {
@@ -298,7 +307,7 @@ $C = "../Common.ui";
 // inside a LayoutMode: Full tab button so the label draws over it.
 @TabSelection = Group {
   Anchor: (Full: 0);
-  Background: #E8A93B(0.10);
+  Background: #d9b572(0.10);
   Visible: false;
 
   Group {
@@ -313,7 +322,7 @@ $C = "../Common.ui";
   @Anchor = ();
 
   Anchor: (...@Anchor, Width: @Size, Height: @Size);
-  Background: #0a0f16(0.55);
+  Background: #0b1422(0.55);
   LayoutMode: CenterMiddle;
 };
 
@@ -321,7 +330,7 @@ $C = "../Common.ui";
 // #<id>.Background at runtime, as the swatches do.
 @Pill = Group {
   @Text = "";
-  @Color = #7a9cc6(0.85);
+  @Color = #67a5da(0.85);
   @Anchor = ();
 
   Anchor: (...@Anchor, Height: 18);

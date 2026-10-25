@@ -1,0 +1,57 @@
+// One rendered block of a wiki body. Appended once per block into
+// #ArticleBody; the server shows exactly one of the five variants.
+//
+// One template rather than five files because the body is rendered a block at
+// a time and the reader has to stay in document order — appending from a
+// single template keeps the indices the server addresses (`#ArticleBody[i]`)
+// in step with the blocks it parsed.
+//
+// Heights are deliberately left off the wrapping labels: a Label with no
+// Height wraps to fit its content, which is what a paragraph of unknown
+// length needs.
+$C = "../Common.ui";
+$M = "MysticTheme.ui";
+
+Group {
+  LayoutMode: Top;
+
+  Label #LineHeading {
+    Anchor: (Height: 24, Top: 8, Bottom: 4);
+    Style: $M.@HeadingGoldStyle;
+    Visible: false;
+  }
+
+  Label #LineParagraph {
+    Anchor: (Bottom: 8);
+    Style: $M.@BodyStyle;
+    Visible: false;
+  }
+
+  Group #LineBullet {
+    LayoutMode: Left;
+    Anchor: (Bottom: 6);
+    Visible: false;
+
+    $M.@Bullet {
+      Anchor: (Width: 8, Height: 8, Top: 7, Right: 10);
+    }
+
+    Label #LineBulletText {
+      FlexWeight: 1;
+      Style: $M.@BodyMutedStyle;
+    }
+  }
+
+  Group #LineRule {
+    Anchor: (Height: 1, Top: 8, Bottom: 10);
+    Background: $M.@LineSoft;
+    Visible: false;
+  }
+
+  // Common.ui fixes this button's height after the @Anchor spread, so the
+  // anchor here only carries width and spacing.
+  $C.@SmallSecondaryTextButton #LineLink {
+    @Anchor = (Width: 280, Bottom: 8);
+    Visible: false;
+  }
+}

@@ -42,7 +42,7 @@ $C.@Container {
 
         Group #TabMyVaultsAccent {
           Anchor: (Height: 3);
-          Background: #E8A93B;
+          Background: #d9b572;
         }
       }
 
@@ -59,7 +59,7 @@ $C.@Container {
 
         Group #TabSettingsAccent {
           Anchor: (Height: 3);
-          Background: #E8A93B;
+          Background: #d9b572;
           Visible: false;
         }
       }
@@ -71,13 +71,13 @@ $C.@Container {
 
         Label {
           FlexWeight: 1;
-          Style: (...$M.@TabLabelStyle, TextColor: #e8c97a);
+          Style: (...$M.@TabLabelStyle, TextColor: #e7ce9b);
           Text: "Admin";
         }
 
         Group #TabAdminAccent {
           Anchor: (Height: 3);
-          Background: #E8A93B;
+          Background: #d9b572;
           Visible: false;
         }
       }

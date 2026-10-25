@@ -14,7 +14,7 @@ public final class KeyDraft {
     public String id;
     /** Any registered item; the key looks like it. */
     public String baseItemId;
-    /** MysticText markup, e.g. {@code <#E7B84D>&lAvalon Royal Key}. */
+    /** MysticText markup, e.g. {@code <#d9b572>&lAvalon Royal Key}. */
     public String name;
     /** One entry per line, MysticText markup; joined into the item's single description. */
     public List<String> lore = new ArrayList<>();

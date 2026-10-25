@@ -348,6 +348,36 @@ public final class ChannelsSubModule {
         return displayNameFor(player.getUuid()).orElse(currentChannel(player.getUuid()));
     }
 
+    /**
+     * Whether this player may speak in a channel right now: it exists, it is
+     * enabled, and they are allowed to listen to it. Aliases resolve, so the
+     * shortcut rail can be configured with whatever name the server uses.
+     *
+     * <p>Read-only — unlike {@link #setChannel}, asking does not switch anyone.</p>
+     */
+    public boolean canUseChannel(PlayerRef player, String channelId) {
+        String id = resolveChannelId(channelId);
+        if (id.isEmpty()) {
+            return false;
+        }
+        for (ChatConfig.Channel channel : visibleChannels(player)) {
+            if (normalize(channel.id).equals(id)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The configured display name of a channel, whether or not any particular
+     * player can see it. Empty when no such channel is configured — which is
+     * how the shell tells "no guild channel on this server" apart from "you are
+     * not in a guild".
+     */
+    public Optional<String> channelDisplayName(String channelId) {
+        return findChannel(resolveChannelId(channelId)).map(ChannelsSubModule::displayName);
+    }
+
     /** Display rows for the channel-browser UI: channels the player may see. */
     public List<ChannelPages.ChannelRow> channelRowsFor(PlayerRef player) {
         List<ChannelPages.ChannelRow> rows = new ArrayList<>();

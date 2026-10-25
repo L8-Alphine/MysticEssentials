@@ -30,6 +30,26 @@ public interface ChatService {
     boolean setChannel(UUID player, String channelId);
 
     /**
+     * Whether an online player may speak in this channel right now. False for
+     * an offline player, an unknown channel, or one they may not listen to.
+     *
+     * <p>Read-only: asking never switches anyone's channel. The navigation
+     * shell uses this to tell an unavailable shortcut from a usable one
+     * without side effects.</p>
+     */
+    default boolean canUseChannel(UUID player, String channelId) {
+        return false;
+    }
+
+    /**
+     * The configured display name of a channel, independent of any player.
+     * Empty when the server has no such channel configured.
+     */
+    default Optional<String> channelDisplayName(String channelId) {
+        return Optional.empty();
+    }
+
+    /**
      * Creates an in-memory temporary channel owned by a player.
      *
      * @return {@code false} when the channel cannot be created, including when the

@@ -22,7 +22,7 @@ public final class EditorTabs {
     public static final String TAB_UI = "MysticEssentials/LootBoxEditorTab.ui";
 
     /** The active tab's label colour: the theme's soft gold for "this one". */
-    private static final String SELECTED_MARKUP = "<#E8C97A>";
+    private static final String SELECTED_MARKUP = "<#e7ce9b>";
 
     /** One tab: the id the page switches on, and its label. */
     public record Tab(String id, String label) {

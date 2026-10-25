@@ -19,6 +19,6 @@ Group #Cell {
 
   Label #Qty {
     Anchor: (Height: 14);
-    Style: (...$M.@CaptionStyle, TextColor: #dee2ef, HorizontalAlignment: Center);
+    Style: (...$M.@CaptionStyle, TextColor: #f3ebdd, HorizontalAlignment: Center);
   }
 }

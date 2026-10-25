@@ -718,7 +718,7 @@ final class ChannelPages {
 
     /** @return {@code color} if it is a {@code #RRGGBB} hex string, else a neutral blue. */
     private static String safeColor(String color) {
-        return color == null || !color.matches("#[0-9a-fA-F]{6}") ? "#7a9cc6" : color;
+        return color == null || !color.matches("#[0-9a-fA-F]{6}") ? "#67a5da" : color;
     }
 
     private static UUID tryUuid(String raw) {

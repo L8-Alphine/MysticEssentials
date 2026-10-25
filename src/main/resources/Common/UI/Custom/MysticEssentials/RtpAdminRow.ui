@@ -7,7 +7,7 @@ Group #Row {
   Anchor: (Height: 108, Bottom: 6);
   LayoutMode: Top;
   Padding: (Left: 14, Right: 14, Top: 10, Bottom: 10);
-  Background: #0a0f16(0.38);
+  Background: #0b1422(0.38);
 
   Group {
     Anchor: (Height: 32, Bottom: 6);
@@ -46,6 +46,6 @@ Group #Row {
 
   Label #Result {
     Anchor: (Height: 16);
-    Style: (...$M.@RowMetaStyle, TextColor: #e8c97a);
+    Style: (...$M.@RowMetaStyle, TextColor: #e7ce9b);
   }
 }

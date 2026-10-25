@@ -406,6 +406,22 @@ public final class Permissions {
         return CUSTOMCOMMANDS_BYPASS_COOLDOWN + "." + commandName.toLowerCase(Locale.ROOT);
     }
 
+    // ----- Navigation shell ---------------------------------------------------
+
+    /** Open {@code /menu}. */
+    public static final String SHELL_MENU = "mysticessentials.shell.menu";
+    /** Open {@code /shortcuts} and use {@code /1} – {@code /9}. */
+    public static final String SHELL_SHORTCUTS = "mysticessentials.shell.shortcuts";
+
+    // ----- Server wiki --------------------------------------------------------
+
+    /** Read the wiki. */
+    public static final String WIKI_USE = "mysticessentials.wiki.use";
+    /** Create, edit and delete stored articles. */
+    public static final String WIKI_EDIT = "mysticessentials.wiki.edit";
+    /** {@code mysticessentials.wiki.read.<article>} — read one restricted article. */
+    public static final String WIKI_READ_BASE = "mysticessentials.wiki.read";
+
     /** {@code mysticessentials.vaults.vault.<n>} — highest accessible vault number. */
     public static String vaultNumber(int n) {
         return VAULTS_VAULT_BASE + "." + n;
@@ -424,5 +440,10 @@ public final class Permissions {
     /** {@code mysticessentials.teleport.rtp.profile.<profile>} — permission to use a profile. */
     public static String rtpProfile(String profile) {
         return RTP_PROFILE_BASE + "." + profile.toLowerCase(Locale.ROOT);
+    }
+
+    /** {@code mysticessentials.wiki.read.<article>} — permission to read one article. */
+    public static String wikiRead(String articleId) {
+        return WIKI_READ_BASE + "." + articleId.toLowerCase(Locale.ROOT);
     }
 }

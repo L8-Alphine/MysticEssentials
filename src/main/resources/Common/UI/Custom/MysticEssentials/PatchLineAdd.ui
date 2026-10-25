@@ -10,7 +10,7 @@ Group #Row {
 
   Label {
     Anchor: (Width: 16);
-    Style: (FontSize: 14, RenderBold: true, TextColor: #6fd08c, VerticalAlignment: Center);
+    Style: (FontSize: 14, RenderBold: true, TextColor: #64c995, VerticalAlignment: Center);
     Text: "+";
   }
 

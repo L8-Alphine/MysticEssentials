@@ -7,7 +7,7 @@ Group #Row {
   Anchor: (Height: 52, Bottom: 4);
   LayoutMode: Left;
   Padding: (Left: 12, Right: 12, Top: 8, Bottom: 8);
-  Background: #0a0f16(0.38);
+  Background: #0b1422(0.38);
 
   $M.@IconWell {
     @Anchor = (Right: 12);

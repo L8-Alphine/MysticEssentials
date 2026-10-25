@@ -24,7 +24,7 @@ $C.@Container {
 
     Group #DangerBar {
       Anchor: (Height: 3, Bottom: 10);
-      Background: #d46a6a;
+      Background: #e48786;
       Visible: false;
     }
 

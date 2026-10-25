@@ -23,7 +23,7 @@ Button #Row {
 
       Group #Swatch {
         Anchor: (Width: 12, Height: 12);
-        Background: #7a9cc6;
+        Background: #67a5da;
       }
     }
 

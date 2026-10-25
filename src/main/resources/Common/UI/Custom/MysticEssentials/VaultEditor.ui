@@ -54,7 +54,7 @@ $C.@Container {
             Anchor: (Width: 50, Height: 32);
             Format: Rgb;
             Style: $C.@DefaultColorPickerDropdownBoxStyle;
-            Color: #7a9cc6;
+            Color: #67a5da;
             DisplayTextField: true;
           }
         }

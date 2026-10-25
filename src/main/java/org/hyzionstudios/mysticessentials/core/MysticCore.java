@@ -750,6 +750,16 @@ public final class MysticCore implements MysticEssentialsAPI {
         return service("announcements", AnnouncementService.class);
     }
 
+    @Override
+    public org.hyzionstudios.mysticessentials.api.shell.ShellService getShellService() {
+        return service("shell", org.hyzionstudios.mysticessentials.api.shell.ShellService.class);
+    }
+
+    @Override
+    public org.hyzionstudios.mysticessentials.api.wiki.WikiService getWikiService() {
+        return service("wiki", org.hyzionstudios.mysticessentials.api.wiki.WikiService.class);
+    }
+
     /** Resolves a module-owned service, or {@code null} if the module is disabled. */
     private <T> T service(String moduleId, Class<T> type) {
         if (moduleManager == null || !moduleManager.isEnabled(moduleId)) {

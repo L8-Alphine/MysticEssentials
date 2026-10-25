@@ -13,7 +13,7 @@ Group #MysticNotificationBannerRoot {
 
   Group #MysticNotificationBannerPanel {
     Anchor: (Width: 640, Height: 52);
-    Background: #0a0f16(0.72);
+    Background: #0b1422(0.72);
     LayoutMode: Left;
 
     Group #MysticNotificationBannerAccent {
@@ -37,7 +37,7 @@ Group #MysticNotificationBannerRoot {
 
         Label #MysticNotificationBannerHint {
           Anchor: (Width: 140);
-          Style: (FontSize: 11, RenderUppercase: true, LetterSpacing: 1, TextColor: #96a9be, HorizontalAlignment: End, VerticalAlignment: Center);
+          Style: (FontSize: 11, RenderUppercase: true, LetterSpacing: 1, TextColor: #aec1d5, HorizontalAlignment: End, VerticalAlignment: Center);
         }
       }
 

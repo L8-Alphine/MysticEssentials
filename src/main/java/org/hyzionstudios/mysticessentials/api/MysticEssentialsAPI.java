@@ -95,4 +95,14 @@ public interface MysticEssentialsAPI {
     ChatService getChatService();
 
     AnnouncementService getAnnouncementService();
+
+    /**
+     * The navigation shell: the shortcut rail and the main menu. Null when the
+     * shell module is disabled, which is how another mod tells "no menu on
+     * this server" from "menu present, my card was rejected".
+     */
+    org.hyzionstudios.mysticessentials.api.shell.ShellService getShellService();
+
+    /** The built-in server wiki. Null when the wiki module is disabled. */
+    org.hyzionstudios.mysticessentials.api.wiki.WikiService getWikiService();
 }

@@ -1,0 +1,76 @@
+// Shortcuts — the pointer-driven twin of the HUD rail.
+//
+// The rail itself is a HUD overlay, and the client routes no events to a HUD
+// (CustomHud carries no event bindings), so this page is where the same nine
+// slots become real buttons. Keep the order, glyphs and states identical to
+// ShortcutRailHud: this is the same object, reachable with a mouse.
+$C = "../Common.ui";
+$M = "MysticTheme.ui";
+
+$C.@PageOverlay {}
+
+$C.@Container {
+  Anchor: (Width: 560, Height: 640);
+
+  #Title {
+    Group {
+      $C.@Title {
+        @Text = "Shortcuts";
+      }
+
+      $M.@HeaderMeta #HeaderHint {}
+    }
+  }
+
+  #Content {
+    LayoutMode: Top;
+
+    Label #ShortcutIntro {
+      Anchor: (Height: 34, Bottom: 10);
+      Style: $M.@HintStyle;
+    }
+
+    $M.@Section {
+      @Text = "Chat Channels";
+      @Anchor = (Bottom: 8);
+    }
+
+    Group #ChannelList {
+      Anchor: (Bottom: 14);
+      LayoutMode: Top;
+    }
+
+    $M.@Section {
+      @Text = "Destinations";
+      @Anchor = (Bottom: 8);
+    }
+
+    Group #DestinationList {
+      FlexWeight: 1;
+      LayoutMode: TopScrolling;
+      Padding: (Right: 6);
+      ScrollbarStyle: $C.@DefaultScrollbarStyle;
+    }
+
+    $M.@ActionBar {
+      @Anchor = (Height: 44, Top: 12);
+
+      $C.@SecondaryTextButton #ToggleRailButton {
+        @Text = "Hide Rail";
+        @Anchor = (Width: 160, Right: 8);
+      }
+
+      $C.@TertiaryTextButton #OpenMenuButton {
+        @Text = "Main Menu";
+        @Anchor = (Width: 160);
+      }
+
+      $M.@Spacer {}
+
+      $C.@CancelTextButton #CloseButton {
+        @Text = "Close";
+        @Anchor = (Width: 120);
+      }
+    }
+  }
+}

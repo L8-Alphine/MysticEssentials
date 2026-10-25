@@ -29,17 +29,17 @@ $C.@Container {
       Group {
         LayoutMode: Left;
         Anchor: (Height: 40, Bottom: 10);
-        Background: #E8A93B(0.10);
+        Background: #d9b572(0.10);
         Padding: (Left: 12, Right: 8);
 
         Group {
           Anchor: (Width: 3, Height: 22, Right: 10);
-          Background: #E8A93B;
+          Background: #d9b572;
         }
 
         Label #CurrentChannelLabel {
           FlexWeight: 1;
-          Style: (...$M.@SubheadingStyle, TextColor: #e8c97a);
+          Style: (...$M.@SubheadingStyle, TextColor: #e7ce9b);
         }
 
         $C.@SmallSecondaryTextButton #ViewMembersButton {
@@ -97,7 +97,7 @@ $C.@Container {
 
           Group #ChannelDetailSwatch {
             Anchor: (Width: 6, Height: 24, Top: 4, Right: 12);
-            Background: #7a9cc6;
+            Background: #67a5da;
           }
 
           Label #ChannelName {

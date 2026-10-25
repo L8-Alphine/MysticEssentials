@@ -14,6 +14,25 @@ Optional arguments use `[brackets]`. Required arguments use `<angle brackets>`.
 | `/mystic license [reload]` | Show license status/server id, or reload `license.mclicense` | `mysticessentials.license` |
 | `/notifications`, `/notifs` | Open notification history, filters, and preferences | None |
 
+## Navigation Shell and Server Wiki
+
+| Command | Description | Permission |
+| --- | --- | --- |
+| `/menu`, `/mysticmenu` | Open the Adventurer's Menu | None |
+| `/shortcuts`, `/sc` | Open the Shortcuts page | None |
+| `/shortcuts <1-9>` | Run a shortcut slot | None |
+| `/shortcuts rail` | Show or hide the rail beside chat | None |
+| `/1` … `/9` | Run that shortcut slot | None |
+| `/wiki`, `/codex` | Open the server wiki | `mysticessentials.wiki.use` |
+| `/wiki <id>` | Open one wiki page | `mysticessentials.wiki.use` |
+| `/wiki <words…>` | Search the wiki | `mysticessentials.wiki.use` |
+| `/wiki new\|edit <id>` | Write or change a page | `mysticessentials.wiki.edit` |
+| `/wiki delete <id>` | Delete a stored page | `mysticessentials.wiki.edit` |
+
+ALT+1–9 is not available: a server-side mod cannot bind a client key on this
+engine. See [Navigation Shell](shell-module) for what the engine does and does
+not allow.
+
 ## Teleportation
 
 | Command | Description | Permission |

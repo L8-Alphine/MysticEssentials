@@ -37,23 +37,24 @@ public abstract class MysticPage extends CustomUIPage {
      * Runtime text colours, keyed by element id. A {@code TextSpans} value carries
      * its own colour and wins over the label style in the {@code .ui}, so this
      * table is where the theme's palette reaches text the server writes. The
-     * tokens mirror {@code MysticTheme.ui}: display and value text
-     * {@code #DEE2EF}, row names white, meta {@code #96A9BE}, eyebrows and
-     * counts {@code #858E9D}, captions {@code #5A6A7A}, gold for "this one".
-     * Text that carries information reads at 4.5:1 or better on the window
-     * background ({@code #16212F}); captions do not, so LootBox hints and
-     * notes use the muted colour instead (P2-L).
+     * tokens mirror the Hyzion palette in {@code MysticTheme.ui}: display and
+     * value text {@code #F3EBDD} (text.primary), row names {@code #F8F3EA},
+     * meta {@code #AEC1D5} (text.secondary), eyebrows and counts
+     * {@code #93A8C0}, captions {@code #6E829B}, gold {@code #D9B572} for
+     * "this one". Text that carries information reads at 4.5:1 or better on
+     * the window background ({@code #16212F}); captions do not, so LootBox
+     * hints and notes use the muted colour instead (P2-L).
      */
-    private static final String DEFAULT_UI_TEXT_COLOR = "#DEE2EF";
-    private static final String TEXT_HI = "#FFFFFF";
-    private static final String TEXT_BODY = "#DEE2EF";
-    private static final String TEXT_MUTED = "#96A9BE";
-    private static final String TEXT_DIM = "#858E9D";
-    private static final String TEXT_FAINT = "#5A6A7A";
-    private static final String GOLD = "#E8A93B";
-    private static final String GOLD_SOFT = "#E8C97A";
-    private static final String WARN = "#FFCA3A";
-    private static final String DANGER = "#D46A6A";
+    private static final String DEFAULT_UI_TEXT_COLOR = "#F3EBDD";
+    private static final String TEXT_HI = "#F8F3EA";
+    private static final String TEXT_BODY = "#F3EBDD";
+    private static final String TEXT_MUTED = "#AEC1D5";
+    private static final String TEXT_DIM = "#93A8C0";
+    private static final String TEXT_FAINT = "#6E829B";
+    private static final String GOLD = "#D9B572";
+    private static final String GOLD_SOFT = "#E7CE9B";
+    private static final String WARN = "#E8BC63";
+    private static final String DANGER = "#E48786";
     /** {@code @ColorButtonText} in the game's Common.ui. */
     private static final String BUTTON_TEXT = "#BFCDD5";
     private static final Pattern TEXT_TARGET =
@@ -246,7 +247,7 @@ public abstract class MysticPage extends CustomUIPage {
             Map.entry("StackHint", TEXT_MUTED),
             Map.entry("KeysHint", TEXT_MUTED),
             Map.entry("RulesNote", TEXT_MUTED),
-            Map.entry("Unread", "#FFD97A"),
+            Map.entry("Unread", "#E7CE9B"),
             Map.entry("Secondary", DANGER));
 
     protected final MysticCore core;
@@ -355,7 +356,7 @@ public abstract class MysticPage extends CustomUIPage {
 
     /** @return {@code color} if it is a {@code #RRGGBB} hex string, else a neutral blue. */
     protected static String safeColor(String color) {
-        return color == null || !color.matches("#[0-9a-fA-F]{6}") ? "#7a9cc6" : color;
+        return color == null || !color.matches("#[0-9a-fA-F]{6}") ? "#67A5DA" : color;
     }
 
     protected static String blankToNull(String value) {

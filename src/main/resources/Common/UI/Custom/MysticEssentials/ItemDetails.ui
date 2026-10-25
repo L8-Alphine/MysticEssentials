@@ -37,7 +37,7 @@ $C.@Container #MysticItemShell {
       // Rarity spine, recoloured by the server.
       Group #RarityAccent {
         Anchor: (Width: 4, Height: 90, Right: 16);
-        Background: #7a9cc6;
+        Background: #67a5da;
       }
 
       $M.@IconWell {
@@ -84,7 +84,7 @@ $C.@Container #MysticItemShell {
       Group #QualityBadge {
         LayoutMode: CenterMiddle;
         Anchor: (Width: 116, Height: 26, Left: 10, Top: 4);
-        Background: #7a9cc6(0.22);
+        Background: #67a5da(0.22);
 
         Label #QualityBadgeLabel {
           Anchor: (Full: 4);

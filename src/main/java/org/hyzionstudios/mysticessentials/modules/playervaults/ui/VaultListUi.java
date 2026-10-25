@@ -363,6 +363,6 @@ final class VaultListUi extends MysticPage {
         if (vault != null && vault.metadata != null) {
             return safeColor(vault.metadata.color);
         }
-        return "#7a9cc6";
+        return "#67a5da";
     }
 }

@@ -8,7 +8,7 @@ Group #Row {
   Anchor: (Height: 48, Bottom: 4);
   LayoutMode: Left;
   Padding: (Left: 12, Right: 10, Top: 8, Bottom: 8);
-  Background: #E8A93B(0.07);
+  Background: #d9b572(0.07);
 
   $M.@IconWell {
     @Size = 32;
@@ -16,13 +16,13 @@ Group #Row {
 
     Group {
       Anchor: (Width: 12, Height: 12);
-      Background: #E8A93B;
+      Background: #d9b572;
     }
   }
 
   Label #Name {
     FlexWeight: 1;
-    Style: (...$M.@RowNameStyle, TextColor: #e8c97a);
+    Style: (...$M.@RowNameStyle, TextColor: #e7ce9b);
   }
 
   Label #Status {

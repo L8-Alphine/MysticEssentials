@@ -4,11 +4,11 @@ $M = "MysticTheme.ui";
 Group #Row {
   Anchor: (Height: 34, Bottom: 4);
   LayoutMode: Full;
-  Background: #0a0f16(0.38);
+  Background: #0b1422(0.38);
 
   Group #Hl {
     Anchor: (Full: 0);
-    Background: #E8A93B(0.40);
+    Background: #d9b572(0.40);
     Visible: false;
   }
 

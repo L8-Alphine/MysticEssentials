@@ -1,0 +1,57 @@
+// Mystic Essentials shortcut rail — the vertical ALT-slot toolbar that sits
+// immediately left of the chat panel (Master UI/UX Design Bible v1.0 §8).
+//
+// Deliberately written with colour literals rather than `$M = MysticTheme.ui`.
+// This is an always-on overlay appended at join: a document that fails to parse
+// aborts EVERY custom UI document on that client, so the rail carries no
+// cross-document reference that a future theme edit could break. The literals
+// below are the Hyzion tokens — keep them in step with MysticTheme.ui:
+//   #0b1422 Ink0 · #3a506b border.standard · #aec1d5 text.secondary
+//   #93a8c0 TextDim · #6e829b TextFaint · #d9b572 accent.gold
+//
+// Every id is mod-prefixed. Custom UI selectors are matched by name with
+// nothing scoping them per document, so a generic id in an always-on overlay
+// collides with the next mod that picks the same name.
+//
+// The root's Anchor and Height are replaced from the server
+// (ShortcutRailHud) so the rail keeps its distance from the chat panel at any
+// resolution and sizes itself to however many slots the server configured.
+Group #MysticShortcutRailRoot {
+  Anchor: (Left: 12, Bottom: 196, Width: 46, Height: 520);
+  LayoutMode: Top;
+
+  // Group caption, as in the reference: "CHAT CH" over the channel block.
+  Label #MysticShortcutRailTitle {
+    Anchor: (Height: 14, Bottom: 5);
+    Style: (
+      FontSize: 9,
+      RenderBold: true,
+      RenderUppercase: true,
+      LetterSpacing: 1,
+      TextColor: #93a8c0,
+      Alignment: Center,
+      VerticalAlignment: Center
+    );
+  }
+
+  // One MysticEssentialsShortcutRailSlot.ui is appended here per slot.
+  Group #MysticShortcutRailSlots {
+    FlexWeight: 1;
+    LayoutMode: Top;
+  }
+
+  // Keybind/command hint, as in the reference's bottom-left corner. The server
+  // writes whatever actually activates a slot on this build.
+  Label #MysticShortcutRailHint {
+    Anchor: (Height: 14, Top: 3);
+    Style: (
+      FontSize: 9,
+      RenderBold: true,
+      RenderUppercase: true,
+      LetterSpacing: 1,
+      TextColor: #6e829b,
+      Alignment: Center,
+      VerticalAlignment: Center
+    );
+  }
+}

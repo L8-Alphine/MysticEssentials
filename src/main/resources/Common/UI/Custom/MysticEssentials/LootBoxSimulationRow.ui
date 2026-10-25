@@ -4,7 +4,7 @@ $M = "MysticTheme.ui";
 
 Group #Row {
   Anchor: (Height: 40, Bottom: 4);
-  Background: #0a0f16(0.38);
+  Background: #0b1422(0.38);
   LayoutMode: Left;
   Padding: (Left: 10, Right: 10, Top: 6, Bottom: 6);
 
@@ -20,22 +20,22 @@ Group #Row {
     Group {
       LayoutMode: Left;
       Anchor: (Height: 6, Bottom: 4);
-      Background: #0a0f16(0.55);
+      Background: #0b1422(0.55);
 
       Group #TheoryBar {
         Anchor: (Width: 1, Height: 6);
-        Background: #e8c97a(0.9);
+        Background: #e7ce9b(0.9);
       }
     }
 
     Group {
       LayoutMode: Left;
       Anchor: (Height: 6);
-      Background: #0a0f16(0.55);
+      Background: #0b1422(0.55);
 
       Group #ObservedBar {
         Anchor: (Width: 1, Height: 6);
-        Background: #7a9cc6;
+        Background: #67a5da;
       }
     }
   }

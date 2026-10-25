@@ -10,20 +10,20 @@ import java.util.Map;
  */
 public final class UiTheme {
 
-    public static final String TEXT = "#d7e1ee";
+    public static final String TEXT = "#f3ebdd";
     public static final String TEXT_STRONG = "#ffffff";
-    public static final String TEXT_MUTED = "#96a9be";
-    public static final String TEXT_DIM = "#6f7f93";
-    public static final String ACCENT = "#e8a93b";
-    public static final String DANGER = "#d46a6a";
-    public static final String SUCCESS = "#7fd47f";
+    public static final String TEXT_MUTED = "#aec1d5";
+    public static final String TEXT_DIM = "#93a8c0";
+    public static final String ACCENT = "#d9b572";
+    public static final String DANGER = "#e48786";
+    public static final String SUCCESS = "#64c995";
 
     /** Panel fill used by {@code <panel>} and {@code <card>} when unstyled. */
     public static final String PANEL_BACKGROUND = "#000000(0.18)";
     /** Hover and press fills for interactive rows, matching the builtin rows. */
     public static final String INTERACTIVE_HOVERED = "#7a9cc6(0.18)";
     public static final String INTERACTIVE_PRESSED = "#7a9cc6(0.28)";
-    public static final String SEPARATOR = "#2b3542";
+    public static final String SEPARATOR = "#3a506b";
 
     static final int DEFAULT_FONT_SIZE = 14;
     static final int HEADING_FONT_SIZE = 20;
@@ -52,7 +52,7 @@ public final class UiTheme {
             Map.entry("red", DANGER),
             Map.entry("success", SUCCESS),
             Map.entry("green", SUCCESS),
-            Map.entry("blue", "#7a9cc6"),
+            Map.entry("blue", "#67a5da"),
             Map.entry("panel", PANEL_BACKGROUND),
             Map.entry("separator", SEPARATOR),
             Map.entry("transparent", "#000000(0.0)"));

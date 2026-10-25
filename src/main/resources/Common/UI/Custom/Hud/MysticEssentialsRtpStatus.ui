@@ -7,7 +7,7 @@ Group #RtpStatusHudRoot {
   LayoutMode: CenterMiddle;
 
   Group #RtpStatusPanel {
-    Background: #0a0f16(0.55);
+    Background: #0b1422(0.55);
     LayoutMode: Left;
 
     Group {

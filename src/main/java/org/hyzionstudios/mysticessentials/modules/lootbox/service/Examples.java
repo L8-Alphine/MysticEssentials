@@ -17,7 +17,7 @@ final class Examples {
     static LootBoxDraft pool() {
         LootBoxDraft draft = new LootBoxDraft();
         draft.id = "example_supply";
-        draft.displayName = "<#E7B84D>Example Supply Crate";
+        draft.displayName = "<#d9b572>Example Supply Crate";
         draft.description = "A starter pool. Edit this file, then run /lootbox publish example_supply.";
         draft.icon = "Furniture_Crude_Chest_Large";
         draft.mode = "WEIGHTED";
@@ -26,7 +26,7 @@ final class Examples {
         draft.rewards.add(item("apples", "Apples x16", "Common", 3000, "Plant_Fruit_Apple", 16));
         draft.rewards.add(item("iron_bars", "Iron Bars x8", "Uncommon", 1500, "Ingredient_Bar_Iron", 8));
         draft.rewards.add(item("iron_sword", "Iron Sword", "Rare", 900, "Weapon_Sword_Iron", 1));
-        LootBoxDraft.RewardSpec gold = item("gold_bars", "<#E8A93B>Gold Bars x4", "Legendary", 100,
+        LootBoxDraft.RewardSpec gold = item("gold_bars", "<#d9b572>Gold Bars x4", "Legendary", 100,
                 "Ingredient_Bar_Gold", 4);
         gold.announce = true;
         draft.rewards.add(gold);
@@ -37,7 +37,7 @@ final class Examples {
         KeyDraft key = new KeyDraft();
         key.id = "mystic:example_key";
         key.baseItemId = "Ingredient_Bar_Copper";
-        key.name = "<#E7B84D>&lExample Crate Key";
+        key.name = "<#d9b572>&lExample Crate Key";
         key.lore = List.of("&7Opens: &fExample Supply Crate", "&8Use it on the crate, or run /lootbox.");
         key.uses = 1;
         return key;

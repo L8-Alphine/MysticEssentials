@@ -294,6 +294,29 @@ valid CustomContent license; permissions do not bypass its license gate.
 | `mysticessentials.customcommands.bypass.cooldown[.<name>]` | Bypass all / one command's cooldown |
 | `mysticessentials.customcommands.command.<name>` | Dynamic: implicit per-command use node |
 
+## Navigation Shell
+
+| Node | Grants |
+| --- | --- |
+| `mysticessentials.shell.menu` | Reserved for gating `/menu`; the command is open by default |
+| `mysticessentials.shell.shortcuts` | Reserved for gating `/shortcuts` and `/1`–`/9` |
+
+Individual rail slots are gated per slot through the `permission` field in
+`modules/shell/config.json`, so a server can restrict one destination without
+taking the whole rail away.
+
+## Server Wiki
+
+| Node | Grants |
+| --- | --- |
+| `mysticessentials.wiki.use` | Read the wiki (`/wiki`, `/codex`) |
+| `mysticessentials.wiki.edit` | Create, edit and delete stored articles |
+| `mysticessentials.wiki.read.<article>` | Dynamic: read one restricted article |
+
+An article's `viewPermission` can be any node, not only the
+`mysticessentials.wiki.read.*` family; readers without it do not see the page in
+the browser, in the category counts, or by id.
+
 ## Dynamic limit examples
 
 LuckPerms examples:

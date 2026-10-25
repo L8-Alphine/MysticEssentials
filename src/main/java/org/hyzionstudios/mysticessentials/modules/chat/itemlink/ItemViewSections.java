@@ -192,7 +192,7 @@ final class ItemViewSections {
         List<String> lines = new ArrayList<>();
         for (ItemModifierEntry modifier : view.modifiers()) {
             String source = modifier.source();
-            String color = modifier.amount() < 0 ? "#d46a6a" : "#8fd48f";
+            String color = modifier.amount() < 0 ? "#e48786" : "#64c995";
             StringBuilder line = new StringBuilder("<").append(color).append(">")
                     .append(RichText.plain(modifier.display()).markup());
             if (source != null && !source.isBlank()) {

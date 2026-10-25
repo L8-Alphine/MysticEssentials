@@ -8,7 +8,7 @@ Group #Row {
   Anchor: (Height: 56, Bottom: 4);
   LayoutMode: Left;
   Padding: (Left: 12, Right: 12, Top: 10, Bottom: 10);
-  Background: #0a0f16(0.38);
+  Background: #0b1422(0.38);
 
   // ItemSlotButton parent gives the native item tooltip on hover.
   ItemSlotButton #IconButton {

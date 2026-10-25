@@ -525,6 +525,21 @@ public final class ChatModule extends AbstractMysticModule implements ChatServic
     }
 
     @Override
+    public boolean canUseChannel(UUID player, String channelId) {
+        if (channels == null) {
+            return false;
+        }
+        return core.platform().findPlayer(player)
+                .map(ref -> channels.canUseChannel(ref, channelId))
+                .orElse(false);
+    }
+
+    @Override
+    public Optional<String> channelDisplayName(String channelId) {
+        return channels == null ? Optional.empty() : channels.channelDisplayName(channelId);
+    }
+
+    @Override
     public boolean createTemporaryChannel(UUID owner, String channelId, String permissionGate) {
         return channels != null && channels.createTemporaryChannel(owner, channelId, permissionGate);
     }

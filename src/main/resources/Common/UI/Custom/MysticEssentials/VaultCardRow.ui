@@ -17,7 +17,7 @@ Button #Row {
 
     Group #Swatch {
       Anchor: (Width: 3, Height: 48, Right: 11);
-      Background: #7a9cc6;
+      Background: #67a5da;
     }
 
     $M.@IconWell {

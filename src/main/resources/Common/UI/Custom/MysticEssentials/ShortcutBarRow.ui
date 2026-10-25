@@ -1,0 +1,52 @@
+// Row template for the Shortcuts page. Appended per slot:
+//   cmd.append("#ChannelList", "MysticEssentials/ShortcutBarRow.ui")
+// and populated by index: cmd.set("#ChannelList[i] #SlotName.TextSpans", ...).
+//
+// #SlotSelected marks the channel the player is speaking in; #SlotState carries
+// the reason a slot is unavailable, so a disabled shortcut explains itself
+// rather than just dimming.
+$M = "MysticTheme.ui";
+
+Button #Row {
+  Anchor: (Height: 52, Bottom: 4);
+  Style: $M.@RowStyle;
+  LayoutMode: Full;
+
+  $M.@RowSelection #SlotSelected {
+    @Height = 52;
+  }
+
+  Group {
+    Anchor: (Full: 0);
+    LayoutMode: Left;
+    Padding: (Left: 12, Right: 12, Top: 8, Bottom: 8);
+
+    $M.@IconWell {
+      @Anchor = (Right: 12);
+
+      Label #SlotGlyph {
+        Style: $M.@HeadingStyle;
+      }
+    }
+
+    Group {
+      LayoutMode: Top;
+      FlexWeight: 1;
+
+      Label #SlotName {
+        Anchor: (Height: 20, Bottom: 2);
+        Style: $M.@RowNameFitStyle;
+      }
+
+      Label #SlotState {
+        Anchor: (Height: 14);
+        Style: $M.@RowMetaFitStyle;
+      }
+    }
+
+    Label #SlotKey {
+      Anchor: (Width: 56);
+      Style: $M.@RowSideStyle;
+    }
+  }
+}

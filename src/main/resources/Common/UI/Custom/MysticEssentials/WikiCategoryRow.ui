@@ -1,0 +1,28 @@
+// Category item in the wiki browser's left rail.
+$M = "MysticTheme.ui";
+
+Button #Row {
+  Anchor: (Height: 36, Bottom: 2);
+  Style: $M.@RowStyle;
+  LayoutMode: Full;
+
+  $M.@RowSelection #CategorySelected {
+    @Height = 36;
+  }
+
+  Group {
+    Anchor: (Full: 0);
+    LayoutMode: Left;
+    Padding: (Left: 12, Right: 10);
+
+    Label #CategoryName {
+      FlexWeight: 1;
+      Style: $M.@SubheadingFitStyle;
+    }
+
+    Label #CategoryCount {
+      Anchor: (Width: 40);
+      Style: $M.@RowSideStyle;
+    }
+  }
+}

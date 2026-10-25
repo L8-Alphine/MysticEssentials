@@ -134,7 +134,7 @@ public final class ItemPickerPage extends MysticPage {
                     String.join(" · ", ItemCatalog.categories(itemId))));
             if (chosen) {
                 cmd.set(row + " #Selected.Visible", true);
-                cmd.set(row + " #Status.TextSpans", uiText(row + " #Status.TextSpans", "<#E8C97A>Current"));
+                cmd.set(row + " #Status.TextSpans", uiText(row + " #Status.TextSpans", "<#e7ce9b>Current"));
             }
             event.addEventBinding(CustomUIEventBindingType.Activating, row,
                     new EventData().put("action", "pick").put("item", itemId));

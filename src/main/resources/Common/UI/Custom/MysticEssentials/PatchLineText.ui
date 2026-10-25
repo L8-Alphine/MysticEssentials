@@ -10,6 +10,6 @@ Group #Row {
 
   Label #Line {
     FlexWeight: 1;
-    Style: (FontSize: 14, TextColor: #dee2ef, VerticalAlignment: Center);
+    Style: (FontSize: 14, TextColor: #f3ebdd, VerticalAlignment: Center);
   }
 }

@@ -8,11 +8,11 @@ Group #Row {
   Anchor: (Height: 68, Bottom: 4);
   LayoutMode: Left;
   Padding: (Left: 0, Right: 10, Top: 8, Bottom: 8);
-  Background: #0a0f16(0.38);
+  Background: #0b1422(0.38);
 
   Group {
     Anchor: (Width: 3, Height: 52, Right: 13);
-    Background: #E8A93B(0.6);
+    Background: #d9b572(0.6);
   }
 
   Group {
@@ -26,7 +26,7 @@ Group #Row {
 
     Label #Meta {
       Anchor: (Height: 14, Bottom: 2);
-      Style: (...$M.@RowMetaStyle, TextColor: #e8c97a);
+      Style: (...$M.@RowMetaStyle, TextColor: #e7ce9b);
     }
 
     Label #Preview {

@@ -1,0 +1,33 @@
+// Navigation item for the Main Menu rail. Appended per section:
+//   cmd.append("#MenuNav", "MysticEssentials/MainMenuNavRow.ui")
+//
+// #NavSelected marks the open section; #NavCount carries the badge (pending
+// invites, unread mail) and is hidden when there is nothing to report.
+$M = "MysticTheme.ui";
+
+Button #Row {
+  Anchor: (Height: 40, Bottom: 2);
+  Style: $M.@RowStyle;
+  LayoutMode: Full;
+
+  $M.@RowSelection #NavSelected {
+    @Height = 40;
+  }
+
+  Group {
+    Anchor: (Full: 0);
+    LayoutMode: Left;
+    Padding: (Left: 12, Right: 10);
+
+    Label #NavName {
+      FlexWeight: 1;
+      Style: $M.@SubheadingFitStyle;
+    }
+
+    Label #NavCount {
+      Anchor: (Width: 42);
+      Style: $M.@RowSideGoldStyle;
+      Visible: false;
+    }
+  }
+}

@@ -9,7 +9,7 @@ Group #MysticActionBarRoot {
   LayoutMode: CenterMiddle;
 
   Group #MysticActionBarPanel {
-    Background: #0a0f16(0.55);
+    Background: #0b1422(0.55);
     Padding: (Horizontal: 16, Vertical: 4);
     LayoutMode: CenterMiddle;
 

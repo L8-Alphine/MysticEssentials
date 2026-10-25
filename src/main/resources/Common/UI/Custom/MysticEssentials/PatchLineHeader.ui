@@ -9,11 +9,11 @@ Group #Row {
 
   Group {
     Anchor: (Width: 3, Height: 14, Top: 5, Right: 9);
-    Background: #7a9cc6;
+    Background: #67a5da;
   }
 
   Label #Line {
     FlexWeight: 1;
-    Style: (...$M.@EyebrowStyle, FontSize: 12, TextColor: #96b8e0);
+    Style: (...$M.@EyebrowStyle, FontSize: 12, TextColor: #8fc2ec);
   }
 }

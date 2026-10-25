@@ -29,7 +29,7 @@ Button #Row {
 
     Label #Pick {
       Anchor: (Width: 72);
-      Style: (...$M.@PillStyle, TextColor: #e8c97a, HorizontalAlignment: End);
+      Style: (...$M.@PillStyle, TextColor: #e7ce9b, HorizontalAlignment: End);
       Text: "Select";
     }
   }

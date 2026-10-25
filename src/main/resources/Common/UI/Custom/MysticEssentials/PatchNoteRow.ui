@@ -17,7 +17,7 @@ Button #Row {
 
     Group #Accent {
       Anchor: (Width: 3, Height: 40, Right: 13);
-      Background: #E8A93B;
+      Background: #d9b572;
       Visible: false;
     }
 
@@ -31,7 +31,7 @@ Button #Row {
 
         Label #Unread {
           Anchor: (Width: 14);
-          Style: (...$M.@RowNameStyle, TextColor: #6fd08c);
+          Style: (...$M.@RowNameStyle, TextColor: #64c995);
         }
 
         Label #Title {
@@ -48,7 +48,7 @@ Button #Row {
 
     Group #Pinned {
       Anchor: (Width: 46, Height: 18, Left: 6, Top: 11);
-      Background: #7a9cc6(0.30);
+      Background: #67a5da(0.30);
       Padding: (Horizontal: 4);
       LayoutMode: CenterMiddle;
       Visible: false;

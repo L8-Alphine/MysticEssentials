@@ -20,7 +20,7 @@ Button #Row {
 
   Group #Active {
     Anchor: (Height: 3);
-    Background: #E8A93B;
+    Background: #d9b572;
     Visible: false;
   }
 }

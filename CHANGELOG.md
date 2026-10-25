@@ -1,5 +1,69 @@
 # Mystic Essentials Changelog
 
+## Unreleased — Hyzion shell: shortcut rail, server wiki, theme pass
+
+Server-side checks only (build, `check`, UI document validation, engine source);
+nothing here has been seen in a game client yet.
+
+### Navigation Shell (new module `shell`)
+
+- **Shortcut rail** beside the chat panel: nine numbered tiles, the active chat
+  channel marked with a gold rim, unavailable slots dimmed **with the reason**
+  (no guild, no party, store unconfigured, module off). Position, size, caption,
+  separators and every slot are configurable; each player can hide it and the
+  choice is remembered.
+- **`/1` … `/9`**, `/shortcuts`, `/shortcuts <1-9>` and `/shortcuts rail`.
+- **`/menu`** — the Adventurer's Menu: a section rail (Overview, Adventure,
+  Community, Services, Account, Settings, Staff) over a two-column card grid.
+  Cards come from Essentials' own modules, from the first-party ecosystem
+  (MysticQuests, MysticRPG, MysticGuilds, MysticEconomy, MysticIdentity,
+  MysticNameTags, MysticModeration, MysticGeneration) detected by plugin id with
+  no compile-time dependency, and from cards other mods register.
+- A module that is absent, not started, disabled or not permitted shows as an
+  explained card rather than vanishing. Cards are re-resolved when pressed and
+  every action authorises server-side.
+- **`ShellService` / `MenuDestination`** for other mods, via
+  `MysticEssentialsProvider.get().getShellService()`.
+
+**ALT+1–9 is not possible from a server-side mod on 0.7.3 and is not claimed.**
+There is no keybind registry in the server API; the client's bindings are not
+asset-driven (`HotkeyLabel.InputBindingKey` only displays an existing one);
+`CustomUIEventBindingType.KeyDown` is a page binding that fires only while a
+page is open and focused; and `CustomHud` carries no `eventBindings`, so a HUD
+overlay cannot be clicked either. The serverside Noesis UI that *would* allow an
+interactive HUD widget refuses to start without
+`-Dhytale.serverside_ui_preview` and reports itself as unfinished. Every input
+path funnels through `ShellService#activateSlot`, so a future keybind is one new
+caller, and the rail's footer hint is written by the module rather than
+hardcoded so it never advertises a shortcut that does not work.
+
+### Server Wiki (new module `wiki`)
+
+- In-game, editable wiki: categories, search across the whole wiki, `[[links]]`
+  between pages, per-article view permissions, and a last-edited footer.
+- **Editor in game** (`/wiki new|edit <id>`, or Edit on a page): title,
+  category, summary, tags, view permission and body. A page's id is fixed after
+  the first save so existing `[[links]]` cannot be silently broken.
+- **Other mods' pages**: `WikiService#registerEntry` adds a page rendered from
+  its owner on every open, so a mod's reference cannot go stale and leaves with
+  the mod. Stored and contributed pages share one id space, one search and one
+  link syntax.
+- The shell publishes its own contributed page, written per reader, listing the
+  slots that player can actually use.
+- Articles persist to `data/modules/wiki/articles.json`, hand-editable and
+  re-read by `/mystic reload`.
+
+### Hyzion theme pass
+
+- `MysticTheme.ui` now carries the Master UI/UX Design Bible's Hyzion palette
+  (canvas `#101b2c`, panel `#16263b`, card `#203550`, border `#3a506b`, royal
+  `#b38a4e`, gold `#d9b572`, blue `#67a5da`, parchment text `#f3ebdd`), and the
+  legacy literals were retinted across all 121 `.ui` documents and the
+  UI-facing Java colour tables. Config defaults (chat formats, notification and
+  item-view settings) were left alone so saved server configs are untouched.
+- Every text token still passes WCAG AA on the game's window fill; the existing
+  contrast check is unchanged and passes.
+
 ## Unreleased — Notifications fix and LootBox presentation v2
 
 Server-side checks only (build, verify tasks, engine source); nothing here has

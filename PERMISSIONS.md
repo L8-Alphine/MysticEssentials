@@ -333,6 +333,19 @@ Suggested groups:
 `keys.give`, `publish` and `rewards.command` decide what players can win; keep them
 with admins.
 
+## Navigation Shell and Server Wiki
+
+| Node | Grants |
+| --- | --- |
+| `mysticessentials.shell.menu` | Reserved for gating `/menu` |
+| `mysticessentials.shell.shortcuts` | Reserved for gating `/shortcuts` and `/1`–`/9` |
+| `mysticessentials.wiki.use` | Read the wiki |
+| `mysticessentials.wiki.edit` | Create, edit and delete stored articles |
+| `mysticessentials.wiki.read.<article>` | Read one restricted article |
+
+`wiki.edit` lets a player publish text to every other player on the server; keep
+it with staff.
+
 ## Dynamic limits
 
 Numeric limits (`home.limit`, `playerwarp.limit`, `vaults.vault`, `vaults.rows`)

@@ -1,0 +1,99 @@
+// Server Wiki — reader. One page, full width, so long bodies stay readable.
+$C = "../Common.ui";
+$M = "MysticTheme.ui";
+
+$C.@PageOverlay {}
+
+$C.@Container {
+  Anchor: (Width: 900, Height: 660);
+
+  #Title {
+    Group {
+      $C.@Title {
+        @Text = "Server Wiki";
+      }
+
+      $M.@HeaderMeta #ArticleCategory {}
+    }
+  }
+
+  #Content {
+    LayoutMode: Top;
+
+    Label #ArticleTitle {
+      Anchor: (Height: 28, Bottom: 2);
+      Style: $M.@DisplayStyle;
+    }
+
+    Label #ArticleSummary {
+      Anchor: (Height: 18, Bottom: 8);
+      Style: $M.@HintStyle;
+    }
+
+    $M.@Hairline {
+      @Anchor = (Bottom: 10);
+    }
+
+    $M.@Well {
+      FlexWeight: 1;
+
+      Label #ArticleEmpty {
+        Anchor: (Height: 80);
+        Style: $M.@EmptyStyle;
+        Text: "This page has nothing written on it yet.";
+        Visible: false;
+      }
+
+      // One WikiLine.ui per rendered block of the body.
+      Group #ArticleBody {
+        FlexWeight: 1;
+        LayoutMode: TopScrolling;
+        Padding: (Right: 8, Left: 4);
+        ScrollbarStyle: $C.@DefaultScrollbarStyle;
+      }
+    }
+
+    Group #RelatedSection {
+      Anchor: (Height: 76, Top: 10);
+      LayoutMode: Top;
+      Visible: false;
+
+      $M.@Section {
+        @Text = "Related";
+        @Anchor = (Bottom: 6);
+      }
+
+      Group #RelatedList {
+        FlexWeight: 1;
+        LayoutMode: Left;
+      }
+    }
+
+    $M.@ActionBar {
+      @Anchor = (Height: 44, Top: 12);
+
+      $C.@SecondaryTextButton #BackButton {
+        @Text = "Back";
+        @Anchor = (Width: 130, Right: 8);
+      }
+
+      $C.@TextButton #EditButton {
+        @Text = "Edit";
+        @Anchor = (Width: 130);
+        Visible: false;
+      }
+
+      $M.@Spacer {}
+
+      Label #ArticleFooter {
+        Anchor: (Width: 320, Right: 12);
+        Style: $M.@HeaderMetaStyle;
+      }
+
+      $C.@CancelTextButton #CloseButton {
+        @Text = "Close";
+        @Anchor = (Width: 120);
+      }
+    }
+  }
+}

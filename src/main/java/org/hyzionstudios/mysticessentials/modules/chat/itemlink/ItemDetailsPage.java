@@ -181,7 +181,7 @@ public final class ItemDetailsPage extends MysticPage {
         if (sections.isEmpty()) {
             // Identity alone is still a valid view. Say so plainly rather than
             // leaving the reader staring at an empty panel.
-            emitParagraph(cmd, "This item carries no additional details.", "#9fb0c4", 13);
+            emitParagraph(cmd, "This item carries no additional details.", "#aec1d5", 13);
             return;
         }
 
@@ -238,7 +238,7 @@ public final class ItemDetailsPage extends MysticPage {
             emitRow(cmd, row.label(), row.value());
         }
         for (String paragraph : section.paragraphs()) {
-            emitParagraph(cmd, paragraph, "#c9d6e5", 13);
+            emitParagraph(cmd, paragraph, "#e3ecf7", 13);
         }
     }
 
@@ -248,7 +248,7 @@ public final class ItemDetailsPage extends MysticPage {
             return;
         }
         if (value == null || value.isBlank()) {
-            emitParagraph(cmd, label, "#d7e1ee", 13);
+            emitParagraph(cmd, label, "#f3ebdd", 13);
             return;
         }
         String rowId = nextId("r");
@@ -391,31 +391,31 @@ public final class ItemDetailsPage extends MysticPage {
         classification.quality().ifPresent(quality ->
                 emitParagraph(cmd, quality.displayName(), accent(), 14));
         classification.subcategory().or(classification::category).ifPresent(type ->
-                emitParagraph(cmd, type, "#96a9be", 13));
+                emitParagraph(cmd, type, "#aec1d5", 13));
 
         List<String> body = new ArrayList<>();
         view.description().forEach(line -> addIfPresent(body, line.plain()));
         view.lore().forEach(line -> addIfPresent(body, line.plain()));
-        body.forEach(line -> emitParagraph(cmd, line, "#c9d6e5", 13));
+        body.forEach(line -> emitParagraph(cmd, line, "#e3ecf7", 13));
 
         for (ItemModifierEntry modifier : view.modifiers()) {
-            emitParagraph(cmd, modifier.display(), modifier.amount() < 0 ? "#d46a6a" : "#8fd48f", 13);
+            emitParagraph(cmd, modifier.display(), modifier.amount() < 0 ? "#e48786" : "#64c995", 13);
         }
 
         classification.combinedLabel().ifPresent(label ->
-                emitParagraph(cmd, label, "#e8c97a", 13));
+                emitParagraph(cmd, label, "#e7ce9b", 13));
 
         if (!view.primaryStats().isEmpty()) {
-            emitParagraph(cmd, "Damage Data", "#E8A93B", 13);
+            emitParagraph(cmd, "Damage Data", "#d9b572", 13);
             for (ItemStatEntry stat : view.primaryStats()) {
                 emitParagraph(cmd, "• " + stat.label().plain() + ": " + stat.value().plain(),
-                        "#d7e1ee", 12);
+                        "#f3ebdd", 12);
             }
         }
         view.durability()
                 .filter(durability -> durability.isDisplayable())
                 .ifPresent(durability ->
-                        emitParagraph(cmd, "Durability: " + durability.display(), "#9fb0c4", 12));
+                        emitParagraph(cmd, "Durability: " + durability.display(), "#aec1d5", 12));
     }
 
     private static void addIfPresent(List<String> target, String line) {

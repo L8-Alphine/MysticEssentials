@@ -20,7 +20,9 @@ import org.hyzionstudios.mysticessentials.modules.customcontent.CustomContentMod
 import org.hyzionstudios.mysticessentials.modules.spawn.SpawnModule;
 import org.hyzionstudios.mysticessentials.modules.teleportation.TeleportationModule;
 import org.hyzionstudios.mysticessentials.modules.tutorial.TutorialModule;
+import org.hyzionstudios.mysticessentials.modules.shell.ShellModule;
 import org.hyzionstudios.mysticessentials.modules.warps.WarpModule;
+import org.hyzionstudios.mysticessentials.modules.wiki.WikiModule;
 
 /**
  * Registers the built-in V1 modules with the {@link ModuleManagerImpl}. Actual
@@ -54,5 +56,7 @@ public final class ModuleBootstrap {
         manager.register(new CraftBlockModule());
         manager.register(new CustomContentModule());
         manager.register(new LootBoxModule());
+        manager.register(new WikiModule());
+        manager.register(new ShellModule());
     }
 }

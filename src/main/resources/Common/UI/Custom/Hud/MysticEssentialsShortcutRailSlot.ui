@@ -1,0 +1,89 @@
+// One tile of the shortcut rail. Appended once per slot into
+// #MysticShortcutRailSlots; the server addresses each by index
+// (`#MysticShortcutRailSlots[0] #MysticSlotGlyph.TextSpans`).
+//
+// States, per the bible's ShortcutHUDItem contract:
+//   active       — #MysticSlotActive visible: gold rim + gold glyph
+//   unavailable  — #MysticSlotGlyph/#MysticSlotNumber dimmed by the server
+//   separator    — #MysticSlotSeparator visible after the channel block (4)
+//                  and after the services block (6)
+//
+// Colour literals rather than a theme import: see the header of
+// MysticEssentialsShortcutRail.ui for why an always-on overlay carries no
+// cross-document reference.
+Group {
+  Anchor: (Width: 46, Height: 46, Bottom: 5);
+
+  // Base plate.
+  Group {
+    Anchor: (Full: 0);
+    Background: #0b1422(0.72);
+    OutlineColor: #3a506b(0.55);
+    OutlineSize: 1;
+  }
+
+  // Selected/active channel: border + indicator, never colour alone — the
+  // glyph recolours to gold and the tooltip names the state.
+  Group #MysticSlotActive {
+    Anchor: (Full: 0);
+    Background: #d9b572(0.16);
+    OutlineColor: #d9b572;
+    OutlineSize: 1;
+    Visible: false;
+  }
+
+  // Active marker on the inner edge, mirroring the reference's gold bar.
+  Group #MysticSlotBar {
+    Anchor: (Left: 0, Top: 11, Width: 3, Height: 24);
+    Background: #d9b572;
+    Visible: false;
+  }
+
+  // Icon glyph. Short text rather than a texture: the mod ships no PNGs, and a
+  // missing TexturePath in an always-on overlay would break the document.
+  Group {
+    Anchor: (Full: 0);
+    LayoutMode: CenterMiddle;
+
+    Label #MysticSlotGlyph {
+      Style: (
+        FontName: "Secondary",
+        FontSize: 17,
+        RenderBold: true,
+        RenderUppercase: true,
+        TextColor: #aec1d5,
+        Alignment: Center,
+        VerticalAlignment: Center
+      );
+    }
+  }
+
+  // Slot number, always legible so the shortcut stays discoverable.
+  Label #MysticSlotNumber {
+    Anchor: (Right: 4, Top: 2, Width: 12, Height: 12);
+    Style: (
+      FontSize: 10,
+      RenderBold: true,
+      TextColor: #93a8c0,
+      HorizontalAlignment: End,
+      VerticalAlignment: Center
+    );
+  }
+
+  // Hover target for the tooltip. The property is declared here rather than
+  // set on the tile root at runtime: a property the client does not recognise
+  // on an element aborts the whole document, and this overlay is appended at
+  // join, so a mistake here would cost every custom UI on that client.
+  Group #MysticSlotHit {
+    Anchor: (Full: 0);
+    HitTestVisible: true;
+    TooltipText: "";
+  }
+
+  // Group divider, drawn under the tile it closes.
+  Group #MysticSlotSeparator {
+    Anchor: (Left: 6, Right: 6, Bottom: 0, Height: 1);
+    Background: #3a506b(0.55);
+    Visible: false;
+  }
+}

@@ -1,0 +1,19 @@
+// One "Related" chip under a wiki page. Its own template rather than a reuse
+// of WikiLine.ui: the related strip is a Left flow, and WikiLine's root is a
+// Top-flow group with no width of its own, which would collapse in one.
+//
+// The button is a CHILD of the root, not the root itself: an appended
+// template's root is addressed by index (`#RelatedList[0]`), and a selector
+// looking for `#RelatedList[0] #RelatedLink` searches that root's descendants.
+$C = "../Common.ui";
+
+Group {
+  Anchor: (Width: 268);
+  LayoutMode: Left;
+
+  // Common.ui fixes this button's height after the @Anchor spread, so the
+  // anchor here only carries width.
+  $C.@SmallSecondaryTextButton #RelatedLink {
+    @Anchor = (Width: 260);
+  }
+}

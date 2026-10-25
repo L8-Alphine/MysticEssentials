@@ -20,7 +20,7 @@ Button #Row {
 
       Group #Swatch {
         Anchor: (Width: 12, Height: 12);
-        Background: #7a9cc6;
+        Background: #67a5da;
       }
     }
 
@@ -42,7 +42,7 @@ Button #Row {
     // Primary tag: authority / rank. Colour comes from the server.
     Group #TagChip {
       Anchor: (Width: 84, Height: 18, Top: 9, Left: 8);
-      Background: #7a9cc6;
+      Background: #67a5da;
       Padding: (Horizontal: 6);
       LayoutMode: CenterMiddle;
 
@@ -54,7 +54,7 @@ Button #Row {
 
     Label #Secondary {
       Anchor: (Width: 58, Height: 36, Left: 6);
-      Style: (...$M.@PillStyle, TextColor: #D46A6A, HorizontalAlignment: End);
+      Style: (...$M.@PillStyle, TextColor: #e48786, HorizontalAlignment: End);
       Visible: false;
     }
   }

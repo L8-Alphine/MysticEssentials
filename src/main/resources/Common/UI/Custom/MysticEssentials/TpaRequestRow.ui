@@ -8,11 +8,11 @@ Group #Row {
   Anchor: (Height: 76, Bottom: 6);
   LayoutMode: Left;
   Padding: (Left: 0, Right: 12, Top: 10, Bottom: 10);
-  Background: #0a0f16(0.38);
+  Background: #0b1422(0.38);
 
   Group {
     Anchor: (Width: 3, Height: 56, Right: 11);
-    Background: #7a9cc6;
+    Background: #67a5da;
   }
 
   Group {

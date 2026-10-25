@@ -1,0 +1,104 @@
+// Server Wiki — browser. Categories on the left, a searchable list of pages on
+// the right. Stored articles and pages contributed by other mods sit in the
+// same list: a reader should not have to care which mod wrote a page.
+$C = "../Common.ui";
+$M = "MysticTheme.ui";
+
+$C.@PageOverlay {}
+
+$C.@Container {
+  Anchor: (Width: 980, Height: 640);
+
+  #Title {
+    Group {
+      $C.@Title {
+        @Text = "Server Wiki";
+      }
+
+      $M.@HeaderMeta #WikiCount {}
+    }
+  }
+
+  #Content {
+    LayoutMode: Left;
+
+    // ---- Categories ----------------------------------------------------------
+    Group {
+      Anchor: (Width: 228);
+      LayoutMode: Top;
+
+      $M.@Section {
+        @Text = "Categories";
+        @Anchor = (Bottom: 8);
+      }
+
+      $M.@Well {
+        FlexWeight: 1;
+
+        Group #CategoryList {
+          FlexWeight: 1;
+          LayoutMode: TopScrolling;
+          Padding: (Right: 6);
+          ScrollbarStyle: $C.@DefaultScrollbarStyle;
+        }
+      }
+
+      $C.@SecondaryTextButton #NewArticleButton {
+        @Text = "New Page";
+        @Anchor = (Height: 36, Top: 10);
+        Visible: false;
+      }
+    }
+
+    $M.@ColumnDivider {}
+
+    // ---- Pages ---------------------------------------------------------------
+    Group {
+      FlexWeight: 1;
+      LayoutMode: Top;
+
+      Label #WikiSubtitle {
+        Anchor: (Height: 18, Bottom: 8);
+        Style: $M.@HintStyle;
+      }
+
+      $C.@TextField #SearchInput {
+        @Anchor = (Height: 34, Bottom: 10);
+        PlaceholderText: "Search the wiki";
+      }
+
+      $M.@Well {
+        FlexWeight: 1;
+
+        Label #WikiEmpty {
+          Anchor: (Height: 80);
+          Style: $M.@EmptyStyle;
+          Visible: false;
+        }
+
+        Group #ArticleList {
+          FlexWeight: 1;
+          LayoutMode: TopScrolling;
+          Padding: (Right: 6);
+          ScrollbarStyle: $C.@DefaultScrollbarStyle;
+        }
+      }
+
+      $M.@ActionBar {
+        @Anchor = (Height: 44, Top: 12);
+
+        $C.@TertiaryTextButton #MenuButton {
+          @Text = "Main Menu";
+          @Anchor = (Width: 160);
+        }
+
+        $M.@Spacer {}
+
+        $C.@CancelTextButton #CloseButton {
+          @Text = "Close";
+          @Anchor = (Width: 120);
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,143 @@
+// Main Menu — the Mystic Essentials shell (Master UI/UX Design Bible v1.0 §7,
+// §10). A left navigation rail over the bible's six sections plus Staff, a
+// world/character context strip, and a two-column card grid of destinations.
+//
+// The shell only routes: every card is owned by the module that supplies it,
+// and a module that is absent, disabled or not permitted renders as an
+// explained unavailable card rather than a dead tile.
+$C = "../Common.ui";
+$M = "MysticTheme.ui";
+
+$C.@PageOverlay {}
+
+$C.@Container {
+  Anchor: (Width: 1000, Height: 660);
+
+  #Title {
+    Group {
+      $C.@Title {
+        @Text = "Adventurer's Menu";
+      }
+
+      $M.@HeaderMeta #MenuContext {}
+    }
+  }
+
+  #Content {
+    LayoutMode: Left;
+
+    // ---- Navigation rail -----------------------------------------------------
+    Group {
+      Anchor: (Width: 206);
+      LayoutMode: Top;
+
+      $M.@Section {
+        @Text = "Sections";
+        @Anchor = (Bottom: 8);
+      }
+
+      // One MainMenuNavRow.ui per visible section.
+      Group #MenuNav {
+        FlexWeight: 1;
+        LayoutMode: Top;
+      }
+
+      $M.@Hairline {
+        @Anchor = (Top: 6, Bottom: 8);
+      }
+
+      Label #MenuFooterStatus {
+        Anchor: (Height: 30);
+        Style: $M.@CaptionStyle;
+      }
+    }
+
+    $M.@ColumnDivider {}
+
+    // ---- Section content -----------------------------------------------------
+    Group {
+      FlexWeight: 1;
+      LayoutMode: Top;
+
+      Group {
+        Anchor: (Height: 44, Bottom: 6);
+        LayoutMode: Top;
+
+        Label #SectionTitle {
+          Anchor: (Height: 24, Bottom: 2);
+          Style: $M.@DisplaySmallStyle;
+        }
+
+        Label #SectionBlurb {
+          Anchor: (Height: 16);
+          Style: $M.@HintStyle;
+        }
+      }
+
+      $M.@Hairline {
+        @Anchor = (Bottom: 10);
+      }
+
+      $M.@Well {
+        FlexWeight: 1;
+
+        Label #MenuEmpty {
+          Anchor: (Height: 80);
+          Style: $M.@EmptyStyle;
+          Visible: false;
+        }
+
+        Group {
+          FlexWeight: 1;
+          LayoutMode: TopScrolling;
+          Padding: (Right: 6);
+          ScrollbarStyle: $C.@DefaultScrollbarStyle;
+
+          // Two columns: the bible's primary and secondary grids. The server
+          // deals cards left/right so the grid stays balanced at any count.
+          Group {
+            LayoutMode: Left;
+
+            Group #MenuCardsLeft {
+              FlexWeight: 1;
+              LayoutMode: Top;
+              Padding: (Right: 6);
+            }
+
+            Group #MenuCardsRight {
+              FlexWeight: 1;
+              LayoutMode: Top;
+              Padding: (Left: 6);
+            }
+          }
+        }
+      }
+
+      $M.@ActionBar {
+        @Anchor = (Height: 44, Top: 12);
+
+        $C.@SecondaryTextButton #ShortcutsButton {
+          @Text = "Shortcuts";
+          @Anchor = (Width: 150, Right: 8);
+        }
+
+        $C.@TertiaryTextButton #WikiButton {
+          @Text = "Server Wiki";
+          @Anchor = (Width: 160);
+        }
+
+        $M.@Spacer {}
+
+        Label #MenuKeyHint {
+          Anchor: (Width: 220, Right: 12);
+          Style: $M.@HeaderMetaStyle;
+        }
+
+        $C.@CancelTextButton #CloseButton {
+          @Text = "Close";
+          @Anchor = (Width: 120);
+        }
+      }
+    }
+  }
+}

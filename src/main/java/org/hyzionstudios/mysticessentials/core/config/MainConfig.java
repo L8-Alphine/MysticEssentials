@@ -34,6 +34,10 @@ public final class MainConfig {
         map.put("patchnotes", true);
         map.put("portals", true);
         map.put("craftblock", true);
+        // The navigation shell (shortcut rail + /menu) and the built-in server
+        // wiki ship on: they are the front door to everything else.
+        map.put("shell", true);
+        map.put("wiki", true);
         // Tutorial ships disabled: enable here AND in modules/tutorial/config.json.
         map.put("tutorial", false);
         // Custom Commands ships disabled: enable here AND in modules/customcommands/config.json.

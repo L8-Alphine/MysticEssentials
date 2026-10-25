@@ -35,7 +35,7 @@ $C.@Container {
 
       Label #ItemCount {
         FlexWeight: 1;
-        Style: (...$M.@EyebrowStyle, TextColor: #96a9be);
+        Style: (...$M.@EyebrowStyle, TextColor: #aec1d5);
       }
     }
 

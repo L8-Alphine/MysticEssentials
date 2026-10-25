@@ -52,6 +52,8 @@ These may be `null` when the owning module is disabled:
 | `AfkService` | `getAfkService()` | `afk` |
 | `ChatService` | `getChatService()` | `chat` |
 | `AnnouncementService` | `getAnnouncementService()` | `announcements` |
+| `ShellService` | `getShellService()` | `shell` |
+| `WikiService` | `getWikiService()` | `wiki` |
 
 Always guard module services:
 
@@ -61,6 +63,52 @@ if (api.getModuleManager().isEnabled("warps") && api.getWarpService() != null) {
     api.getWarpService().listAllPlayerWarps();
 }
 ```
+
+## Putting your mod on the menu and in the wiki
+
+Both registrations are optional and fail soft: the getter is `null` when the
+module is off, and that is how you tell "this server has no menu" from "the menu
+is there and rejected my card". Register on enable, unregister on disable.
+
+```java
+MysticEssentialsAPI api = MysticEssentialsProvider.get();
+
+ShellService shell = api.getShellService();
+if (shell != null) {
+    shell.registerDestination(MenuDestination.of(
+            "mymod:dashboard", MenuSectionId.COMMUNITY, "My Dashboard", "D",
+            "What my mod does.", 10, this::openDashboard));
+}
+
+WikiService wiki = api.getWikiService();
+if (wiki != null) {
+    wiki.registerEntry(new WikiEntry(
+            "mymod:getting-started", "Getting Started", "Guides",
+            "How to use my mod.", List.of("mymod"), 10,
+            null, this::buildWikiBody));
+}
+```
+
+On disable:
+
+```java
+if (shell != null) {
+    shell.unregisterDestination("mymod:dashboard");
+}
+if (wiki != null) {
+    wiki.unregisterNamespace("mymod");
+}
+```
+
+Your predicates and body suppliers run inside Essentials' page build on a world
+thread. Keep them cheap and non-blocking; one that throws costs your card or
+page and nothing else, and the failure is logged. A wiki body is rendered on
+every open, so it can reflect the reader's own state rather than a frozen copy,
+and `[[other-page]]` links work in both directions across mods.
+
+Authorisation stays yours: a card that is visible is not a card that is
+permitted, and Essentials re-checks availability when a card is pressed but
+never substitutes for your own server-side check inside the action.
 
 ## Teleporting players
 
