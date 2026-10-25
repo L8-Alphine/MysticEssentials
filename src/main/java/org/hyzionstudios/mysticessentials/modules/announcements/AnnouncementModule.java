@@ -93,6 +93,23 @@ public final class AnnouncementModule extends AbstractMysticModule implements An
         sendAnnouncement(message, NotificationAudience.all());
     }
 
+    /**
+     * Writes one chat line to this server's players and nothing else: no event
+     * title, toast, action bar, banner or sound. For status lines such as AFK
+     * notices, which used to inherit a genuine broadcast's on-screen title.
+     */
+    public void broadcastChatLocal(String message) {
+        send(announcement(config.broadcastTitle, message, null)
+                .chatPrefix(orEmpty(config.broadcastPrefix))
+                .showInChat(true)
+                .showAsTitle(false)
+                .showAsToast(false)
+                .showAsActionBar(false)
+                .showAsBanner(false)
+                .playSound(false)
+                .build(), NotificationAudience.all());
+    }
+
     @Override
     public void broadcastToWorld(String world, String message) {
         sendAnnouncement(message, NotificationAudience.world(world));

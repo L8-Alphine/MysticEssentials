@@ -482,11 +482,12 @@ public final class AfkModule extends AbstractMysticModule implements AfkService 
      * Broadcasts an AFK status line to this server's players, unless the player is
      * vanished. Local only: {@code announce} is "to the server", and the network
      * relay would carry every status line (and its reason) to every server.
+     * Chat only: an AFK notice is a status line, not an on-screen announcement.
      */
     private void announce(UUID player, String message) {
         if (config.announce && core.getAnnouncementService() instanceof AnnouncementModule announcements
                 && !core.vanish().isVanished(player)) {
-            announcements.broadcastLocal("&8* &7" + message);
+            announcements.broadcastChatLocal("&8* &7" + message);
         }
     }
 
