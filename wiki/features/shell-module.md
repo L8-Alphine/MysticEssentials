@@ -19,7 +19,7 @@ The slot assignment follows the Mystic Ecosystem UI/UX Design Bible:
 | 5 | Server store | "The server has not set up a store yet" |
 | 6 | Server wiki | Wiki module off |
 | 7 | Warps | Warps module off |
-| 8 | Server browser | "No server browser is configured" |
+| 8 | Server browser | Browser turned off (`browser.enabled`) |
 | 9 | Main menu | Always available |
 
 A slot that cannot be used is never hidden — it dims and says why, on the tile's
@@ -75,7 +75,56 @@ off, so it never advertises a shortcut the server has switched off.
 | `/shortcuts`, `/sc` | Open the Shortcuts page | — |
 | `/shortcuts <1-9>` | Run a slot | — |
 | `/shortcuts rail` | Show or hide the rail, remembered per player | — |
+| `/shortcuts edit [1-9]` | Open the Rail Editor | `mysticessentials.shell.admin` |
+| `/servers`, `/serverbrowser` | Open the Server Browser | — |
 | `/1` … `/9` | Run that slot | — |
+
+## Editing the rail in game
+
+`/shortcuts edit` (or **Edit Rail** on the Shortcuts page, shown only to
+holders of `mysticessentials.shell.admin`) opens the Rail Editor. Pick a slot on
+the left, then set:
+
+- **Does** — chat channel, store link, server wiki, warps, server browser, main
+  menu, command, or nothing.
+- **Label**, **Runs** (the channel id, command or link), **Letter** (shown when
+  the slot has no icon) and **Permission**.
+- **Icon** — pick from the game's own icons in the grid, or **Default** (the
+  kind's own icon) or **Letter** (no icon).
+
+Nothing is written until **Save**. Save re-checks the permission, writes
+`modules/shell/config.json` off the world thread, and redraws every player's
+rail at once. **Reset Slot** loads the shipped default into the form. Slot
+numbers are fixed: Alt+N and `/N` always run slot N.
+
+A **Command** slot runs as the player who presses it, under their own
+permissions, so it cannot be used to run something the player could not run
+by typing it.
+
+## Server Browser
+
+Slot 8, the menu's **Server Browser** card and `/servers` open the browser: region
+tabs across the top, then server cards three to a row under group headings.
+Each card shows the server's icon, region, description and one of:
+
+| Status | Meaning | Connect |
+| --- | --- | --- |
+| *N online* | On the Redis network roster; vanished players are not counted | Moves the player |
+| You are here | The server the player is on | — |
+| Open | Listed by address only; no live count | Moves the player |
+| Offline | Named in config but not on the roster, with no address to fall back on | — |
+| Coming soon | `comingSoon: true` | — |
+| Locked | The player lacks the card's `permission` | — |
+
+Connect re-resolves the card first, so a server that went offline or a
+permission revoked since the page opened is honoured. A server on the roster is
+reached through it — through the proxy when `storage.redis.proxyHost` is set —
+otherwise straight at its `host`/`port`.
+
+With nothing configured and `showNetwork` on, the browser lists this server and
+every other server on the network roster, so a Redis network works with no
+setup. Point slot 8's `target` at a command or link to use your own selector
+instead; the menu card and `/servers` follow it too.
 
 ## The menu
 
@@ -110,8 +159,8 @@ so a card that went unavailable while the menu was open cannot be used.
     "enabled": true,
     "visibleByDefault": true,
     "offsetX": 12,
-    "offsetY": 196,
-    "title": "Chat Ch",
+    "offsetY": 316,
+    "title": "Chat",
     "hint": "",
     "separatorsAfter": [4, 6]
   },
@@ -123,26 +172,48 @@ so a card that went unavailable while the menu was open cannot be used.
     "serverTitle": "",
     "hiddenModules": []
   },
+  "browser": {
+    "enabled": true,
+    "showNetwork": true,
+    "servers": [
+      { "id": "survival-1", "name": "Survival", "description": "The main world.",
+        "group": "Survival", "region": "NA", "icon": "Natural",
+        "host": "", "port": 0, "maxPlayers": 100, "permission": "", "comingSoon": false }
+    ]
+  },
   "slots": [
     { "index": 1, "kind": "CHANNEL", "label": "Server Channel", "glyph": "S", "target": "global", "icon": "" }
   ]
 }
 ```
 
-- `offsetX` / `offsetY` place the rail beside the chat panel. Raise `offsetX` on
-  a server that moves chat inward; the rail must not overlap chat at the UI
-  scales you support.
+- `offsetX` / `offsetY` place the rail beside the chat panel. The default
+  centres it on the default chat panel. Raise `offsetX` on a server that moves
+  chat inward; the rail must not overlap chat at the UI scales you support.
+- `title` sits above the first tile. The rail is 34 px wide, so keep it to about
+  four letters.
+- Configs written before this version move from `offsetY: 196` and
+  `"Chat Ch"` to the new defaults automatically, but only if they still held
+  the old defaults; a position or title you chose is kept.
 - `hint` overrides the footer text. Left empty, the module writes what actually
   activates a slot.
 - `kind` is one of `CHANNEL`, `STORE`, `WIKI`, `WARPS`, `SERVERS`, `MENU`,
   `COMMAND`, `NONE`.
 - `target` is a channel id for `CHANNEL`, and a command line (or an `http(s)`
   URL, which is sent as a clickable chat link) for the rest.
-- `icon` is a vanilla icon, given as its asset path under `Common/` — for
-  example `Icons/ItemCategories/Portal.png`. Left empty, each slot gets the icon
-  that fits what it does, from Hytale's flat category icons (Party uses the
+- `icon` is a vanilla icon: a picker name from the Rail Editor (`Portal`,
+  `Fist Bump`, `Letter`…) or an asset path under `Common/`, for example
+  `Icons/ItemCategories/Portal.png`. Left empty, each slot gets the icon that
+  fits what it does, from Hytale's flat category icons (Party uses the
   fist-bump emote). `none` shows the letter mark from `glyph` instead. A server
-  with its own asset pack can point this at its own art the same way.
+  with its own asset pack can point this at its own art by path. An unknown
+  name falls back to the default rather than drawing nothing.
+- `browser.servers[]`: `id` is the server's `storage.redis.serverId` (gives the
+  live count and routes through the roster); `host`/`port` is the fallback for
+  a server that is not on the roster; `region` feeds the tabs (cards without
+  one show under every tab); `group` is the heading; `maxPlayers` is shown as
+  "12 / 100"; `permission` locks the card; `comingSoon` shows it without a
+  Connect button. `showNetwork` adds roster servers you did not list.
 - `glyph` is one or two characters, shown only when a slot has no icon.
 - `keys.altShortcuts` turns ALT+1–9 on or off.
 

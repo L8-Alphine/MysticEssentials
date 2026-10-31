@@ -18,6 +18,7 @@ import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.core.message.MysticText;
 import org.hyzionstudios.mysticessentials.modules.mail.MailModule.ItemPick;
 import org.hyzionstudios.mysticessentials.platform.ui.MysticPage;
+import org.hyzionstudios.mysticessentials.platform.ui.VanillaIcons;
 
 import com.google.gson.JsonObject;
 import com.hypixel.hytale.component.Ref;
@@ -67,18 +68,21 @@ final class MailPages {
 
     /** The selectable areas of the Mail UI. */
     enum View {
-        INBOX("Inbox"),
-        COMPOSE("Compose"),
-        SENT("Sent"),
-        ARCHIVED("Archived"),
-        DELETED("Deleted"),
-        ANNOUNCEMENTS("Announcements"),
-        ATTACHMENTS("Attachments");
+        // Full-colour item renders: the flat icon set has no letters or bins.
+        INBOX("Inbox", VanillaIcons.LETTER),
+        COMPOSE("Compose", VanillaIcons.FEATHER),
+        SENT("Sent", VanillaIcons.SCROLL),
+        ARCHIVED("Archived", VanillaIcons.CHEST),
+        DELETED("Deleted", VanillaIcons.TRASH),
+        ANNOUNCEMENTS("Announcements", VanillaIcons.POSTER),
+        ATTACHMENTS("Attachments", VanillaIcons.PARCEL);
 
         final String title;
+        final String icon;
 
-        View(String title) {
+        View(String title, String icon) {
             this.title = title;
+            this.icon = icon;
         }
 
         boolean isFolder() {
@@ -212,6 +216,8 @@ final class MailPages {
                 cmd.append(container, NAV_ROW_UI);
                 cmd.set(row + " #Label.TextSpans", uiText(row + " #Label.TextSpans", navLabel(entry)));
                 cmd.set(row + " #Accent.Visible", isActive(entry));
+                cmd.set(row + " #Icon.AssetPath", entry.icon);
+                cmd.set(row + " #Icon.Visible", true);
                 event.addEventBinding(CustomUIEventBindingType.Activating, row,
                         new EventData().put("action", "view").put("view", entry.name()));
             }

@@ -85,8 +85,11 @@ final class ShortcutBar {
             case MENU -> ready(slot.index, kind, label, glyph, target, "Opens the menu");
             case STORE -> configured(slot.index, kind, label, glyph, target,
                     "The server has not set up a store yet");
-            case SERVERS -> configured(slot.index, kind, label, glyph, target,
-                    "No server browser is configured");
+            // An empty target means the built-in browser; a set one is the
+            // server's own selector (a command or a link) and wins.
+            case SERVERS -> !target.isEmpty() || shell.serversAvailable()
+                    ? ready(slot.index, kind, label, glyph, target, "Opens the server browser")
+                    : denied(slot.index, kind, label, glyph, target, "The server browser is turned off");
             case COMMAND -> configured(slot.index, kind, label, glyph, target,
                     "This shortcut has no command set");
             case NONE -> ShortcutSlot.empty(slot.index);

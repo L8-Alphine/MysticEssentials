@@ -62,7 +62,14 @@ $C.@Container {
 
       $C.@TertiaryTextButton #OpenMenuButton {
         @Text = "Main Menu";
-        @Anchor = (Width: 160);
+        @Anchor = (Width: 160, Right: 8);
+      }
+
+      // Shown only to mysticessentials.shell.admin.
+      $C.@TertiaryTextButton #EditRailButton {
+        @Text = "Edit Rail";
+        @Anchor = (Width: 140);
+        Visible: false;
       }
 
       $M.@Spacer {}

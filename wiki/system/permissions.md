@@ -300,6 +300,7 @@ valid CustomContent license; permissions do not bypass its license gate.
 | --- | --- |
 | `mysticessentials.shell.menu` | Reserved for gating `/menu`; the command is open by default |
 | `mysticessentials.shell.shortcuts` | Reserved for gating `/shortcuts` and `/1`–`/9` |
+| `mysticessentials.shell.admin` | Edit the shortcut rail for every player in game (`/shortcuts edit`) |
 
 Individual rail slots are gated per slot through the `permission` field in
 `modules/shell/config.json`, so a server can restrict one destination without

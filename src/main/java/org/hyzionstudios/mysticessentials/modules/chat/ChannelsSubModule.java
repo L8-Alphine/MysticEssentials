@@ -2575,7 +2575,8 @@ public final class ChannelsSubModule {
         ChannelCommand() {
             super(ChannelsSubModule.this.core, "channel", "Show, switch, or create chat channels.");
             allowExtraArguments();
-            addAliases("ch");
+            // Before any addSubCommand: adding a child seals the alias list.
+            addAliases("ch", "channels");
             addSubCommand(new ChannelJoinSubCommand());
             addSubCommand(new ChannelLeaveSubCommand());
             addSubCommand(new ChannelSwitchSubCommand());

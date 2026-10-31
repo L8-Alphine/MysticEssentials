@@ -339,6 +339,7 @@ with admins.
 | --- | --- |
 | `mysticessentials.shell.menu` | Reserved for gating `/menu` |
 | `mysticessentials.shell.shortcuts` | Reserved for gating `/shortcuts` and `/1`–`/9` |
+| `mysticessentials.shell.admin` | Edit the shortcut rail for every player in game (`/shortcuts edit`) |
 | `mysticessentials.wiki.use` | Read the wiki |
 | `mysticessentials.wiki.edit` | Create, edit and delete stored articles |
 | `mysticessentials.wiki.read.<article>` | Read one restricted article |

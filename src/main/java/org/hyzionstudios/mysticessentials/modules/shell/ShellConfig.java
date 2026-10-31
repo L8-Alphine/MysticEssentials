@@ -3,6 +3,8 @@ package org.hyzionstudios.mysticessentials.modules.shell;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.hyzionstudios.mysticessentials.platform.ui.VanillaIcons;
+
 /**
  * Typed model of {@code mods/MysticEssentials/modules/shell/config.json}.
  *
@@ -14,11 +16,12 @@ import java.util.List;
  */
 public final class ShellConfig {
 
-    public int configVersion = 1;
+    public int configVersion = 2;
 
     public Rail rail = new Rail();
     public Keys keys = new Keys();
     public Menu menu = new Menu();
+    public Browser browser = new Browser();
     public List<Slot> slots = defaultSlots();
 
     /** The always-on overlay left of chat. */
@@ -36,14 +39,21 @@ public final class ShellConfig {
          * chat inward.
          */
         public int offsetX = 12;
-        /** Pixels from the bottom edge to the foot of the rail. */
-        public int offsetY = 196;
-        /** Caption above the first tile, as in the reference's "CHAT CH". */
-        public String title = "Chat Ch";
+        /**
+         * Pixels from the bottom edge to the foot of the rail. The default
+         * centres the rail on the default chat panel; raise or lower it if
+         * your players resize chat.
+         */
+        public int offsetY = 316;
+        /**
+         * Caption above the first tile. Keep it short: the rail is 34 px wide,
+         * and anything longer than about four letters is cut off.
+         */
+        public String title = "Chat";
         /**
          * Footer hint. Left empty, the module writes what actually activates a
-         * slot on this build, which is the honest thing to show: a server-side
-         * mod cannot bind ALT+1–9 on the client (see ShortcutRailHud).
+         * slot: {@code Alt+#} while ALT shortcuts are on, {@code /1 – /9} when
+         * they are off.
          */
         public String hint = "";
         /** Draw a divider under these slot numbers. The bible suggests 4 and 6. */
@@ -74,6 +84,54 @@ public final class ShellConfig {
         public List<String> hiddenModules = new ArrayList<>();
     }
 
+    /**
+     * The Server Browser (rail slot 8, the menu card, {@code /servers}). Lists
+     * {@link #servers} grouped and filterable by region, with live player
+     * counts for any server on the Redis network roster.
+     */
+    public static final class Browser {
+        public boolean enabled = true;
+        /**
+         * Also list servers on the network roster that {@link #servers} does
+         * not name, under "Network", plus this server when it is not listed.
+         * Turn off for a hand-curated list.
+         */
+        public boolean showNetwork = true;
+        /** The servers to offer, in the order they are shown within a group. */
+        public List<Server> servers = new ArrayList<>();
+    }
+
+    /** One server card in the browser. */
+    public static final class Server {
+        /**
+         * The server's network id ({@code storage.redis.serverId} on that
+         * server). With Redis on, it gives the card a live player count and
+         * Connect goes through the roster (or the proxy, when one is set).
+         */
+        public String id = "";
+        public String name = "";
+        public String description = "";
+        /** Cards with the same group sit under one heading ("Survival", "Minigames"). */
+        public String group = "";
+        /** A short region code for the filter tabs ("NA", "EU"). Empty: shown under every tab. */
+        public String region = "";
+        /** A {@link VanillaIcons} name ("Portal") or a Common-rooted path; empty for the default. */
+        public String icon = "";
+        /**
+         * Direct address, for a server that is not on the network roster (a
+         * partner server, or a network without Redis). Players are referred
+         * straight to it; the count is not known.
+         */
+        public String host = "";
+        public int port = 0;
+        /** Shown after the player count when set ("12 / 100 online"). */
+        public int maxPlayers = 0;
+        /** Permission needed to connect; others see the card, locked, with the reason. */
+        public String permission = "";
+        /** Show the card with "Coming soon" instead of a Connect button. */
+        public boolean comingSoon = false;
+    }
+
     /** One rail position. */
     public static final class Slot {
         /** 1–9, matching the number drawn on the tile. */
@@ -83,11 +141,8 @@ public final class ShellConfig {
         /** Tile caption in the Shortcuts page and the tooltip. */
         public String label = "";
         /**
-         * One or two characters drawn on the tile. Letter marks rather than
-         * icons: the mod ships no textures, and a TexturePath that does not
-         * resolve in an always-on overlay breaks every custom UI document on
-         * that client. Any text works, so a server with its own asset pack can
-         * put a glyph from its own font here.
+         * One or two characters drawn on the tile when it has no icon
+         * ({@code icon: "none"}, or a path the client cannot find).
          */
         public String glyph = "";
         /**
@@ -98,11 +153,12 @@ public final class ShellConfig {
          */
         public String target = "";
         /**
-         * A vanilla icon, as its asset path under {@code Common/} (for example
-         * {@code Icons/ItemCategories/Portal.png}). Left empty, the slot gets
-         * the icon that fits what it does; {@code none} shows the letter mark
-         * from {@link #glyph} instead. A server with its own asset pack can
-         * point this at its own art the same way.
+         * A vanilla icon: a {@link VanillaIcons} picker name ({@code Portal},
+         * {@code Fist Bump}) or an asset path under {@code Common/} (for
+         * example {@code Icons/ItemCategories/Portal.png}). Left empty, the
+         * slot gets the icon that fits what it does; {@code none} shows the
+         * letter mark from {@link #glyph} instead. A server with its own asset
+         * pack can point this at its own art by path.
          */
         public String icon = "";
         /** Permission required to use the slot; empty means everyone. */
@@ -122,9 +178,6 @@ public final class ShellConfig {
         }
     }
 
-    /** The icon prefix for vanilla's flat category icons. */
-    private static final String CATEGORY = "Icons/ItemCategories/";
-
     /**
      * The icon a slot draws: its configured one, else the default for what it
      * does, else none. Defaults come from vanilla's flat white category icons
@@ -139,25 +192,57 @@ public final class ShellConfig {
         if ("none".equalsIgnoreCase(configured)) {
             return "";
         }
-        if (!configured.isEmpty()) {
-            return configured;
+        String resolved = VanillaIcons.resolve(configured);
+        if (!resolved.isEmpty()) {
+            return resolved;
         }
         String target = slot.target == null ? "" : slot.target.trim().toLowerCase(java.util.Locale.ROOT);
         return switch (ShortcutKind.parse(slot.kind)) {
             case CHANNEL -> switch (target) {
-                case "trade", "trading", "market" -> CATEGORY + "Container.png";
-                case "guild", "clan" -> CATEGORY + "Items-Shields.png";
-                case "party", "group" -> "Icons/Emotes/FistBump@2x.png";
-                default -> CATEGORY + "Signs.png";
+                case "trade", "trading", "market" -> VanillaIcons.CONTAINER;
+                case "guild", "clan" -> VanillaIcons.SHIELDS;
+                case "party", "group" -> VanillaIcons.EMOTE_FIST_BUMP;
+                default -> VanillaIcons.SIGNS;
             };
-            case STORE -> CATEGORY + "Natural-Ore.png";
-            case WIKI -> CATEGORY + "Items-Recipe.png";
-            case WARPS -> CATEGORY + "Portal.png";
-            case SERVERS -> CATEGORY + "Natural.png";
-            case MENU -> CATEGORY + "TechnicalBlocks.png";
-            case COMMAND -> CATEGORY + "Misc.png";
+            case STORE -> VanillaIcons.ORE;
+            case WIKI -> VanillaIcons.RECIPE;
+            case WARPS -> VanillaIcons.PORTAL;
+            case SERVERS -> VanillaIcons.NATURAL;
+            case MENU -> VanillaIcons.TECHNICAL;
+            case COMMAND -> VanillaIcons.MISC;
             case NONE -> "";
         };
+    }
+
+    /** @return the shipped slot for {@code index}, or an empty one */
+    static Slot defaultSlot(int index) {
+        for (Slot slot : defaultSlots()) {
+            if (slot.index == index) {
+                return slot;
+            }
+        }
+        Slot empty = new Slot();
+        empty.index = index;
+        return empty;
+    }
+
+    /**
+     * A detached copy, so an editor's draft never aliases the live config that
+     * world threads are reading. A missing slot copies as an empty one.
+     */
+    static Slot copy(Slot source, int index) {
+        Slot copy = new Slot();
+        copy.index = index;
+        if (source != null) {
+            copy.kind = source.kind;
+            copy.label = source.label;
+            copy.glyph = source.glyph;
+            copy.target = source.target;
+            copy.icon = source.icon;
+            copy.permission = source.permission;
+            copy.enabled = source.enabled;
+        }
+        return copy;
     }
 
     private static List<Slot> defaultSlots() {

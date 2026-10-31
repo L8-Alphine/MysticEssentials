@@ -412,6 +412,8 @@ public final class Permissions {
     public static final String SHELL_MENU = "mysticessentials.shell.menu";
     /** Open {@code /shortcuts} and use {@code /1} – {@code /9}. */
     public static final String SHELL_SHORTCUTS = "mysticessentials.shell.shortcuts";
+    /** Edit the shortcut rail for everyone (slots, labels, commands, icons) in game. */
+    public static final String SHELL_ADMIN = "mysticessentials.shell.admin";
 
     // ----- Server wiki --------------------------------------------------------
 

@@ -1,0 +1,251 @@
+// Rail Editor — /shortcuts edit (mysticessentials.shell.admin). Changes the
+// shortcut rail for everyone: what each of the nine slots does, its label,
+// its command or channel, and its icon, picked from the game's own icons.
+//
+// Left: the nine slots (RailEditorSlotRow.ui, appended per slot). Right: the
+// selected slot's form, then the icon grid (RailEditorIconTile.ui, appended
+// per icon into a wrapping group inside the scroller). Nothing is written
+// until Save; every press carries the typed values so a pick or a kind change
+// never loses them.
+$C = "../Common.ui";
+$M = "MysticTheme.ui";
+
+$C.@PageOverlay {}
+
+$C.@Container {
+  Anchor: (Width: 1000, Height: 660);
+
+  #Title {
+    Group {
+      $C.@Title {
+        @Text = "Edit Shortcut Rail";
+      }
+
+      $M.@HeaderMeta #EditorContext {
+        @Width = 300;
+      }
+    }
+  }
+
+  #Content {
+    LayoutMode: Left;
+
+    // ---- The nine slots ------------------------------------------------------
+    Group {
+      Anchor: (Width: 270);
+      LayoutMode: Top;
+
+      $M.@Section {
+        @Text = "Slots";
+        @Anchor = (Bottom: 8);
+      }
+
+      $M.@Well {
+        FlexWeight: 1;
+
+        Group #EditorSlots {
+          FlexWeight: 1;
+          LayoutMode: TopScrolling;
+          ScrollbarStyle: $C.@DefaultScrollbarStyle;
+        }
+      }
+
+      Label #EditorNote {
+        Anchor: (Height: 44, Top: 8);
+        Style: $M.@CaptionStyle;
+      }
+    }
+
+    $M.@ColumnDivider {}
+
+    // ---- The selected slot ---------------------------------------------------
+    Group {
+      FlexWeight: 1;
+      LayoutMode: Top;
+
+      Group {
+        Anchor: (Height: 28, Bottom: 8);
+        LayoutMode: Left;
+
+        Label #EditTitle {
+          FlexWeight: 1;
+          Style: $M.@DisplaySmallStyle;
+        }
+
+        Label #EditDirty {
+          Anchor: (Width: 180);
+          Style: $M.@RowSideGoldStyle;
+        }
+      }
+
+      Group {
+        Anchor: (Height: 40, Bottom: 4);
+        LayoutMode: Left;
+
+        Label {
+          Anchor: (Width: 92);
+          Style: $M.@KeyStyle;
+          Text: "Does";
+        }
+
+        $C.@DropdownBox #KindInput {
+          @Anchor = (Vertical: 2, Right: 12);
+        }
+
+        Label #KindHint {
+          FlexWeight: 1;
+          Style: $M.@HintStyle;
+        }
+      }
+
+      Group {
+        Anchor: (Height: 40, Bottom: 4);
+        LayoutMode: Left;
+
+        Label {
+          Anchor: (Width: 92);
+          Style: $M.@KeyStyle;
+          Text: "Label";
+        }
+
+        $C.@TextField #LabelInput {
+          @Anchor = (Vertical: 1);
+          FlexWeight: 1;
+          PlaceholderText: "Shown in the Shortcuts page and the menu";
+        }
+      }
+
+      Group {
+        Anchor: (Height: 40, Bottom: 2);
+        LayoutMode: Left;
+
+        Label {
+          Anchor: (Width: 92);
+          Style: $M.@KeyStyle;
+          Text: "Runs";
+        }
+
+        $C.@TextField #TargetInput {
+          @Anchor = (Vertical: 1);
+          FlexWeight: 1;
+          PlaceholderText: "A command without the slash, a channel id, or a link";
+        }
+      }
+
+      Label #TargetHint {
+        Anchor: (Height: 18, Left: 92, Bottom: 6);
+        Style: $M.@CaptionStyle;
+      }
+
+      Group {
+        Anchor: (Height: 40, Bottom: 6);
+        LayoutMode: Left;
+
+        Label {
+          Anchor: (Width: 92);
+          Style: $M.@KeyStyle;
+          Text: "Letter";
+        }
+
+        $C.@TextField #GlyphInput {
+          @Anchor = (Vertical: 1, Width: 70, Right: 16);
+          PlaceholderText: "A";
+        }
+
+        Label {
+          Anchor: (Width: 92);
+          Style: $M.@KeyStyle;
+          Text: "Permission";
+        }
+
+        $C.@TextField #PermissionInput {
+          @Anchor = (Vertical: 1);
+          FlexWeight: 1;
+          PlaceholderText: "Empty: everyone";
+        }
+      }
+
+      // Current icon, and the two ways out of the grid.
+      Group {
+        Anchor: (Height: 40, Bottom: 6);
+        LayoutMode: Left;
+
+        Label {
+          Anchor: (Width: 92);
+          Style: $M.@KeyStyle;
+          Text: "Icon";
+        }
+
+        $M.@IconWell {
+          @Anchor = (Right: 10);
+
+          AssetImage #IconPreview {
+            Anchor: (Width: 22, Height: 22);
+            AssetPath: "";
+            FallbackTexturePath: "UI/Custom/Pages/Memories/MissingIcon.png";
+            Visible: false;
+          }
+
+          Label #GlyphPreview {
+            Style: $M.@HeadingStyle;
+          }
+        }
+
+        Label #IconName {
+          FlexWeight: 1;
+          Style: $M.@MetaFitStyle;
+        }
+
+        $C.@SmallSecondaryTextButton #IconDefaultButton {
+          @Text = "Default";
+          @Anchor = (Width: 100, Right: 6);
+        }
+
+        $C.@SmallSecondaryTextButton #IconLetterButton {
+          @Text = "Letter";
+          @Anchor = (Width: 100);
+        }
+      }
+
+      $M.@Well {
+        FlexWeight: 1;
+
+        Group {
+          FlexWeight: 1;
+          LayoutMode: TopScrolling;
+          ScrollbarStyle: $C.@DefaultScrollbarStyle;
+
+          Group #IconGrid {
+            LayoutMode: LeftCenterWrap;
+          }
+        }
+      }
+
+      $M.@ActionBar {
+        @Anchor = (Height: 44, Top: 10);
+
+        $C.@SecondaryTextButton #EnabledButton {
+          @Text = "Enabled";
+          @Anchor = (Width: 150, Right: 8);
+        }
+
+        $C.@TertiaryTextButton #ResetButton {
+          @Text = "Reset Slot";
+          @Anchor = (Width: 140);
+        }
+
+        $M.@Spacer {}
+
+        $C.@CancelTextButton #BackButton {
+          @Text = "Back";
+          @Anchor = (Width: 110, Right: 8);
+        }
+
+        $C.@TextButton #SaveButton {
+          @Text = "Save";
+          @Anchor = (Width: 130);
+        }
+      }
+    }
+  }
+}

@@ -17,10 +17,10 @@
 // (ShortcutRailHud) so the rail keeps its distance from the chat panel at any
 // resolution and sizes itself to however many slots the server configured.
 Group #MysticShortcutRailRoot {
-  Anchor: (Left: 12, Bottom: 196, Width: 34, Height: 400);
+  Anchor: (Left: 12, Bottom: 316, Width: 34, Height: 400);
   LayoutMode: Top;
 
-  // Group caption, as in the reference: "CHAT CH" over the channel block.
+  // Group caption over the channel block. 34 px fits about four letters.
   Label #MysticShortcutRailTitle {
     Anchor: (Height: 12, Bottom: 4);
     Style: (

@@ -1,5 +1,7 @@
 package org.hyzionstudios.mysticessentials.modules.shell;
 
+import org.hyzionstudios.mysticessentials.platform.ui.VanillaIcons;
+
 /**
  * The Main Menu's left navigation, as the design bible fixes it (§7).
  *
@@ -9,20 +11,27 @@ package org.hyzionstudios.mysticessentials.modules.shell;
  */
 public enum MenuSection {
 
-    OVERVIEW("Overview", "What you can pick up next."),
-    ADVENTURE("Adventure", "Quests, character, and where to go."),
-    COMMUNITY("Community", "Guilds, party, mail and trading."),
-    SERVICES("Services", "Economy, the store, servers and the wiki."),
-    ACCOUNT("Account", "Your profile, nameplate and notifications."),
-    SETTINGS("Settings", "Shortcuts, chat and personal preferences."),
-    STAFF("Staff", "Moderation and creator tooling.");
+    OVERVIEW("Overview", "What you can pick up next.", VanillaIcons.MARKER_COORDINATE),
+    ADVENTURE("Adventure", "Quests, character, and where to go.", VanillaIcons.WEAPONS),
+    COMMUNITY("Community", "Guilds, party, mail and trading.", VanillaIcons.EMOTE_FIST_BUMP),
+    SERVICES("Services", "Economy, the store, servers and the wiki.", VanillaIcons.ORE),
+    ACCOUNT("Account", "Your profile, nameplate and notifications.", VanillaIcons.MARKER_PLAYER),
+    SETTINGS("Settings", "Shortcuts, chat and personal preferences.", VanillaIcons.TOOLS),
+    STAFF("Staff", "Moderation and creator tooling.", VanillaIcons.EDITOR);
 
     private final String title;
     private final String blurb;
+    private final String icon;
 
-    MenuSection(String title, String blurb) {
+    MenuSection(String title, String blurb, String icon) {
         this.title = title;
         this.blurb = blurb;
+        this.icon = icon;
+    }
+
+    /** @return the section's vanilla icon, Common-rooted */
+    public String icon() {
+        return icon;
     }
 
     public String title() {

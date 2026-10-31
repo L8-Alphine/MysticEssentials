@@ -552,6 +552,52 @@ tasks.register("validateUiDocuments") {
 tasks.named("check") { dependsOn("validateUiDocuments") }
 tasks.named("shadowJar") { dependsOn("validateUiDocuments") }
 
+/*
+ * Vanilla icons are referenced by Common-rooted path ("Icons/ItemCategories/Portal.png")
+ * and set on an AssetImage at runtime. A wrong path is not an error anywhere: the
+ * client draws the fallback (or nothing). So every such literal in the sources and
+ * shipped documents is looked up in the game's Assets.zip here.
+ */
+tasks.register("verifyVanillaIconPaths") {
+    group = "verification"
+    description = "Checks every vanilla icon path the mod names exists in Assets.zip."
+
+    val javaDir = layout.projectDirectory.dir("src/main/java")
+    val uiDir = layout.projectDirectory.dir("src/main/resources/Common/UI/Custom")
+    inputs.dir(javaDir)
+    inputs.dir(uiDir)
+    outputs.upToDateWhen { false }
+
+    doLast {
+        val assetsZip = uiAssetsZipCandidates.firstOrNull { it.isFile }
+        if (assetsZip == null) {
+            logger.lifecycle("verifyVanillaIconPaths: no Assets.zip (set hytale_home), skipping.")
+            return@doLast
+        }
+        val pattern = Regex("\"((?:Icons|UI)/[A-Za-z0-9_@ ./-]+\\.png)\"")
+        val referenced = sortedMapOf<String, MutableSet<String>>()
+        listOf(javaDir.asFile, uiDir.asFile).forEach { root ->
+            root.walkTopDown().filter { it.isFile && (it.extension == "java" || it.extension == "ui") }.forEach { file ->
+                pattern.findAll(file.readText()).forEach { match ->
+                    referenced.getOrPut(match.groupValues[1]) { sortedSetOf() }
+                        .add(file.relativeTo(projectDir).invariantSeparatorsPath)
+                }
+            }
+        }
+        val missing = ZipFile(assetsZip).use { zip ->
+            referenced.filterKeys { zip.getEntry("Common/$it") == null }
+        }
+        if (missing.isNotEmpty()) {
+            throw GradleException(
+                "Vanilla icon paths not in " + assetsZip.name + ":\n  " +
+                    missing.entries.joinToString("\n  ") { (path, files) -> path + "  (" + files.joinToString() + ")" }
+            )
+        }
+        logger.lifecycle("verifyVanillaIconPaths: " + referenced.size + " icon path(s) found in " + assetsZip.name + ".")
+    }
+}
+tasks.named("check") { dependsOn("verifyVanillaIconPaths") }
+
 tasks.register<JavaExec>("verifyItemMetadataCompatibility") {
     group = "verification"
     description = "Checks supported custom-item BSON contracts."

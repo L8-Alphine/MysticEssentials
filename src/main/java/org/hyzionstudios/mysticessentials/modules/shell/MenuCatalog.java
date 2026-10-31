@@ -9,6 +9,7 @@ import org.hyzionstudios.mysticessentials.api.shell.MenuDestination;
 import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.modules.shell.EcosystemRegistry.Availability;
 import org.hyzionstudios.mysticessentials.modules.shell.EcosystemRegistry.EcosystemModule;
+import org.hyzionstudios.mysticessentials.platform.ui.VanillaIcons;
 
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 
@@ -39,9 +40,6 @@ final class MenuCatalog {
             int order, boolean available, String reason, Consumer<PlayerRef> action) {
     }
 
-    private static final String CATEGORY = "Icons/ItemCategories/";
-    private static final String MARKER = "UI/WorldMap/MapMarkers/";
-
     /**
      * Vanilla icons for the cards, by card id, as asset paths under
      * {@code Common/}. Cards missing here keep their letter mark: a letter that
@@ -49,32 +47,36 @@ final class MenuCatalog {
      * in the file name (Builder Tools, Scripted Blocks) are avoided on purpose.
      */
     private static final java.util.Map<String, String> ICONS = java.util.Map.ofEntries(
-            java.util.Map.entry("essentials:warps", CATEGORY + "Portal.png"),
-            java.util.Map.entry("essentials:warps.adventure", CATEGORY + "Portal.png"),
-            java.util.Map.entry("essentials:homes", MARKER + "Home.png"),
-            java.util.Map.entry("essentials:spawn", MARKER + "Spawn.png"),
-            java.util.Map.entry("essentials:kits", CATEGORY + "Items-Armor.png"),
-            java.util.Map.entry("essentials:channels", CATEGORY + "Signs.png"),
-            java.util.Map.entry("essentials:channels.settings", CATEGORY + "Signs.png"),
-            java.util.Map.entry("essentials:tpa", MARKER + "Player.png"),
-            java.util.Map.entry("essentials:playerwarps", MARKER + "Warp.png"),
-            java.util.Map.entry("essentials:store", CATEGORY + "Natural-Ore.png"),
-            java.util.Map.entry("essentials:servers", CATEGORY + "Natural.png"),
-            java.util.Map.entry("essentials:wiki", CATEGORY + "Items-Recipe.png"),
-            java.util.Map.entry("essentials:vaults", CATEGORY + "Container.png"),
-            java.util.Map.entry("essentials:nick", CATEGORY + "Items-Clothes.png"),
-            java.util.Map.entry("essentials:notifications", CATEGORY + "Build-Lights.png"),
-            java.util.Map.entry("essentials:notifications.account", CATEGORY + "Build-Lights.png"),
-            java.util.Map.entry("essentials:patchnotes", CATEGORY + "Misc.png"),
-            java.util.Map.entry("essentials:shortcuts", CATEGORY + "Build-Walls.png"),
-            java.util.Map.entry("essentials:shortcuts.settings", CATEGORY + "Build-Walls.png"),
-            java.util.Map.entry("essentials:rail", CATEGORY + "Shelves.png"),
-            java.util.Map.entry("ecosystem:mysticquests", MARKER + "Coordinate.png"),
-            java.util.Map.entry("ecosystem:mysticrpg", CATEGORY + "Items-Weapons.png"),
-            java.util.Map.entry("ecosystem:mysticguilds", CATEGORY + "Items-Shields.png"),
-            java.util.Map.entry("ecosystem:mysticeconomy", CATEGORY + "Metal.png"),
-            java.util.Map.entry("ecosystem:mysticmoderation", CATEGORY + "Editor.png"),
-            java.util.Map.entry("ecosystem:mysticgeneration", CATEGORY + "Natural-Vegetal.png"));
+            java.util.Map.entry("essentials:warps", VanillaIcons.PORTAL),
+            java.util.Map.entry("essentials:warps.adventure", VanillaIcons.PORTAL),
+            java.util.Map.entry("essentials:homes", VanillaIcons.MARKER_HOME),
+            java.util.Map.entry("essentials:spawn", VanillaIcons.MARKER_SPAWN),
+            java.util.Map.entry("essentials:kits", VanillaIcons.ARMOR),
+            java.util.Map.entry("essentials:channels", VanillaIcons.SIGNS),
+            java.util.Map.entry("essentials:channels.settings", VanillaIcons.SIGNS),
+            java.util.Map.entry("essentials:tpa", VanillaIcons.MARKER_PLAYER),
+            java.util.Map.entry("essentials:playerwarps", VanillaIcons.MARKER_WARP),
+            java.util.Map.entry("essentials:store", VanillaIcons.ORE),
+            java.util.Map.entry("essentials:servers", VanillaIcons.NATURAL),
+            java.util.Map.entry("essentials:wiki", VanillaIcons.RECIPE),
+            java.util.Map.entry("essentials:vaults", VanillaIcons.CONTAINER),
+            java.util.Map.entry("essentials:nick", VanillaIcons.CLOTHES),
+            java.util.Map.entry("essentials:notifications", VanillaIcons.LIGHTS),
+            java.util.Map.entry("essentials:notifications.account", VanillaIcons.LIGHTS),
+            java.util.Map.entry("essentials:patchnotes", VanillaIcons.MISC),
+            java.util.Map.entry("essentials:shortcuts", VanillaIcons.WALLS),
+            java.util.Map.entry("essentials:shortcuts.settings", VanillaIcons.WALLS),
+            java.util.Map.entry("essentials:rail", VanillaIcons.SHELVES),
+            java.util.Map.entry("essentials:mail", VanillaIcons.LETTER),
+            java.util.Map.entry("essentials:mail.community", VanillaIcons.LETTER),
+            java.util.Map.entry("ecosystem:mysticidentity", VanillaIcons.MARKER_PLAYER),
+            java.util.Map.entry("ecosystem:mysticnametags", VanillaIcons.BANNER),
+            java.util.Map.entry("ecosystem:mysticquests", VanillaIcons.MARKER_COORDINATE),
+            java.util.Map.entry("ecosystem:mysticrpg", VanillaIcons.WEAPONS),
+            java.util.Map.entry("ecosystem:mysticguilds", VanillaIcons.SHIELDS),
+            java.util.Map.entry("ecosystem:mysticeconomy", VanillaIcons.METAL),
+            java.util.Map.entry("ecosystem:mysticmoderation", VanillaIcons.EDITOR),
+            java.util.Map.entry("ecosystem:mysticgeneration", VanillaIcons.VEGETAL));
 
     /** @return the card's vanilla icon, or empty for its letter mark. */
     static String iconFor(MenuCard card) {
@@ -152,9 +154,10 @@ final class MenuCatalog {
                 slotCard(cards, "essentials:store", section, "Server Store", "$",
                         "Support the server.", 10, ShortcutKind.STORE,
                         "The server has not set up a store yet");
-                slotCard(cards, "essentials:servers", section, "Server Browser", "B",
-                        "Move to another world.", 20, ShortcutKind.SERVERS,
-                        "No server browser is configured");
+                page(cards, "essentials:servers", section, "Server Browser", "B",
+                        "Move to another server.", 20, shell.serversAvailable(),
+                        "The server browser is turned off on this server",
+                        shell::openServers);
                 page(cards, "essentials:wiki", section, "Server Wiki", "W",
                         "How this server works, written down.", 30,
                         core.getModuleManager().isEnabled("wiki"),

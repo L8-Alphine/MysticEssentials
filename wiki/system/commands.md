@@ -22,6 +22,8 @@ Optional arguments use `[brackets]`. Required arguments use `<angle brackets>`.
 | `/shortcuts`, `/sc` | Open the Shortcuts page | None |
 | `/shortcuts <1-9>` | Run a shortcut slot | None |
 | `/shortcuts rail` | Show or hide the rail beside chat | None |
+| `/shortcuts edit [1-9]` | Open the Rail Editor: change any slot's job, label, command and icon for everyone | `mysticessentials.shell.admin` |
+| `/servers`, `/serverbrowser` | Open the Server Browser | None |
 | `/1` … `/9` | Run that shortcut slot | None |
 | `/wiki`, `/codex` | Open the server wiki | `mysticessentials.wiki.use` |
 | `/wiki <id>` | Open one wiki page | `mysticessentials.wiki.use` |
@@ -127,7 +129,7 @@ Alias: `/portals`. Portals are configured in-game by pressing Use (F) on a porta
 | `/ignore` | List the players you ignore | `mysticessentials.chat.ignore` |
 | `/ignore <player>` | Hide a player's chat lines, mentions, private messages and mail from you | `mysticessentials.chat.ignore` |
 | `/unignore <player>` | Stop ignoring a player | `mysticessentials.chat.ignore` |
-| `/channel`, `/ch` | Open the channel browser or show channel state | None by default |
+| `/channel`, `/channels`, `/ch` | Open the channel browser or show channel state | None by default |
 | `/channel <name>` | Switch speaking channel | Channel permissions may apply |
 | `/channel switch <name> [password]` | Switch speaking channel | Channel permissions may apply |
 | `/channel join <name> [password]` | Listen to a channel | Channel permissions may apply |

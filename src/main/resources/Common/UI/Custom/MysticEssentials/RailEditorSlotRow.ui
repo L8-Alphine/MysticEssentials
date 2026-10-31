@@ -1,0 +1,49 @@
+// One slot in the Rail Editor's list. Appended per slot into #EditorSlots;
+// #RowSelected marks the slot being edited, #RowState says what it does now.
+$M = "MysticTheme.ui";
+
+Button #Row {
+  Anchor: (Height: 46, Bottom: 3);
+  Style: $M.@RowStyle;
+  LayoutMode: Full;
+
+  $M.@RowSelection #RowSelected {
+    @Height = 46;
+  }
+
+  Group {
+    Anchor: (Full: 0);
+    LayoutMode: Left;
+    Padding: (Left: 10, Right: 10, Top: 5, Bottom: 5);
+
+    $M.@IconWell {
+      @Anchor = (Right: 10);
+
+      AssetImage #RowIcon {
+        Anchor: (Width: 22, Height: 22);
+        AssetPath: "";
+        FallbackTexturePath: "UI/Custom/Pages/Memories/MissingIcon.png";
+        Visible: false;
+      }
+
+      Label #RowGlyph {
+        Style: $M.@HeadingStyle;
+      }
+    }
+
+    Group {
+      FlexWeight: 1;
+      LayoutMode: Top;
+
+      Label #RowName {
+        Anchor: (Height: 20);
+        Style: $M.@RowNameFitStyle;
+      }
+
+      Label #RowState {
+        Anchor: (Height: 16);
+        Style: $M.@RowMetaFitStyle;
+      }
+    }
+  }
+}

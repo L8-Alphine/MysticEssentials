@@ -1,0 +1,22 @@
+// One pickable icon in the Rail Editor's grid. Appended per icon into
+// #IconGrid, which wraps; #TileSelected marks the slot's current icon.
+$M = "MysticTheme.ui";
+
+Button #Tile {
+  Anchor: (Width: 44, Height: 44, Right: 6, Bottom: 6);
+  Style: $M.@RowStyle;
+  LayoutMode: Full;
+
+  $M.@TabSelection #TileSelected {}
+
+  Group {
+    Anchor: (Full: 0);
+    LayoutMode: CenterMiddle;
+
+    AssetImage #TileIcon {
+      Anchor: (Width: 26, Height: 26);
+      AssetPath: "";
+      FallbackTexturePath: "UI/Custom/Pages/Memories/MissingIcon.png";
+    }
+  }
+}

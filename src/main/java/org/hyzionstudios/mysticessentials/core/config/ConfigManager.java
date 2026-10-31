@@ -6,6 +6,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 
@@ -42,6 +44,9 @@ public final class ConfigManager {
     private final Map<String, List<Migration>> migrations = new HashMap<>();
     /** Current schema version per config id; absent = 1 (no migrations yet). */
     private final Map<String, Integer> currentVersions = new HashMap<>();
+    /** Newest save written per module id; guarded by itself. */
+    private final Map<String, Long> savedSequence = new HashMap<>();
+    private final AtomicLong saveSequence = new AtomicLong();
 
     public ConfigManager(MysticCore core) {
         this.core = core;
@@ -233,6 +238,32 @@ public final class ConfigManager {
                     + "); using defaults. The file was NOT overwritten.");
             return initialDefaults;
         }
+    }
+
+    /**
+     * Writes a module config back after an in-game edit. The tree is captured
+     * on the caller's thread, so a later edit cannot tear it, and written on
+     * the scheduler, so a slow disk never holds a world tick. Saves of one
+     * module land in the order they were asked for: a stale snapshot that
+     * reaches the disk after a newer one is dropped.
+     */
+    public void saveModuleConfig(String moduleId, Object config) {
+        JsonElement snapshot = Json.toTree(config);
+        Path file = core.paths().moduleConfigFile(moduleId);
+        long sequence = saveSequence.incrementAndGet();
+        core.scheduler().runLater(() -> {
+            synchronized (savedSequence) {
+                if (savedSequence.getOrDefault(moduleId, 0L) > sequence) {
+                    return;
+                }
+                try {
+                    Json.writeFile(file, snapshot);
+                    savedSequence.put(moduleId, sequence);
+                } catch (IOException e) {
+                    core.log(Level.SEVERE, "Failed to save config for module '" + moduleId + "': " + e.getMessage());
+                }
+            }
+        }, 0, TimeUnit.MILLISECONDS);
     }
 
     /** Loads a module's raw messages/permissions JSON object, writing {@code defaults} if absent. */

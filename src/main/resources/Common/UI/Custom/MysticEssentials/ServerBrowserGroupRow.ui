@@ -1,0 +1,20 @@
+// Group heading in the Server Browser list ("Survival", "Network"). Appended
+// into #BrowserList before that group's card rows; #GroupCount says how many
+// of the group's servers are reachable.
+$M = "MysticTheme.ui";
+
+Group #Row {
+  Anchor: (Height: 34);
+  LayoutMode: Left;
+  Padding: (Top: 10, Bottom: 6, Left: 4, Right: 6);
+
+  Label #GroupTitle {
+    FlexWeight: 1;
+    Style: $M.@EyebrowGoldStyle;
+  }
+
+  Label #GroupCount {
+    Anchor: (Width: 200);
+    Style: $M.@RowSideStyle;
+  }
+}

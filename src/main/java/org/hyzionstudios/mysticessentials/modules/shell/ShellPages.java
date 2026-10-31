@@ -4,6 +4,7 @@ import static org.hyzionstudios.mysticessentials.platform.ui.MysticPage.uiText;
 
 import java.util.List;
 
+import org.hyzionstudios.mysticessentials.api.Permissions;
 import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.modules.shell.MenuCatalog.MenuCard;
 import org.hyzionstudios.mysticessentials.platform.ui.MysticPage;
@@ -82,6 +83,9 @@ final class ShellPages {
                     new EventData().put("action", "rail"));
             event.addEventBinding(CustomUIEventBindingType.Activating, "#OpenMenuButton",
                     new EventData().put("action", "menu"));
+            cmd.set("#EditRailButton.Visible", player.hasPermission(Permissions.SHELL_ADMIN));
+            event.addEventBinding(CustomUIEventBindingType.Activating, "#EditRailButton",
+                    new EventData().put("action", "edit"));
             event.addEventBinding(CustomUIEventBindingType.Activating, "#CloseButton",
                     new EventData().put("action", "close"));
         }
@@ -125,6 +129,11 @@ final class ShellPages {
                     reopen(ref, store, new ShortcutBarPage(core, shell, player));
                 }
                 case "menu" -> reopen(ref, store, new MainMenuPage(core, shell, player));
+                case "edit" -> {
+                    if (player.hasPermission(Permissions.SHELL_ADMIN)) {
+                        reopen(ref, store, new RailEditorPage(core, shell, player, 1));
+                    }
+                }
                 case "close" -> close(ref, store);
                 default -> {
                     // Unknown action: leave the page as it is.
@@ -174,6 +183,8 @@ final class ShellPages {
                 cmd.append("#MenuNav", MENU_NAV_UI);
                 cmd.set(row + " #NavName.TextSpans", uiText(row + " #NavName.TextSpans", entry.title()));
                 cmd.set(row + " #NavSelected.Visible", entry == section);
+                cmd.set(row + " #NavIcon.AssetPath", entry.icon());
+                cmd.set(row + " #NavIcon.Visible", true);
                 event.addEventBinding(CustomUIEventBindingType.Activating, row,
                         new EventData().put("action", "section").put("section", entry.name()));
             }

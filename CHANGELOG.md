@@ -1,5 +1,52 @@
 # Mystic Essentials Changelog
 
+## Unreleased — Server Browser, Rail Editor, icons everywhere
+
+Server-side checks only (build, `check`); not yet seen in a game client.
+
+### Server Browser
+
+- **Slot 8, the menu card and `/servers` open a real Server Browser**: region
+  tabs, server cards three to a row under group headings, each with its icon,
+  region, description, live player count (vanished players left out) and a
+  Connect button. States: online, you are here, open (address only), offline,
+  coming soon, locked.
+- Servers come from `browser.servers` in the shell config. With nothing listed
+  and `showNetwork` on, it shows this server and every server on the Redis
+  roster, so a network works without setup.
+- Connect re-resolves the card before moving anyone, then refers the player
+  through the roster (the proxy, when one is set) or straight to the
+  configured address. Building the page reads only in-memory state.
+- A slot 8 `target` still wins: a network with its own selector keeps it.
+
+### Rail Editor
+
+- **`/shortcuts edit`** (and **Edit Rail** on the Shortcuts page) for holders of
+  the new `mysticessentials.shell.admin`: change a slot's job, label, command,
+  letter, permission and icon, picked from a grid of the game's own icons.
+- Nothing is saved until Save, which re-checks the permission, writes the
+  config off the world thread (in order, a stale write is dropped) and redraws
+  every player's rail. The live slot list is swapped, never edited in place.
+
+### Icons
+
+- **Mail folders** (Inbox, Compose, Sent, Archived, Deleted, Announcements,
+  Attachments) and the **menu's section rail** now carry icons; the Mail and
+  Account cards have them too.
+- Every icon path lives in one `VanillaIcons` class as a whole literal, and the
+  new `verifyVanillaIconPaths` build check (part of `check`) looks each one up
+  in the game's Assets.zip — a wrong path draws nothing on the client and
+  would otherwise go unnoticed.
+- A slot or card `icon` can be a picker name (`Portal`, `Fist Bump`) as well as
+  a path.
+
+### Rail position and chat
+
+- The rail moved up to centre on the chat panel (`offsetY` 196 to 316) and its
+  title is now `Chat`, which fits; the old `CHAT CH` was cut to `CHAT...`.
+  Existing configs move only if they still held the old defaults.
+- `/channels` works as an alias of `/channel`.
+
 ## Unreleased — ALT shortcuts, vanilla icons, AFK water fix
 
 Server-side checks only (build, `check`); not yet seen in a game client.

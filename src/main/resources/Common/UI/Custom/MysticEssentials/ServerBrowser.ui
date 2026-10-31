@@ -1,0 +1,97 @@
+// Server Browser — rail slot 8, the menu's Server Browser card, /servers.
+// Region tabs across the top, then server cards three to a row under group
+// headings, in one scrolling list.
+//
+// The list is built by appending, per group, one ServerBrowserGroupRow.ui and
+// then ServerBrowserCardRow.ui rows (three cards each) into #BrowserList, all
+// addressed by index. Every card's state comes from the server: a live count
+// from the network roster, "You are here", "Coming soon", or locked with the
+// reason.
+$C = "../Common.ui";
+$M = "MysticTheme.ui";
+
+$C.@PageOverlay {}
+
+$C.@Container {
+  Anchor: (Width: 1000, Height: 660);
+
+  #Title {
+    Group {
+      $C.@Title {
+        @Text = "Server Browser";
+      }
+
+      $M.@HeaderMeta #BrowserContext {
+        @Width = 320;
+      }
+    }
+  }
+
+  #Content {
+    LayoutMode: Top;
+
+    Group {
+      Anchor: (Height: 36, Bottom: 6);
+      LayoutMode: Left;
+
+      // One ServerBrowserRegionTab.ui per region, after "All". Hidden when
+      // the servers name fewer than two regions.
+      Group #BrowserRegions {
+        FlexWeight: 1;
+        LayoutMode: Left;
+      }
+
+      Label #BrowserSummary {
+        Anchor: (Width: 300);
+        Style: $M.@RowSideStyle;
+      }
+    }
+
+    $M.@Hairline {
+      @Anchor = (Bottom: 10);
+    }
+
+    $M.@Well {
+      FlexWeight: 1;
+
+      Label #BrowserEmpty {
+        Anchor: (Height: 120);
+        Style: $M.@EmptyStyle;
+        Visible: false;
+      }
+
+      Group #BrowserList {
+        FlexWeight: 1;
+        LayoutMode: TopScrolling;
+        Padding: (Right: 6);
+        ScrollbarStyle: $C.@DefaultScrollbarStyle;
+      }
+    }
+
+    $M.@ActionBar {
+      @Anchor = (Height: 44, Top: 12);
+
+      $C.@SecondaryTextButton #MenuButton {
+        @Text = "Menu";
+        @Anchor = (Width: 140, Right: 8);
+      }
+
+      $C.@TertiaryTextButton #RefreshButton {
+        @Text = "Refresh";
+        @Anchor = (Width: 140);
+      }
+
+      $M.@Spacer {}
+
+      Label #BrowserHint {
+        Anchor: (Width: 360, Right: 12);
+        Style: $M.@HeaderMetaStyle;
+      }
+
+      $C.@CancelTextButton #CloseButton {
+        @Text = "Close";
+        @Anchor = (Width: 120);
+      }
+    }
+  }
+}

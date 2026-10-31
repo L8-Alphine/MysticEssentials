@@ -1,8 +1,9 @@
 // Navigation item for the Main Menu rail. Appended per section:
 //   cmd.append("#MenuNav", "MysticEssentials/MainMenuNavRow.ui")
 //
-// #NavSelected marks the open section; #NavCount carries the badge (pending
-// invites, unread mail) and is hidden when there is nothing to report.
+// #NavSelected marks the open section; #NavIcon is the section's vanilla icon;
+// #NavCount carries the badge (pending invites, unread mail) and is hidden when
+// there is nothing to report.
 $M = "MysticTheme.ui";
 
 Button #Row {
@@ -18,6 +19,19 @@ Button #Row {
     Anchor: (Full: 0);
     LayoutMode: Left;
     Padding: (Left: 12, Right: 10);
+
+    // The section's vanilla icon, set at runtime (Common-rooted AssetPath).
+    Group {
+      Anchor: (Width: 20, Right: 10);
+      LayoutMode: CenterMiddle;
+
+      AssetImage #NavIcon {
+        Anchor: (Width: 20, Height: 20);
+        AssetPath: "";
+        FallbackTexturePath: "UI/Custom/Pages/Memories/MissingIcon.png";
+        Visible: false;
+      }
+    }
 
     Label #NavName {
       FlexWeight: 1;

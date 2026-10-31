@@ -1,0 +1,9 @@
+// One region tab in the Server Browser ("All", "NA", "EU"). Appended into
+// #BrowserRegions; the server writes the label, marking the active tab in its
+// text because per-element style cannot change at runtime.
+$M = "MysticTheme.ui";
+
+$M.@Tab #RegionButton {
+  @Text = " ";
+  @Anchor = (Width: 96, Right: 6);
+}

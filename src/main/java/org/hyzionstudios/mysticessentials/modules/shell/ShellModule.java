@@ -18,6 +18,7 @@ import java.util.logging.Level;
 import org.hyzionstudios.mysticessentials.api.MysticEssentialsAPI;
 import org.hyzionstudios.mysticessentials.api.shell.MenuDestination;
 import org.hyzionstudios.mysticessentials.api.shell.ShellService;
+import org.hyzionstudios.mysticessentials.core.config.ConfigManager;
 import org.hyzionstudios.mysticessentials.core.module.AbstractMysticModule;
 import org.hyzionstudios.mysticessentials.core.util.Json;
 import org.hyzionstudios.mysticessentials.modules.shell.MenuCatalog.MenuCard;
@@ -25,6 +26,7 @@ import org.hyzionstudios.mysticessentials.platform.command.MysticCommand;
 import org.hyzionstudios.mysticessentials.platform.command.MysticCommandSender;
 
 import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
 import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerReadyEvent;
@@ -82,8 +84,10 @@ public final class ShellModule extends AbstractMysticModule implements ShellServ
     private AltShortcuts altShortcuts;
     private volatile boolean altActive;
     private MenuCatalog catalog;
+    private ServerDirectory servers;
     private EcosystemRegistry ecosystem;
     private java.util.concurrent.ScheduledFuture<?> refreshTask;
+    private boolean migrationsRegistered;
 
     public ShellModule() {
         super("shell", "Navigation Shell", "1.0.0");
@@ -100,6 +104,34 @@ public final class ShellModule extends AbstractMysticModule implements ShellServ
     @Override
     public void onLoad(MysticEssentialsAPI api) {
         super.onLoad(api);
+        // onLoad runs again on every hot re-enable; the steps belong to the file.
+        if (migrationsRegistered) {
+            return;
+        }
+        migrationsRegistered = true;
+        core.configManager().registerMigration(id(), new ConfigManager.Migration(1, ShellModule::migrateRailV1));
+    }
+
+    /**
+     * v1 to v2: the rail shrank and moved up to centre on the chat panel. Only
+     * values still at the old defaults move, so a server that placed or titled
+     * its rail itself keeps what it chose.
+     */
+    static void migrateRailV1(JsonObject tree) {
+        if (!tree.has("rail") || !tree.get("rail").isJsonObject()) {
+            return;
+        }
+        JsonObject rail = tree.getAsJsonObject("rail");
+        if (rail.has("offsetY") && rail.get("offsetY").isJsonPrimitive()
+                && rail.get("offsetY").getAsInt() == 196) {
+            rail.addProperty("offsetY", 316);
+        }
+        if (rail.has("title") && rail.get("title").isJsonPrimitive()
+                && "Chat Ch".equals(rail.get("title").getAsString())) {
+            rail.addProperty("title", "Chat");
+        }
+        // Never resized the tiles (the document fixes their size).
+        rail.remove("tileSize");
     }
 
     @Override
@@ -108,11 +140,13 @@ public final class ShellModule extends AbstractMysticModule implements ShellServ
         normalize();
         bar = new ShortcutBar(core, this);
         catalog = new MenuCatalog(core, this);
+        servers = new ServerDirectory(core, this);
         ecosystem = new EcosystemRegistry(config.menu.hiddenModules);
         loadRailPreferences();
 
         registerCommand(new MenuCommand());
         registerCommand(new ShortcutsCommand());
+        registerCommand(new ServersCommand());
         registerNumberCommands();
         installAltShortcuts();
 
@@ -221,6 +255,12 @@ public final class ShellModule extends AbstractMysticModule implements ShellServ
         }
         if (config.keys == null) {
             config.keys = new ShellConfig.Keys();
+        }
+        if (config.browser == null) {
+            config.browser = new ShellConfig.Browser();
+        }
+        if (config.browser.servers == null) {
+            config.browser.servers = new ArrayList<>();
         }
     }
 
@@ -400,7 +440,8 @@ public final class ShellModule extends AbstractMysticModule implements ShellServ
             case MENU -> openMenu(player);
             case WIKI -> openWiki(player);
             case WARPS -> core.platform().dispatchPlayerCommand(player, blankTo(slot.target(), "warps"));
-            case STORE, SERVERS, COMMAND -> runTarget(player, slot.kind(), slot.target());
+            case SERVERS -> openServers(player);
+            case STORE, COMMAND -> runTarget(player, slot.kind(), slot.target());
             case NONE -> {
                 tell(player, "Nothing is assigned to slot " + index + ".");
                 return false;
@@ -420,6 +461,79 @@ public final class ShellModule extends AbstractMysticModule implements ShellServ
             return;
         }
         core.platform().dispatchPlayerCommand(player, "wiki");
+    }
+
+    /**
+     * Opens the Server Browser — or, when the server pointed slot 8 at its own
+     * command or link, follows that instead, so a network with its own
+     * selector keeps it.
+     */
+    void openServers(PlayerRef player) {
+        String target = targetFor(ShortcutKind.SERVERS);
+        if (!target.isEmpty()) {
+            runTarget(player, ShortcutKind.SERVERS, target);
+            return;
+        }
+        if (!config.browser.enabled) {
+            tell(player, "The server browser is turned off on this server.");
+            return;
+        }
+        core.platform().openPage(player, new ServerBrowserPage(core, this, player, ""));
+    }
+
+    /** Whether slot 8 and the menu card lead anywhere. */
+    boolean serversAvailable() {
+        return config.browser.enabled || !targetFor(ShortcutKind.SERVERS).isEmpty();
+    }
+
+    ShellConfig.Browser browserConfig() {
+        return config.browser;
+    }
+
+    ServerDirectory servers() {
+        return servers;
+    }
+
+    /** @return the configured slot at {@code index}, or null when the config has none */
+    ShellConfig.Slot configuredSlot(int index) {
+        for (ShellConfig.Slot slot : config.slots) {
+            if (slot != null && slot.index == index) {
+                return slot;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Replaces one slot from the Rail Editor. The list is swapped whole rather
+     * than edited in place: world threads iterate it every time a rail is
+     * resolved, and a list mutated under them would throw. The file is written
+     * off the world thread, then every rail is redrawn.
+     */
+    void saveSlot(ShellConfig.Slot edited) {
+        List<ShellConfig.Slot> next = new ArrayList<>();
+        for (ShellConfig.Slot slot : config.slots) {
+            if (slot != null && slot.index != edited.index) {
+                next.add(slot);
+            }
+        }
+        next.add(ShellConfig.copy(edited, edited.index));
+        next.sort(java.util.Comparator.comparingInt(slot -> slot.index));
+        config.slots = next;
+        core.configManager().saveModuleConfig(id(), config);
+        rendered.clear();
+        for (PlayerRef online : core.platform().onlinePlayers()) {
+            showRail(online);
+        }
+    }
+
+    /** Opens the Rail Editor for a player allowed to change the rail for everyone. */
+    void openRailEditor(PlayerRef player, int slot) {
+        if (!player.hasPermission(org.hyzionstudios.mysticessentials.api.Permissions.SHELL_ADMIN)) {
+            tell(player, "You do not have permission to edit the shortcut rail.");
+            return;
+        }
+        core.platform().openPage(player, new RailEditorPage(core, this, player, RailEditorPage.clampSlot(slot)));
     }
 
     /** @return what the rail slot of this kind is pointed at, or empty when none is. */
@@ -614,6 +728,29 @@ public final class ShellModule extends AbstractMysticModule implements ShellServ
         }
     }
 
+    private static int parseSlot(String value) {
+        try {
+            return Integer.parseInt(value.trim());
+        } catch (NumberFormatException e) {
+            return 1;
+        }
+    }
+
+    /** {@code /servers} opens the Server Browser. */
+    private final class ServersCommand extends MysticCommand {
+        ServersCommand() {
+            super(ShellModule.this.core, "servers", "Browse the servers on this network.");
+            addAliases("serverbrowser");
+        }
+
+        @Override
+        protected void run(MysticCommandSender sender) {
+            sender.player().ifPresentOrElse(
+                    ShellModule.this::openServers,
+                    () -> sender.reply("&cThe server browser is for players."));
+        }
+    }
+
     /**
      * {@code /shortcuts} opens the page; {@code /shortcuts <1-9>} runs a slot;
      * {@code /shortcuts rail} toggles the overlay. Free-form arguments rather
@@ -638,6 +775,8 @@ public final class ShellModule extends AbstractMysticModule implements ShellServ
             String argument = sender.arg(0).map(value -> value.toLowerCase(Locale.ROOT)).orElse("");
             switch (argument) {
                 case "" -> openShortcuts(player);
+                case "edit", "editor" -> openRailEditor(player,
+                        sender.arg(1).map(value -> (int) parseSlot(value)).orElse(1));
                 case "rail", "toggle" -> {
                     setRailVisible(player, !railVisible(player));
                     tell(player, railVisible(player) ? "Shortcut rail shown." : "Shortcut rail hidden.");
@@ -646,7 +785,7 @@ public final class ShellModule extends AbstractMysticModule implements ShellServ
                     try {
                         activateSlot(player, Integer.parseInt(argument));
                     } catch (NumberFormatException e) {
-                        sender.reply("&cUsage: /shortcuts [1-9|rail]");
+                        sender.reply("&cUsage: /shortcuts [1-9|rail|edit [1-9]]");
                     }
                 }
             }

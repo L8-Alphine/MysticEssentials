@@ -249,6 +249,16 @@ public abstract class MysticPage extends CustomUIPage {
             Map.entry("KeysHint", TEXT_MUTED),
             Map.entry("RulesNote", TEXT_MUTED),
             Map.entry("Unread", "#E7CE9B"),
+            // Server Browser
+            Map.entry("BrowserContext", TEXT_DIM),
+            Map.entry("BrowserSummary", TEXT_MUTED),
+            Map.entry("BrowserHint", TEXT_FAINT),
+            Map.entry("BrowserEmpty", TEXT_DIM),
+            Map.entry("GroupTitle", GOLD),
+            Map.entry("GroupCount", TEXT_MUTED),
+            Map.entry("Region", TEXT_DIM),
+            Map.entry("Description", TEXT_MUTED),
+            Map.entry("Connect", BUTTON_TEXT),
             Map.entry("Secondary", DANGER));
 
     /**
