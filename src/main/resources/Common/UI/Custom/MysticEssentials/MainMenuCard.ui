@@ -30,6 +30,15 @@ Button #Row {
       @Size = 42;
       @Anchor = (Right: 12);
 
+      // A vanilla icon by AssetPath (Common-rooted), or the letter mark when
+      // none is set. Only one of the two is ever visible.
+      AssetImage #CardIcon {
+        Anchor: (Width: 26, Height: 26);
+        AssetPath: "";
+        FallbackTexturePath: "UI/Custom/Pages/Memories/MissingIcon.png";
+        Visible: false;
+      }
+
       Label #CardGlyph {
         Style: $M.@HeadingStyle;
       }

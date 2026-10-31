@@ -42,13 +42,24 @@ final class ShortcutRailHud extends CustomUIHud {
 
     private static final String RAIL_UI = "Hud/MysticEssentialsShortcutRail.ui";
     private static final String SLOT_UI = "Hud/MysticEssentialsShortcutRailSlot.ui";
+    private static final String SEPARATOR_UI = "Hud/MysticEssentialsShortcutRailSeparator.ui";
     private static final String SLOTS = "#MysticShortcutRailSlots";
     private static final int Z_ORDER = 0;
 
-    /** Must match the tile heights in MysticEssentialsShortcutRailSlot.ui. */
-    private static final int TILE_GAP = 5;
-    private static final int TITLE_HEIGHT = 19;
-    private static final int HINT_HEIGHT = 17;
+    /*
+     * Mirrors of the sizes in the rail documents. The root's height is set from
+     * here, so these must change together with the .ui files.
+     */
+    /** Tile edge, MysticEssentialsShortcutRailSlot.ui. */
+    private static final int TILE = 34;
+    /** Space under each tile (its Anchor Bottom). */
+    private static final int GAP = 4;
+    /** A separator: 1px line plus its Bottom margin. */
+    private static final int SEPARATOR = 5;
+    /** Title label height plus its Bottom margin, MysticEssentialsShortcutRail.ui. */
+    private static final int TITLE_HEIGHT = 16;
+    /** Hint label height plus its Top margin. */
+    private static final int HINT_HEIGHT = 14;
 
     /**
      * Hyzion tokens as MysticText colour markup, mirrored from MysticTheme.ui
@@ -78,40 +89,46 @@ final class ShortcutRailHud extends CustomUIHud {
         // chat panel on whatever resolution and UI scale the player runs, and
         // only the server knows how many slots there are to fit.
         cmd.setObject("#MysticShortcutRailRoot.Anchor", LayoutRenderer.anchor(
-                rail.offsetX, null, null, rail.offsetY, tileSize(rail), railHeight(rail)));
+                rail.offsetX, null, null, rail.offsetY, TILE, railHeight(rail)));
 
         cmd.set("#MysticShortcutRailTitle.TextSpans",
                 uiText("#MysticShortcutRailTitle.TextSpans", rail.title));
         cmd.set("#MysticShortcutRailHint.TextSpans",
                 uiText("#MysticShortcutRailHint.TextSpans", shell.railHint()));
 
-        for (int i = 0; i < slots.size(); i++) {
-            ShortcutSlot slot = slots.get(i);
-            String tile = SLOTS + "[" + i + "]";
+        // Tiles and separators are siblings in one list, so a tile's selector
+        // is its position among both, not its slot number.
+        int child = 0;
+        for (ShortcutSlot slot : slots) {
+            String tile = SLOTS + "[" + child++ + "]";
             cmd.append(SLOTS, SLOT_UI);
 
-            // An unavailable slot dims but keeps its number, so the shortcut
-            // stays discoverable while it is out of reach.
-            String glyphColor = slot.active() ? GOLD : slot.available() ? TEXT_SECONDARY : TEXT_FAINT;
-            cmd.set(tile + " #MysticSlotGlyph.TextSpans",
-                    uiText(tile + " #MysticSlotGlyph.TextSpans", glyphColor + slot.glyph()));
+            boolean hasIcon = !slot.icon().isEmpty();
+            if (hasIcon) {
+                cmd.set(tile + " #MysticSlotIcon.AssetPath", slot.icon());
+            } else {
+                String glyphColor = slot.active() ? GOLD : slot.available() ? TEXT_SECONDARY : TEXT_FAINT;
+                cmd.set(tile + " #MysticSlotGlyph.TextSpans",
+                        uiText(tile + " #MysticSlotGlyph.TextSpans", glyphColor + slot.glyph()));
+            }
+            // An unavailable slot is veiled but keeps its number, so the
+            // shortcut stays discoverable while it is out of reach.
+            cmd.set(tile + " #MysticSlotDim.Visible", !slot.available());
             cmd.set(tile + " #MysticSlotNumber.TextSpans",
                     uiText(tile + " #MysticSlotNumber.TextSpans",
                             (slot.available() ? TEXT_DIM : TEXT_FAINT) + slot.index()));
-
             cmd.set(tile + " #MysticSlotActive.Visible", slot.active());
             cmd.set(tile + " #MysticSlotBar.Visible", slot.active());
-            cmd.set(tile + " #MysticSlotSeparator.Visible", separatorAfter(rail, slot.index()));
 
+            if (separatorAfter(rail, slot.index()) && slot != slots.get(slots.size() - 1)) {
+                cmd.append(SLOTS, SEPARATOR_UI);
+                child++;
+            }
         }
     }
 
     private static boolean separatorAfter(ShellConfig.Rail rail, int index) {
         return rail.separatorsAfter != null && rail.separatorsAfter.contains(index);
-    }
-
-    private static int tileSize(ShellConfig.Rail rail) {
-        return rail.tileSize > 0 ? rail.tileSize : 46;
     }
 
     /**
@@ -121,11 +138,11 @@ final class ShortcutRailHud extends CustomUIHud {
      * content would float the tiles away from the chat panel.
      */
     private int railHeight(ShellConfig.Rail rail) {
-        int tiles = slots.size() * (tileSize(rail) + TILE_GAP);
+        int tiles = slots.size() * (TILE + GAP);
         int separators = 0;
-        for (ShortcutSlot slot : slots) {
-            if (separatorAfter(rail, slot.index())) {
-                separators += TILE_GAP;
+        for (int i = 0; i < slots.size() - 1; i++) {
+            if (separatorAfter(rail, slots.get(i).index())) {
+                separators += SEPARATOR;
             }
         }
         return TITLE_HEIGHT + tiles + separators + HINT_HEIGHT;

@@ -74,6 +74,13 @@ public final class ShellModule extends AbstractMysticModule implements ShellServ
 
     private ShellConfig config = new ShellConfig();
     private ShortcutBar bar;
+    /**
+     * Registered once for the plugin's lifetime: the entity-store registry
+     * rejects a second registration of the same system class, so a module that
+     * is hot-disabled and re-enabled reuses these and gates them instead.
+     */
+    private AltShortcuts altShortcuts;
+    private volatile boolean altActive;
     private MenuCatalog catalog;
     private EcosystemRegistry ecosystem;
     private java.util.concurrent.ScheduledFuture<?> refreshTask;
@@ -107,6 +114,7 @@ public final class ShellModule extends AbstractMysticModule implements ShellServ
         registerCommand(new MenuCommand());
         registerCommand(new ShortcutsCommand());
         registerNumberCommands();
+        installAltShortcuts();
 
         // The rail is appended on join. PlayerReadyEvent is keyed, so it needs
         // a global registration to arrive at all; a plain registerEvent never
@@ -114,13 +122,17 @@ public final class ShellModule extends AbstractMysticModule implements ShellServ
         registerGlobalEvent(PlayerReadyEvent.class,
                 (PlayerReadyEvent event) -> core.platform().playerRefOf(event.getPlayerRef())
                         .ifPresent(this::showRail));
-        registerEvent(PlayerDisconnectEvent.class,
-                (PlayerDisconnectEvent event) -> rendered.remove(event.getPlayerRef().getUuid()));
+        registerEvent(PlayerDisconnectEvent.class, (PlayerDisconnectEvent event) -> {
+            rendered.remove(event.getPlayerRef().getUuid());
+            if (altShortcuts != null) {
+                altShortcuts.forget(event.getPlayerRef().getUuid());
+            }
+        });
 
         startRefresh();
         publishWikiEntry();
         log("Enabled: rail=" + config.rail.enabled + ", menu=" + config.menu.enabled
-                + ", slots=" + config.slots.size());
+                + ", slots=" + config.slots.size() + ", altShortcuts=" + altActive);
     }
 
     @Override
@@ -128,6 +140,7 @@ public final class ShellModule extends AbstractMysticModule implements ShellServ
         config = core.configManager().loadModuleConfig(id(), ShellConfig.class, new ShellConfig());
         normalize();
         ecosystem = new EcosystemRegistry(config.menu.hiddenModules);
+        altActive = config.keys.altShortcuts && altShortcuts != null;
         rendered.clear();
         stopRefresh();
         startRefresh();
@@ -175,6 +188,7 @@ public final class ShellModule extends AbstractMysticModule implements ShellServ
 
     @Override
     public void onDisable() {
+        altActive = false;
         org.hyzionstudios.mysticessentials.api.wiki.WikiService wiki = core.getWikiService();
         if (wiki != null) {
             wiki.unregisterNamespace("mysticessentials");
@@ -199,15 +213,35 @@ public final class ShellModule extends AbstractMysticModule implements ShellServ
         if (config.slots == null) {
             config.slots = new ArrayList<>();
         }
-        if (config.rail.tileSize <= 0) {
-            config.rail.tileSize = 46;
-        }
         if (config.rail.separatorsAfter == null) {
             config.rail.separatorsAfter = new ArrayList<>();
         }
         if (config.menu.hiddenModules == null) {
             config.menu.hiddenModules = new ArrayList<>();
         }
+        if (config.keys == null) {
+            config.keys = new ShellConfig.Keys();
+        }
+    }
+
+    /** Registers the ALT chord systems once, then follows the config switch. */
+    private void installAltShortcuts() {
+        if (altShortcuts == null) {
+            AltShortcuts candidate = new AltShortcuts(this);
+            boolean walk = core.platform().registerEntitySystem(candidate.walkSystem());
+            boolean slot = walk && core.platform().registerEntitySystem(candidate.slotSystem());
+            if (walk && slot) {
+                altShortcuts = candidate;
+            } else {
+                log("Could not install the ALT shortcut listeners; /1-/9 and the Shortcuts page still work.");
+            }
+        }
+        altActive = config.keys.altShortcuts && altShortcuts != null;
+    }
+
+    /** Whether ALT+1-9 should act right now. Read on world threads every tick. */
+    boolean altShortcutsActive() {
+        return altActive;
     }
 
     // ----- Accessors used by the rail, pages and catalog ---------------------
@@ -234,15 +268,20 @@ public final class ShellModule extends AbstractMysticModule implements ShellServ
     }
 
     /**
-     * What the rail's footer says. Never claims a key the engine cannot
-     * deliver: see the class javadoc for why ALT+1–9 is not one of them.
+     * What the rail's footer says. Written from what is actually live, so it
+     * never advertises a shortcut that is switched off.
      */
     String railHint() {
         String configured = config.rail.hint;
         if (configured != null && !configured.isBlank()) {
             return configured.trim();
         }
-        return "/1 – /9";
+        return altActive ? "Alt+#" : "/1 – /9";
+    }
+
+    /** The key a row shows for one slot. */
+    String keyLabel(int index) {
+        return altActive ? "Alt+" + index : "/" + index;
     }
 
     /** The same point, as a sentence for a page. */
@@ -251,7 +290,9 @@ public final class ShellModule extends AbstractMysticModule implements ShellServ
         if (configured != null && !configured.isBlank()) {
             return "Use " + configured.trim() + " to reach a slot.";
         }
-        return "Type /1 to /9 in chat, or press a row here.";
+        return altActive
+                ? "Hold Alt and press 1 to 9, type /1 to /9 in chat, or press a row here."
+                : "Type /1 to /9 in chat, or press a row here.";
     }
 
     /** One line on the ecosystem, for the menu's footer. */

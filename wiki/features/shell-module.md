@@ -25,39 +25,47 @@ The slot assignment follows the Mystic Ecosystem UI/UX Design Bible:
 A slot that cannot be used is never hidden — it dims and says why, on the tile's
 tooltip, in the Shortcuts page, and in chat if you run it anyway.
 
-## About ALT+1–9
+## ALT+1–9
 
-**The rail cannot be driven with ALT+1–9, and that is an engine limit, not a
-missing feature.** On Hytale `0.7.3` a server-side mod cannot bind a client key:
+Hold **Alt** and press a number, and the matching slot runs. Your held item does
+not change: the hotbar is put back the moment the shortcut fires.
 
-- there is no keybind registry in the server API;
-- the client's input bindings are not asset-driven, so a mod asset pack cannot
-  add one (`HotkeyLabel.InputBindingKey` only *displays* an existing binding);
-- the custom UI protocol's one key event, `CustomUIEventBindingType.KeyDown`,
-  is a **page** binding — it fires only while a page is open and an element has
-  focus, which is exactly when the player is not in the world;
-- and a HUD overlay cannot even be clicked: the `CustomHud` packet carries
-  `commands` but no `eventBindings`, so no press, hover or key on an overlay
-  ever reaches the server.
+There is no keybind API for server-side mods, so this works by reading two keys
+the client already reports. **Alt is Hytale's default walk key**, so holding it
+sets the player's *walking* state; a **digit selects a hotbar slot**. A slot
+change that lands while walking is an ALT+digit press. (This is the same trick
+Endgame & QoL uses for its journal key; the shell binds all nine.)
 
-The serverside Noesis UI preview in `0.7.3` *does* allow interactive HUD widgets,
-but it refuses to start without `-Dhytale.serverside_ui_preview` and reports
-itself as "still in development and not available yet", so nothing here depends
-on it.
+Because both halves are ordinary inputs, the shell has to tell a shortcut from
+ordinary play:
 
-So the rail is a **display**, and the slots are reached three ways that work
-today:
+| Situation | What happens |
+| --- | --- |
+| Alt held, digit pressed | Shortcut runs, hotbar restored |
+| Alt released a moment before the digit | Still counts, for 800 ms |
+| Walking for a while, then **scrolling** one slot | Not a shortcut: a one-slot move needs an Alt press under 350 ms old, since it could be the wheel |
+| Digit reaches the server just before the walk state | Honoured if walking starts within 250 ms (jumps only, never one-slot moves) |
+| A page is already open | Hotbar restored, no second page opened |
+
+One honest trade-off: a player who walks with Alt held **and** presses a number
+to change weapon gets the shortcut instead of the weapon. Turn
+`keys.altShortcuts` off on a server where that matters; `/1`…`/9` keep
+working either way. A player who rebound *walk* away from Alt uses their walk
+key instead.
+
+The rail itself is still a display: a HUD overlay carries no event bindings, so
+it cannot be clicked. Every way of running a slot goes through one method,
+`ShellService#activateSlot`:
 
 | How | Notes |
 | --- | --- |
-| `/1` … `/9` | One keystroke plus Enter — the closest thing to ALT+N |
+| **Alt + 1–9** | When `keys.altShortcuts` is on (the default) |
+| `/1` … `/9` | One keystroke plus Enter |
 | `/shortcuts` | The same nine slots as real buttons |
 | `/shortcuts <1-9>` | Fallback if the single-digit commands are refused |
 
-All three funnel through one method (`ShellService#activateSlot`), so if a future
-build ships client keybinds, the change is one new caller. The rail's footer hint
-is written from the module rather than hardcoded, so it never advertises a
-shortcut that does not work on the build you are running.
+The rail's footer reads `Alt+#` when the chord is live and `/1 – /9` when it is
+off, so it never advertises a shortcut the server has switched off.
 
 ## Commands
 
@@ -103,10 +111,12 @@ so a card that went unavailable while the menu was open cannot be used.
     "visibleByDefault": true,
     "offsetX": 12,
     "offsetY": 196,
-    "tileSize": 46,
     "title": "Chat Ch",
     "hint": "",
     "separatorsAfter": [4, 6]
+  },
+  "keys": {
+    "altShortcuts": true
   },
   "menu": {
     "enabled": true,
@@ -114,7 +124,7 @@ so a card that went unavailable while the menu was open cannot be used.
     "hiddenModules": []
   },
   "slots": [
-    { "index": 1, "kind": "CHANNEL", "label": "Server Channel", "glyph": "S", "target": "global" }
+    { "index": 1, "kind": "CHANNEL", "label": "Server Channel", "glyph": "S", "target": "global", "icon": "" }
   ]
 }
 ```
@@ -128,10 +138,13 @@ so a card that went unavailable while the menu was open cannot be used.
   `COMMAND`, `NONE`.
 - `target` is a channel id for `CHANNEL`, and a command line (or an `http(s)`
   URL, which is sent as a clickable chat link) for the rest.
-- `glyph` is one or two characters. These are letter marks, not icons: the mod
-  ships no textures, and a `TexturePath` that does not resolve inside an
-  always-on overlay breaks **every** custom UI document on that client. Any text
-  works, so a server with its own asset pack can use a glyph from its own font.
+- `icon` is a vanilla icon, given as its asset path under `Common/` — for
+  example `Icons/ItemCategories/Portal.png`. Left empty, each slot gets the icon
+  that fits what it does, from Hytale's flat category icons (Party uses the
+  fist-bump emote). `none` shows the letter mark from `glyph` instead. A server
+  with its own asset pack can point this at its own art the same way.
+- `glyph` is one or two characters, shown only when a slot has no icon.
+- `keys.altShortcuts` turns ALT+1–9 on or off.
 
 Each player's rail choice is stored in `data/modules/shell/rail.json` as the set
 of players who *differ* from `visibleByDefault`, so changing the server default

@@ -17,6 +17,7 @@ public final class ShellConfig {
     public int configVersion = 1;
 
     public Rail rail = new Rail();
+    public Keys keys = new Keys();
     public Menu menu = new Menu();
     public List<Slot> slots = defaultSlots();
 
@@ -37,8 +38,6 @@ public final class ShellConfig {
         public int offsetX = 12;
         /** Pixels from the bottom edge to the foot of the rail. */
         public int offsetY = 196;
-        /** Tile edge in pixels. Must match MysticEssentialsShortcutRailSlot.ui. */
-        public int tileSize = 46;
         /** Caption above the first tile, as in the reference's "CHAT CH". */
         public String title = "Chat Ch";
         /**
@@ -49,6 +48,18 @@ public final class ShellConfig {
         public String hint = "";
         /** Draw a divider under these slot numbers. The bible suggests 4 and 6. */
         public List<Integer> separatorsAfter = new ArrayList<>(List.of(4, 6));
+    }
+
+    /** Keyboard shortcuts. */
+    public static final class Keys {
+        /**
+         * ALT+1 … ALT+9 run the matching rail slot. Read from the walk key
+         * (Alt, by default) plus the hotbar slot a digit selects; the slot is
+         * put back afterwards so the player keeps their held item. A player
+         * who rebound walk away from Alt uses that key instead. Turn this off
+         * if your players walk with Alt held and switch items while doing it.
+         */
+        public boolean altShortcuts = true;
     }
 
     /** The {@code /menu} shell. */
@@ -86,6 +97,14 @@ public final class ShellConfig {
          * page.
          */
         public String target = "";
+        /**
+         * A vanilla icon, as its asset path under {@code Common/} (for example
+         * {@code Icons/ItemCategories/Portal.png}). Left empty, the slot gets
+         * the icon that fits what it does; {@code none} shows the letter mark
+         * from {@link #glyph} instead. A server with its own asset pack can
+         * point this at its own art the same way.
+         */
+        public String icon = "";
         /** Permission required to use the slot; empty means everyone. */
         public String permission = "";
         /** Set false to leave the position empty. */
@@ -101,6 +120,44 @@ public final class ShellConfig {
             this.glyph = glyph;
             this.target = target;
         }
+    }
+
+    /** The icon prefix for vanilla's flat category icons. */
+    private static final String CATEGORY = "Icons/ItemCategories/";
+
+    /**
+     * The icon a slot draws: its configured one, else the default for what it
+     * does, else none. Defaults come from vanilla's flat white category icons
+     * so the rail reads as one family; Party borrows the fist-bump emote,
+     * which only ships at 2x and is referenced by that exact file.
+     */
+    static String iconFor(Slot slot) {
+        if (slot == null) {
+            return "";
+        }
+        String configured = slot.icon == null ? "" : slot.icon.trim();
+        if ("none".equalsIgnoreCase(configured)) {
+            return "";
+        }
+        if (!configured.isEmpty()) {
+            return configured;
+        }
+        String target = slot.target == null ? "" : slot.target.trim().toLowerCase(java.util.Locale.ROOT);
+        return switch (ShortcutKind.parse(slot.kind)) {
+            case CHANNEL -> switch (target) {
+                case "trade", "trading", "market" -> CATEGORY + "Container.png";
+                case "guild", "clan" -> CATEGORY + "Items-Shields.png";
+                case "party", "group" -> "Icons/Emotes/FistBump@2x.png";
+                default -> CATEGORY + "Signs.png";
+            };
+            case STORE -> CATEGORY + "Natural-Ore.png";
+            case WIKI -> CATEGORY + "Items-Recipe.png";
+            case WARPS -> CATEGORY + "Portal.png";
+            case SERVERS -> CATEGORY + "Natural.png";
+            case MENU -> CATEGORY + "TechnicalBlocks.png";
+            case COMMAND -> CATEGORY + "Misc.png";
+            case NONE -> "";
+        };
     }
 
     private static List<Slot> defaultSlots() {

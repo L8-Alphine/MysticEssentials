@@ -90,10 +90,17 @@ final class ShellPages {
                 ShortcutSlot slot) {
             String row = list + "[" + index + "]";
             cmd.append(list, SHORTCUT_ROW_UI);
-            cmd.set(row + " #SlotGlyph.TextSpans", uiText(row + " #SlotGlyph.TextSpans", slot.glyph()));
+            boolean slotIcon = !slot.icon().isEmpty();
+            cmd.set(row + " #SlotIcon.Visible", slotIcon);
+            cmd.set(row + " #SlotGlyph.Visible", !slotIcon);
+            if (slotIcon) {
+                cmd.set(row + " #SlotIcon.AssetPath", slot.icon());
+            } else {
+                cmd.set(row + " #SlotGlyph.TextSpans", uiText(row + " #SlotGlyph.TextSpans", slot.glyph()));
+            }
             cmd.set(row + " #SlotName.TextSpans", uiText(row + " #SlotName.TextSpans", slot.label()));
             cmd.set(row + " #SlotState.TextSpans", uiText(row + " #SlotState.TextSpans", slot.stateLine()));
-            cmd.set(row + " #SlotKey.TextSpans", uiText(row + " #SlotKey.TextSpans", "/" + slot.index()));
+            cmd.set(row + " #SlotKey.TextSpans", uiText(row + " #SlotKey.TextSpans", shell.keyLabel(slot.index())));
             cmd.set(row + " #SlotSelected.Visible", slot.active());
             // An unavailable slot keeps its binding: pressing it should repeat
             // the reason, not do nothing. activateSlot re-checks and explains.
@@ -201,7 +208,14 @@ final class ShellPages {
                 MenuCard card) {
             String row = list + "[" + index + "]";
             cmd.append(list, MENU_CARD_UI);
-            cmd.set(row + " #CardGlyph.TextSpans", uiText(row + " #CardGlyph.TextSpans", card.glyph()));
+            String icon = MenuCatalog.iconFor(card);
+            cmd.set(row + " #CardIcon.Visible", !icon.isEmpty());
+            cmd.set(row + " #CardGlyph.Visible", icon.isEmpty());
+            if (!icon.isEmpty()) {
+                cmd.set(row + " #CardIcon.AssetPath", icon);
+            } else {
+                cmd.set(row + " #CardGlyph.TextSpans", uiText(row + " #CardGlyph.TextSpans", card.glyph()));
+            }
             cmd.set(row + " #CardTitle.TextSpans", uiText(row + " #CardTitle.TextSpans", card.title()));
             cmd.set(row + " #CardBlurb.TextSpans", uiText(row + " #CardBlurb.TextSpans", card.blurb()));
             cmd.set(row + " #CardStatus.Visible", !card.available());

@@ -730,6 +730,14 @@ tasks.register<JavaExec>("verifyChatDelivery") {
     )
 }
 
+tasks.register<JavaExec>("verifyShellShortcuts") {
+    group = "verification"
+    description = "Checks the shortcut rail's wheel filter and its default icons."
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets.test.get().runtimeClasspath + configurations.compileClasspath.get()
+    mainClass.set("org.hyzionstudios.mysticessentials.modules.shell.ShellShortcutsTest")
+}
+
 tasks.register<JavaExec>("verifyAfkZoneGeometry") {
     group = "verification"
     description = "Checks AFK zones cover the whole blocks their corners were set in, everywhere."
@@ -754,6 +762,7 @@ tasks.named("check") {
         "verifyMessageParamOrder",
         "verifyChatDelivery",
         "verifyAfkZoneGeometry",
+        "verifyShellShortcuts",
         "verifyLootBox",
         "verifyLootBoxSaga",
         "verifyLootBoxKeys",

@@ -24,6 +24,15 @@ Button #Row {
     $M.@IconWell {
       @Anchor = (Right: 12);
 
+      // A vanilla icon by AssetPath (Common-rooted), or the letter mark when
+      // none is set. Only one of the two is ever visible.
+      AssetImage #SlotIcon {
+        Anchor: (Width: 22, Height: 22);
+        AssetPath: "";
+        FallbackTexturePath: "UI/Custom/Pages/Memories/MissingIcon.png";
+        Visible: false;
+      }
+
       Label #SlotGlyph {
         Style: $M.@HeadingStyle;
       }

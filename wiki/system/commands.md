@@ -29,9 +29,8 @@ Optional arguments use `[brackets]`. Required arguments use `<angle brackets>`.
 | `/wiki new\|edit <id>` | Write or change a page | `mysticessentials.wiki.edit` |
 | `/wiki delete <id>` | Delete a stored page | `mysticessentials.wiki.edit` |
 
-ALT+1–9 is not available: a server-side mod cannot bind a client key on this
-engine. See [Navigation Shell](shell-module) for what the engine does and does
-not allow.
+**Alt + 1–9** also runs a slot (hold the walk key, press a number); see
+[Navigation Shell](shell-module) for how that is detected and how to turn it off.
 
 ## Teleportation
 

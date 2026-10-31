@@ -1,5 +1,50 @@
 # Mystic Essentials Changelog
 
+## Unreleased — ALT shortcuts, vanilla icons, AFK water fix
+
+Server-side checks only (build, `check`); not yet seen in a game client.
+
+### ALT+1–9
+
+- **Hold Alt and press 1–9 to run a rail slot.** There is no keybind API, but
+  Alt is Hytale's default walk key and a digit selects a hotbar slot — both
+  reach the server — so a slot change that lands while walking is the chord.
+  The hotbar is restored on server and client, so you keep your held item.
+- Scrolling is not a shortcut: a one-slot move counts only with an Alt press
+  under 350 ms old. Alt released up to 800 ms before the digit still counts, and
+  a digit that beats the walk state to the server is honoured for 250 ms.
+- Restoring the slot raises the same slot event. With nine digits bound, that
+  echo would otherwise read as another ALT+digit and loop; it is marked and
+  ignored.
+- `keys.altShortcuts` (default on). The rail footer reads `Alt+#` while it is
+  live, and the Shortcuts page shows `Alt+N` per row.
+- Two ECS systems, registered once and gated by the module: one boolean read per
+  player per tick, map writes only on a walk start or stop.
+
+### Icons and a smaller rail
+
+- Rail tiles, the Shortcuts page and the menu use **vanilla icons** — Hytale's
+  flat category icons (Signs, Container, Shields, Ore, Recipe, Portal, Natural,
+  TechnicalBlocks) plus the fist-bump emote for Party and map markers for
+  homes, spawn and player warps. Set by `AssetPath` at runtime, the same way
+  Endgame & QoL's HUD does; nothing is copied into the mod. Every path is
+  checked against `Assets.zip`. Per-slot `icon` override, `none` for the letter.
+- Rail tiles are **34 px (from 46)**, icons 20 px, labels 8 px. Unavailable
+  slots are veiled rather than recoloured. Group dividers are real gaps now,
+  not a line drawn over a tile's edge.
+- `rail.tileSize` is gone: it never resized the tiles, which the document fixes.
+
+### AFK zones
+
+- **Players are never placed with water over their head.** Fluid is a separate
+  layer from the block, so a lake bed reads as air with water in it; water is
+  not a blocked fluid (wading pools work), so the scan accepted spots that
+  drowned an AFK player over time. Every cell above the feet must now be dry.
+- **A zone is the box its preview shows.** The pos1/pos2 preview drew whole
+  blocks; the zone itself tested the raw foot positions, so the edge blocks were
+  only partly inside; and the size message rounded a third way. All three now
+  use whole blocks, inclusive. Existing zones read the same way, no data change.
+
 ## Unreleased — Hytale 0.7.5, and the tick comes back
 
 Server-side checks only (build, `check`, UI document validation, the 0.7.5
@@ -88,17 +133,7 @@ nothing here has been seen in a game client yet.
 - **`ShellService` / `MenuDestination`** for other mods, via
   `MysticEssentialsProvider.get().getShellService()`.
 
-**ALT+1–9 is not possible from a server-side mod on 0.7.3 and is not claimed.**
-There is no keybind registry in the server API; the client's bindings are not
-asset-driven (`HotkeyLabel.InputBindingKey` only displays an existing one);
-`CustomUIEventBindingType.KeyDown` is a page binding that fires only while a
-page is open and focused; and `CustomHud` carries no `eventBindings`, so a HUD
-overlay cannot be clicked either. The serverside Noesis UI that *would* allow an
-interactive HUD widget refuses to start without
-`-Dhytale.serverside_ui_preview` and reports itself as unfinished. Every input
-path funnels through `ShellService#activateSlot`, so a future keybind is one new
-caller, and the rail's footer hint is written by the module rather than
-hardcoded so it never advertises a shortcut that does not work.
+**Correction:** this release first said ALT+1–9 was impossible from a server-side mod. It is possible — see the ALT shortcuts entry above.
 
 ### Server Wiki (new module `wiki`)
 

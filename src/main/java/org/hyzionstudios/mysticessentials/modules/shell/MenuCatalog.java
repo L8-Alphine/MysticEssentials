@@ -39,6 +39,48 @@ final class MenuCatalog {
             int order, boolean available, String reason, Consumer<PlayerRef> action) {
     }
 
+    private static final String CATEGORY = "Icons/ItemCategories/";
+    private static final String MARKER = "UI/WorldMap/MapMarkers/";
+
+    /**
+     * Vanilla icons for the cards, by card id, as asset paths under
+     * {@code Common/}. Cards missing here keep their letter mark: a letter that
+     * says what a card is beats an icon that only looks tidy. Paths with spaces
+     * in the file name (Builder Tools, Scripted Blocks) are avoided on purpose.
+     */
+    private static final java.util.Map<String, String> ICONS = java.util.Map.ofEntries(
+            java.util.Map.entry("essentials:warps", CATEGORY + "Portal.png"),
+            java.util.Map.entry("essentials:warps.adventure", CATEGORY + "Portal.png"),
+            java.util.Map.entry("essentials:homes", MARKER + "Home.png"),
+            java.util.Map.entry("essentials:spawn", MARKER + "Spawn.png"),
+            java.util.Map.entry("essentials:kits", CATEGORY + "Items-Armor.png"),
+            java.util.Map.entry("essentials:channels", CATEGORY + "Signs.png"),
+            java.util.Map.entry("essentials:channels.settings", CATEGORY + "Signs.png"),
+            java.util.Map.entry("essentials:tpa", MARKER + "Player.png"),
+            java.util.Map.entry("essentials:playerwarps", MARKER + "Warp.png"),
+            java.util.Map.entry("essentials:store", CATEGORY + "Natural-Ore.png"),
+            java.util.Map.entry("essentials:servers", CATEGORY + "Natural.png"),
+            java.util.Map.entry("essentials:wiki", CATEGORY + "Items-Recipe.png"),
+            java.util.Map.entry("essentials:vaults", CATEGORY + "Container.png"),
+            java.util.Map.entry("essentials:nick", CATEGORY + "Items-Clothes.png"),
+            java.util.Map.entry("essentials:notifications", CATEGORY + "Build-Lights.png"),
+            java.util.Map.entry("essentials:notifications.account", CATEGORY + "Build-Lights.png"),
+            java.util.Map.entry("essentials:patchnotes", CATEGORY + "Misc.png"),
+            java.util.Map.entry("essentials:shortcuts", CATEGORY + "Build-Walls.png"),
+            java.util.Map.entry("essentials:shortcuts.settings", CATEGORY + "Build-Walls.png"),
+            java.util.Map.entry("essentials:rail", CATEGORY + "Shelves.png"),
+            java.util.Map.entry("ecosystem:mysticquests", MARKER + "Coordinate.png"),
+            java.util.Map.entry("ecosystem:mysticrpg", CATEGORY + "Items-Weapons.png"),
+            java.util.Map.entry("ecosystem:mysticguilds", CATEGORY + "Items-Shields.png"),
+            java.util.Map.entry("ecosystem:mysticeconomy", CATEGORY + "Metal.png"),
+            java.util.Map.entry("ecosystem:mysticmoderation", CATEGORY + "Editor.png"),
+            java.util.Map.entry("ecosystem:mysticgeneration", CATEGORY + "Natural-Vegetal.png"));
+
+    /** @return the card's vanilla icon, or empty for its letter mark. */
+    static String iconFor(MenuCard card) {
+        return card == null ? "" : ICONS.getOrDefault(card.id(), "");
+    }
+
     private final MysticCore core;
     private final ShellModule shell;
 

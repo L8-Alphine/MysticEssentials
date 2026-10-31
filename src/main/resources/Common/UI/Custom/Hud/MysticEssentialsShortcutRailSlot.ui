@@ -1,30 +1,22 @@
 // One tile of the shortcut rail. Appended once per slot into
-// #MysticShortcutRailSlots; the server addresses each by index
-// (`#MysticShortcutRailSlots[0] #MysticSlotGlyph.TextSpans`).
+// #MysticShortcutRailSlots; the server addresses each by its child index.
 //
 // States, per the bible's ShortcutHUDItem contract:
-//   active       — #MysticSlotActive visible: gold edge + gold glyph
-//   unavailable  — #MysticSlotGlyph/#MysticSlotNumber dimmed by the server
-//   separator    — #MysticSlotSeparator visible after the channel block (4)
-//                  and after the services block (6)
+//   active       — #MysticSlotActive + #MysticSlotBar: gold wash and gold edge
+//   unavailable  — #MysticSlotDim veils the icon; the number dims too
+//   icon         — #MysticSlotIcon, a vanilla icon set by AssetPath at runtime;
+//                  slots configured without one show #MysticSlotGlyph instead
 //
-// EVERY construct here is one the shipped corpus already uses. This document
-// is appended at join, and a client that rejects it drops the whole merged
-// Custom UI namespace -- which takes other mods' Hud/ documents down with it,
-// so the error names their file, not ours. Nothing novel belongs in here:
+// This document is appended at join, and a client that rejects it drops the
+// whole merged Custom UI namespace -- other mods' documents included. So every
+// construct here is one a shipped document already uses at join. The icon
+// element is copied in form from Endgame & QoL's always-on KeyHintsHud.ui
+// (AssetImage, Anchor Full, empty AssetPath set at runtime); that HUD sets no
+// FallbackTexturePath, so neither does this one.
 //
-//   * borders are nested plain Groups, not OutlineColor/OutlineSize (which
-//     vanilla uses once in its entire corpus, and this mod never did before);
-//   * no TooltipText and no HitTestVisible (zero vanilla uses, and pointless
-//     besides -- CustomHud carries no event bindings, so a HUD never receives
-//     a hover in the first place);
-//   * HorizontalAlignment, not the bare Alignment.
-//
-// Colour literals rather than a theme import: see the header of
-// MysticEssentialsShortcutRail.ui for why an always-on overlay carries no
-// cross-document reference.
+// Sizes are mirrored in ShortcutRailHud (TILE, GAP): change them together.
 Group {
-  Anchor: (Width: 46, Height: 46, Bottom: 5);
+  Anchor: (Width: 34, Height: 34, Bottom: 4);
 
   // Base plate.
   Group {
@@ -32,34 +24,46 @@ Group {
     Background: #0b1422(0.72);
   }
 
-  // Resting edge, drawn as four hairlines rather than an outline property.
+  // Resting edge.
   Group {
     Anchor: (Left: 0, Top: 0, Right: 0, Height: 1);
     Background: #3a506b(0.55);
   }
 
   Group {
-    Anchor: (Left: 0, Bottom: 1, Right: 0, Height: 1);
+    Anchor: (Left: 0, Bottom: 0, Right: 0, Height: 1);
     Background: #3a506b(0.55);
   }
 
-  // Selected/active channel: a gold wash plus the gold edge below, never
-  // colour alone -- the glyph recolours to gold as well.
+  // Active channel: gold wash plus a gold edge, never colour alone.
   Group #MysticSlotActive {
     Anchor: (Full: 0);
     Background: #d9b572(0.16);
     Visible: false;
   }
 
-  // Active marker on the inner edge, mirroring the reference's gold bar.
   Group #MysticSlotBar {
-    Anchor: (Left: 0, Top: 11, Width: 3, Height: 24);
+    Anchor: (Left: 0, Top: 8, Width: 2, Height: 18);
     Background: #d9b572;
     Visible: false;
   }
 
-  // Icon glyph. Short text rather than a texture: the mod ships no PNGs, and a
-  // missing TexturePath in an always-on overlay would break the document.
+  // Vanilla icon, centred.
+  Group {
+    Anchor: (Full: 0);
+    LayoutMode: CenterMiddle;
+
+    Group {
+      Anchor: (Width: 20, Height: 20);
+
+      AssetImage #MysticSlotIcon {
+        Anchor: (Full: 0);
+        AssetPath: "";
+      }
+    }
+  }
+
+  // Letter mark for a slot configured without an icon.
   Group {
     Anchor: (Full: 0);
     LayoutMode: CenterMiddle;
@@ -67,7 +71,7 @@ Group {
     Label #MysticSlotGlyph {
       Style: (
         FontName: "Secondary",
-        FontSize: 17,
+        FontSize: 13,
         RenderBold: true,
         RenderUppercase: true,
         TextColor: #aec1d5,
@@ -77,22 +81,22 @@ Group {
     }
   }
 
-  // Slot number, always legible so the shortcut stays discoverable.
+  // Out of reach: an icon cannot be recoloured, so it is veiled instead.
+  Group #MysticSlotDim {
+    Anchor: (Full: 0);
+    Background: #0b1422(0.6);
+    Visible: false;
+  }
+
+  // Slot number, drawn last so it stays legible over the veil.
   Label #MysticSlotNumber {
-    Anchor: (Right: 4, Top: 2, Width: 12, Height: 12);
+    Anchor: (Right: 2, Top: 1, Width: 10, Height: 10);
     Style: (
-      FontSize: 10,
+      FontSize: 8,
       RenderBold: true,
       TextColor: #93a8c0,
       HorizontalAlignment: End,
       VerticalAlignment: Center
     );
-  }
-
-  // Group divider, drawn under the tile it closes.
-  Group #MysticSlotSeparator {
-    Anchor: (Left: 6, Right: 6, Bottom: 0, Height: 1);
-    Background: #3a506b(0.55);
-    Visible: false;
   }
 }

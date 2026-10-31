@@ -17,6 +17,8 @@ package org.hyzionstudios.mysticessentials.modules.shell;
  * @param available  whether pressing it will do anything
  * @param reason     why not, when {@code available} is false
  * @param active     whether this is the channel the player is speaking in
+ * @param icon       a vanilla icon's asset path from {@code Common/}, or empty
+ *                   for the letter mark
  */
 public record ShortcutSlot(
         int index,
@@ -27,12 +29,19 @@ public record ShortcutSlot(
         String state,
         boolean available,
         String reason,
-        boolean active) {
+        boolean active,
+        String icon) {
 
     /** An unoccupied position: drawn, numbered, inert. */
     static ShortcutSlot empty(int index) {
         return new ShortcutSlot(index, ShortcutKind.NONE, "Unused", "-", "", "",
-                false, "Nothing is assigned to this slot", false);
+                false, "Nothing is assigned to this slot", false, "");
+    }
+
+    /** @return this slot with an icon attached. */
+    ShortcutSlot withIcon(String path) {
+        return new ShortcutSlot(index, kind, label, glyph, target, state, available, reason, active,
+                path == null ? "" : path);
     }
 
     /** @return the line the tile and row show under the name. */

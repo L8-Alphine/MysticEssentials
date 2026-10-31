@@ -1,0 +1,9 @@
+// Divider between groups of rail tiles (after the channels, after the
+// services). Its own element rather than a line inside a tile, so it adds real
+// space between the groups instead of drawing over a tile's edge.
+//
+// Sizes are mirrored in ShortcutRailHud (SEPARATOR): change them together.
+Group {
+  Anchor: (Left: 6, Right: 6, Height: 1, Bottom: 4);
+  Background: #3a506b;
+}

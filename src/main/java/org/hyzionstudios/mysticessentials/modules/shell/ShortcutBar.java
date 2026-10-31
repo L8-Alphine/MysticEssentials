@@ -34,7 +34,8 @@ final class ShortcutBar {
         List<ShortcutSlot> resolved = new ArrayList<>();
         for (int index = 1; index <= 9; index++) {
             ShellConfig.Slot slot = find(configured, index);
-            resolved.add(slot == null || !slot.enabled ? ShortcutSlot.empty(index) : resolve(player, slot));
+            resolved.add(slot == null || !slot.enabled ? ShortcutSlot.empty(index)
+                    : resolve(player, slot).withIcon(ShellConfig.iconFor(slot)));
         }
         return resolved;
     }
@@ -48,7 +49,7 @@ final class ShortcutBar {
         if (slot == null || !slot.enabled) {
             return Optional.of(ShortcutSlot.empty(index));
         }
-        return Optional.of(resolve(player, slot));
+        return Optional.of(resolve(player, slot).withIcon(ShellConfig.iconFor(slot)));
     }
 
     private static ShellConfig.Slot find(List<ShellConfig.Slot> slots, int index) {
@@ -115,7 +116,7 @@ final class ShortcutBar {
         }
         boolean speaking = channelId.equalsIgnoreCase(chat.currentChannel(player.getUuid()));
         return new ShortcutSlot(index, ShortcutKind.CHANNEL, label, glyph, channelId,
-                speaking ? "Speaking here" : "Switch to this channel", true, "", speaking);
+                speaking ? "Speaking here" : "Switch to this channel", true, "", speaking, "");
     }
 
     /**
@@ -154,12 +155,12 @@ final class ShortcutBar {
 
     private static ShortcutSlot ready(int index, ShortcutKind kind, String label, String glyph,
             String target, String state) {
-        return new ShortcutSlot(index, kind, label, glyph, target, state, true, "", false);
+        return new ShortcutSlot(index, kind, label, glyph, target, state, true, "", false, "");
     }
 
     private static ShortcutSlot denied(int index, ShortcutKind kind, String label, String glyph,
             String target, String reason) {
-        return new ShortcutSlot(index, kind, label, glyph, target, "", false, reason, false);
+        return new ShortcutSlot(index, kind, label, glyph, target, "", false, reason, false, "");
     }
 
     private static String defaultLabel(ShortcutKind kind, int index) {
