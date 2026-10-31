@@ -103,14 +103,7 @@ final class ShortcutRailHud extends CustomUIHud {
             cmd.set(tile + " #MysticSlotBar.Visible", slot.active());
             cmd.set(tile + " #MysticSlotSeparator.Visible", separatorAfter(rail, slot.index()));
 
-            // A HUD routes no mouse events, so the tooltip is the only thing
-            // that can explain an unavailable slot without opening a page.
-            cmd.set(tile + " #MysticSlotHit.TooltipText", tooltip(slot));
         }
-    }
-
-    private String tooltip(ShortcutSlot slot) {
-        return slot.index() + " — " + slot.label() + "\n" + slot.stateLine();
     }
 
     private static boolean separatorAfter(ShellConfig.Rail rail, int index) {

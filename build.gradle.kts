@@ -457,10 +457,51 @@ tasks.register("validateUiDocuments") {
             return found
         }
 
+        // The client's string reader accepts only a doubled backslash and an
+        // escaped quote. Any other backslash inside a quoted string is a hard
+        // parse error, and like the two failures above it is NOT contained:
+        // the client stops resolving other packs' documents, so the error the
+        // player sees names some other mod's file. A \n in a PlaceholderText
+        // is the easy way to write one by accident.
+        fun badEscapes(source: String): List<Int> {
+            val found = mutableListOf<Int>()
+            var inString = false
+            var line = 1
+            var i = 0
+            while (i < source.length) {
+                val c = source[i]
+                if (c == '\n') { line++; i++; inString = false; continue }
+                if (!inString) {
+                    if (c == '"') { inString = true; i++; continue }
+                    if (c == '/' && i + 1 < source.length && source[i + 1] == '/') {
+                        while (i < source.length && source[i] != '\n') i++
+                        continue
+                    }
+                    i++
+                    continue
+                }
+                if (c == '\\') {
+                    val next = if (i + 1 < source.length) source[i + 1] else ' '
+                    if (next != '\\' && next != '"') found += line
+                    i += 2
+                    continue
+                }
+                if (c == '"') inString = false
+                i++
+            }
+            return found
+        }
+
         listOf(uiDir.asFile, spikeUiDir.asFile).filter { it.isDirectory }
             .flatMap { dir -> dir.walkTopDown().filter { it.isFile && it.extension == "ui" }.toList() }
             .forEach { file ->
             val text = file.readText()
+            badEscapes(text).forEach { lineNumber ->
+                problems += file.name + ":" + lineNumber +
+                    ": invalid string escape -- inside a quoted string the client accepts" +
+                    " only a doubled backslash or an escaped quote, so a newline escape is" +
+                    " a parse error; write the text on one line"
+            }
             misorderedParameters(text).forEach { lineNumber ->
                 problems += file.name + ":" + lineNumber +
                     ": a @parameter is assigned after a plain property -- move it above the" +

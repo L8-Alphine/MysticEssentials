@@ -114,7 +114,10 @@ $C.@Container {
     $C.@MultilineTextField #BodyInput {
       @Anchor = (Bottom: 6);
       FlexWeight: 1;
-      PlaceholderText: "## A heading\nA paragraph.\n- A bullet\n[[another-page]] links to another page.";
+      // One line, no escapes. The client's string reader accepts only a
+      // doubled backslash and an escaped quote: a \n here is a hard parse
+      // error that takes the whole merged Custom UI namespace with it.
+      PlaceholderText: "## Heading  -  - Bullet  -  blank line for a paragraph  -  [[page-id]] to link";
     }
 
     Label #EditorStatus {

@@ -29,7 +29,7 @@ Group #MysticShortcutRailRoot {
       RenderUppercase: true,
       LetterSpacing: 1,
       TextColor: #93a8c0,
-      Alignment: Center,
+      HorizontalAlignment: Center,
       VerticalAlignment: Center
     );
   }
@@ -50,7 +50,7 @@ Group #MysticShortcutRailRoot {
       RenderUppercase: true,
       LetterSpacing: 1,
       TextColor: #6e829b,
-      Alignment: Center,
+      HorizontalAlignment: Center,
       VerticalAlignment: Center
     );
   }

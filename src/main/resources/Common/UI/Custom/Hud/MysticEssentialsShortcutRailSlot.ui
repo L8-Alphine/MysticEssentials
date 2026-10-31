@@ -3,10 +3,22 @@
 // (`#MysticShortcutRailSlots[0] #MysticSlotGlyph.TextSpans`).
 //
 // States, per the bible's ShortcutHUDItem contract:
-//   active       — #MysticSlotActive visible: gold rim + gold glyph
+//   active       — #MysticSlotActive visible: gold edge + gold glyph
 //   unavailable  — #MysticSlotGlyph/#MysticSlotNumber dimmed by the server
 //   separator    — #MysticSlotSeparator visible after the channel block (4)
 //                  and after the services block (6)
+//
+// EVERY construct here is one the shipped corpus already uses. This document
+// is appended at join, and a client that rejects it drops the whole merged
+// Custom UI namespace -- which takes other mods' Hud/ documents down with it,
+// so the error names their file, not ours. Nothing novel belongs in here:
+//
+//   * borders are nested plain Groups, not OutlineColor/OutlineSize (which
+//     vanilla uses once in its entire corpus, and this mod never did before);
+//   * no TooltipText and no HitTestVisible (zero vanilla uses, and pointless
+//     besides -- CustomHud carries no event bindings, so a HUD never receives
+//     a hover in the first place);
+//   * HorizontalAlignment, not the bare Alignment.
 //
 // Colour literals rather than a theme import: see the header of
 // MysticEssentialsShortcutRail.ui for why an always-on overlay carries no
@@ -18,17 +30,24 @@ Group {
   Group {
     Anchor: (Full: 0);
     Background: #0b1422(0.72);
-    OutlineColor: #3a506b(0.55);
-    OutlineSize: 1;
   }
 
-  // Selected/active channel: border + indicator, never colour alone — the
-  // glyph recolours to gold and the tooltip names the state.
+  // Resting edge, drawn as four hairlines rather than an outline property.
+  Group {
+    Anchor: (Left: 0, Top: 0, Right: 0, Height: 1);
+    Background: #3a506b(0.55);
+  }
+
+  Group {
+    Anchor: (Left: 0, Bottom: 1, Right: 0, Height: 1);
+    Background: #3a506b(0.55);
+  }
+
+  // Selected/active channel: a gold wash plus the gold edge below, never
+  // colour alone -- the glyph recolours to gold as well.
   Group #MysticSlotActive {
     Anchor: (Full: 0);
     Background: #d9b572(0.16);
-    OutlineColor: #d9b572;
-    OutlineSize: 1;
     Visible: false;
   }
 
@@ -52,7 +71,7 @@ Group {
         RenderBold: true,
         RenderUppercase: true,
         TextColor: #aec1d5,
-        Alignment: Center,
+        HorizontalAlignment: Center,
         VerticalAlignment: Center
       );
     }
@@ -68,16 +87,6 @@ Group {
       HorizontalAlignment: End,
       VerticalAlignment: Center
     );
-  }
-
-  // Hover target for the tooltip. The property is declared here rather than
-  // set on the tile root at runtime: a property the client does not recognise
-  // on an element aborts the whole document, and this overlay is appended at
-  // join, so a mistake here would cost every custom UI on that client.
-  Group #MysticSlotHit {
-    Anchor: (Full: 0);
-    HitTestVisible: true;
-    TooltipText: "";
   }
 
   // Group divider, drawn under the tile it closes.
