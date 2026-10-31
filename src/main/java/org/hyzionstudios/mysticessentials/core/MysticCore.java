@@ -149,13 +149,15 @@ public final class MysticCore implements MysticEssentialsAPI {
         platform = new HytalePlatform(this, plugin);
         MysticArgTypes.bind(this);
         scheduler = new SchedulerService(this);
-        scheduler.start();
         cooldowns = new CooldownService();
         eventBus = new SimpleEventBus(this);
 
         configManager = new ConfigManager(this);
         configManager.load();
         MainConfig config = config();
+        // After the config: performance.schedulerThreads sizes the pool, and
+        // nothing above here schedules anything.
+        scheduler.start();
 
         // Storage + Redis.
         storageService = new StorageServiceImpl(this);

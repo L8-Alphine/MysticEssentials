@@ -2,6 +2,7 @@ package org.hyzionstudios.mysticessentials.modules.lootbox.service;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -113,6 +114,18 @@ public final class CrateService {
             }
             return CompletableFuture.allOf(loads.toArray(CompletableFuture[]::new));
         });
+    }
+
+    /**
+     * Every crate, unsorted and uncopied.
+     *
+     * <p>For hot paths such as the idle-effect tick. {@link #list()} copies and
+     * sorts on every call, which is right for a UI and wrong several times a
+     * second. The map is concurrent, so iterating this view is safe while
+     * crates are added or removed.</p>
+     */
+    public Collection<CrateInstance> all() {
+        return crates.values();
     }
 
     public List<CrateInstance> list() {

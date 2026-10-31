@@ -1,5 +1,68 @@
 # Mystic Essentials Changelog
 
+## Unreleased — Hytale 0.7.5, and the tick comes back
+
+Server-side checks only (build, `check`, UI document validation, the 0.7.5
+server jar); nothing here has been seen in a game client yet.
+
+### Hytale 0.7.5
+
+- Builds against `0.7.5`. Nothing the mod uses was removed or re-signed: the
+  release adds QUIC pacing and frame checks, `ConnectionHandler#handlesPacket`,
+  `CertificateTrustPolicy` and a Sentry filter, all engine-internal. The
+  manifest's `>=0.7.0 <0.8.0` already covered it.
+
+### Crate effects no longer cost a world tick
+
+The idle-effect loop ran **on the world thread** and did a spatial query per
+crate per tick, plus a registry lookup and a markup strip per crate for the
+floating name. A few hundred crates meant hundreds of spatial queries a second
+whether or not a player stood anywhere near one. That was the lag.
+
+- The tick now **plans off-thread and only spawns on-thread**. Player positions
+  are read from `PlayerRef#getTransform` / `#getWorldUuid`, which are plain
+  field reads rather than entity-store lookups, so "who is near what" is pure
+  computation on the scheduler. A world with nothing to draw is never woken at
+  all.
+- Per-crate spatial queries are gone, replaced by one squared-distance test per
+  player per crate against a position snapshot.
+- Nameplate text is built off-thread and only for crates a player is near.
+- Idle timers are pruned by walking the timers rather than rebuilding a set of
+  every crate-by-slot pair each tick, and the crate list is read through a new
+  uncopied `CrateService#all()` instead of the sorting `list()`.
+
+### Reveal animation off the world thread
+
+Each frame hopped to the world thread and built its command list there. Now the
+step claims its slot and builds the frame on the scheduler, and the world
+thread does only `sendUpdate`, which is the part that reads the player. Step
+claiming and landing are taken under the page's monitor, because frames are
+timed on a pool and Skip lands the reveal from the world thread.
+
+### Scheduler
+
+- The shared pool was **2 threads** for every timer the mod owns — AFK, teleport
+  warmups, RTP search, playtime, crate effects and now every reveal frame. It
+  is now half the host's processors (2–8), overridable with
+  `performance.schedulerThreads`.
+- The pool starts after the config that sizes it is read.
+- The tutorial autosave no longer parks a scheduler thread on `saveAll().join()`.
+
+### Networking: smaller UI packets
+
+An old-style page sends its whole command array in **one** `CustomPage` packet;
+the newer `UISurface` chunks at 64. A server with several hundred warps was
+sending thousands of commands in a single packet, and 0.7.5's
+`QuicheChannel#allocateLargePacketBuffer` logs a warning and allocates an
+oversized buffer for exactly that shape.
+
+- `MysticPage.MAX_LIST_ROWS` (150) caps how many rows one build draws, applied
+  to warps, the wiki page list and article bodies, kits, the LootBox catalog
+  and receipt history.
+- Every capped list **says it was cut** ("150 of 480 warps — search to narrow").
+  Lists bounded by one object (a mail's attachments, a kit's items, a reveal's
+  reward table) are untouched.
+
 ## Unreleased — Hyzion shell: shortcut rail, server wiki, theme pass
 
 Server-side checks only (build, `check`, UI document validation, engine source);

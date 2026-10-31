@@ -2,7 +2,7 @@
 
 Mystic Essentials is a modular essentials foundation for Hytale servers. It provides day-to-day server features such as homes, spawn, server warps, player warps, teleport requests, back teleport, mail, private messages, chat formatting, managed chat channels, item sharing, mentions, notifications, announcements, AFK and playtime tracking, greetings and MOTD messages, kits, paid flight, craft blocking, inventory snapshots, nicknames, and an API for addon developers.
 
-The mod is built and tested against Hytale Server `0.6.8` and declares support for server versions `>=0.6.8 <0.7.0`.
+The mod is built against Hytale Server `0.7.5` and declares support for server versions `>=0.7.0 <0.8.0`.
 
 ## Who this wiki is for
 

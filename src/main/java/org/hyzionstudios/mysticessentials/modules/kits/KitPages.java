@@ -48,10 +48,13 @@ final class KitPages {
             cmd.append(KITS_UI);
             Map<String, KitConfig.Kit> visible = kits.visibleKits(player);
             List<Map.Entry<String, KitConfig.Kit>> entries = new ArrayList<>(visible.entrySet());
-            cmd.set("#KitCount.TextSpans", uiText("#KitCount.TextSpans", entries.size() + " kits"));
+            int totalKits = entries.size();
             cmd.set("#KitEmpty.Visible", entries.isEmpty());
             Map.Entry<String, KitConfig.Kit> selected = selected(entries);
 
+            entries = capRows(entries);
+            cmd.set("#KitCount.TextSpans",
+                    uiText("#KitCount.TextSpans", rowCount(entries.size(), totalKits, "kits")));
             for (int i = 0; i < entries.size(); i++) {
                 Map.Entry<String, KitConfig.Kit> entry = entries.get(i);
                 String row = "#KitList[" + i + "]";

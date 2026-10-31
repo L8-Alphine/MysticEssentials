@@ -9,6 +9,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 
 import org.hyzionstudios.mysticessentials.core.MysticCore;
+import org.hyzionstudios.mysticessentials.core.config.MainConfig;
 
 /**
  * Delayed and repeating task scheduling for the Core and modules.
@@ -32,6 +33,29 @@ public final class SchedulerService {
         this.core = core;
     }
 
+    /**
+     * Threads in the pool.
+     *
+     * <p>Half the host's processors, clamped to 2..8, unless the config names a
+     * number. Every timer the mod owns shares this pool, so one task that
+     * blocks delays the rest: the floor of 2 is a floor, not a target.</p>
+     */
+    private int poolSize() {
+        int configured = 0;
+        try {
+            MainConfig config = core.config();
+            if (config != null && config.performance != null) {
+                configured = config.performance.schedulerThreads;
+            }
+        } catch (RuntimeException ignored) {
+            // Started before the config was read: fall through to the default.
+        }
+        if (configured > 0) {
+            return Math.min(configured, 32);
+        }
+        return Math.clamp(Runtime.getRuntime().availableProcessors() / 2, 2, 8);
+    }
+
     public void start() {
         ThreadFactory factory = new ThreadFactory() {
             private final AtomicInteger counter = new AtomicInteger();
@@ -43,7 +67,7 @@ public final class SchedulerService {
                 return thread;
             }
         };
-        executor = Executors.newScheduledThreadPool(2, factory);
+        executor = Executors.newScheduledThreadPool(poolSize(), factory);
     }
 
     /** Runs {@code task} once after {@code delay}. */

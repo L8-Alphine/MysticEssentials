@@ -89,7 +89,7 @@ final class WikiPages {
                 }
             }
             cmd.set("#WikiCount.TextSpans", uiText("#WikiCount.TextSpans",
-                    visible.size() + " of " + all.size() + " pages"));
+                    rowCount(Math.min(visible.size(), MAX_LIST_ROWS), all.size(), "pages")));
 
             renderCategories(cmd, event, all, wiki.categoriesOf(all));
             renderArticles(cmd, event, visible);
@@ -145,7 +145,8 @@ final class WikiPages {
             }
         }
 
-        private void renderArticles(UICommandBuilder cmd, UIEventBuilder event, List<WikiPage> visible) {
+        private void renderArticles(UICommandBuilder cmd, UIEventBuilder event, List<WikiPage> all) {
+            List<WikiPage> visible = capRows(all);
             for (int i = 0; i < visible.size(); i++) {
                 WikiPage page = visible.get(i);
                 String row = "#ArticleList[" + i + "]";
@@ -235,10 +236,18 @@ final class WikiPages {
             cmd.set("#ArticleCategory.TextSpans", uiText("#ArticleCategory.TextSpans", page.category()));
             cmd.set("#ArticleFooter.TextSpans", uiText("#ArticleFooter.TextSpans", page.footer()));
 
-            List<WikiMarkup.Block> blocks = WikiMarkup.parse(page.body());
-            cmd.set("#ArticleEmpty.Visible", blocks.isEmpty());
+            // A very long article is one very large packet; draw the first
+            // screens and say the rest is there.
+            List<WikiMarkup.Block> parsed = WikiMarkup.parse(page.body());
+            List<WikiMarkup.Block> blocks = capRows(parsed);
+            cmd.set("#ArticleEmpty.Visible", parsed.isEmpty());
             for (int i = 0; i < blocks.size(); i++) {
                 renderBlock(cmd, event, i, blocks.get(i));
+            }
+            if (blocks.size() < parsed.size()) {
+                cmd.set("#ArticleFooter.TextSpans", uiText("#ArticleFooter.TextSpans",
+                        "Showing the first " + blocks.size() + " of " + parsed.size()
+                                + " lines \u00b7 " + page.footer()));
             }
 
             Map<String, String> related = WikiMarkup.relatedLinks(page.body());

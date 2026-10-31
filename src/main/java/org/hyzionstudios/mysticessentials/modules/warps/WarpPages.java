@@ -2,6 +2,7 @@ package org.hyzionstudios.mysticessentials.modules.warps;
 
 import static org.hyzionstudios.mysticessentials.platform.ui.MysticPage.uiText;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -65,11 +66,20 @@ final class WarpPages {
         public void build(Ref<EntityStore> ref, UICommandBuilder cmd, UIEventBuilder event,
                 Store<EntityStore> store) {
             cmd.append(WARPS_UI);
-            List<Warp> visible = warps.listServerWarps(player.getUuid()).stream()
+            List<Warp> visible = new ArrayList<>(warps.listServerWarps(player.getUuid()).stream()
                     .filter(w -> matchesSearch(search, w.getName(), w.getDescription()))
-                    .toList();
-            cmd.set("#WarpEmpty.Visible", visible.isEmpty());
+                    .toList());
             Warp selected = selectedWarp(visible, selectedName);
+            int total = visible.size();
+            visible = capRows(visible);
+            boolean cut = total > visible.size();
+            // The empty label doubles as the list's notice line: it sits above
+            // the rows, so it reads as a header when the list was cut.
+            cmd.set("#WarpEmpty.Visible", visible.isEmpty() || cut);
+            if (cut) {
+                cmd.set("#WarpEmpty.TextSpans",
+                        uiText("#WarpEmpty.TextSpans", rowCount(visible.size(), total, "warps")));
+            }
             for (int i = 0; i < visible.size(); i++) {
                 Warp warp = visible.get(i);
                 String row = "#WarpList[" + i + "]";

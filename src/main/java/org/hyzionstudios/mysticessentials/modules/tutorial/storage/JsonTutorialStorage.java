@@ -50,7 +50,10 @@ public final class JsonTutorialStorage implements TutorialStorage {
 
     public void start(int autosaveSeconds) {
         int interval = Math.max(10, autosaveSeconds);
-        autosaveTask = core.scheduler().runRepeating(() -> saveAll().join(), interval, interval, TimeUnit.SECONDS);
+        // Not join(): saveAll() already runs the writes off this thread, and
+        // waiting here parks one of the few shared scheduler threads on disk
+        // I/O. Failures are logged by saveAll itself.
+        autosaveTask = core.scheduler().runRepeating(this::saveAll, interval, interval, TimeUnit.SECONDS);
     }
 
     @Override

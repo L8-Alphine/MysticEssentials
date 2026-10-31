@@ -333,6 +333,7 @@ public final class LootBoxPages {
                     + (pending > 0 ? pending + " pending reward" + (pending == 1 ? "" : "s") + " to claim"
                             : "nothing pending")));
             cmd.set("#ListEmpty.Visible", pools.isEmpty());
+            pools = capRows(pools);
             for (int i = 0; i < pools.size(); i++) {
                 LootBoxRevision revision = pools.get(i);
                 String row = "#PoolList[" + i + "]";
@@ -523,7 +524,13 @@ public final class LootBoxPages {
         private volatile String status = "Delivering...";
         private PresentationAdapter adapter;
         private PresentationAdapter.Stage stage;
+        /**
+         * The last step sent. Claimed under the page's monitor: steps are timed
+         * on the scheduler pool, so two can come due at once, and the world
+         * thread can land the reveal underneath them when Skip is pressed.
+         */
         private int shown;
+        private volatile World world;
         /** The entity store of the world the reveal was opened in. */
         private Store<EntityStore> store;
 
@@ -597,11 +604,16 @@ public final class LootBoxPages {
             adapter.build(cmd, stage);
 
             World world = store.getExternalData().getWorld();
+            this.world = world;
             this.store = store;
             result.delivery().thenAccept(delivery -> {
                 status = delivery.label();
                 if (landed && !dismissed) {
-                    run(world, this::pushStatus);
+                    // Built here, on whichever thread completed the delivery;
+                    // the world thread only sends it.
+                    UICommandBuilder status = new UICommandBuilder();
+                    status.set("#Status.TextSpans", uiText("#Status.TextSpans", this.status));
+                    run(world, () -> sendUpdate(status));
                 }
             });
             schedule(world);
@@ -614,13 +626,14 @@ public final class LootBoxPages {
             }
             List<Long> times = stage.plan().stepAtMs();
             if (times.isEmpty()) {
-                run(world, this::land);
+                land();
                 return;
             }
             for (int i = 0; i < times.size(); i++) {
                 int step = i + 1;
-                steps.add(core.scheduler().runLater(() -> run(world, () -> step(step)), times.get(i),
-                        TimeUnit.MILLISECONDS));
+                // The task itself runs on the scheduler: it claims the step and
+                // builds the frame, then hands the world thread the send alone.
+                steps.add(core.scheduler().runLater(() -> step(step), times.get(i), TimeUnit.MILLISECONDS));
             }
         }
 
@@ -644,25 +657,48 @@ public final class LootBoxPages {
             });
         }
 
-        private void step(int step) {
+        /**
+         * Claims a step so it is drawn once and in order.
+         *
+         * @return false when the reveal has landed or gone, or this step has
+         *         already been drawn
+         */
+        private synchronized boolean claim(int step) {
             if (landed || dismissed || step <= shown) {
-                return;
+                return false;
             }
             shown = step;
+            return true;
+        }
+
+        /** One animation frame. Runs on the scheduler thread. */
+        private void step(int step) {
+            if (!claim(step)) {
+                return;
+            }
             if (step >= stage.plan().steps()) {
                 land();
                 return;
             }
+            // Pure: the adapter writes a command list, touching no entity and
+            // no world. Only the send below needs the world thread.
             UICommandBuilder cmd = new UICommandBuilder();
             adapter.step(cmd, stage, step);
-            sendUpdate(cmd);
+            run(world, () -> sendUpdate(cmd));
         }
 
+        /**
+         * Draws the result and stops the animation. Reached from the last step
+         * (scheduler thread) and from Skip (world thread), so the flag is
+         * claimed under the monitor and the frame is built before the hop.
+         */
         private void land() {
-            if (landed || dismissed) {
-                return;
+            synchronized (this) {
+                if (landed || dismissed) {
+                    return;
+                }
+                landed = true;
             }
-            landed = true;
             steps.forEach(task -> task.cancel(false));
             UICommandBuilder cmd = new UICommandBuilder();
             adapter.land(cmd, stage);
@@ -677,7 +713,7 @@ public final class LootBoxPages {
                 cmd.set("#RevealList[" + row + "] #Hl.Visible", true);
             }
             cmd.set("#SkipButton.Visible", false);
-            sendUpdate(cmd);
+            run(world, () -> sendUpdate(cmd));
         }
 
         /** What each bonus roll landed on, with the exact chance it had. */
@@ -693,12 +729,6 @@ public final class LootBoxPages {
                         .append(" (").append(bonus.probability).append(")");
             }
             return line.toString();
-        }
-
-        private void pushStatus() {
-            UICommandBuilder cmd = new UICommandBuilder();
-            cmd.set("#Status.TextSpans", uiText("#Status.TextSpans", status));
-            sendUpdate(cmd);
         }
 
         @Override
@@ -743,11 +773,13 @@ public final class LootBoxPages {
         @Override
         public void build(Ref<EntityStore> ref, UICommandBuilder cmd, UIEventBuilder event, Store<EntityStore> store) {
             cmd.append(HISTORY_UI);
-            cmd.set("#HeaderInfo.TextSpans", uiText("#HeaderInfo.TextSpans", ownerName + " · " + receipts.size()
-                    + " receipt" + (receipts.size() == 1 ? "" : "s") + " · chances are as shown when each opened"));
+            List<PlayerLootState.Receipt> shown = capRows(receipts);
+            cmd.set("#HeaderInfo.TextSpans", uiText("#HeaderInfo.TextSpans", ownerName + " · "
+                    + rowCount(shown.size(), receipts.size(), "receipts")
+                    + " · chances are as shown when each opened"));
             cmd.set("#ListEmpty.Visible", receipts.isEmpty());
-            for (int i = 0; i < receipts.size(); i++) {
-                PlayerLootState.Receipt receipt = receipts.get(i);
+            for (int i = 0; i < shown.size(); i++) {
+                PlayerLootState.Receipt receipt = shown.get(i);
                 String row = "#ReceiptList[" + i + "]";
                 cmd.append("#ReceiptList", HISTORY_ROW_UI);
                 cmd.set(row + " #Name.TextSpans", uiText(row + " #Name.TextSpans", receipt.rewardName));

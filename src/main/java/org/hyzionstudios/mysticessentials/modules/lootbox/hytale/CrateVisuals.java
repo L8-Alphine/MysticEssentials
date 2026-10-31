@@ -1,7 +1,9 @@
 package org.hyzionstudios.mysticessentials.modules.lootbox.hytale;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -250,33 +252,86 @@ public final class CrateVisuals {
     }
 
     // ----- Idle tick ----------------------------------------------------------
+    //
+    // The whole of "which players are near which crate, and what should fire"
+    // is computed on the scheduler thread. Only the particle spawns and the
+    // nameplate upkeep reach a world thread, and only for crates a player is
+    // actually standing near.
+    //
+    // That is possible because PlayerRef#getTransform and #getWorldUuid are
+    // plain field reads, not entity-store lookups (checked against the 0.7.5
+    // jar): a player's position can be read off-thread. It may be one tick
+    // stale, which for a 24-block radius test is not a difference anyone sees.
+    //
+    // The old shape ran a spatial query per crate per tick ON the world thread,
+    // so a server with a few hundred crates paid hundreds of spatial queries a
+    // second whether or not anyone stood near one. That is what made the crate
+    // particles cost a tick.
+
+    /** A player the planner can place without touching a world thread. */
+    private record Viewer(Ref<EntityStore> ref, double x, double y, double z) {
+    }
+
+    /** One particle for a world thread to spawn. */
+    private record Spawn(String particleId, double x, double y, double z, float scale, float duration,
+            List<Ref<EntityStore>> viewers) {
+    }
+
+    /** A crate whose floating name needs creating or retitling, text already built. */
+    private record Plate(CrateInstance crate, String text) {
+    }
+
+    /** Everything one world's thread has to do this tick. */
+    private record Plan(List<Spawn> spawns, List<Plate> plates, Set<String> keep, boolean prune) {
+        boolean isEmpty() {
+            return spawns.isEmpty() && plates.isEmpty() && !prune;
+        }
+    }
 
     private void tick() {
         if (!running || LootBoxModule.active() != module) {
             return;
         }
-        Map<String, List<CrateInstance>> byWorld = new HashMap<>();
-        for (CrateInstance crate : module.crates().list()) {
-            byWorld.computeIfAbsent(worldKey(crate), k -> new ArrayList<>()).add(crate);
+        Collection<CrateInstance> crates = module.crates().all();
+        if (crates.isEmpty() && nameplates.isEmpty()) {
+            return;
         }
-        // Forget timers of removed crates and of stack entries that no longer exist.
-        Set<String> slots = new java.util.HashSet<>();
-        for (CrateInstance crate : module.crates().list()) {
-            for (int i = 0; i < crate.visuals.extras.size(); i++) {
-                slots.add(crate.crateId + "#" + i);
+        LootBoxConfig.Crates config = module.config().crates;
+
+        Map<String, List<CrateInstance>> byWorld = new HashMap<>();
+        for (CrateInstance crate : crates) {
+            if (!crate.disabled) {
+                byWorld.computeIfAbsent(worldKey(crate), k -> new ArrayList<>()).add(crate);
             }
         }
-        lastIdle.keySet().retainAll(slots);
-        nameplates.values().forEach(holder -> byWorld.computeIfAbsent(holder.worldKey(), k -> new ArrayList<>()));
-        byWorld.forEach((worldKey, crates) -> {
+        // A world still holding one of our nameplates needs a visit even when
+        // its last crate is gone, so the holder entity gets cleaned up.
+        for (Holder holder : nameplates.values()) {
+            byWorld.computeIfAbsent(holder.worldKey(), k -> new ArrayList<>());
+        }
+        if (byWorld.isEmpty()) {
+            return;
+        }
+
+        pruneIdleTimers();
+        Map<String, List<Viewer>> viewersByWorld = snapshotViewers();
+        long now = System.currentTimeMillis();
+
+        byWorld.forEach((worldKey, worldCrates) -> {
             World world = core.platform().world(worldKey).orElse(null);
             if (world == null) {
                 nameplates.values().removeIf(holder -> holder.worldKey().equals(worldKey));
                 return;
             }
+            Plan plan = plan(config, worldKey, worldCrates,
+                    viewersByWorld.getOrDefault(worldKey, List.of()), now);
+            if (plan.isEmpty()) {
+                // Nothing here this tick: do not wake the world thread at all.
+                return;
+            }
             world.execute(() -> {
                 try {
-                    tickWorld(world, worldKey, crates);
+                    apply(world, worldKey, plan);
                 } catch (Throwable t) {
                     core.log(Level.WARNING, "[lootbox] crate visuals in " + world.getName() + " failed: " + t);
                 }
@@ -284,42 +339,93 @@ public final class CrateVisuals {
         });
     }
 
-    /** One world's crates. Runs on the world thread. */
-    private void tickWorld(World world, String worldKey, List<CrateInstance> crates) {
-        if (!running) {
-            return;
-        }
-        Store<EntityStore> store = world.getEntityStore().getStore();
-        LootBoxConfig.Crates config = module.config().crates;
-        float duration = Math.max(MIN_INTERVAL_MS, config.idleEffectIntervalMs) / 1000f;
-        Set<String> keep = ConcurrentHashMap.newKeySet();
-        Budget budget = new Budget(config.particleBudgetPerWorld, config.particleBudgetPerClient);
-        long now = System.currentTimeMillis();
-        for (CrateInstance crate : crates) {
-            if (crate.disabled) {
+    /**
+     * Every player who wants effects, by world, with their position copied out.
+     *
+     * <p>Read entirely off the world threads. The position may be a tick stale;
+     * the only thing it decides is a radius test.</p>
+     */
+    private Map<String, List<Viewer>> snapshotViewers() {
+        Map<String, List<Viewer>> byWorld = new HashMap<>();
+        for (PlayerRef player : core.platform().onlinePlayers()) {
+            if (player == null || !player.isValid() || !effectsOn(player.getUuid())) {
                 continue;
             }
+            UUID worldUuid = player.getWorldUuid();
+            Ref<EntityStore> ref = player.getReference();
+            if (worldUuid == null || ref == null || !ref.isValid()) {
+                continue;
+            }
+            // Copy the coordinates out now: the Transform instance is reused and
+            // rewritten in place by the world thread on every move.
+            Vector3d at = player.getTransform().getPosition();
+            byWorld.computeIfAbsent(worldUuid.toString(), k -> new ArrayList<>())
+                    .add(new Viewer(ref, at.x, at.y, at.z));
+        }
+        return byWorld;
+    }
+
+    /**
+     * Forgets idle timers for stacked slots that no longer exist.
+     *
+     * <p>Walks the timers, not the crates: only a slot that has actually fired
+     * owns a timer, so this costs what is playing rather than what the server
+     * owns. The old shape built a set of every crate-by-slot pair each tick.</p>
+     */
+    private void pruneIdleTimers() {
+        if (lastIdle.isEmpty()) {
+            return;
+        }
+        lastIdle.keySet().removeIf(slot -> {
+            int hash = slot.lastIndexOf('#');
+            if (hash < 0) {
+                return true;
+            }
+            CrateInstance crate = module.crates().get(slot.substring(0, hash)).orElse(null);
+            if (crate == null) {
+                return true;
+            }
+            try {
+                return Integer.parseInt(slot.substring(hash + 1)) >= crate.visuals.extras.size();
+            } catch (NumberFormatException e) {
+                return true;
+            }
+        });
+    }
+
+    /** What this world's thread should do. Pure computation: no store access. */
+    private Plan plan(LootBoxConfig.Crates config, String worldKey, List<CrateInstance> crates,
+            List<Viewer> viewers, long now) {
+        List<Spawn> spawns = new ArrayList<>();
+        List<Plate> plates = new ArrayList<>();
+        Set<String> keep = new HashSet<>();
+        float duration = Math.max(MIN_INTERVAL_MS, config.idleEffectIntervalMs) / 1000f;
+        double radius = Math.max(1.0, config.effectRadius);
+        double radiusSq = radius * radius;
+        Budget budget = new Budget(config.particleBudgetPerWorld, config.particleBudgetPerClient);
+
+        for (CrateInstance crate : crates) {
             boolean floating = config.nameplates && crate.visuals.nameplate;
             if (floating) {
                 keep.add(crate.crateId);
             }
-            List<Ref<EntityStore>> near = nearby(store, center(crate), config.effectRadius);
+            if (viewers.isEmpty()) {
+                continue;
+            }
+            List<Ref<EntityStore>> near = near(viewers, crate, radiusSq);
             if (near.isEmpty()) {
                 continue;
             }
             if (floating) {
-                ensureNameplate(store, worldKey, crate, config.nameplateHeight);
-            }
-            List<Ref<EntityStore>> viewers = withEffects(store, near);
-            if (viewers.isEmpty()) {
-                continue;
+                // Built here so the world thread never does the registry lookup
+                // and the markup strip.
+                plates.add(new Plate(crate, nameplateText(crate)));
             }
             if (particleExists(crate.visuals.idleParticle)) {
-                Vector3d at = center(crate);
-                List<Ref<EntityStore>> to = budget.take(viewers);
+                List<Ref<EntityStore>> to = budget.take(near);
                 if (!to.isEmpty()) {
-                    ParticleUtil.spawnParticleEffect(crate.visuals.idleParticle, at.x, at.y, at.z, 0f, 0f, 0f, 1f,
-                            null, null, to, store, duration);
+                    spawns.add(new Spawn(crate.visuals.idleParticle, crate.x + 0.5, crate.y + 0.5, crate.z + 0.5,
+                            1f, duration, to));
                 }
             }
             List<CrateInstance.Effect> extras = stack(crate);
@@ -337,21 +443,90 @@ public final class CrateVisuals {
                 if (last != null && now - last < every) {
                     continue;
                 }
-                List<Ref<EntityStore>> to = budget.take(viewers);
+                List<Ref<EntityStore>> to = budget.take(near);
                 if (to.isEmpty()) {
                     continue;
                 }
                 lastIdle.put(slot, now);
-                ParticleUtil.spawnParticleEffect(effect.id, crate.x + 0.5, crate.y + effect.height, crate.z + 0.5,
-                        0f, 0f, 0f, (float) effect.scale, null, null, to, store, every / 1000f);
+                spawns.add(new Spawn(effect.id, crate.x + 0.5, crate.y + effect.height, crate.z + 0.5,
+                        (float) effect.scale, every / 1000f, to));
             }
         }
-        for (Map.Entry<String, Holder> entry : List.copyOf(nameplates.entrySet())) {
+
+        boolean prune = false;
+        for (Map.Entry<String, Holder> entry : nameplates.entrySet()) {
             if (entry.getValue().worldKey().equals(worldKey) && !keep.contains(entry.getKey())) {
+                prune = true;
+                break;
+            }
+        }
+        return new Plan(spawns, plates, keep, prune);
+    }
+
+    /** The viewers within {@code radiusSq} of a crate's centre, by squared distance. */
+    private static List<Ref<EntityStore>> near(List<Viewer> viewers, CrateInstance crate, double radiusSq) {
+        List<Ref<EntityStore>> near = null;
+        double cx = crate.x + 0.5;
+        double cy = crate.y + 0.5;
+        double cz = crate.z + 0.5;
+        for (Viewer viewer : viewers) {
+            double dx = viewer.x() - cx;
+            double dy = viewer.y() - cy;
+            double dz = viewer.z() - cz;
+            if (dx * dx + dy * dy + dz * dz > radiusSq) {
+                continue;
+            }
+            if (near == null) {
+                near = new ArrayList<>(4);
+            }
+            near.add(viewer.ref());
+        }
+        return near == null ? List.of() : near;
+    }
+
+    /** The world-thread half: spawn what was planned, keep the floating names in step. */
+    private void apply(World world, String worldKey, Plan plan) {
+        if (!running) {
+            return;
+        }
+        Store<EntityStore> store = world.getEntityStore().getStore();
+        for (Plate plate : plan.plates()) {
+            ensureNameplate(store, worldKey, plate.crate(), plate.text(),
+                    module.config().crates.nameplateHeight);
+        }
+        for (Spawn spawn : plan.spawns()) {
+            List<Ref<EntityStore>> live = live(spawn.viewers());
+            if (live.isEmpty()) {
+                continue;
+            }
+            ParticleUtil.spawnParticleEffect(spawn.particleId(), spawn.x(), spawn.y(), spawn.z(), 0f, 0f, 0f,
+                    spawn.scale(), null, null, live, store, spawn.duration());
+        }
+        if (!plan.prune()) {
+            return;
+        }
+        for (Map.Entry<String, Holder> entry : List.copyOf(nameplates.entrySet())) {
+            if (entry.getValue().worldKey().equals(worldKey) && !plan.keep().contains(entry.getKey())) {
                 nameplates.remove(entry.getKey());
                 remove(store, entry.getValue());
             }
         }
+    }
+
+    /** Drops refs that went away between planning and the world thread picking it up. */
+    private static List<Ref<EntityStore>> live(List<Ref<EntityStore>> refs) {
+        for (Ref<EntityStore> ref : refs) {
+            if (ref == null || !ref.isValid()) {
+                List<Ref<EntityStore>> alive = new ArrayList<>(refs.size());
+                for (Ref<EntityStore> candidate : refs) {
+                    if (candidate != null && candidate.isValid()) {
+                        alive.add(candidate);
+                    }
+                }
+                return alive;
+            }
+        }
+        return refs;
     }
 
     // ----- Opening ------------------------------------------------------------
@@ -506,8 +681,8 @@ public final class CrateVisuals {
         return live == null ? crate.lootboxId : MysticText.stripMarkup(live.spec.displayName);
     }
 
-    private void ensureNameplate(Store<EntityStore> store, String worldKey, CrateInstance crate, double height) {
-        String text = nameplateText(crate);
+    private void ensureNameplate(Store<EntityStore> store, String worldKey, CrateInstance crate, String text,
+            double height) {
         Holder existing = nameplates.get(crate.crateId);
         if (existing != null && existing.ref().isValid() && existing.worldKey().equals(worldKey)) {
             if (!existing.text().equals(text)) {

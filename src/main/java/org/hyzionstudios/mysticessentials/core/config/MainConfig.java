@@ -12,6 +12,7 @@ public final class MainConfig {
 
     public int configVersion = 1;
     public Storage storage = new Storage();
+    public Performance performance = new Performance();
     public Integrations integrations = new Integrations();
     public UpdateNotifier updateNotifier = new UpdateNotifier();
     public PlayerList playerList = new PlayerList();
@@ -54,6 +55,20 @@ public final class MainConfig {
     /** @return whether a module is enabled; unknown modules default to {@code false}. */
     public boolean isModuleEnabled(String id) {
         return modules != null && modules.getOrDefault(id, false);
+    }
+
+    /** Knobs that trade memory for latency. */
+    public static final class Performance {
+        /**
+         * Threads in the shared scheduler pool, which runs every timer the mod
+         * owns: AFK ticks, teleport warmups, RTP search, the LootBox crate
+         * effect planner and each reveal animation frame.
+         *
+         * <p>0 means pick one from the host: half its processors, at least 2
+         * and at most 8. Raise it only if timers visibly run late; this pool
+         * must never do world or entity work, so it should stay small.</p>
+         */
+        public int schedulerThreads = 0;
     }
 
     public static final class Storage {

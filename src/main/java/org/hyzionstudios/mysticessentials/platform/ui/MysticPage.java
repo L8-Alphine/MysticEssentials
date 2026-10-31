@@ -1,5 +1,6 @@
 package org.hyzionstudios.mysticessentials.platform.ui;
 
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -250,6 +251,21 @@ public abstract class MysticPage extends CustomUIPage {
             Map.entry("Unread", "#E7CE9B"),
             Map.entry("Secondary", DANGER));
 
+    /**
+     * The most rows one list page draws in a single build.
+     *
+     * <p>A page's whole command array travels in one {@code CustomPage}
+     * packet: unlike the newer {@code UISurface}, which chunks at 64 commands,
+     * nothing splits it. A few hundred rows at three or four commands each is
+     * therefore one very large packet, and on 0.7.5
+     * {@code QuicheChannel#allocateLargePacketBuffer} logs a warning and
+     * allocates an oversized buffer for precisely that shape.</p>
+     *
+     * <p>Pages that can exceed this cap must say so on screen — see
+     * {@link #rowCount}. Hiding rows quietly is worse than a slow page.</p>
+     */
+    public static final int MAX_LIST_ROWS = 150;
+
     protected final MysticCore core;
     protected final PlayerRef player;
 
@@ -300,6 +316,23 @@ public abstract class MysticPage extends CustomUIPage {
             message.getFormattedMessage().messageParams.values().forEach(
                     parameter -> applyDefaultColor(new Message(parameter), defaultColor));
         }
+    }
+
+    /** @return at most {@link #MAX_LIST_ROWS} of {@code rows}, for drawing. */
+    protected static <T> List<T> capRows(List<T> rows) {
+        return rows.size() <= MAX_LIST_ROWS ? rows : rows.subList(0, MAX_LIST_ROWS);
+    }
+
+    /**
+     * The count line for a list, which says when it was cut.
+     *
+     * @param noun plural, lowercase ({@code "warps"})
+     */
+    protected static String rowCount(int shown, int total, String noun) {
+        if (shown >= total) {
+            return total + " " + noun;
+        }
+        return shown + " of " + total + " " + noun + " \u2014 search to narrow";
     }
 
     /** Replaces the current page with {@code page} (must be called from {@code handleDataEvent}). */

@@ -8,7 +8,7 @@ integrations for permissions, placeholders, economy, moderation, RPG content,
 custom content, item metadata, SQL, and cross-server Redis.
 
 Built and tested against **Hytale Server 0.6.2 (Update 6)**. The manifest accepts
-the Update 6 patch line (`>=0.6.0 <0.7.0`).
+the Update 7 patch line (`>=0.7.0 <0.8.0`), built against `0.7.5`.
 
 ---
 
