@@ -745,10 +745,16 @@ public final class HytalePlatform {
                         || contains(blockedFluidIds, fluidId(world, blockX, floorY, blockZ))) {
                     continue;
                 }
+                // Fluid is a separate layer from the block: a lake-bed cell reads
+                // as AIR with water in it. The feet may stand in an unblocked
+                // fluid (a wading pool), but every cell above them must hold no
+                // fluid at all -- water over the head is a slow drowning, and an
+                // AFK player is by definition not there to swim up.
                 boolean clear = true;
                 for (int dy = 0; dy < headroom && clear; dy++) {
+                    int fluid = fluidId(world, blockX, feetY + dy, blockZ);
                     clear = blockId(world, blockX, feetY + dy, blockZ) == AIR_BLOCK_ID
-                            && !contains(blockedFluidIds, fluidId(world, blockX, feetY + dy, blockZ));
+                            && (dy == 0 ? !contains(blockedFluidIds, fluid) : fluid == Fluid.EMPTY_ID);
                 }
                 if (!clear) {
                     continue;

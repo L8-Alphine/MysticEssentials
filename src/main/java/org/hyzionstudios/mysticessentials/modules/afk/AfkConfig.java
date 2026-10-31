@@ -62,12 +62,32 @@ public final class AfkConfig {
                     || pos.getWorld() == null || !pos.getWorld().equals(cornerA.getWorld())) {
                 return false;
             }
-            return between(pos.getX(), cornerA.getX(), cornerB.getX())
-                    && between(pos.getZ(), cornerA.getZ(), cornerB.getZ());
+            int x = (int) Math.floor(pos.getX());
+            int z = (int) Math.floor(pos.getZ());
+            return x >= minBlock(cornerA.getX(), cornerB.getX()) && x <= maxBlock(cornerA.getX(), cornerB.getX())
+                    && z >= minBlock(cornerA.getZ(), cornerB.getZ()) && z <= maxBlock(cornerA.getZ(), cornerB.getZ());
         }
 
-        private static boolean between(double v, double a, double b) {
-            return v >= Math.min(a, b) && v <= Math.max(a, b);
+        /*
+         * The zone covers WHOLE blocks: every block from the one the first
+         * corner was set in to the one the second was set in, inclusive. That
+         * is exactly the box /afkzone pos1 and pos2 draw while you mark it out.
+         * The corners are stored as the admin's exact foot position, and the
+         * zone used to test those raw floats -- so the edge blocks you stood
+         * on were only partly inside, a player at the edge of a marked block
+         * could read as outside, and the size message rounded a third way.
+         * Reading the stored floats as the blocks they sit in fixes existing
+         * zones too, with no change to the saved data.
+         */
+
+        /** The lowest block coordinate the zone covers on one axis. */
+        public static int minBlock(double a, double b) {
+            return (int) Math.floor(Math.min(a, b));
+        }
+
+        /** The highest block coordinate the zone covers on one axis, inclusive. */
+        public static int maxBlock(double a, double b) {
+            return (int) Math.floor(Math.max(a, b));
         }
     }
 
@@ -179,9 +199,12 @@ public final class AfkConfig {
             public List<String> blockedBlocks = new ArrayList<>(List.of(
                     "Fluid_Lava", "Trap_Spike", "Plant_Cactus"));
             /**
-             * Fluid asset ids that may not be in the floor or body blocks (e.g.
-             * {@code Lava}, {@code Poison}). Fluids left off this list are
-             * allowed, so water AFK pools still work.
+             * Fluid asset ids that may not be in the floor or the feet block
+             * (e.g. {@code Lava}, {@code Poison}). Fluids left off this list are
+             * allowed there, so a shallow water AFK pool still works. The cells
+             * above the feet must hold no fluid at all whatever this says: a
+             * spot with water over the head is never chosen, because an AFK
+             * player cannot swim up and would slowly drown.
              */
             public List<String> blockedFluids = new ArrayList<>(List.of(
                     "Lava", "Lava_Source", "Fire", "Poison", "Poison_Source", "Tar", "Tar_Source"));

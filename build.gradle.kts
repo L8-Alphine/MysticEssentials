@@ -730,6 +730,14 @@ tasks.register<JavaExec>("verifyChatDelivery") {
     )
 }
 
+tasks.register<JavaExec>("verifyAfkZoneGeometry") {
+    group = "verification"
+    description = "Checks AFK zones cover the whole blocks their corners were set in, everywhere."
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets.test.get().runtimeClasspath + configurations.compileClasspath.get()
+    mainClass.set("org.hyzionstudios.mysticessentials.modules.afk.AfkZoneGeometryTest")
+}
+
 // Compatibility checks use a dependency-free main method rather than a test
 // framework; Gradle 9 otherwise treats their presence as a discovery failure.
 tasks.test { failOnNoDiscoveredTests = false }
@@ -745,6 +753,7 @@ tasks.named("check") {
         "verifyShadedJar",
         "verifyMessageParamOrder",
         "verifyChatDelivery",
+        "verifyAfkZoneGeometry",
         "verifyLootBox",
         "verifyLootBoxSaga",
         "verifyLootBoxKeys",

@@ -744,8 +744,8 @@ public final class AfkModule extends AbstractMysticModule implements AfkService 
         if (remaining <= 0) {
             return CompletableFuture.completedFuture(Optional.empty());
         }
-        int blockX = (int) Math.floor(randomBetween(zone.cornerA.getX(), zone.cornerB.getX()));
-        int blockZ = (int) Math.floor(randomBetween(zone.cornerA.getZ(), zone.cornerB.getZ()));
+        int blockX = randomBlock(zone.cornerA.getX(), zone.cornerB.getX());
+        int blockZ = randomBlock(zone.cornerA.getZ(), zone.cornerB.getZ());
         return core.platform().findStandingSpot(zone.cornerA.getWorld(), blockX, blockZ,
                         Math.max(1, safety.requiredHeadroom), blockedBlockIds, blockedFluidIds,
                         referenceFeetY(zone), Math.max(1, safety.verticalSearchRange))
@@ -809,16 +809,17 @@ public final class AfkModule extends AbstractMysticModule implements AfkService 
 
     /** Pre-scan behaviour, kept for {@code safeTeleport.enabled = false}: the lowest corner Y. */
     private static MysticLocation randomPointIn(AfkConfig.Zone zone) {
-        double x = randomBetween(zone.cornerA.getX(), zone.cornerB.getX());
-        double z = randomBetween(zone.cornerA.getZ(), zone.cornerB.getZ());
+        double x = randomBlock(zone.cornerA.getX(), zone.cornerB.getX()) + 0.5;
+        double z = randomBlock(zone.cornerA.getZ(), zone.cornerB.getZ()) + 0.5;
         double y = Math.min(zone.cornerA.getY(), zone.cornerB.getY());
         return new MysticLocation(zone.cornerA.getWorld(), x, y + 0.1, z, 0f, 0f);
     }
 
-    private static double randomBetween(double a, double b) {
-        double min = Math.min(a, b);
-        double max = Math.max(a, b);
-        return min >= max ? min : ThreadLocalRandom.current().nextDouble(min, max);
+    /** A random block coordinate inside the zone on one axis, edges included (see {@code Zone.contains}). */
+    static int randomBlock(double a, double b) {
+        int min = AfkConfig.Zone.minBlock(a, b);
+        int max = AfkConfig.Zone.maxBlock(a, b);
+        return min >= max ? min : ThreadLocalRandom.current().nextInt(min, max + 1);
     }
 
     /** Persists the return location in the player profile so it survives restarts. */
@@ -954,8 +955,10 @@ public final class AfkModule extends AbstractMysticModule implements AfkService 
 
     /** The zone's X/Z footprint — its height is not part of the zone (see {@code Zone.contains}). */
     static String formatSize(AfkConfig.Zone zone) {
-        long dx = Math.round(Math.abs(zone.cornerA.getX() - zone.cornerB.getX())) + 1;
-        long dz = Math.round(Math.abs(zone.cornerA.getZ() - zone.cornerB.getZ())) + 1;
+        int dx = AfkConfig.Zone.maxBlock(zone.cornerA.getX(), zone.cornerB.getX())
+                - AfkConfig.Zone.minBlock(zone.cornerA.getX(), zone.cornerB.getX()) + 1;
+        int dz = AfkConfig.Zone.maxBlock(zone.cornerA.getZ(), zone.cornerB.getZ())
+                - AfkConfig.Zone.minBlock(zone.cornerA.getZ(), zone.cornerB.getZ()) + 1;
         return dx + "x" + dz;
     }
 
