@@ -9,8 +9,11 @@ Server-side checks only (build, `check`, a dev-server boot); not yet seen in a g
   restore set the other off. The rail now leaves a digit to a mod that already
   uses it, found by plugin id and read from that mod's own config (Endgame:
   `Misc.JournalHotkeyEnabled` / `JournalHotkeyDigit`). It also ignores
-  Endgame's restore, and waits for Alt to be released before putting a player
-  back on Endgame's digit. Slot 2 still runs from `/2` and the Shortcuts page.
+  Endgame's restore. Every ALT shortcut pressed while holding slot 2 used to
+  open the Journal as well, because putting the player back on slot 2 looked
+  like ALT+2; that restore now goes by way of "no slot", which Endgame does not
+  count as a press, so it happens at once with no Journal. Slot 2 still runs
+  from `/2` and the Shortcuts page.
   Turning Endgame's hotkey off gives ALT+2 back to the rail on the next reload.
   New `keys.disabledAltSlots` turns single digits off.
 - **Wiki categories nest**: a category is a path (`Guides/Combat`), drawn as a

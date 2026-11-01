@@ -69,8 +69,12 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
  *       same event while Alt is still latched; to this class that would read as
  *       ALT+(the slot it went back to). It is ignored like our own echo.</li>
  *   <li><b>Our restore.</b> Putting a player back <em>onto</em> the other mod's
- *       digit while Alt is down would read to it as its chord. That restore
- *       waits until Alt has been up for longer than a latch.</li>
+ *       digit while Alt is down would read to it as its chord — so every
+ *       shortcut pressed from that slot opened it too. That restore goes by way
+ *       of no slot ({@value #NO_SLOT}): a move from no slot is what joining
+ *       looks like, and neither that mod (Endgame checks the previous slot is
+ *       0 or more) nor this class reads it as a press. If something else takes
+ *       the hotbar in between, the restore stops there.</li>
  * </ul>
  *
  * <h2>Cost on the world thread</h2>
@@ -90,10 +94,10 @@ final class AltShortcuts {
     private static final long CHORD_MS = 250;
     /** How long our own restore's echo is expected. */
     private static final long ECHO_MS = 1000;
-    /** A held-back restore waits this long past the latch, for the other mod's tick to see Alt go up. */
-    private static final long RESTORE_MARGIN_MS = 250;
     /** Shortcuts are numbered 1–9, whatever the hotbar's capacity. */
     private static final int SLOTS = 9;
+    /** The hotbar's "nothing selected"; the engine reads it as an empty hand. */
+    private static final byte NO_SLOT = -1;
 
     /** Per player and mutable: written only on a walk transition, so a quiet tick allocates nothing. */
     private static final class Walk {
@@ -108,15 +112,10 @@ final class AltShortcuts {
     private record Echo(byte slot, long until) {
     }
 
-    /** A restore held back until Alt is up: from the shortcut's slot back to {@code to}. */
-    private record Restore(byte from, byte to) {
-    }
-
     private final ShellModule shell;
     private final Map<UUID, Walk> walks = new ConcurrentHashMap<>();
     private final Map<UUID, Chord> chords = new ConcurrentHashMap<>();
     private final Map<UUID, Echo> echoes = new ConcurrentHashMap<>();
-    private final Map<UUID, Restore> restores = new ConcurrentHashMap<>();
 
     AltShortcuts(ShellModule shell) {
         this.shell = shell;
@@ -135,7 +134,6 @@ final class AltShortcuts {
         walks.remove(player);
         chords.remove(player);
         echoes.remove(player);
-        restores.remove(player);
     }
 
     // ----- Walk state ---------------------------------------------------------
@@ -158,9 +156,8 @@ final class AltShortcuts {
         }
         if (walk.walking == walkingNow) {
             // Keep only recent walkers in the map: a long-released walk can no
-            // longer latch anything. A held-back restore still needs the
-            // release time, so its walker stays until the restore is done.
-            if (!walkingNow && now - walk.end > LATCH_MS && !restores.containsKey(player)) {
+            // longer latch anything.
+            if (!walkingNow && now - walk.end > LATCH_MS) {
                 walks.remove(player);
             }
             return false;
@@ -197,12 +194,7 @@ final class AltShortcuts {
                 return;
             }
             Store<EntityStore> live = ref.getStore();
-            if (shell.altDigitYielded(previous + 1)) {
-                // Going back onto another mod's digit with Alt down would be its chord.
-                restores.put(player.getUuid(), new Restore(slot, previous));
-            } else {
-                restore(ref, live, player, slot, previous);
-            }
+            restore(ref, live, player, slot, previous);
             Player entity = live.getComponent(ref, Player.getComponentType());
             if (entity != null && entity.getPageManager().getCustomPage() != null) {
                 // A page already has the player's attention; the hotbar is put
@@ -216,31 +208,23 @@ final class AltShortcuts {
     /** Puts the player back on {@code to}, if they are still on {@code from}. World thread. */
     private void restore(Ref<EntityStore> ref, Store<EntityStore> store, PlayerRef player, byte from, byte to) {
         InventoryComponent.Hotbar hotbar = store.getComponent(ref, InventoryComponent.Hotbar.getComponentType());
-        if (hotbar != null && hotbar.getActiveSlot() == from) {
-            // Mark first: the restore raises the event synchronously.
-            echoes.put(player.getUuid(), new Echo(to, System.currentTimeMillis() + ECHO_MS));
-            hotbar.setActiveSlot(to, ref, store);
-            player.getPacketHandler().writeNoCache(new SetActiveSlot(hotbar.getSectionId(), to));
-        }
-    }
-
-    /** Runs a held-back restore once Alt has been up for a latch and a margin. */
-    private void settle(Ref<EntityStore> ref, Store<EntityStore> store, PlayerRef player, long now) {
-        UUID id = player.getUuid();
-        Restore pending = restores.get(id);
-        if (pending == null) {
+        if (hotbar == null || hotbar.getActiveSlot() != from) {
             return;
         }
-        Walk walk = walks.get(id);
-        if (walk != null && (walk.walking || now - walk.end <= LATCH_MS + RESTORE_MARGIN_MS)) {
-            return;
-        }
-        restores.remove(id);
-        store.getExternalData().getWorld().execute(() -> {
-            if (ref.isValid()) {
-                restore(ref, ref.getStore(), player, pending.from(), pending.to());
+        if (shell.altDigitYielded(to + 1)) {
+            // Straight onto another mod's digit, with Alt down, is its chord;
+            // arriving from no slot is not. Both moves land in this one task,
+            // so nothing sees the empty hand, and the client only hears `to`.
+            hotbar.setActiveSlot(NO_SLOT, ref, store);
+            if (hotbar.getActiveSlot() != NO_SLOT) {
+                // Something holds the hotbar (Tamework's flight lock does); leave it.
+                return;
             }
-        });
+        }
+        // Mark first: the restore raises the event synchronously.
+        echoes.put(player.getUuid(), new Echo(to, System.currentTimeMillis() + ECHO_MS));
+        hotbar.setActiveSlot(to, ref, store);
+        player.getPacketHandler().writeNoCache(new SetActiveSlot(hotbar.getSectionId(), to));
     }
 
     // ----- Systems ------------------------------------------------------------
@@ -265,11 +249,7 @@ final class AltShortcuts {
                 return;
             }
             long now = System.currentTimeMillis();
-            boolean started = observe(player.getUuid(), movement.getMovementStates(), now);
-            if (!restores.isEmpty()) {
-                settle(chunk.getReferenceTo(index), store, player, now);
-            }
-            if (!started) {
+            if (!observe(player.getUuid(), movement.getMovementStates(), now)) {
                 return;
             }
             // Walking just started: honour a digit that arrived a moment early.

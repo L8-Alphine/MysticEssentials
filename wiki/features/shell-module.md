@@ -84,8 +84,12 @@ was left at startup. For that digit:
   editor and the Shortcuts page, which shows `/2` as its key.
 - Endgame's restore of your hotbar is ignored, so it cannot set off another
   shortcut.
-- After any other ALT shortcut, putting you back on slot 2 waits until Alt is
-  released, so the restore is not read as Endgame's chord.
+- After any other ALT shortcut pressed while holding slot 2, you are put back
+  on slot 2 by way of "no slot". Endgame never reads a move from no slot as a
+  press (joining looks like one), so the Journal stays shut. Before this, every
+  ALT shortcut pressed from slot 2 opened the Journal too.
+- ALT+2 while already holding slot 2 does nothing: the hotbar does not move, so
+  Endgame sees no press. That is Endgame's own limit; `/eg journal` still works.
 
 **To give ALT+2 to the rail instead**, turn Endgame's hotkey off
 (`"JournalHotkeyEnabled": false`) or move it (`"JournalHotkeyDigit"`) in
