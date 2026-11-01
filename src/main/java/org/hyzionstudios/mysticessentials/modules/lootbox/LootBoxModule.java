@@ -252,8 +252,15 @@ public final class LootBoxModule extends AbstractMysticModule implements LootBox
         rewards.updateConfig(config);
         opening.updateConfig(config);
         visuals.reschedule();
-        registry.reloadDrafts();
-        log("LootBox drafts and settings reloaded.");
+        // Off the calling thread: /mystic reload can run on a world thread, and
+        // re-reading every draft file there would hold that world until it finished.
+        registry.refreshDrafts().whenComplete((ignored, error) -> {
+            if (error != null) {
+                core.log(Level.WARNING, "[lootbox] could not re-read the drafts: " + error);
+            } else {
+                log("LootBox drafts and settings reloaded.");
+            }
+        });
     }
 
     @Override

@@ -15,6 +15,9 @@ Server-side checks only (build, `check`); not yet seen in a game client.
   ships, which showed a missing-texture mark in the wiki, tutorials, and the
   mail and teleport player lists. It is a gold "•" now; the player lists show
   the player icon instead.
+- LootBox's part of `/mystic reload` re-reads draft files in the background
+  instead of holding the thread that ran the command; the "reloaded" line is
+  logged when the read finishes.
 - `verifyVanillaIconPaths` also checks every `TexturePath` in the mod's documents
   (relative to the document, accepting a `@2x` twin as the client does), so a
   texture dropped from the game fails the build instead of the screen.
