@@ -1,5 +1,24 @@
 # Mystic Essentials Changelog
 
+## Unreleased — Patch note icons, working bullets
+
+Server-side checks only (build, `check`); not yet seen in a game client.
+
+- **Patch notes have icons**: each patch in the list and its header show one,
+  set per patch with `icon` (any icon name, `custom:<name>`, `item:<ItemId>` or a
+  path) or the module's `defaultIcon` (Hyzion's Patch Notes). Section headings
+  show their category's icon — additions, fixes, changes and removals ship with
+  one each, and a category can set its own or `none`.
+- Additions no longer read "+ +": the marker comes from the line, not the text,
+  and a wrapped item shows it once. The "Pinned" pill fits its label.
+- **Bullets draw again.** The theme's bullet used a texture the game no longer
+  ships, which showed a missing-texture mark in the wiki, tutorials, and the
+  mail and teleport player lists. It is a gold "•" now; the player lists show
+  the player icon instead.
+- `verifyVanillaIconPaths` also checks every `TexturePath` in the mod's documents
+  (relative to the document, accepting a `@2x` twin as the client does), so a
+  texture dropped from the game fails the build instead of the screen.
+
 ## Unreleased — The real "Loading..." fix, a bigger wiki editor, every texture
 
 Server-side checks only (build, `check`); not yet seen in a game client.

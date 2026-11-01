@@ -55,29 +55,64 @@ public final class PatchNotesConfig {
     /** The filterable categories, in display order. */
     public List<Category> categories = defaultCategories();
 
+    /**
+     * The picture for a patch that sets no {@code icon} of its own: an icon
+     * name, {@code custom:<name>}, {@code item:<ItemId>} or a path.
+     */
+    public String defaultIcon = "Hyzion Patch Notes";
+
     /** Generate the bundled example patches on first startup. */
     public boolean generateExamples = true;
 
     private static List<Category> defaultCategories() {
         List<Category> list = new ArrayList<>();
-        list.add(new Category("additions", "Additions"));
-        list.add(new Category("fixes", "Fixes"));
-        list.add(new Category("changes", "Changes"));
-        list.add(new Category("removals", "Removals"));
+        list.add(new Category("additions", "Additions", "Hyzion Generation"));
+        list.add(new Category("fixes", "Fixes", "Hyzion Settings"));
+        list.add(new Category("changes", "Changes", "Hyzion Announcement"));
+        list.add(new Category("removals", "Removals", "Hyzion Trash"));
         return list;
+    }
+
+    /**
+     * The icon a section of this category shows by its heading. A category
+     * with no {@code icon} of its own (configs written before icons existed)
+     * falls back to the shipped one for its id; {@code none} shows the plain
+     * rule instead.
+     */
+    public String iconFor(String categoryId) {
+        if (categoryId == null || categoryId.isBlank()) {
+            return "";
+        }
+        if (categories != null) {
+            for (Category category : categories) {
+                if (category != null && categoryId.equalsIgnoreCase(category.id)
+                        && category.icon != null && !category.icon.isBlank()) {
+                    return category.icon.equalsIgnoreCase("none") ? "" : category.icon.trim();
+                }
+            }
+        }
+        for (Category shipped : defaultCategories()) {
+            if (categoryId.equalsIgnoreCase(shipped.id)) {
+                return shipped.icon;
+            }
+        }
+        return "";
     }
 
     /** A filter category: a stable {@code id} matched against {@link PatchNote.Section#type} and a display label. */
     public static final class Category {
         public String id;
         public String displayName;
+        /** Shown by the heading of each section of this category; see {@link PatchNotesConfig#iconFor}. */
+        public String icon = "";
 
         public Category() {
         }
 
-        public Category(String id, String displayName) {
+        public Category(String id, String displayName, String icon) {
             this.id = id;
             this.displayName = displayName;
+            this.icon = icon;
         }
     }
 

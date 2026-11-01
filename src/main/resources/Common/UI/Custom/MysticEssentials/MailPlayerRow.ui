@@ -17,8 +17,9 @@ Button #Row {
       @Size = 32;
       @Anchor = (Right: 12);
 
-      $M.@Bullet {
-        Anchor: (Width: 8, Height: 8);
+      AssetImage {
+        Anchor: (Width: 22, Height: 22);
+        AssetPath: "UI/Custom/MysticEssentials/Icons/Hyzion/Player.png";
       }
     }
 

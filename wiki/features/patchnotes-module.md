@@ -40,6 +40,7 @@ A note supports these fields:
 | `showOnLogin` | boolean | Counts toward join notices / auto-open |
 | `requiredRead` | boolean | Marks the note as important to read |
 | `summary` | string | Short blurb shown under the title |
+| `icon` | string | The patch's picture in the list and its header: an icon name (`Hyzion Announcement`, `Portal`), `custom:<name>` for a PNG in `mods/MysticEssentials/icons/`, `item:<ItemId>`, or a path. Empty uses `defaultIcon` |
 | `tags` | list | Freeform tags |
 | `categories` | list | Category ids this note belongs to |
 | `sections` | list | Titled content blocks (see below) |
@@ -73,6 +74,8 @@ Each **section** is `{ "type": "<category-id>", "title": "...", "body": "..." }`
 }
 ```
 
+Body lines starting with `+ ` are additions and `- ` (in a removals section) removals; each gets one green or red marker, even when it wraps. Other `- ` lines are plain `•` bullets.
+
 The viewer's filter buttons are built from the config `categories` list (defaults: Additions, Fixes, Changes, Removals). Give a section a `type` outside that list and it simply won't have a dedicated filter button.
 
 ## Join behavior
@@ -104,7 +107,8 @@ modules/patchnotes/config.json
 | `defaultFilter` | `"all"` | Default category filter |
 | `defaultSort` | `"newest"` | `newest` or `oldest` (pinned always first) |
 | `maxPatchNotesShown` | `50` | Cap on listed notes; `0` = unlimited |
-| `categories` | Additions/Fixes/Changes/Removals | Filter categories, in display order |
+| `categories` | Additions/Fixes/Changes/Removals | Filter categories, in display order. Each may set an `icon` shown by its sections' headings (`none` for the plain rule); left out, the shipped ones are used |
+| `defaultIcon` | `Hyzion Patch Notes` | The picture for a patch that sets no `icon` |
 | `generateExamples` | `true` | Generate bundled example patches on first startup |
 
 > The viewer's colors are baked into its `.ui` files because Update 6 Custom UI labels only support a static style, so they cannot be re-themed at runtime.

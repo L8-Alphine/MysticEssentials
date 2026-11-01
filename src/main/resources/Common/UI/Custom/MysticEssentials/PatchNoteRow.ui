@@ -16,9 +16,29 @@ Button #Row {
     Padding: (Left: 0, Right: 12, Top: 9, Bottom: 9);
 
     Group #Accent {
-      Anchor: (Width: 3, Height: 40, Right: 13);
+      Anchor: (Width: 3, Height: 40, Right: 9);
       Background: #d9b572;
       Visible: false;
+    }
+
+    // The patch's icon (or item), set by the server.
+    $M.@IconWell {
+      @Size = 40;
+      @Anchor = (Right: 10);
+
+      AssetImage #RowIcon {
+        Anchor: (Width: 30, Height: 30);
+        AssetPath: "";
+        FallbackTexturePath: "UI/Custom/Pages/Memories/MissingIcon.png";
+        Visible: false;
+      }
+
+      ItemSlot #RowItem {
+        Anchor: (Width: 36, Height: 36);
+        ShowQualityBackground: false;
+        ShowQuantity: false;
+        Visible: false;
+      }
     }
 
     Group {
@@ -47,7 +67,7 @@ Button #Row {
     }
 
     Group #Pinned {
-      Anchor: (Width: 46, Height: 18, Left: 6, Top: 11);
+      Anchor: (Width: 64, Height: 18, Left: 6, Top: 11);
       Background: #67a5da(0.30);
       Padding: (Horizontal: 4);
       LayoutMode: CenterMiddle;

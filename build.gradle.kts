@@ -560,7 +560,7 @@ tasks.named("shadowJar") { dependsOn("validateUiDocuments") }
  */
 tasks.register("verifyVanillaIconPaths") {
     group = "verification"
-    description = "Checks every vanilla icon path the mod names exists in Assets.zip."
+    description = "Checks every icon and document texture path the mod names exists in Assets.zip or the mod."
 
     val javaDir = layout.projectDirectory.dir("src/main/java")
     val uiDir = layout.projectDirectory.dir("src/main/resources/Common/UI/Custom")
@@ -585,8 +585,25 @@ tasks.register("verifyVanillaIconPaths") {
             }
         }
         val shipped = layout.projectDirectory.dir("src/main/resources/Common").asFile
+        // A document's own TexturePath is relative to that document. A texture the
+        // game stops shipping draws a missing-texture mark (IconBullet.png did).
+        val texture = Regex("""(?<![A-Za-z])TexturePath:\s*"([^"]+\.png)"""")
+        uiDir.asFile.walkTopDown().filter { it.isFile && it.extension == "ui" }.forEach { file ->
+            texture.findAll(file.readText()).forEach { match ->
+                val resolved = file.parentFile.resolve(match.groupValues[1]).normalize()
+                val commonRelative = resolved.relativeTo(shipped).invariantSeparatorsPath
+                referenced.getOrPut(commonRelative) { sortedSetOf() }
+                    .add(file.relativeTo(projectDir).invariantSeparatorsPath)
+            }
+        }
+        // The client resolves "X.png" to "X@2x.png" when only the 2x file ships
+        // (vanilla's own documents rely on it: BulletIcon.png, HeaderTabBackground.png).
         val missing = ZipFile(assetsZip).use { zip ->
-            referenced.filterKeys { zip.getEntry("Common/$it") == null && !File(shipped, it).isFile }
+            referenced.filterKeys { path ->
+                listOf(path, path.replace(Regex("\\.png$"), "@2x.png")).none { candidate ->
+                    zip.getEntry("Common/$candidate") != null || File(shipped, candidate).isFile
+                }
+            }
         }
         if (missing.isNotEmpty()) {
             throw GradleException(
@@ -785,6 +802,14 @@ tasks.register<JavaExec>("verifyShellShortcuts") {
     mainClass.set("org.hyzionstudios.mysticessentials.modules.shell.ShellShortcutsTest")
 }
 
+tasks.register<JavaExec>("verifyPatchMarkup") {
+    group = "verification"
+    description = "Checks patch note lines carry one marker per item."
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets.test.get().runtimeClasspath + configurations.compileClasspath.get()
+    mainClass.set("org.hyzionstudios.mysticessentials.modules.patchnotes.PatchMarkupTest")
+}
+
 tasks.register<JavaExec>("verifyIconPipeline") {
     group = "verification"
     description = "Checks server icons are capped, recompressed, edge-bled and named as documented."
@@ -828,6 +853,7 @@ tasks.named("check") {
         "verifyShellShortcuts",
         "verifyWikiMarkup",
         "verifyIconPipeline",
+        "verifyPatchMarkup",
         "verifyLootBox",
         "verifyLootBoxSaga",
         "verifyLootBoxKeys",

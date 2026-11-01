@@ -8,7 +8,8 @@ Group #Row {
   Anchor: (Height: 20);
   Padding: (Left: 12);
 
-  Label {
+  // Hidden on a wrapped line, so each item has one marker.
+  Label #Marker {
     Anchor: (Width: 16);
     Style: (FontSize: 14, RenderBold: true, TextColor: #e48786, VerticalAlignment: Center);
     Text: "-";

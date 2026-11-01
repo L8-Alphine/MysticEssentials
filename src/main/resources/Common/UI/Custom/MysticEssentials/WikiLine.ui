@@ -60,9 +60,7 @@ Group {
     Anchor: (Bottom: 6);
     Visible: false;
 
-    $M.@Bullet {
-      Anchor: (Width: 8, Height: 8, Top: 7, Right: 10);
-    }
+    $M.@Bullet {}
 
     Label #LineBulletText {
       FlexWeight: 1;

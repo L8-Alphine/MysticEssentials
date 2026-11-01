@@ -7,6 +7,7 @@ import java.util.List;
 
 import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.modules.patchnotes.PatchNotesConfig.Category;
+import org.hyzionstudios.mysticessentials.platform.ui.HyzionIcons;
 import org.hyzionstudios.mysticessentials.platform.ui.MysticPage;
 
 import com.google.gson.JsonObject;
@@ -105,6 +106,7 @@ final class PatchNotesPages {
                 cmd.set(row + " #Meta.TextSpans", uiText(row + " #Meta.TextSpans", metaShort(note)));
                 cmd.set(row + " #Unread.TextSpans", uiText(row + " #Unread.TextSpans", state.isRead(note.safeId()) ? "" : "●"));
                 cmd.set(row + " #Pinned.Visible", note.pinned);
+                setIconOrItem(cmd, row + " #RowIcon", row + " #RowItem", iconOf(note), HyzionIcons.PATCH_NOTES);
                 cmd.set(row + " #Accent.Visible", note.safeId().equals(selectedId));
                 event.addEventBinding(CustomUIEventBindingType.Activating, row,
                         new EventData().put("action", "select").put("id", note.safeId()));
@@ -113,6 +115,11 @@ final class PatchNotesPages {
             cmd.set("#SearchInput.Value", search);
             event.addEventBinding(CustomUIEventBindingType.Activating, "#SearchButton",
                     new EventData().put("action", "search").append("@search", "#SearchInput.Value"));
+        }
+
+        /** The patch's own icon, else the module's default. */
+        private String iconOf(PatchNote note) {
+            return note.icon == null || note.icon.isBlank() ? module.config().defaultIcon : note.icon;
         }
 
         private static String metaShort(PatchNote note) {
@@ -153,6 +160,7 @@ final class PatchNotesPages {
             }
 
             cmd.set("#PatchTitle.TextSpans", uiText("#PatchTitle.TextSpans", note.title == null ? note.safeId() : note.title));
+            setIconOrItem(cmd, "#PatchIcon", "#PatchItem", iconOf(note), HyzionIcons.PATCH_NOTES);
             cmd.set("#PatchMeta.TextSpans", uiText("#PatchMeta.TextSpans", metaLong(note)));
             boolean hasSummary = note.summary != null && !note.summary.isBlank();
             cmd.set("#PatchSummary.Visible", hasSummary);
@@ -233,6 +241,16 @@ final class PatchNotesPages {
                     // added / removed tint has to travel with the text.
                     cmd.set(row + " #Line.TextSpans", uiText(row + " #Line.TextSpans",
                             lineTint(line.type()) + line.text()));
+                }
+                if (line.type() == PatchMarkup.Type.ADD || line.type() == PatchMarkup.Type.REMOVE) {
+                    // One marker per item: a wrapped line continues the one above.
+                    cmd.set(row + " #Marker.Visible", !line.continued());
+                }
+                if (line.type() == PatchMarkup.Type.HEADER) {
+                    String icon = module.config().iconFor(line.section());
+                    String path = icon.isEmpty() ? "" : org.hyzionstudios.mysticessentials.platform.ui.VanillaIcons.resolve(icon);
+                    cmd.set(row + " #Bar.Visible", path.isEmpty());
+                    setIcon(cmd, row + " #Icon", path);
                 }
                 index++;
             }

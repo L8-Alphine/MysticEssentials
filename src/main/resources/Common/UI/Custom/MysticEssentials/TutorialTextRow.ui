@@ -8,7 +8,7 @@ Group #Row {
   Anchor: (Bottom: 10);
 
   $M.@Bullet {
-    Anchor: (Width: 8, Height: 8, Top: 6, Right: 10);
+    Anchor: (Width: 14, Height: 20, Top: 2, Right: 8);
   }
 
   Label #Text {

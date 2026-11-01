@@ -74,14 +74,43 @@ $C.@Container {
       FlexWeight: 1;
       LayoutMode: Top;
 
-      Label #PatchTitle {
-        Anchor: (Height: 32, Bottom: 2);
-        Style: $M.@DisplayStyle;
-      }
+      Group {
+        Anchor: (Height: 56, Bottom: 8);
+        LayoutMode: Left;
 
-      Label #PatchMeta {
-        Anchor: (Height: 16, Bottom: 8);
-        Style: $M.@MetaStyle;
+        $M.@IconWell {
+          @Size = 56;
+          @Anchor = (Right: 14);
+
+          AssetImage #PatchIcon {
+            Anchor: (Width: 46, Height: 46);
+            AssetPath: "";
+            FallbackTexturePath: "UI/Custom/Pages/Memories/MissingIcon.png";
+            Visible: false;
+          }
+
+          ItemSlot #PatchItem {
+            Anchor: (Width: 52, Height: 52);
+            ShowQualityBackground: true;
+            ShowQuantity: false;
+            Visible: false;
+          }
+        }
+
+        Group {
+          FlexWeight: 1;
+          LayoutMode: Top;
+
+          Label #PatchTitle {
+            Anchor: (Height: 32, Bottom: 2);
+            Style: $M.@DisplayStyle;
+          }
+
+          Label #PatchMeta {
+            Anchor: (Height: 16);
+            Style: $M.@MetaStyle;
+          }
+        }
       }
 
       Label #PatchSummary {

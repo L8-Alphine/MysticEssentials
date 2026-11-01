@@ -405,6 +405,27 @@ public abstract class MysticPage extends CustomUIPage {
         }
     }
 
+    /**
+     * Shows an icon reference in an {@code AssetImage} / {@code ItemSlot} pair:
+     * {@code item:<Id>} draws the item; anything else resolves as an icon name
+     * ({@code Hyzion Wiki}, {@code Portal}, {@code custom:x}) or a path; when
+     * nothing resolves, {@code fallback} (a path) is shown.
+     */
+    public static void setIconOrItem(com.hypixel.hytale.server.core.ui.builder.UICommandBuilder cmd,
+            String image, String slot, String reference, String fallback) {
+        String value = reference == null ? "" : reference.trim();
+        if (value.regionMatches(true, 0, "item:", 0, 5) && ItemCatalog.exists(value.substring(5).trim())) {
+            cmd.set(image + ".Visible", false);
+            cmd.set(slot + ".Visible", true);
+            cmd.set(slot + ".ItemId", value.substring(5).trim());
+            return;
+        }
+        String path = value.isEmpty() ? "" : VanillaIcons.resolve(value);
+        cmd.set(slot + ".Visible", false);
+        cmd.set(image + ".Visible", true);
+        cmd.set(image + ".AssetPath", path.isEmpty() ? fallback : path);
+    }
+
     /** @return at most {@link #MAX_LIST_ROWS} of {@code rows}, for drawing. */
     protected static <T> List<T> capRows(List<T> rows) {
         return rows.size() <= MAX_LIST_ROWS ? rows : rows.subList(0, MAX_LIST_ROWS);

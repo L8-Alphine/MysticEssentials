@@ -178,17 +178,7 @@ final class WikiRenderer {
      * and a page with neither gets the wiki's book.
      */
     static void pageIcon(UICommandBuilder cmd, String image, String slot, String icon) {
-        String value = icon == null ? "" : icon.trim();
-        if (value.regionMatches(true, 0, "item:", 0, 5) && ItemCatalog.exists(value.substring(5).trim())) {
-            cmd.set(image + ".Visible", false);
-            cmd.set(slot + ".Visible", true);
-            cmd.set(slot + ".ItemId", value.substring(5).trim());
-            return;
-        }
-        String path = value.isEmpty() ? "" : iconPath(value);
-        cmd.set(slot + ".Visible", false);
-        cmd.set(image + ".Visible", true);
-        cmd.set(image + ".AssetPath", path.isEmpty() ? HyzionIcons.WIKI : path);
+        org.hyzionstudios.mysticessentials.platform.ui.MysticPage.setIconOrItem(cmd, image, slot, icon, HyzionIcons.WIKI);
     }
 
     /** The item's translated name, or its id made readable when it has none. */

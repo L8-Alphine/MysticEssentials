@@ -32,6 +32,12 @@ public final class PatchNote {
     public boolean requiredRead;
 
     public String summary;
+    /**
+     * The patch's picture in the list and its header: an icon name
+     * ({@code Hyzion Patch Notes}, {@code Portal}, {@code custom:release}),
+     * {@code item:<ItemId>} or a path. Empty uses the module's {@code defaultIcon}.
+     */
+    public String icon = "";
     public List<String> tags = new ArrayList<>();
     /** Optional convenience list of the category ids used by this patch. */
     public List<String> categories = new ArrayList<>();

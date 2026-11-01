@@ -41,15 +41,24 @@ final class PatchMarkup {
         BLANK
     }
 
-    /** A single rendered line: its style {@link Type} and the plain text to show. */
-    record Line(Type type, String text) {
+    /**
+     * A single rendered line.
+     *
+     * @param continued a wrapped line after an item's first, which shows no marker
+     * @param section   the section's category id, on {@link Type#HEADER} lines
+     */
+    record Line(Type type, String text, boolean continued, String section) {
+
+        Line(Type type, String text) {
+            this(type, text, false, "");
+        }
     }
 
     /** Renders one section (title + body) into display lines, coloured by {@code sectionType}. */
     static List<Line> renderSection(String title, String body, String sectionType) {
         List<Line> lines = new ArrayList<>();
         if (title != null && !title.isBlank()) {
-            lines.add(new Line(Type.HEADER, title.trim()));
+            lines.add(new Line(Type.HEADER, title.trim(), false, sectionType == null ? "" : sectionType.trim()));
         }
         lines.addAll(renderBody(body, sectionType));
         return lines;
@@ -70,10 +79,11 @@ final class PatchMarkup {
             if (line.startsWith("#")) {
                 lines.add(new Line(Type.HEADER, stripInline(line.replaceFirst("^#{1,6}\\s*", ""))));
             } else if (line.startsWith("+ ")) {
-                wrapInto(lines, Type.ADD, "+ ", stripInline(line.substring(2)), BULLET_WRAP);
+                // The add and remove templates draw their own +/- marker.
+                wrapInto(lines, Type.ADD, "", stripInline(line.substring(2)), BULLET_WRAP);
             } else if (line.startsWith("- ") || line.startsWith("* ")) {
                 Type bulletType = bulletTypeFor(sectionType);
-                String glyph = bulletType == Type.ADD ? "+ " : bulletType == Type.REMOVE ? "- " : "• ";
+                String glyph = bulletType == Type.BULLET ? "• " : "";
                 wrapInto(lines, bulletType, glyph, stripInline(line.substring(2)), BULLET_WRAP);
             } else {
                 wrapInto(lines, Type.TEXT, "", stripInline(line), WRAP);
@@ -104,6 +114,7 @@ final class PatchMarkup {
             out.add(new Line(type, prefix.stripTrailing()));
             return;
         }
+        int before = out.size();
         String indent = " ".repeat(prefix.length());
         StringBuilder current = new StringBuilder();
         boolean first = true;
@@ -122,6 +133,10 @@ final class PatchMarkup {
         }
         if (current.length() > 0) {
             out.add(new Line(type, (first ? prefix : indent) + current));
+        }
+        for (int i = before + 1; i < out.size(); i++) {
+            Line wrapped = out.get(i);
+            out.set(i, new Line(wrapped.type(), wrapped.text(), true, ""));
         }
     }
 
