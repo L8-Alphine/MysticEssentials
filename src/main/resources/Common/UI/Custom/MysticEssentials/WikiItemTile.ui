@@ -1,0 +1,21 @@
+// One item in the wiki editor's image search. Appended per result into
+// #ItemResults, which wraps. Click adds {{item:...}} to the body; right-click
+// makes the item the page's icon.
+$M = "MysticTheme.ui";
+
+Button #Tile {
+  Anchor: (Width: 46, Height: 46, Right: 6, Bottom: 6);
+  Style: $M.@RowStyle;
+  LayoutMode: Full;
+
+  Group {
+    Anchor: (Full: 0);
+    LayoutMode: CenterMiddle;
+
+    ItemSlot #TileItem {
+      Anchor: (Width: 42, Height: 42);
+      ShowQualityBackground: false;
+      ShowQuantity: false;
+    }
+  }
+}

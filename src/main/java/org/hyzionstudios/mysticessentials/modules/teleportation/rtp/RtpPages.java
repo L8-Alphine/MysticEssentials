@@ -83,7 +83,7 @@ final class RtpPages {
         }
 
         @Override
-        public void handleDataEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
+        protected void onEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
             JsonObject payload = parse(data);
             if ("select".equals(string(payload, "action"))) {
                 String profileId = field(payload, "profile");
@@ -127,7 +127,7 @@ final class RtpPages {
         }
 
         @Override
-        public void handleDataEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
+        protected void onEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
             JsonObject payload = parse(data);
             switch (string(payload, "action")) {
                 case "confirm" -> {
@@ -186,7 +186,7 @@ final class RtpPages {
         }
 
         @Override
-        public void handleDataEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
+        protected void onEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
             if (!player.hasPermission(Permissions.RTP_ADMIN)) {
                 return;
             }

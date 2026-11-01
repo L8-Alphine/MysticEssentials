@@ -145,8 +145,10 @@ public final class VanillaIcons {
 
     /**
      * Resolves what a player or config typed: a picker name ("Portal",
-     * "fist bump") or a path. A path is returned as given — servers with their
-     * own asset pack point at their own art the same way.
+     * "fist bump"), a server icon ({@code custom:castle}, from
+     * {@code mods/MysticEssentials/icons/castle.png}) or a path. A path is
+     * returned as given — servers with their own asset pack point at their own
+     * art the same way.
      *
      * @return the path, or empty when {@code input} is blank or an unknown name
      */
@@ -155,10 +157,18 @@ public final class VanillaIcons {
             return "";
         }
         String trimmed = input.trim();
+        if (trimmed.regionMatches(true, 0, CustomIcons.PREFIX, 0, CustomIcons.PREFIX.length())) {
+            return CustomIcons.resolve(trimmed);
+        }
         if (trimmed.indexOf('/') >= 0 || trimmed.endsWith(".png")) {
             return trimmed;
         }
         String key = normalise(trimmed);
+        for (Entry entry : HyzionIcons.PICKER) {
+            if (normalise(entry.name()).equals(key)) {
+                return entry.path();
+            }
+        }
         for (Entry entry : PICKER) {
             if (normalise(entry.name()).equals(key)) {
                 return entry.path();
@@ -167,10 +177,29 @@ public final class VanillaIcons {
         return "";
     }
 
+    /** The picker's full list: server icons, Hyzion's family, then the game's. */
+    public static List<Entry> pickerWithCustom() {
+        List<Entry> custom = CustomIcons.entries();
+        List<Entry> all = new java.util.ArrayList<>(custom.size() + HyzionIcons.PICKER.size() + PICKER.size());
+        all.addAll(custom);
+        all.addAll(HyzionIcons.PICKER);
+        all.addAll(PICKER);
+        return all;
+    }
+
     /** @return the picker name for a path, or empty when it is not one of ours */
     public static String nameOf(String path) {
         if (path == null || path.isBlank()) {
             return "";
+        }
+        String custom = CustomIcons.nameOf(path);
+        if (!custom.isEmpty()) {
+            return custom;
+        }
+        for (Entry entry : HyzionIcons.PICKER) {
+            if (entry.path().equals(path)) {
+                return entry.name();
+            }
         }
         for (Entry entry : PICKER) {
             if (entry.path().equals(path)) {

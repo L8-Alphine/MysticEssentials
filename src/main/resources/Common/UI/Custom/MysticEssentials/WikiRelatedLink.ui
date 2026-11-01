@@ -8,12 +8,12 @@
 $C = "../Common.ui";
 
 Group {
-  Anchor: (Width: 268);
+  Anchor: (Width: 172);
   LayoutMode: Left;
 
   // Common.ui fixes this button's height after the @Anchor spread, so the
   // anchor here only carries width.
   $C.@SmallSecondaryTextButton #RelatedLink {
-    @Anchor = (Width: 260);
+    @Anchor = (Width: 164);
   }
 }

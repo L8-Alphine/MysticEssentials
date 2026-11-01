@@ -1,7 +1,7 @@
 // Row template for player-warp lists. Appended per entry:
 //   cmd.append("#PwarpList", "MysticEssentials/PlayerWarpRow.ui")
 // and populated by index: cmd.set("#PwarpList[i] #Name.TextSpans", ...).
-// #Swatch is recoloured by the server; #Selected marks the current selection.
+// #RowIcon is set by the server; #Selected marks the current selection.
 $M = "MysticTheme.ui";
 
 Button #Row {
@@ -21,9 +21,12 @@ Button #Row {
     $M.@IconWell {
       @Anchor = (Right: 12);
 
-      Group #Swatch {
-        Anchor: (Width: 12, Height: 12);
-        Background: #55FFFF;
+      // Vanilla icon (Common-rooted AssetPath), set by the server.
+      AssetImage #RowIcon {
+        Anchor: (Width: 22, Height: 22);
+        AssetPath: "";
+        FallbackTexturePath: "UI/Custom/Pages/Memories/MissingIcon.png";
+        Visible: false;
       }
     }
 

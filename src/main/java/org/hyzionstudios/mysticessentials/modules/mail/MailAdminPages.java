@@ -189,7 +189,7 @@ final class MailAdminPages {
         }
 
         @Override
-        public void handleDataEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
+        protected void onEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
             JsonObject payload = parse(data);
             switch (string(payload, "action")) {
                 case "audience" -> reopen(draftFrom(payload, field(payload, "audience"), draft.picks()));

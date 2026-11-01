@@ -1,16 +1,22 @@
-// Server Wiki — editor. Staff write pages here rather than in a file on the
-// host, which is the point of a wiki that can be edited in game.
+// Server Wiki — editor. Write on the left, see it on the right as you type.
 //
-// Deliberately one screen with no tabs: a page is a title, where it files, a
-// summary line and a body, and splitting four fields across tabs would hide
-// half of what someone is writing.
+// The right pane has two tabs: Preview (the page rendered exactly as readers
+// will see it, refreshed as the body changes) and Images (search the game's
+// icons, Hyzion's, the server's own and every item; click one to add it to the
+// body, right-click to make it the page's icon).
+//
+// The client gives the server no cursor position, so the toolbar and the image
+// picker add at the end of the body. PlaceholderText stays one line with no
+// escapes: the client's string reader accepts only a doubled backslash and an
+// escaped quote, and a \n here is a hard parse error that takes the whole
+// merged Custom UI namespace with it.
 $C = "../Common.ui";
 $M = "MysticTheme.ui";
 
 $C.@PageOverlay {}
 
 $C.@Container {
-  Anchor: (Width: 900, Height: 660);
+  Anchor: (Width: 1050, Height: 700);
 
   #Title {
     Group {
@@ -18,132 +24,342 @@ $C.@Container {
         @Text = "Edit Wiki Page";
       }
 
-      $M.@HeaderMeta #EditorId {}
+      $M.@HeaderMeta #EditorId {
+        @Width = 300;
+      }
     }
   }
 
   #Content {
-    LayoutMode: Top;
+    LayoutMode: Left;
 
+    // ---- Writing -------------------------------------------------------------
     Group {
-      LayoutMode: Left;
-      Anchor: (Height: 62, Bottom: 6);
-
-      Group {
-        FlexWeight: 2;
-        LayoutMode: Top;
-        Padding: (Right: 10);
-
-        $M.@FieldLabel {
-          @Text = "Title";
-        }
-
-        $C.@TextField #TitleInput {
-          @Anchor = (Height: 34);
-          PlaceholderText: "What this page is called";
-        }
-      }
-
-      Group {
-        FlexWeight: 1;
-        LayoutMode: Top;
-
-        $M.@FieldLabel {
-          @Text = "Category";
-        }
-
-        $C.@TextField #CategoryInput {
-          @Anchor = (Height: 34);
-          PlaceholderText: "Getting Started";
-        }
-      }
-    }
-
-    Group {
+      Anchor: (Width: 500);
       LayoutMode: Top;
-      Anchor: (Height: 62, Bottom: 6);
 
-      $M.@FieldLabel {
-        @Text = "Summary";
+      Group {
+        LayoutMode: Left;
+        Anchor: (Height: 58, Bottom: 4);
+
+        Group {
+          FlexWeight: 2;
+          LayoutMode: Top;
+          Padding: (Right: 8);
+
+          $M.@FieldLabel {
+            @Text = "Title";
+          }
+
+          $C.@TextField #TitleInput {
+            @Anchor = (Height: 32);
+            PlaceholderText: "What this page is called";
+          }
+        }
+
+        Group {
+          FlexWeight: 1;
+          LayoutMode: Top;
+
+          $M.@FieldLabel {
+            @Text = "Category";
+          }
+
+          $C.@TextField #CategoryInput {
+            @Anchor = (Height: 32);
+            PlaceholderText: "Getting Started";
+          }
+        }
       }
 
-      $C.@TextField #SummaryInput {
-        @Anchor = (Height: 34);
-        PlaceholderText: "One line shown in the page list";
+      Group {
+        LayoutMode: Left;
+        Anchor: (Height: 58, Bottom: 4);
+
+        Group {
+          FlexWeight: 2;
+          LayoutMode: Top;
+          Padding: (Right: 8);
+
+          $M.@FieldLabel {
+            @Text = "Summary";
+          }
+
+          $C.@TextField #SummaryInput {
+            @Anchor = (Height: 32);
+            PlaceholderText: "One line shown in the page list";
+          }
+        }
+
+        Group {
+          FlexWeight: 1;
+          LayoutMode: Top;
+
+          $M.@FieldLabel {
+            @Text = "Icon";
+          }
+
+          $C.@TextField #IconInput {
+            @Anchor = (Height: 32);
+            PlaceholderText: "Right-click one in Images";
+          }
+        }
+      }
+
+      Group {
+        LayoutMode: Left;
+        Anchor: (Height: 58, Bottom: 6);
+
+        Group {
+          FlexWeight: 2;
+          LayoutMode: Top;
+          Padding: (Right: 8);
+
+          $M.@FieldLabel {
+            @Text = "Tags";
+          }
+
+          $C.@TextField #TagsInput {
+            @Anchor = (Height: 32);
+            PlaceholderText: "Comma separated, for search";
+          }
+        }
+
+        Group {
+          FlexWeight: 1;
+          LayoutMode: Top;
+
+          $M.@FieldLabel {
+            @Text = "View Permission";
+          }
+
+          $C.@TextField #PermissionInput {
+            @Anchor = (Height: 32);
+            PlaceholderText: "Blank for everyone";
+          }
+        }
+      }
+
+      // Structure, then colour. Each adds to the end of the body.
+      Group {
+        LayoutMode: Left;
+        Anchor: (Height: 32, Bottom: 4);
+
+        $C.@SmallSecondaryTextButton #InsertHeading {
+          @Text = "H2";
+          @Anchor = (Width: 46, Right: 4);
+        }
+
+        $C.@SmallSecondaryTextButton #InsertSubheading {
+          @Text = "H3";
+          @Anchor = (Width: 46, Right: 4);
+        }
+
+        $C.@SmallSecondaryTextButton #InsertBullet {
+          @Text = "List";
+          @Anchor = (Width: 56, Right: 4);
+        }
+
+        $C.@SmallSecondaryTextButton #InsertQuote {
+          @Text = "Note";
+          @Anchor = (Width: 58, Right: 4);
+        }
+
+        $C.@SmallSecondaryTextButton #InsertRule {
+          @Text = "Line";
+          @Anchor = (Width: 56, Right: 4);
+        }
+
+        $C.@SmallSecondaryTextButton #InsertLink {
+          @Text = "Link";
+          @Anchor = (Width: 56, Right: 4);
+        }
+
+        $C.@SmallSecondaryTextButton #InsertEmbed {
+          @Text = "Embed";
+          @Anchor = (Width: 66);
+        }
+      }
+
+      Group {
+        LayoutMode: Left;
+        Anchor: (Height: 32, Bottom: 6);
+
+        Label {
+          Anchor: (Width: 52);
+          Style: $M.@KeyStyle;
+          Text: "Colour";
+        }
+
+        $C.@SmallSecondaryTextButton #ColourGold {
+          @Text = "Gold";
+          @Anchor = (Width: 60, Right: 4);
+        }
+
+        $C.@SmallSecondaryTextButton #ColourBlue {
+          @Text = "Blue";
+          @Anchor = (Width: 60, Right: 4);
+        }
+
+        $C.@SmallSecondaryTextButton #ColourGreen {
+          @Text = "Green";
+          @Anchor = (Width: 64, Right: 4);
+        }
+
+        $C.@SmallSecondaryTextButton #ColourRed {
+          @Text = "Red";
+          @Anchor = (Width: 56, Right: 4);
+        }
+
+        $C.@SmallSecondaryTextButton #ColourGrey {
+          @Text = "Grey";
+          @Anchor = (Width: 60, Right: 4);
+        }
+
+        $C.@SmallSecondaryTextButton #ColourReset {
+          @Text = "Plain";
+          @Anchor = (Width: 62);
+        }
+      }
+
+      $C.@MultilineTextField #BodyInput {
+        @Anchor = (Bottom: 6);
+        FlexWeight: 1;
+        PlaceholderText: "## Heading  -  - Bullet  -  > Note  -  [[page-id]] to link  -  pictures from the Images tab";
+      }
+
+      Label #EditorStatus {
+        Anchor: (Height: 18, Bottom: 2);
+        Style: $M.@HintStyle;
+      }
+
+      $M.@ActionBar {
+        @Anchor = (Height: 44, Top: 4);
+
+        $C.@TextButton #SaveButton {
+          @Text = "Save";
+          @Anchor = (Width: 130, Right: 8);
+        }
+
+        $C.@SecondaryTextButton #CancelButton {
+          @Text = "Back";
+          @Anchor = (Width: 120);
+        }
+
+        $M.@Spacer {}
+
+        $C.@CancelTextButton #DeleteButton {
+          @Text = "Delete";
+          @Anchor = (Width: 120);
+          Visible: false;
+        }
       }
     }
 
+    $M.@ColumnDivider {}
+
+    // ---- Seeing it -----------------------------------------------------------
     Group {
-      LayoutMode: Left;
-      Anchor: (Height: 62, Bottom: 6);
+      FlexWeight: 1;
+      LayoutMode: Top;
 
       Group {
-        FlexWeight: 2;
-        LayoutMode: Top;
-        Padding: (Right: 10);
+        LayoutMode: Left;
+        Anchor: (Height: 32, Bottom: 8);
 
-        $M.@FieldLabel {
-          @Text = "Tags";
+        $M.@Tab #PreviewTab {
+          @Text = "Preview";
+          @Anchor = (Width: 120, Right: 6);
         }
 
-        $C.@TextField #TagsInput {
-          @Anchor = (Height: 34);
-          PlaceholderText: "Comma separated, for search";
+        $M.@Tab #ImagesTab {
+          @Text = "Images";
+          @Anchor = (Width: 120);
+        }
+
+        $M.@Spacer {}
+
+        $C.@SmallSecondaryTextButton #RefreshPreview {
+          @Text = "Refresh";
+          @Anchor = (Width: 90);
         }
       }
 
-      Group {
+      Group #PreviewPane {
         FlexWeight: 1;
         LayoutMode: Top;
 
-        $M.@FieldLabel {
-          @Text = "View Permission";
+        $M.@Well {
+          FlexWeight: 1;
+
+          Label #PreviewEmpty {
+            Anchor: (Height: 80);
+            Style: $M.@EmptyStyle;
+            Text: "Start writing and the page appears here.";
+            Visible: false;
+          }
+
+          Group #PreviewBody {
+            FlexWeight: 1;
+            LayoutMode: TopScrolling;
+            Padding: (Right: 10, Left: 6, Top: 4);
+            ScrollbarStyle: $C.@DefaultScrollbarStyle;
+          }
         }
-
-        $C.@TextField #PermissionInput {
-          @Anchor = (Height: 34);
-          PlaceholderText: "Blank for everyone";
-        }
-      }
-    }
-
-    $M.@FieldLabel {
-      @Text = "Body";
-    }
-
-    $C.@MultilineTextField #BodyInput {
-      @Anchor = (Bottom: 6);
-      FlexWeight: 1;
-      // One line, no escapes. The client's string reader accepts only a
-      // doubled backslash and an escaped quote: a \n here is a hard parse
-      // error that takes the whole merged Custom UI namespace with it.
-      PlaceholderText: "## Heading  -  - Bullet  -  blank line for a paragraph  -  [[page-id]] to link";
-    }
-
-    Label #EditorStatus {
-      Anchor: (Height: 18, Bottom: 2);
-      Style: $M.@HintStyle;
-    }
-
-    $M.@ActionBar {
-      @Anchor = (Height: 44, Top: 6);
-
-      $C.@TextButton #SaveButton {
-        @Text = "Save";
-        @Anchor = (Width: 140, Right: 8);
       }
 
-      $C.@SecondaryTextButton #CancelButton {
-        @Text = "Back";
-        @Anchor = (Width: 130);
-      }
-
-      $M.@Spacer {}
-
-      $C.@CancelTextButton #DeleteButton {
-        @Text = "Delete";
-        @Anchor = (Width: 130);
+      Group #ImagesPane {
+        FlexWeight: 1;
+        LayoutMode: Top;
         Visible: false;
+
+        $C.@TextField #ImageSearch {
+          @Anchor = (Height: 32, Bottom: 6);
+          PlaceholderText: "Search icons and items: chest, portal, pickaxe...";
+        }
+
+        Label #ImageHint {
+          Anchor: (Height: 18, Bottom: 6);
+          Style: $M.@HintStyle;
+        }
+
+        $M.@Section {
+          @Text = "Icons";
+          @Anchor = (Bottom: 6);
+        }
+
+        $M.@Well {
+          FlexWeight: 3;
+
+          Group {
+            FlexWeight: 1;
+            LayoutMode: TopScrolling;
+            ScrollbarStyle: $C.@DefaultScrollbarStyle;
+
+            Group #IconResults {
+              LayoutMode: LeftCenterWrap;
+            }
+          }
+        }
+
+        $M.@Section {
+          @Text = "Items";
+          @Anchor = (Top: 8, Bottom: 6);
+        }
+
+        $M.@Well {
+          FlexWeight: 2;
+
+          Group {
+            FlexWeight: 1;
+            LayoutMode: TopScrolling;
+            ScrollbarStyle: $C.@DefaultScrollbarStyle;
+
+            Group #ItemResults {
+              LayoutMode: LeftCenterWrap;
+            }
+          }
+        }
       }
     }
   }

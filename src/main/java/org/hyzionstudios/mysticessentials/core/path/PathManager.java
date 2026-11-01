@@ -88,6 +88,11 @@ public final class PathManager {
         return dataDir().resolve("cache");
     }
 
+    /** PNGs the server adds as icons ({@code custom:<name>}). */
+    public Path iconsDir() {
+        return root.resolve("icons");
+    }
+
     public Path logsDir() {
         return root.resolve("logs");
     }

@@ -86,7 +86,7 @@ final class InventoryPages {
         }
 
         @Override
-        public void handleDataEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
+        protected void onEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
             JsonObject payload = parse(data);
             String action = string(payload, "action");
             switch (action) {
@@ -204,7 +204,7 @@ final class InventoryPages {
         }
 
         @Override
-        public void handleDataEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
+        protected void onEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
             JsonObject payload = parse(data);
             switch (string(payload, "action")) {
                 case "back" -> {

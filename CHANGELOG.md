@@ -1,5 +1,56 @@
 # Mystic Essentials Changelog
 
+## Unreleased — No more stuck "Loading...", Hyzion icons, a new wiki
+
+Server-side checks only (build, `check`); not yet seen in a game client.
+
+### Pages never sit on "Loading..."
+
+- **Every page event now gets an answer.** A button bound the default way locks
+  the page until the server replies; a handler that only chatted (the Server
+  Browser's Connect on an offline card), or a next page that failed to build
+  (swallowed silently), left players locked out. `MysticPage` now wraps every
+  handler: failures are logged and the page unlocked at once, and a handler
+  that sent nothing is unlocked after 1.2 s, which leaves room for the ones that
+  answer after async work. All 61 handlers moved to `onEvent`.
+- Inputs that fire per keystroke (search boxes, the Rail Editor's dropdown, the
+  dialog editor's fields) are no longer locking. The engine drops events that
+  arrive while the client still owes an acknowledgement, and a dropped locking
+  event is a page stuck for good.
+
+### Icons
+
+- **Hyzion's icon set** (35 icons) is shipped and used across the rail, menu,
+  Shortcuts page, mail, kits, vaults, homes, warps, the server browser and the
+  wiki. Shipped at 64 px from 128 px masters in `art/icons/hyzion/`
+  (`scripts/optimize-icons.py`): 952 KB down to 303 KB for every client to
+  download, and closer to the 20–44 px they are drawn at.
+- **Padlocks** on anything the player cannot use: menu cards, Shortcuts rows,
+  locked server cards, kits, vaults, hidden warps.
+- **Server icons**: PNGs in `mods/MysticEssentials/icons/` load at startup and on
+  reload, pushed to online players, and are named `custom:<name>`.
+- **Kits** show their items in turn (or a set `icon`) instead of a coloured
+  square; kits behind a permission are listed with a padlock
+  (`showLockedKits`, default on). Status reads in colour.
+- Warp, home and player-warp rows show icons in place of colour squares.
+
+### Wiki
+
+- **One bigger window** (1050×700): search, categories and pages on the left,
+  the page with its icon on the right. Search updates only the list.
+- **Markup**: `###` subheadings, `>` notes, colours, `{{image:…}}`,
+  `{{icons:…}}`, `{{item:…}}`, `{{items:…}}`, `{{page:…}}` embeds, and
+  `[label](https://…)` / `[label](/command)` links next to `[[page]]`. Inline
+  links are drawn blue and collected as buttons under the page.
+- **Editor**: live preview as you type, an Images tab that searches icons and
+  items (click to add, right-click for the page icon), a toolbar for structure
+  and colours, and a page icon field. Save errors no longer wipe what was typed.
+
+### Sizes
+
+- The Shortcuts page is two columns (channels | destinations) so all nine fit.
+- The Mail rewards dropdown no longer pushes out past its column.
+
 ## Unreleased — Server Browser, Rail Editor, icons everywhere
 
 Server-side checks only (build, `check`); not yet seen in a game client.

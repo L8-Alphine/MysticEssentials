@@ -168,7 +168,7 @@ public final class SimulationPage extends MysticPage {
     // ----- Events -------------------------------------------------------------
 
     @Override
-    public void handleDataEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
+    protected void onEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
         JsonObject payload = parse(data);
         String action = string(payload, "action");
         State next = state.withDraws(INPUTS.read(payload).getOrDefault(DRAWS.key(), state.draws())).withNotice(null);

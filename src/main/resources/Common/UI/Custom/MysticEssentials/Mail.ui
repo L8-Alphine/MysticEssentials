@@ -280,8 +280,10 @@ $C.@Container {
           LayoutMode: Left;
           Anchor: (Height: 44, Bottom: 8);
 
+          // Anchor set directly: Common.ui's DropdownBox fixes Width: 330 after
+          // the @Anchor spread, which pushed the box out past the column.
           $C.@DropdownBox #ItemDropdown {
-            @Anchor = (Vertical: 6, Right: 8);
+            Anchor: (Top: 6, Height: 32, Right: 8);
             FlexWeight: 1;
           }
 

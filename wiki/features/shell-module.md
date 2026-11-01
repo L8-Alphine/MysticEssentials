@@ -201,8 +201,10 @@ so a card that went unavailable while the menu was open cannot be used.
   `COMMAND`, `NONE`.
 - `target` is a channel id for `CHANNEL`, and a command line (or an `http(s)`
   URL, which is sent as a clickable chat link) for the rest.
-- `icon` is a vanilla icon: a picker name from the Rail Editor (`Portal`,
-  `Fist Bump`, `Letter`…) or an asset path under `Common/`, for example
+- `icon` is a picker name from the Rail Editor — Hyzion's own set
+  (`Hyzion Portal`, `Hyzion Guild`…), the game's (`Portal`, `Fist Bump`,
+  `Letter`…) — a server icon (`custom:<name>`, see below) or an asset path
+  under `Common/`, for example
   `Icons/ItemCategories/Portal.png`. Left empty, each slot gets the icon that
   fits what it does, from Hytale's flat category icons (Party uses the
   fist-bump emote). `none` shows the letter mark from `glyph` instead. A server
@@ -216,6 +218,27 @@ so a card that went unavailable while the menu was open cannot be used.
   Connect button. `showNetwork` adds roster servers you did not list.
 - `glyph` is one or two characters, shown only when a slot has no icon.
 - `keys.altShortcuts` turns ALT+1–9 on or off.
+
+### Icons
+
+Three sets, all usable anywhere an icon is accepted (rail slots, server cards,
+kits, wiki pages):
+
+| Set | Name it as | Where it comes from |
+| --- | --- | --- |
+| Hyzion | `Hyzion <Name>` (`Hyzion Wiki`, `Hyzion Lock`…) | Shipped with the mod; the defaults for the rail, menu, mail, kits, warps and homes |
+| The game's | `Portal`, `Fist Bump`, `Letter`… | The client's own assets |
+| The server's | `custom:<name>` | Any PNG you put in `mods/MysticEssentials/icons/` |
+
+Server icons: drop `castle.png` into `mods/MysticEssentials/icons/` and use
+`custom:castle`. Names are letters, digits, `-` and `_`; files over 1 MB or that
+are not PNGs are skipped and logged. They load at startup and on
+`/mystic reload` (only new or changed files are sent, so a reload does not
+re-send everything to everyone online). 64×64 matches the shipped set; anything
+from 32 to 128 square works.
+
+Anything a player cannot use shows the **padlock** instead of its icon: menu
+cards, Shortcuts rows, locked server cards, kits and vaults.
 
 Each player's rail choice is stored in `data/modules/shell/rail.json` as the set
 of players who *differ* from `visibleByDefault`, so changing the server default

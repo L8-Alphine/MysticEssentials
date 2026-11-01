@@ -158,6 +158,9 @@ public final class MysticCore implements MysticEssentialsAPI {
         // After the config: performance.schedulerThreads sizes the pool, and
         // nothing above here schedules anything.
         scheduler.start();
+        // Before any player can join, so every client gets them with the rest of
+        // the common assets.
+        org.hyzionstudios.mysticessentials.platform.ui.CustomIcons.load(this, paths.iconsDir());
 
         // Storage + Redis.
         storageService = new StorageServiceImpl(this);
@@ -559,6 +562,9 @@ public final class MysticCore implements MysticEssentialsAPI {
      * drift from everything else on the server.
      */
     public void reloadSharedServices() {
+        // File reads: off whichever thread ran the reload command.
+        scheduler.runLater(() -> org.hyzionstudios.mysticessentials.platform.ui.CustomIcons.load(this, paths.iconsDir()),
+                0, java.util.concurrent.TimeUnit.MILLISECONDS);
         // An unreadable file keeps the running settings instead of resetting them.
         if (itemInspectionService != null) {
             ItemViewConfig itemView = loadSharedConfig("chat", "item-view.json",

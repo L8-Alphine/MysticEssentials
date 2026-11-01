@@ -84,8 +84,8 @@ $C.@Container {
       $M.@Spacer {}
 
       Label #BrowserHint {
-        Anchor: (Width: 360, Right: 12);
-        Style: $M.@HeaderMetaStyle;
+        Anchor: (Width: 440, Right: 12);
+        Style: (...$M.@HeaderMetaStyle, ShrinkTextToFit: true, MinShrinkTextToFitFontSize: 9);
       }
 
       $C.@CancelTextButton #CloseButton {

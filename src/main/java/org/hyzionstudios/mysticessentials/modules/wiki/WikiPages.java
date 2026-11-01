@@ -1,16 +1,18 @@
 package org.hyzionstudios.mysticessentials.modules.wiki;
 
-import static org.hyzionstudios.mysticessentials.platform.ui.MysticPage.uiText;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.modules.wiki.WikiModule.WikiPage;
+import org.hyzionstudios.mysticessentials.platform.ui.ItemCatalog;
 import org.hyzionstudios.mysticessentials.platform.ui.MysticPage;
+import org.hyzionstudios.mysticessentials.platform.ui.VanillaIcons;
 
 import com.google.gson.JsonObject;
 import com.hypixel.hytale.component.Ref;
@@ -23,83 +25,68 @@ import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
-/** Browser, reader and editor for the server wiki. */
+/** The wiki's two windows: the reader (find and read) and the editor (write and preview). */
 final class WikiPages {
 
-    static final String BROWSER_UI = "MysticEssentials/Wiki.ui";
+    static final String READER_UI = "MysticEssentials/Wiki.ui";
     static final String CATEGORY_ROW_UI = "MysticEssentials/WikiCategoryRow.ui";
     static final String ARTICLE_ROW_UI = "MysticEssentials/WikiRow.ui";
-    static final String ARTICLE_UI = "MysticEssentials/WikiArticle.ui";
-    static final String LINE_UI = "MysticEssentials/WikiLine.ui";
     static final String RELATED_UI = "MysticEssentials/WikiRelatedLink.ui";
     static final String EDITOR_UI = "MysticEssentials/WikiEditor.ui";
+    static final String ICON_TILE_UI = "MysticEssentials/RailEditorIconTile.ui";
+    static final String ITEM_TILE_UI = "MysticEssentials/WikiItemTile.ui";
 
-    /** Related links shown under a page; more than this and the strip wraps badly. */
-    private static final int MAX_RELATED = 3;
+    /** Link buttons under a page; four fit across the reading column. */
+    private static final int MAX_RELATED = 4;
 
     private WikiPages() {
     }
 
-    // ----- Browser -----------------------------------------------------------
+    // ----- Reader ------------------------------------------------------------
 
     /**
-     * Categories on the left, pages on the right. A category of {@code null}
-     * means "everything", which is what search needs: typing a word should
-     * look across the whole wiki, not inside whichever category happened to be
-     * selected.
+     * Search, categories and pages on the left; the open page on the right.
+     *
+     * <p>A category of {@code null} means "everything", which is what search
+     * needs: typing a word looks across the whole wiki, not inside whichever
+     * category happened to be selected. Typing updates only the page list —
+     * rebuilding the window per keystroke would take the box's focus away.</p>
      */
-    static final class BrowserPage extends MysticPage {
+    static final class ReaderPage extends MysticPage {
 
         private final WikiModule wiki;
         private final String category;
         private final String search;
+        private final String articleId;
 
-        BrowserPage(MysticCore core, WikiModule wiki, PlayerRef player) {
-            this(core, wiki, player, null, "");
-        }
-
-        BrowserPage(MysticCore core, WikiModule wiki, PlayerRef player, String category, String search) {
+        ReaderPage(MysticCore core, WikiModule wiki, PlayerRef player, String category, String search,
+                String articleId) {
             super(core, player, CustomPageLifetime.CanDismiss);
             this.wiki = wiki;
             this.category = category;
             this.search = search == null ? "" : search;
+            this.articleId = WikiModule.key(articleId);
         }
 
         @Override
         public void build(Ref<EntityStore> ref, UICommandBuilder cmd, UIEventBuilder event,
                 Store<EntityStore> store) {
-            cmd.append(BROWSER_UI);
+            cmd.append(READER_UI);
             WikiConfig config = wiki.config();
             cmd.set("#WikiSubtitle.TextSpans", uiText("#WikiSubtitle.TextSpans", config.subtitle));
-            // The page is rebuilt on every keystroke, so the box has to be
-            // handed its own text back or it would clear itself as it is typed.
             cmd.set("#SearchInput.Value", search);
 
             List<WikiPage> all = wiki.pages(player);
-            List<WikiPage> visible = new ArrayList<>();
-            for (WikiPage page : all) {
-                // A search is a whole-wiki search: a hit outside the selected
-                // category is still the answer the reader asked for, so the
-                // category filter only applies while the box is empty.
-                boolean keep = search.isBlank()
-                        ? category == null || page.category().equalsIgnoreCase(category)
-                        : WikiModule.matches(page, search);
-                if (keep) {
-                    visible.add(page);
-                }
-            }
+            List<WikiPage> visible = filter(all, search);
+            WikiPage open = articleId.isEmpty()
+                    ? (visible.isEmpty() ? null : visible.get(0))
+                    : wiki.page(player, articleId).orElse(null);
+
             cmd.set("#WikiCount.TextSpans", uiText("#WikiCount.TextSpans",
-                    rowCount(Math.min(visible.size(), MAX_LIST_ROWS), all.size(), "pages")));
-
+                    all.size() == 1 ? "1 page" : all.size() + " pages"));
             renderCategories(cmd, event, all, wiki.categoriesOf(all));
-            renderArticles(cmd, event, visible);
-
-            cmd.set("#WikiEmpty.Visible", visible.isEmpty());
-            if (visible.isEmpty()) {
-                cmd.set("#WikiEmpty.TextSpans", uiText("#WikiEmpty.TextSpans",
-                        search.isBlank() ? "Nothing has been written here yet."
-                                : "Nothing matches \"" + search + "\"."));
-            }
+            renderList(cmd, event, visible, open == null ? "" : open.id());
+            renderArticle(cmd, event, open);
 
             boolean canEdit = wiki.canEdit(player);
             cmd.set("#NewArticleButton.Visible", canEdit);
@@ -107,12 +94,26 @@ final class WikiPages {
                 event.addEventBinding(CustomUIEventBindingType.Activating, "#NewArticleButton",
                         new EventData().put("action", "new"));
             }
+            // Not locking, and answered with a list-only update: see the class note.
             event.addEventBinding(CustomUIEventBindingType.ValueChanged, "#SearchInput",
-                    new EventData().put("action", "search").append("@search", "#SearchInput.Value"));
+                    new EventData().put("action", "search").append("@search", "#SearchInput.Value"), false);
             event.addEventBinding(CustomUIEventBindingType.Activating, "#MenuButton",
                     new EventData().put("action", "menu"));
             event.addEventBinding(CustomUIEventBindingType.Activating, "#CloseButton",
                     new EventData().put("action", "close"));
+        }
+
+        private List<WikiPage> filter(List<WikiPage> all, String query) {
+            List<WikiPage> visible = new ArrayList<>();
+            for (WikiPage page : all) {
+                boolean keep = query.isBlank()
+                        ? category == null || page.category().equalsIgnoreCase(category)
+                        : WikiModule.matches(page, query);
+                if (keep) {
+                    visible.add(page);
+                }
+            }
+            return visible;
         }
 
         private void renderCategories(UICommandBuilder cmd, UIEventBuilder event, List<WikiPage> all,
@@ -130,7 +131,7 @@ final class WikiPages {
             }
             int index = 0;
             for (Map.Entry<String, Integer> entry : counts.entrySet()) {
-                String row = "#CategoryList[" + index + "]";
+                String row = "#CategoryList[" + index++ + "]";
                 cmd.append("#CategoryList", CATEGORY_ROW_UI);
                 boolean everything = entry.getKey().isEmpty();
                 cmd.set(row + " #CategoryName.TextSpans", uiText(row + " #CategoryName.TextSpans",
@@ -141,41 +142,107 @@ final class WikiPages {
                         everything ? category == null : entry.getKey().equalsIgnoreCase(category));
                 event.addEventBinding(CustomUIEventBindingType.Activating, row,
                         new EventData().put("action", "category").put("category", entry.getKey()));
-                index++;
             }
         }
 
-        private void renderArticles(UICommandBuilder cmd, UIEventBuilder event, List<WikiPage> all) {
-            List<WikiPage> visible = capRows(all);
-            for (int i = 0; i < visible.size(); i++) {
-                WikiPage page = visible.get(i);
+        private void renderList(UICommandBuilder cmd, UIEventBuilder event, List<WikiPage> visible, String openId) {
+            List<WikiPage> rows = capRows(visible);
+            for (int i = 0; i < rows.size(); i++) {
+                WikiPage page = rows.get(i);
                 String row = "#ArticleList[" + i + "]";
                 cmd.append("#ArticleList", ARTICLE_ROW_UI);
-                cmd.set(row + " #WikiRowTitle.TextSpans",
-                        uiText(row + " #WikiRowTitle.TextSpans", page.title()));
-                cmd.set(row + " #WikiRowSummary.TextSpans",
-                        uiText(row + " #WikiRowSummary.TextSpans",
-                                page.summary().isBlank() ? page.category() : page.summary()));
+                WikiRenderer.pageIcon(cmd, row + " #WikiRowIcon", row + " #WikiRowItem", page.icon());
+                cmd.set(row + " #WikiRowTitle.TextSpans", uiText(row + " #WikiRowTitle.TextSpans", page.title()));
+                cmd.set(row + " #WikiRowSummary.TextSpans", uiText(row + " #WikiRowSummary.TextSpans",
+                        page.summary().isBlank() ? page.category() : page.summary()));
                 cmd.set(row + " #WikiRowSource.TextSpans",
-                        uiText(row + " #WikiRowSource.TextSpans", page.stored() ? "" : "From a mod"));
+                        uiText(row + " #WikiRowSource.TextSpans", page.stored() ? "" : "Mod"));
+                cmd.set(row + " #WikiRowSelected.Visible", page.id().equals(openId));
                 event.addEventBinding(CustomUIEventBindingType.Activating, row,
                         new EventData().put("action", "open").put("article", page.id()));
+            }
+            cmd.set("#WikiEmpty.Visible", visible.isEmpty());
+            if (visible.isEmpty()) {
+                cmd.set("#WikiEmpty.TextSpans", uiText("#WikiEmpty.TextSpans",
+                        search.isBlank() ? "Nothing has been written here yet." : "Nothing matches that search."));
+            }
+        }
+
+        private void renderArticle(UICommandBuilder cmd, UIEventBuilder event, WikiPage page) {
+            if (page == null) {
+                WikiRenderer.pageIcon(cmd, "#ArticleIcon", "#ArticleItem", "");
+                cmd.set("#ArticleTitle.TextSpans", uiText("#ArticleTitle.TextSpans",
+                        articleId.isEmpty() ? "Server Wiki" : "Not found"));
+                cmd.set("#ArticleSummary.TextSpans", uiText("#ArticleSummary.TextSpans", articleId.isEmpty()
+                        ? "Pick a page on the left." : "There is no page called \"" + articleId + "\"."));
+                cmd.set("#ArticleEmpty.Visible", true);
+                return;
+            }
+            WikiRenderer.pageIcon(cmd, "#ArticleIcon", "#ArticleItem", page.icon());
+            cmd.set("#ArticleTitle.TextSpans", uiText("#ArticleTitle.TextSpans", page.title()));
+            cmd.set("#ArticleSummary.TextSpans", uiText("#ArticleSummary.TextSpans", page.summary()));
+            cmd.set("#ArticleCategory.TextSpans", uiText("#ArticleCategory.TextSpans", page.category()));
+            cmd.set("#ArticleFooter.TextSpans", uiText("#ArticleFooter.TextSpans", page.footer()));
+
+            // A very long article is one very large packet; draw the first
+            // screens and say the rest is there.
+            List<WikiMarkup.Block> parsed = WikiRenderer.expand(WikiMarkup.parse(page.body()), wiki, player, page.id());
+            List<WikiMarkup.Block> blocks = capRows(parsed);
+            cmd.set("#ArticleEmpty.Visible", parsed.isEmpty());
+            WikiRenderer.render(cmd, event, "#ArticleBody", blocks);
+            if (blocks.size() < parsed.size()) {
+                cmd.set("#ArticleFooter.TextSpans", uiText("#ArticleFooter.TextSpans",
+                        "First " + blocks.size() + " of " + parsed.size() + " lines · " + page.footer()));
+            }
+
+            Map<String, String> related = WikiMarkup.relatedLinks(page.body());
+            cmd.set("#RelatedSection.Visible", !related.isEmpty());
+            int index = 0;
+            for (Map.Entry<String, String> link : related.entrySet()) {
+                if (index >= MAX_RELATED) {
+                    break;
+                }
+                String row = "#RelatedList[" + index++ + "]";
+                cmd.append("#RelatedList", RELATED_UI);
+                cmd.set(row + " #RelatedLink.TextSpans", uiText(row + " #RelatedLink.TextSpans", link.getValue()));
+                event.addEventBinding(CustomUIEventBindingType.Activating, row + " #RelatedLink",
+                        new EventData().put("action", "link").put("target", link.getKey()));
+            }
+
+            // Only stored pages are editable here; a mod's page belongs to the mod that renders it.
+            boolean editable = page.stored() && wiki.canEdit(player);
+            cmd.set("#EditButton.Visible", editable);
+            if (editable) {
+                event.addEventBinding(CustomUIEventBindingType.Activating, "#EditButton",
+                        new EventData().put("action", "edit").put("article", page.id()));
             }
         }
 
         @Override
-        public void handleDataEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
+        protected void onEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
             JsonObject payload = parse(data);
             switch (string(payload, "action")) {
                 case "category" -> {
                     String picked = field(payload, "category");
-                    reopen(ref, store, new BrowserPage(core, wiki, player,
-                            picked.isEmpty() ? null : picked, search));
+                    reopen(ref, store, new ReaderPage(core, wiki, player, picked.isEmpty() ? null : picked, "", ""));
                 }
-                case "search" -> reopen(ref, store,
-                        new BrowserPage(core, wiki, player, category, field(payload, "search")));
+                case "search" -> {
+                    // The list only; the box keeps its focus and what was typed.
+                    String query = field(payload, "search");
+                    UICommandBuilder cmd = new UICommandBuilder();
+                    UIEventBuilder event = new UIEventBuilder();
+                    cmd.clear("#ArticleList");
+                    renderList(cmd, event, filter(wiki.pages(player), query), articleId);
+                    sendUpdate(cmd, event);
+                }
                 case "open" -> reopen(ref, store,
-                        new ArticlePage(core, wiki, player, field(payload, "article"), category, search));
+                        new ReaderPage(core, wiki, player, category, search, field(payload, "article")));
+                case "link" -> follow(ref, store, field(payload, "target"));
+                case "edit" -> {
+                    if (wiki.canEdit(player)) {
+                        reopen(ref, store, new EditorPage(core, wiki, player, field(payload, "article")));
+                    }
+                }
                 case "new" -> {
                     if (wiki.canEdit(player)) {
                         reopen(ref, store, new EditorPage(core, wiki, player, ""));
@@ -191,146 +258,24 @@ final class WikiPages {
                 }
             }
         }
-    }
 
-    // ----- Reader ------------------------------------------------------------
-
-    /** One page, rendered a block at a time so links inside it stay pressable. */
-    static final class ArticlePage extends MysticPage {
-
-        private final WikiModule wiki;
-        private final String articleId;
-        private final String backCategory;
-        private final String backSearch;
-
-        ArticlePage(MysticCore core, WikiModule wiki, PlayerRef player, String articleId) {
-            this(core, wiki, player, articleId, null, "");
-        }
-
-        ArticlePage(MysticCore core, WikiModule wiki, PlayerRef player, String articleId,
-                String backCategory, String backSearch) {
-            super(core, player, CustomPageLifetime.CanDismiss);
-            this.wiki = wiki;
-            this.articleId = WikiModule.key(articleId);
-            this.backCategory = backCategory;
-            this.backSearch = backSearch == null ? "" : backSearch;
-        }
-
-        @Override
-        public void build(Ref<EntityStore> ref, UICommandBuilder cmd, UIEventBuilder event,
-                Store<EntityStore> store) {
-            cmd.append(ARTICLE_UI);
-            WikiPage page = wiki.page(player, articleId).orElse(null);
-            if (page == null) {
-                // Deleted, or a [[link]] to a page that was never written.
-                cmd.set("#ArticleTitle.TextSpans", uiText("#ArticleTitle.TextSpans", "Not found"));
-                cmd.set("#ArticleSummary.TextSpans", uiText("#ArticleSummary.TextSpans",
-                        "There is no page called \"" + articleId + "\"."));
-                cmd.set("#ArticleEmpty.Visible", true);
-                bindFooter(event);
-                return;
-            }
-
-            cmd.set("#ArticleTitle.TextSpans", uiText("#ArticleTitle.TextSpans", page.title()));
-            cmd.set("#ArticleSummary.TextSpans", uiText("#ArticleSummary.TextSpans", page.summary()));
-            cmd.set("#ArticleCategory.TextSpans", uiText("#ArticleCategory.TextSpans", page.category()));
-            cmd.set("#ArticleFooter.TextSpans", uiText("#ArticleFooter.TextSpans", page.footer()));
-
-            // A very long article is one very large packet; draw the first
-            // screens and say the rest is there.
-            List<WikiMarkup.Block> parsed = WikiMarkup.parse(page.body());
-            List<WikiMarkup.Block> blocks = capRows(parsed);
-            cmd.set("#ArticleEmpty.Visible", parsed.isEmpty());
-            for (int i = 0; i < blocks.size(); i++) {
-                renderBlock(cmd, event, i, blocks.get(i));
-            }
-            if (blocks.size() < parsed.size()) {
-                cmd.set("#ArticleFooter.TextSpans", uiText("#ArticleFooter.TextSpans",
-                        "Showing the first " + blocks.size() + " of " + parsed.size()
-                                + " lines \u00b7 " + page.footer()));
-            }
-
-            Map<String, String> related = WikiMarkup.relatedLinks(page.body());
-            cmd.set("#RelatedSection.Visible", !related.isEmpty());
-            int index = 0;
-            for (Map.Entry<String, String> link : related.entrySet()) {
-                if (index >= MAX_RELATED) {
-                    break;
+        /**
+         * A page id opens here; a command runs as the reader, under their own
+         * permissions, after the window closes; a web address goes to chat as a
+         * clickable line, because a game window cannot open a browser.
+         */
+        private void follow(Ref<EntityStore> ref, Store<EntityStore> store, String target) {
+            switch (WikiMarkup.Target.of(target)) {
+                case PAGE -> reopen(ref, store, new ReaderPage(core, wiki, player, category, search, target));
+                case COMMAND -> {
+                    close(ref, store);
+                    core.platform().dispatchPlayerCommand(player, target.substring(1));
                 }
-                String row = "#RelatedList[" + index + "]";
-                cmd.append("#RelatedList", RELATED_UI);
-                cmd.set(row + " #RelatedLink.TextSpans",
-                        uiText(row + " #RelatedLink.TextSpans", link.getValue()));
-                event.addEventBinding(CustomUIEventBindingType.Activating, row + " #RelatedLink",
-                        new EventData().put("action", "open").put("article", link.getKey()));
-                index++;
-            }
-
-            // Only stored pages are editable here; a mod's page belongs to
-            // the mod that renders it.
-            boolean editable = page.stored() && wiki.canEdit(player);
-            cmd.set("#EditButton.Visible", editable);
-            if (editable) {
-                event.addEventBinding(CustomUIEventBindingType.Activating, "#EditButton",
-                        new EventData().put("action", "edit"));
-            }
-            bindFooter(event);
-        }
-
-        private void renderBlock(UICommandBuilder cmd, UIEventBuilder event, int index,
-                WikiMarkup.Block block) {
-            String row = "#ArticleBody[" + index + "]";
-            cmd.append("#ArticleBody", LINE_UI);
-            switch (block.kind()) {
-                case HEADING -> {
-                    cmd.set(row + " #LineHeading.Visible", true);
-                    cmd.set(row + " #LineHeading.TextSpans",
-                            uiText(row + " #LineHeading.TextSpans", block.text()));
-                }
-                case PARAGRAPH -> {
-                    cmd.set(row + " #LineParagraph.Visible", true);
-                    cmd.set(row + " #LineParagraph.TextSpans",
-                            uiText(row + " #LineParagraph.TextSpans", block.text()));
-                }
-                case BULLET -> {
-                    cmd.set(row + " #LineBullet.Visible", true);
-                    cmd.set(row + " #LineBulletText.TextSpans",
-                            uiText(row + " #LineBulletText.TextSpans", block.text()));
-                }
-                case RULE -> cmd.set(row + " #LineRule.Visible", true);
-                case LINK -> {
-                    cmd.set(row + " #LineLink.Visible", true);
-                    cmd.set(row + " #LineLink.TextSpans",
-                            uiText(row + " #LineLink.TextSpans", block.text()));
-                    event.addEventBinding(CustomUIEventBindingType.Activating, row + " #LineLink",
-                            new EventData().put("action", "open").put("article", block.target()));
-                }
-            }
-        }
-
-        private void bindFooter(UIEventBuilder event) {
-            event.addEventBinding(CustomUIEventBindingType.Activating, "#BackButton",
-                    new EventData().put("action", "back"));
-            event.addEventBinding(CustomUIEventBindingType.Activating, "#CloseButton",
-                    new EventData().put("action", "close"));
-        }
-
-        @Override
-        public void handleDataEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
-            JsonObject payload = parse(data);
-            switch (string(payload, "action")) {
-                case "open" -> reopen(ref, store, new ArticlePage(core, wiki, player,
-                        field(payload, "article"), backCategory, backSearch));
-                case "edit" -> {
-                    if (wiki.canEdit(player)) {
-                        reopen(ref, store, new EditorPage(core, wiki, player, articleId));
-                    }
-                }
-                case "back" -> reopen(ref, store,
-                        new BrowserPage(core, wiki, player, backCategory, backSearch));
-                case "close" -> close(ref, store);
-                default -> {
-                    // Unknown action: leave the page as it is.
+                case URL -> {
+                    core.getMessageService().send(player, "&7Link: <link:" + target + "><#8fc2ec><u>" + target + "</u></#8fc2ec></link>");
+                    UICommandBuilder cmd = new UICommandBuilder();
+                    cmd.set("#ArticleFooter.TextSpans", uiText("#ArticleFooter.TextSpans", "&eLink sent to your chat"));
+                    sendUpdate(cmd);
                 }
             }
         }
@@ -339,27 +284,33 @@ final class WikiPages {
     // ----- Editor ------------------------------------------------------------
 
     /**
-     * Create or change a stored page.
+     * Create or change a stored page, with the rendered page beside it.
      *
      * <p>The id is fixed once the page exists: changing it would silently break
      * every {@code [[link]]} pointing at it, so a rename is a new page plus a
      * delete, which at least leaves the author looking at both.</p>
+     *
+     * <p>Only Save and Delete rebuild the window. Everything else — the
+     * toolbar, the image search, the tabs, the preview — is a partial update,
+     * so what is typed stays where it is.</p>
      */
     static final class EditorPage extends MysticPage {
 
+        /** Preview refreshes no more often than this while typing. */
+        static final long PREVIEW_DELAY_MS = 300;
+        /** Image search results per kind. */
+        static final int MAX_RESULTS = 60;
+
         private final WikiModule wiki;
         private final String articleId;
-        private final String status;
+        /** The latest body the client sent; the debounced preview draws it. */
+        private String pendingBody;
+        private boolean previewScheduled;
 
         EditorPage(MysticCore core, WikiModule wiki, PlayerRef player, String articleId) {
-            this(core, wiki, player, articleId, "");
-        }
-
-        EditorPage(MysticCore core, WikiModule wiki, PlayerRef player, String articleId, String status) {
             super(core, player, CustomPageLifetime.CanDismiss);
             this.wiki = wiki;
             this.articleId = WikiModule.key(articleId);
-            this.status = status == null ? "" : status;
         }
 
         @Override
@@ -368,71 +319,239 @@ final class WikiPages {
             cmd.append(EDITOR_UI);
             WikiArticle article = wiki.stored(articleId).orElse(null);
             boolean existing = article != null;
+            String body = existing && article.body != null ? article.body : "";
 
-            cmd.set("#EditorId.TextSpans", uiText("#EditorId.TextSpans",
-                    articleId.isEmpty() ? "New page" : articleId));
+            cmd.set("#EditorId.TextSpans", uiText("#EditorId.TextSpans", articleId.isEmpty() ? "New page" : articleId));
             cmd.set("#TitleInput.Value", existing ? article.displayTitle() : "");
             cmd.set("#CategoryInput.Value", existing ? article.displayCategory() : "General");
             cmd.set("#SummaryInput.Value", existing && article.summary != null ? article.summary : "");
-            cmd.set("#TagsInput.Value",
-                    existing && article.tags != null ? String.join(", ", article.tags) : "");
-            cmd.set("#PermissionInput.Value",
-                    existing && article.viewPermission != null ? article.viewPermission : "");
-            cmd.set("#BodyInput.Value", existing && article.body != null ? article.body : "");
-            cmd.set("#EditorStatus.TextSpans", uiText("#EditorStatus.TextSpans",
-                    status.isBlank()
-                            ? (articleId.isEmpty()
-                                    ? "Give the page an id in the title field — it becomes the [[link]] name."
-                                    : "Editing " + articleId + ".")
-                            : status));
+            cmd.set("#IconInput.Value", existing && article.icon != null ? article.icon : "");
+            cmd.set("#TagsInput.Value", existing && article.tags != null ? String.join(", ", article.tags) : "");
+            cmd.set("#PermissionInput.Value", existing && article.viewPermission != null ? article.viewPermission : "");
+            cmd.set("#BodyInput.Value", body);
+            cmd.set("#EditorStatus.TextSpans", uiText("#EditorStatus.TextSpans", articleId.isEmpty()
+                    ? "The title becomes the page id, the name [[links]] use."
+                    : "Editing " + articleId + ". Toolbar and pictures add to the end of the body."));
+            tabs(cmd, true);
+            drawPreview(cmd, body);
+            drawResults(cmd, event, "");
 
             cmd.set("#DeleteButton.Visible", existing);
             if (existing) {
                 event.addEventBinding(CustomUIEventBindingType.Activating, "#DeleteButton",
                         new EventData().put("action", "delete"));
             }
+            bindInsert(event, "#InsertHeading", "\n## Heading\n");
+            bindInsert(event, "#InsertSubheading", "\n### Subheading\n");
+            bindInsert(event, "#InsertBullet", "\n- ");
+            bindInsert(event, "#InsertQuote", "\n> ");
+            bindInsert(event, "#InsertRule", "\n---\n");
+            bindInsert(event, "#InsertLink", "\n[[page-id|Read more]]\n");
+            bindInsert(event, "#InsertEmbed", "\n{{page:page-id}}\n");
+            bindInsert(event, "#ColourGold", "&6");
+            bindInsert(event, "#ColourBlue", "<#67a5da>");
+            bindInsert(event, "#ColourGreen", "&a");
+            bindInsert(event, "#ColourRed", "&c");
+            bindInsert(event, "#ColourGrey", "&7");
+            bindInsert(event, "#ColourReset", "&r");
+            colourLabels(cmd);
 
-            // Every field travels with the Save press: the page is rebuilt on
-            // each press, so anything not sent now is lost.
+            // Non-locking: these fire per keystroke, and the answers are partial updates.
+            event.addEventBinding(CustomUIEventBindingType.ValueChanged, "#BodyInput",
+                    new EventData().put("action", "body").append("@body", "#BodyInput.Value"), false);
+            event.addEventBinding(CustomUIEventBindingType.ValueChanged, "#ImageSearch",
+                    new EventData().put("action", "images").append("@query", "#ImageSearch.Value"), false);
+            event.addEventBinding(CustomUIEventBindingType.Activating, "#PreviewTab",
+                    new EventData().put("action", "tab").put("tab", "preview").append("@body", "#BodyInput.Value"));
+            event.addEventBinding(CustomUIEventBindingType.Activating, "#ImagesTab",
+                    new EventData().put("action", "tab").put("tab", "images"));
+            event.addEventBinding(CustomUIEventBindingType.Activating, "#RefreshPreview",
+                    new EventData().put("action", "refresh").append("@body", "#BodyInput.Value"));
+            // Every field travels with Save: anything not sent now is lost.
             event.addEventBinding(CustomUIEventBindingType.Activating, "#SaveButton",
-                    new EventData().put("action", "save")
-                            .append("@title", "#TitleInput.Value")
-                            .append("@category", "#CategoryInput.Value")
-                            .append("@summary", "#SummaryInput.Value")
-                            .append("@tags", "#TagsInput.Value")
-                            .append("@permission", "#PermissionInput.Value")
-                            .append("@body", "#BodyInput.Value"));
+                    form(new EventData().put("action", "save")));
             event.addEventBinding(CustomUIEventBindingType.Activating, "#CancelButton",
                     new EventData().put("action", "back"));
         }
 
+        private static EventData form(EventData data) {
+            return data.append("@title", "#TitleInput.Value")
+                    .append("@category", "#CategoryInput.Value")
+                    .append("@summary", "#SummaryInput.Value")
+                    .append("@icon", "#IconInput.Value")
+                    .append("@tags", "#TagsInput.Value")
+                    .append("@permission", "#PermissionInput.Value")
+                    .append("@body", "#BodyInput.Value");
+        }
+
+        private void bindInsert(UIEventBuilder event, String button, String snippet) {
+            event.addEventBinding(CustomUIEventBindingType.Activating, button,
+                    new EventData().put("action", "insert").put("snippet", snippet).append("@body", "#BodyInput.Value"));
+        }
+
+        /** The colour buttons say their colour in it. */
+        private static void colourLabels(UICommandBuilder cmd) {
+            cmd.set("#ColourGold.TextSpans", uiText("#ColourGold.TextSpans", "&6Gold"));
+            cmd.set("#ColourBlue.TextSpans", uiText("#ColourBlue.TextSpans", "<#67a5da>Blue"));
+            cmd.set("#ColourGreen.TextSpans", uiText("#ColourGreen.TextSpans", "&aGreen"));
+            cmd.set("#ColourRed.TextSpans", uiText("#ColourRed.TextSpans", "&cRed"));
+            cmd.set("#ColourGrey.TextSpans", uiText("#ColourGrey.TextSpans", "&7Grey"));
+            cmd.set("#ColourReset.TextSpans", uiText("#ColourReset.TextSpans", "&fPlain"));
+        }
+
+        private static void tabs(UICommandBuilder cmd, boolean preview) {
+            cmd.set("#PreviewPane.Visible", preview);
+            cmd.set("#ImagesPane.Visible", !preview);
+            cmd.set("#PreviewTab.TextSpans", uiText("#PreviewTab.TextSpans", preview ? "&a> Preview" : "&7Preview"));
+            cmd.set("#ImagesTab.TextSpans", uiText("#ImagesTab.TextSpans", preview ? "&7Images" : "&a> Images"));
+        }
+
+        /** Draws the body into the preview exactly as the reader would, links inert. */
+        private void drawPreview(UICommandBuilder cmd, String body) {
+            List<WikiMarkup.Block> blocks = capRows(WikiRenderer.expand(WikiMarkup.parse(body), wiki, player, articleId));
+            cmd.set("#PreviewEmpty.Visible", blocks.isEmpty());
+            WikiRenderer.render(cmd, null, "#PreviewBody", blocks);
+        }
+
+        /**
+         * The image search: every icon whose name matches (the server's own,
+         * Hyzion's, then the game's) and, once something is typed, matching
+         * items. Click adds it to the body; right-click makes it the page icon.
+         */
+        private void drawResults(UICommandBuilder cmd, UIEventBuilder event, String query) {
+            String needle = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
+            int icons = 0;
+            for (VanillaIcons.Entry entry : VanillaIcons.pickerWithCustom()) {
+                if (icons >= MAX_RESULTS) {
+                    break;
+                }
+                if (!needle.isEmpty() && !entry.name().toLowerCase(Locale.ROOT).contains(needle)) {
+                    continue;
+                }
+                String tile = "#IconResults[" + icons++ + "]";
+                cmd.append("#IconResults", ICON_TILE_UI);
+                cmd.set(tile + " #TileIcon.AssetPath", entry.path());
+                event.addEventBinding(CustomUIEventBindingType.Activating, tile, new EventData()
+                        .put("action", "insert").put("snippet", "\n{{image:" + entry.name() + "}}\n")
+                        .append("@body", "#BodyInput.Value"));
+                event.addEventBinding(CustomUIEventBindingType.RightClicking, tile,
+                        new EventData().put("action", "icon").put("icon", entry.name()));
+            }
+            int items = 0;
+            if (!needle.isEmpty()) {
+                for (String itemId : ItemCatalog.search(needle, MAX_RESULTS)) {
+                    String tile = "#ItemResults[" + items++ + "]";
+                    cmd.append("#ItemResults", ITEM_TILE_UI);
+                    cmd.set(tile + " #TileItem.ItemId", itemId);
+                    event.addEventBinding(CustomUIEventBindingType.Activating, tile, new EventData()
+                            .put("action", "insert").put("snippet", "\n{{item:" + itemId + "}}\n")
+                            .append("@body", "#BodyInput.Value"));
+                    event.addEventBinding(CustomUIEventBindingType.RightClicking, tile,
+                            new EventData().put("action", "icon").put("icon", "item:" + itemId));
+                }
+            }
+            cmd.set("#ImageHint.TextSpans", uiText("#ImageHint.TextSpans", needle.isEmpty()
+                    ? "Type to search items too. Click to add, right-click for the page icon."
+                    : icons + " icons, " + items + " items. Click to add, right-click for the page icon."));
+        }
+
         @Override
-        public void handleDataEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
+        protected void onEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
             JsonObject payload = parse(data);
             if (!wiki.canEdit(player)) {
                 close(ref, store);
                 return;
             }
             switch (string(payload, "action")) {
+                case "body" -> schedulePreview(store, field(payload, "body"));
+                case "refresh" -> {
+                    UICommandBuilder cmd = new UICommandBuilder();
+                    cmd.clear("#PreviewBody");
+                    drawPreview(cmd, field(payload, "body"));
+                    sendUpdate(cmd);
+                }
+                case "insert" -> {
+                    String body = field(payload, "body") + string(payload, "snippet");
+                    UICommandBuilder cmd = new UICommandBuilder();
+                    cmd.set("#BodyInput.Value", body);
+                    cmd.clear("#PreviewBody");
+                    drawPreview(cmd, body);
+                    sendUpdate(cmd);
+                }
+                case "icon" -> {
+                    UICommandBuilder cmd = new UICommandBuilder();
+                    cmd.set("#IconInput.Value", string(payload, "icon"));
+                    cmd.set("#EditorStatus.TextSpans", uiText("#EditorStatus.TextSpans",
+                            "Page icon set to " + string(payload, "icon") + ". Save to keep it."));
+                    sendUpdate(cmd);
+                }
+                case "images" -> {
+                    UICommandBuilder cmd = new UICommandBuilder();
+                    UIEventBuilder event = new UIEventBuilder();
+                    cmd.clear("#IconResults");
+                    cmd.clear("#ItemResults");
+                    drawResults(cmd, event, field(payload, "query"));
+                    sendUpdate(cmd, event);
+                }
+                case "tab" -> {
+                    boolean preview = "preview".equals(string(payload, "tab"));
+                    UICommandBuilder cmd = new UICommandBuilder();
+                    tabs(cmd, preview);
+                    if (preview) {
+                        cmd.clear("#PreviewBody");
+                        drawPreview(cmd, field(payload, "body"));
+                    }
+                    sendUpdate(cmd);
+                }
                 case "save" -> save(ref, store, payload);
                 case "delete" -> {
                     wiki.delete(articleId);
-                    reopen(ref, store, new BrowserPage(core, wiki, player));
+                    reopen(ref, store, new ReaderPage(core, wiki, player, null, "", ""));
                 }
-                case "back" -> reopen(ref, store, articleId.isEmpty()
-                        ? new BrowserPage(core, wiki, player)
-                        : new ArticlePage(core, wiki, player, articleId));
+                case "back" -> reopen(ref, store, new ReaderPage(core, wiki, player, null, "", articleId));
                 default -> {
                     // Unknown action: leave the page as it is.
                 }
             }
         }
 
+        /**
+         * Coalesces keystrokes: the first schedules a draw, later ones only
+         * replace what it will draw. Runs on the world thread both ways.
+         */
+        private void schedulePreview(Store<EntityStore> store, String body) {
+            pendingBody = body;
+            if (previewScheduled) {
+                return;
+            }
+            previewScheduled = true;
+            var world = store.getExternalData().getWorld();
+            core.scheduler().runLater(() -> world.execute(() -> {
+                previewScheduled = false;
+                if (!isCurrent()) {
+                    return;
+                }
+                UICommandBuilder cmd = new UICommandBuilder();
+                cmd.clear("#PreviewBody");
+                drawPreview(cmd, pendingBody);
+                sendUpdate(cmd);
+            }), PREVIEW_DELAY_MS, TimeUnit.MILLISECONDS);
+        }
+
+        private boolean isCurrent() {
+            Ref<EntityStore> ref = player.getReference();
+            if (ref == null) {
+                return false;
+            }
+            var entity = ref.getStore().getComponent(ref,
+                    com.hypixel.hytale.server.core.entity.entities.Player.getComponentType());
+            return entity != null && entity.getPageManager().getCustomPage() == this;
+        }
+
         private void save(Ref<EntityStore> ref, Store<EntityStore> store, JsonObject payload) {
             String title = field(payload, "title").trim();
             if (title.isEmpty()) {
-                reopen(ref, store, new EditorPage(core, wiki, player, articleId,
-                        "Give the page a title before saving."));
+                status("&cGive the page a title before saving.");
                 return;
             }
             // A new page takes its id from the title, slugged; an existing one
@@ -443,22 +562,29 @@ final class WikiPages {
             article.title = title;
             article.category = blankTo(field(payload, "category").trim(), "General");
             article.summary = field(payload, "summary").trim();
+            article.icon = field(payload, "icon").trim();
             article.viewPermission = field(payload, "permission").trim();
             article.body = field(payload, "body");
             article.tags = Arrays.stream(field(payload, "tags").split(","))
                     .map(String::trim).filter(tag -> !tag.isEmpty()).toList();
 
             if (!wiki.put(player, article)) {
-                reopen(ref, store, new EditorPage(core, wiki, player, articleId,
-                        "That id is not usable, or another mod already owns it."));
+                status("&cThat id is not usable, or another mod already owns it.");
                 return;
             }
-            reopen(ref, store, new ArticlePage(core, wiki, player, id));
+            reopen(ref, store, new ReaderPage(core, wiki, player, null, "", id));
+        }
+
+        /** Says something under the body without rebuilding the window (which would lose the typing). */
+        private void status(String message) {
+            UICommandBuilder cmd = new UICommandBuilder();
+            cmd.set("#EditorStatus.TextSpans", uiText("#EditorStatus.TextSpans", message));
+            sendUpdate(cmd);
         }
 
         /** Turns a title into an id: lowercase, words joined with hyphens. */
         private static String slug(String title) {
-            String slug = title.toLowerCase(java.util.Locale.ROOT)
+            String slug = title.toLowerCase(Locale.ROOT)
                     .replaceAll("[^a-z0-9]+", "-")
                     .replaceAll("(^-+)|(-+$)", "");
             return slug.length() > 64 ? slug.substring(0, 64) : slug;

@@ -9,7 +9,7 @@ import org.hyzionstudios.mysticessentials.api.shell.MenuDestination;
 import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.modules.shell.EcosystemRegistry.Availability;
 import org.hyzionstudios.mysticessentials.modules.shell.EcosystemRegistry.EcosystemModule;
-import org.hyzionstudios.mysticessentials.platform.ui.VanillaIcons;
+import org.hyzionstudios.mysticessentials.platform.ui.HyzionIcons;
 
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 
@@ -41,44 +41,44 @@ final class MenuCatalog {
     }
 
     /**
-     * Vanilla icons for the cards, by card id, as asset paths under
+     * Hyzion icons for the cards, by card id, as asset paths under
      * {@code Common/}. Cards missing here keep their letter mark: a letter that
      * says what a card is beats an icon that only looks tidy. Paths with spaces
      * in the file name (Builder Tools, Scripted Blocks) are avoided on purpose.
      */
     private static final java.util.Map<String, String> ICONS = java.util.Map.ofEntries(
-            java.util.Map.entry("essentials:warps", VanillaIcons.PORTAL),
-            java.util.Map.entry("essentials:warps.adventure", VanillaIcons.PORTAL),
-            java.util.Map.entry("essentials:homes", VanillaIcons.MARKER_HOME),
-            java.util.Map.entry("essentials:spawn", VanillaIcons.MARKER_SPAWN),
-            java.util.Map.entry("essentials:kits", VanillaIcons.ARMOR),
-            java.util.Map.entry("essentials:channels", VanillaIcons.SIGNS),
-            java.util.Map.entry("essentials:channels.settings", VanillaIcons.SIGNS),
-            java.util.Map.entry("essentials:tpa", VanillaIcons.MARKER_PLAYER),
-            java.util.Map.entry("essentials:playerwarps", VanillaIcons.MARKER_WARP),
-            java.util.Map.entry("essentials:store", VanillaIcons.ORE),
-            java.util.Map.entry("essentials:servers", VanillaIcons.NATURAL),
-            java.util.Map.entry("essentials:wiki", VanillaIcons.RECIPE),
-            java.util.Map.entry("essentials:vaults", VanillaIcons.CONTAINER),
-            java.util.Map.entry("essentials:nick", VanillaIcons.CLOTHES),
-            java.util.Map.entry("essentials:notifications", VanillaIcons.LIGHTS),
-            java.util.Map.entry("essentials:notifications.account", VanillaIcons.LIGHTS),
-            java.util.Map.entry("essentials:patchnotes", VanillaIcons.MISC),
-            java.util.Map.entry("essentials:shortcuts", VanillaIcons.WALLS),
-            java.util.Map.entry("essentials:shortcuts.settings", VanillaIcons.WALLS),
-            java.util.Map.entry("essentials:rail", VanillaIcons.SHELVES),
-            java.util.Map.entry("essentials:mail", VanillaIcons.LETTER),
-            java.util.Map.entry("essentials:mail.community", VanillaIcons.LETTER),
-            java.util.Map.entry("ecosystem:mysticidentity", VanillaIcons.MARKER_PLAYER),
-            java.util.Map.entry("ecosystem:mysticnametags", VanillaIcons.BANNER),
-            java.util.Map.entry("ecosystem:mysticquests", VanillaIcons.MARKER_COORDINATE),
-            java.util.Map.entry("ecosystem:mysticrpg", VanillaIcons.WEAPONS),
-            java.util.Map.entry("ecosystem:mysticguilds", VanillaIcons.SHIELDS),
-            java.util.Map.entry("ecosystem:mysticeconomy", VanillaIcons.METAL),
-            java.util.Map.entry("ecosystem:mysticmoderation", VanillaIcons.EDITOR),
-            java.util.Map.entry("ecosystem:mysticgeneration", VanillaIcons.VEGETAL));
+            java.util.Map.entry("essentials:warps", HyzionIcons.PORTAL),
+            java.util.Map.entry("essentials:warps.adventure", HyzionIcons.PORTAL),
+            java.util.Map.entry("essentials:homes", HyzionIcons.HOME),
+            java.util.Map.entry("essentials:spawn", HyzionIcons.SPAWN),
+            java.util.Map.entry("essentials:kits", HyzionIcons.ARMOR),
+            java.util.Map.entry("essentials:channels", HyzionIcons.CHANNELS),
+            java.util.Map.entry("essentials:channels.settings", HyzionIcons.CHANNELS),
+            java.util.Map.entry("essentials:tpa", HyzionIcons.PLAYER),
+            java.util.Map.entry("essentials:playerwarps", HyzionIcons.WARP),
+            java.util.Map.entry("essentials:store", HyzionIcons.SERVICES),
+            java.util.Map.entry("essentials:servers", HyzionIcons.SERVERS),
+            java.util.Map.entry("essentials:wiki", HyzionIcons.WIKI),
+            java.util.Map.entry("essentials:vaults", HyzionIcons.VAULT),
+            java.util.Map.entry("essentials:nick", HyzionIcons.NICKNAME),
+            java.util.Map.entry("essentials:notifications", HyzionIcons.NOTIFICATIONS),
+            java.util.Map.entry("essentials:notifications.account", HyzionIcons.NOTIFICATIONS),
+            java.util.Map.entry("essentials:patchnotes", HyzionIcons.PATCH_NOTES),
+            java.util.Map.entry("essentials:shortcuts", HyzionIcons.SHORTCUTS),
+            java.util.Map.entry("essentials:shortcuts.settings", HyzionIcons.SHORTCUTS),
+            java.util.Map.entry("essentials:rail", HyzionIcons.RAIL),
+            java.util.Map.entry("essentials:mail", HyzionIcons.MAIL),
+            java.util.Map.entry("essentials:mail.community", HyzionIcons.MAIL),
+            java.util.Map.entry("ecosystem:mysticidentity", HyzionIcons.PLAYER),
+            java.util.Map.entry("ecosystem:mysticnametags", HyzionIcons.NAMETAG),
+            java.util.Map.entry("ecosystem:mysticquests", HyzionIcons.COMPASS),
+            java.util.Map.entry("ecosystem:mysticrpg", HyzionIcons.ADVENTURE),
+            java.util.Map.entry("ecosystem:mysticguilds", HyzionIcons.GUILD),
+            java.util.Map.entry("ecosystem:mysticeconomy", HyzionIcons.ECONOMY),
+            java.util.Map.entry("ecosystem:mysticmoderation", HyzionIcons.STAFF),
+            java.util.Map.entry("ecosystem:mysticgeneration", HyzionIcons.GENERATION));
 
-    /** @return the card's vanilla icon, or empty for its letter mark. */
+    /** @return the card's Hyzion icon, or empty for its letter mark. */
     static String iconFor(MenuCard card) {
         return card == null ? "" : ICONS.getOrDefault(card.id(), "");
     }

@@ -10,7 +10,7 @@ $M = "MysticTheme.ui";
 $C.@PageOverlay {}
 
 $C.@Container {
-  Anchor: (Width: 560, Height: 640);
+  Anchor: (Width: 940, Height: 560);
 
   #Title {
     Group {
@@ -30,26 +30,45 @@ $C.@Container {
       Style: $M.@HintStyle;
     }
 
-    $M.@Section {
-      @Text = "Chat Channels";
-      @Anchor = (Bottom: 8);
-    }
-
-    Group #ChannelList {
-      Anchor: (Bottom: 14);
-      LayoutMode: Top;
-    }
-
-    $M.@Section {
-      @Text = "Destinations";
-      @Anchor = (Bottom: 8);
-    }
-
-    Group #DestinationList {
+    // Channels left, destinations right: nine rows stacked in one column did
+    // not fit, and the last destinations scrolled out of sight.
+    Group {
       FlexWeight: 1;
-      LayoutMode: TopScrolling;
-      Padding: (Right: 6);
-      ScrollbarStyle: $C.@DefaultScrollbarStyle;
+      LayoutMode: Left;
+
+      Group {
+        FlexWeight: 1;
+        LayoutMode: Top;
+
+        $M.@Section {
+          @Text = "Chat Channels";
+          @Anchor = (Bottom: 8);
+        }
+
+        Group #ChannelList {
+          FlexWeight: 1;
+          LayoutMode: Top;
+        }
+      }
+
+      $M.@ColumnDivider {}
+
+      Group {
+        FlexWeight: 1;
+        LayoutMode: Top;
+
+        $M.@Section {
+          @Text = "Destinations";
+          @Anchor = (Bottom: 8);
+        }
+
+        Group #DestinationList {
+          FlexWeight: 1;
+          LayoutMode: TopScrolling;
+          Padding: (Right: 6);
+          ScrollbarStyle: $C.@DefaultScrollbarStyle;
+        }
+      }
     }
 
     $M.@ActionBar {

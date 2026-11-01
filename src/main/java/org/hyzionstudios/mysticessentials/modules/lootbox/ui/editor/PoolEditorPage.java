@@ -448,7 +448,7 @@ public final class PoolEditorPage extends MysticPage {
     // ----- Events -------------------------------------------------------------
 
     @Override
-    public void handleDataEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
+    protected void onEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
         if (!current()) {
             core.getMessageService().send(player, "&eThat editor was closed; open the pool again from /lootbox admin.");
             close(ref, store);

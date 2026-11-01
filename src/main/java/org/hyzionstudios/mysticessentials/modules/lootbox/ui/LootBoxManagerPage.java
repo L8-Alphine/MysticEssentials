@@ -245,7 +245,7 @@ public final class LootBoxManagerPage extends MysticPage {
     // ----- Events -------------------------------------------------------------
 
     @Override
-    public void handleDataEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
+    protected void onEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
         JsonObject payload = parse(data);
         String action = string(payload, "action");
         if ("close".equals(action)) {

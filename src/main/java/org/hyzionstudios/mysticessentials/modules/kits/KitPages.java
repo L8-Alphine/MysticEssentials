@@ -7,7 +7,10 @@ import java.util.List;
 import java.util.Map;
 
 import org.hyzionstudios.mysticessentials.core.MysticCore;
+import org.hyzionstudios.mysticessentials.platform.ui.HyzionIcons;
+import org.hyzionstudios.mysticessentials.platform.ui.ItemCatalog;
 import org.hyzionstudios.mysticessentials.platform.ui.MysticPage;
+import org.hyzionstudios.mysticessentials.platform.ui.VanillaIcons;
 
 import com.google.gson.JsonObject;
 import com.hypixel.hytale.component.Ref;
@@ -33,8 +36,15 @@ final class KitPages {
     }
 
     static final class KitListPage extends MysticPage {
+        /** How long each item shows before the row moves to the next. */
+        static final long CYCLE_MS = 1500;
+
         private final KitModule kits;
         private final String selectedKit;
+        /** Rows whose picture cycles: selector to the kit's item ids. */
+        private final java.util.Map<String, List<String>> cycling = new java.util.LinkedHashMap<>();
+        private int frame;
+        private java.util.concurrent.ScheduledFuture<?> cycleTask;
 
         KitListPage(MysticCore core, KitModule kits, PlayerRef player, String selectedKit) {
             super(core, player, CustomPageLifetime.CanDismiss);
@@ -63,25 +73,117 @@ final class KitPages {
                 cmd.append("#KitList", KIT_ROW_UI);
                 cmd.set(row + " #Name.TextSpans", uiText(row + " #Name.TextSpans", KitModule.displayName(id, kit)));
                 cmd.set(row + " #Meta.TextSpans", uiText(row + " #Meta.TextSpans", kitSummary(id, kit)));
-                cmd.set(row + " #Status.TextSpans", uiText(row + " #Status.TextSpans", kits.statusText(player, id, kit)));
-                cmd.set(row + " #Swatch.Background", statusColor(kits.statusText(player, id, kit)));
+                String status = kits.statusText(player, id, kit);
+                cmd.set(row + " #Status.TextSpans", uiText(row + " #Status.TextSpans", statusColor(status) + status));
+                picture(cmd, row, id, kit);
                 cmd.set(row + " #Selected.Visible", entry == selected);
+                // Not locking: the page updates itself while items cycle, and an
+                // event that lands before the client acknowledges an update is
+                // dropped by the engine, which would leave a locked page stuck.
                 event.addEventBinding(CustomUIEventBindingType.Activating, row,
-                        new EventData().put("action", "select").put("kit", id));
+                        new EventData().put("action", "select").put("kit", id), false);
             }
+            startCycling(store);
 
             applyDetails(cmd, selected);
             if (selected != null) {
                 String id = selected.getKey();
                 event.addEventBinding(CustomUIEventBindingType.Activating, "#ClaimButton",
-                        new EventData().put("action", "claim").put("kit", id));
+                        new EventData().put("action", "claim").put("kit", id), false);
                 event.addEventBinding(CustomUIEventBindingType.Activating, "#PreviewButton",
-                        new EventData().put("action", "preview").put("kit", id));
+                        new EventData().put("action", "preview").put("kit", id), false);
+            }
+        }
+
+        /**
+         * The row's picture: a padlock for a kit the player cannot claim, the
+         * configured icon or item, else the kit's own items in turn.
+         */
+        private void picture(UICommandBuilder cmd, String row, String id, KitConfig.Kit kit) {
+            String configured = kit.icon == null ? "" : kit.icon.trim();
+            List<String> items = new ArrayList<>();
+            if (!kits.canAccess(player, id, kit)) {
+                setIcon(cmd, row + " #RowIcon", HyzionIcons.LOCK);
+                cmd.set(row + " #RowItem.Visible", false);
+                return;
+            }
+            if (configured.regionMatches(true, 0, "item:", 0, 5)) {
+                items.add(configured.substring(5).trim());
+            } else if (!configured.isEmpty()) {
+                String path = VanillaIcons.resolve(configured);
+                if (!path.isEmpty()) {
+                    setIcon(cmd, row + " #RowIcon", path);
+                    cmd.set(row + " #RowItem.Visible", false);
+                    return;
+                }
+            } else if (kit.items != null) {
+                for (KitConfig.KitItem item : kit.items) {
+                    if (item != null && item.itemId != null) {
+                        items.add(item.itemId);
+                    }
+                }
+            }
+            // An item id the client does not know must never reach an ItemSlot.
+            items.removeIf(itemId -> !ItemCatalog.exists(itemId));
+            if (items.isEmpty()) {
+                setIcon(cmd, row + " #RowIcon", HyzionIcons.ARCHIVE);
+                cmd.set(row + " #RowItem.Visible", false);
+                return;
+            }
+            cmd.set(row + " #RowIcon.Visible", false);
+            cmd.set(row + " #RowItem.Visible", true);
+            cmd.set(row + " #RowItem.ItemId", items.get(0));
+            if (items.size() > 1) {
+                cycling.put(row, items);
+            }
+        }
+
+        /**
+         * Advances every cycling row while this page is the one on screen.
+         * The timer only hops onto the world thread; it stops itself when the
+         * page is closed or replaced.
+         */
+        private void startCycling(Store<EntityStore> store) {
+            if (cycling.isEmpty() || cycleTask != null) {
+                return;
+            }
+            var world = store.getExternalData().getWorld();
+            cycleTask = core.scheduler().runRepeating(() -> world.execute(this::advance),
+                    CYCLE_MS, CYCLE_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
+        }
+
+        private void advance() {
+            Ref<EntityStore> ref = player.getReference();
+            com.hypixel.hytale.server.core.entity.entities.Player entity = ref == null ? null
+                    : ref.getStore().getComponent(ref, com.hypixel.hytale.server.core.entity.entities.Player.getComponentType());
+            if (entity == null || entity.getPageManager().getCustomPage() != this) {
+                stopCycling();
+                return;
+            }
+            frame++;
+            UICommandBuilder cmd = new UICommandBuilder();
+            for (java.util.Map.Entry<String, List<String>> row : cycling.entrySet()) {
+                List<String> items = row.getValue();
+                cmd.set(row.getKey() + " #RowItem.ItemId", items.get(frame % items.size()));
+            }
+            sendUpdate(cmd);
+        }
+
+        private void stopCycling() {
+            if (cycleTask != null) {
+                cycleTask.cancel(false);
+                cycleTask = null;
             }
         }
 
         @Override
-        public void handleDataEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
+        public void onDismiss(Ref<EntityStore> ref, Store<EntityStore> store) {
+            stopCycling();
+            super.onDismiss(ref, store);
+        }
+
+        @Override
+        protected void onEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
             JsonObject payload = parse(data);
             String kit = field(payload, "kit");
             switch (string(payload, "action")) {
@@ -190,7 +292,7 @@ final class KitPages {
         }
 
         @Override
-        public void handleDataEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
+        protected void onEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
             JsonObject payload = parse(data);
             switch (string(payload, "action")) {
                 case "back" -> reopen(ref, store, new KitListPage(core, kits, player, kitName));
@@ -219,13 +321,14 @@ final class KitPages {
         return KitModule.formatDuration(kit.cooldownSeconds);
     }
 
+    /** Colour markup for a status line: ready, waiting, or blocked. */
     private static String statusColor(String status) {
-        if (status == null || status.startsWith("Ready")) {
-            return "#55FF55";
+        if (status == null || status.startsWith("Ready,") || status.equals("Ready")) {
+            return "&a";
         }
         if (status.contains("claimed") || status.contains("Ready in")) {
-            return "#FFAA00";
+            return "&6";
         }
-        return "#FF5555";
+        return "&c";
     }
 }

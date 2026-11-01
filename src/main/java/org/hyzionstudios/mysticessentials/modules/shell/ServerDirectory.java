@@ -15,6 +15,7 @@ import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.core.network.NetworkPlayerService;
 import org.hyzionstudios.mysticessentials.core.network.NetworkPlayerService.NetworkPlayer;
 import org.hyzionstudios.mysticessentials.core.network.NetworkPlayerService.RemoteServer;
+import org.hyzionstudios.mysticessentials.platform.ui.HyzionIcons;
 import org.hyzionstudios.mysticessentials.platform.ui.VanillaIcons;
 
 import com.hypixel.hytale.server.core.universe.PlayerRef;
@@ -119,7 +120,7 @@ final class ServerDirectory {
             if (!listed.contains(local)) {
                 String title = blankTo(shell.serverTitle(), networked ? local : "This server");
                 entries.add(new Entry("n:" + local, title, "The server you are on.", NETWORK_GROUP, "",
-                        VanillaIcons.MARKER_HOME, Status.HERE, counts.getOrDefault(local, 0), 0, local, "", 0));
+                        HyzionIcons.HOME, Status.HERE, counts.getOrDefault(local, 0), 0, local, "", 0));
             }
             for (RemoteServer remote : network.remoteServers()) {
                 if (!networked || listed.contains(remote.serverId())) {
@@ -127,7 +128,7 @@ final class ServerDirectory {
                 }
                 Status status = network.hasEndpoint(remote.serverId()) ? Status.ONLINE : Status.OFFLINE;
                 entries.add(new Entry("n:" + remote.serverId(), remote.serverId(), "", NETWORK_GROUP, "",
-                        VanillaIcons.NATURAL, status, counts.getOrDefault(remote.serverId(), 0), 0,
+                        HyzionIcons.SERVERS, status, counts.getOrDefault(remote.serverId(), 0), 0,
                         remote.serverId(), "", 0));
             }
         }
@@ -212,7 +213,7 @@ final class ServerDirectory {
 
     private static String iconOf(String configured) {
         String resolved = VanillaIcons.resolve(configured);
-        return resolved.isEmpty() ? VanillaIcons.PORTAL : resolved;
+        return resolved.isEmpty() ? HyzionIcons.PORTAL : resolved;
     }
 
     private static String clean(String value) {

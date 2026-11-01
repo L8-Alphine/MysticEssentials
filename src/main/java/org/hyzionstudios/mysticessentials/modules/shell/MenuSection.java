@@ -1,6 +1,6 @@
 package org.hyzionstudios.mysticessentials.modules.shell;
 
-import org.hyzionstudios.mysticessentials.platform.ui.VanillaIcons;
+import org.hyzionstudios.mysticessentials.platform.ui.HyzionIcons;
 
 /**
  * The Main Menu's left navigation, as the design bible fixes it (§7).
@@ -11,13 +11,13 @@ import org.hyzionstudios.mysticessentials.platform.ui.VanillaIcons;
  */
 public enum MenuSection {
 
-    OVERVIEW("Overview", "What you can pick up next.", VanillaIcons.MARKER_COORDINATE),
-    ADVENTURE("Adventure", "Quests, character, and where to go.", VanillaIcons.WEAPONS),
-    COMMUNITY("Community", "Guilds, party, mail and trading.", VanillaIcons.EMOTE_FIST_BUMP),
-    SERVICES("Services", "Economy, the store, servers and the wiki.", VanillaIcons.ORE),
-    ACCOUNT("Account", "Your profile, nameplate and notifications.", VanillaIcons.MARKER_PLAYER),
-    SETTINGS("Settings", "Shortcuts, chat and personal preferences.", VanillaIcons.TOOLS),
-    STAFF("Staff", "Moderation and creator tooling.", VanillaIcons.EDITOR);
+    OVERVIEW("Overview", "What you can pick up next.", HyzionIcons.COMPASS),
+    ADVENTURE("Adventure", "Quests, character, and where to go.", HyzionIcons.ADVENTURE),
+    COMMUNITY("Community", "Guilds, party, mail and trading.", HyzionIcons.COMMUNITY),
+    SERVICES("Services", "Economy, the store, servers and the wiki.", HyzionIcons.SERVICES),
+    ACCOUNT("Account", "Your profile, nameplate and notifications.", HyzionIcons.PLAYER),
+    SETTINGS("Settings", "Shortcuts, chat and personal preferences.", HyzionIcons.SETTINGS),
+    STAFF("Staff", "Moderation and creator tooling.", HyzionIcons.STAFF);
 
     private final String title;
     private final String blurb;
@@ -29,7 +29,7 @@ public enum MenuSection {
         this.icon = icon;
     }
 
-    /** @return the section's vanilla icon, Common-rooted */
+    /** @return the section's Hyzion icon, Common-rooted */
     public String icon() {
         return icon;
     }

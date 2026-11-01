@@ -17,7 +17,26 @@ Button #Row {
   Group {
     Anchor: (Full: 0);
     LayoutMode: Left;
-    Padding: (Left: 12, Right: 12, Top: 9, Bottom: 9);
+    Padding: (Left: 10, Right: 10, Top: 9, Bottom: 9);
+
+    // The page's icon (or item), set by the server.
+    $M.@IconWell {
+      @Anchor = (Right: 10);
+
+      AssetImage #WikiRowIcon {
+        Anchor: (Width: 26, Height: 26);
+        AssetPath: "";
+        FallbackTexturePath: "UI/Custom/Pages/Memories/MissingIcon.png";
+        Visible: false;
+      }
+
+      ItemSlot #WikiRowItem {
+        Anchor: (Width: 34, Height: 34);
+        ShowQualityBackground: false;
+        ShowQuantity: false;
+        Visible: false;
+      }
+    }
 
     Group {
       LayoutMode: Top;
@@ -35,8 +54,8 @@ Button #Row {
     }
 
     Label #WikiRowSource {
-      Anchor: (Width: 90);
-      Style: $M.@RowSideStyle;
+      Anchor: (Width: 64);
+      Style: (...$M.@RowSideStyle, FontSize: 10);
     }
   }
 }

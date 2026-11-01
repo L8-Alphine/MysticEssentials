@@ -9,6 +9,7 @@ import org.hyzionstudios.mysticessentials.api.Permissions;
 import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.modules.shell.ServerDirectory.Entry;
 import org.hyzionstudios.mysticessentials.modules.shell.ServerDirectory.Status;
+import org.hyzionstudios.mysticessentials.platform.ui.HyzionIcons;
 import org.hyzionstudios.mysticessentials.platform.ui.MysticPage;
 
 import com.google.gson.JsonObject;
@@ -46,11 +47,18 @@ final class ServerBrowserPage extends MysticPage {
     private final ShellModule shell;
     /** The region tab in view; empty for All. */
     private final String region;
+    /** Why the last Connect did nothing, shown on the page; empty when there is none. */
+    private final String notice;
 
     ServerBrowserPage(MysticCore core, ShellModule shell, PlayerRef player, String region) {
+        this(core, shell, player, region, "");
+    }
+
+    ServerBrowserPage(MysticCore core, ShellModule shell, PlayerRef player, String region, String notice) {
         super(core, player, CustomPageLifetime.CanDismiss);
         this.shell = shell;
         this.region = region == null ? "" : region;
+        this.notice = notice == null ? "" : notice;
     }
 
     @Override
@@ -116,7 +124,8 @@ final class ServerBrowserPage extends MysticPage {
         }
         cmd.set("#BrowserSummary.TextSpans", uiText("#BrowserSummary.TextSpans", summary(shown, total)));
         cmd.set("#BrowserContext.TextSpans", uiText("#BrowserContext.TextSpans", context(all)));
-        cmd.set("#BrowserHint.TextSpans", uiText("#BrowserHint.TextSpans", hint()));
+        cmd.set("#BrowserHint.TextSpans", uiText("#BrowserHint.TextSpans",
+                notice.isEmpty() ? hint() : "&e" + notice));
 
         event.addEventBinding(CustomUIEventBindingType.Activating, "#MenuButton",
                 new EventData().put("action", "menu"));
@@ -136,7 +145,7 @@ final class ServerBrowserPage extends MysticPage {
     }
 
     private void renderCard(UICommandBuilder cmd, UIEventBuilder event, String card, Entry entry) {
-        cmd.set(card + " #Icon.AssetPath", entry.icon());
+        cmd.set(card + " #Icon.AssetPath", entry.status() == Status.LOCKED ? HyzionIcons.LOCK : entry.icon());
         cmd.set(card + " #Name.TextSpans", uiText(card + " #Name.TextSpans", entry.name()));
         cmd.set(card + " #Region.TextSpans", uiText(card + " #Region.TextSpans", regionLine(entry)));
         cmd.set(card + " #Description.TextSpans", uiText(card + " #Description.TextSpans",
@@ -225,13 +234,13 @@ final class ServerBrowserPage extends MysticPage {
 
     private String hint() {
         if (player.hasPermission(Permissions.SHELL_ADMIN)) {
-            return "Servers are set in shell config, under browser";
+            return "Server list: shell config, browser section";
         }
         return core.networkPlayers().isNetworked() ? "Player counts are live" : "";
     }
 
     @Override
-    public void handleDataEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
+    protected void onEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
         JsonObject payload = parse(data);
         switch (string(payload, "action")) {
             case "region" -> reopen(ref, store, new ServerBrowserPage(core, shell, player, field(payload, "region")));
@@ -244,7 +253,9 @@ final class ServerBrowserPage extends MysticPage {
                     return;
                 }
                 if (!entry.connectable()) {
-                    shell.tell(player, shell.servers().connect(player, entry));
+                    // Answer on the page: a chat line alone leaves the page locked.
+                    reopen(ref, store, new ServerBrowserPage(core, shell, player, region,
+                            shell.servers().connect(player, entry)));
                     return;
                 }
                 close(ref, store);

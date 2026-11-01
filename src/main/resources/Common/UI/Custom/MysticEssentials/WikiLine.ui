@@ -1,10 +1,11 @@
-// One rendered block of a wiki body. Appended once per block into
-// #ArticleBody; the server shows exactly one of the five variants.
+// One rendered block of a wiki body. Appended once per block into the reader's
+// #ArticleBody (and the editor's #PreviewBody); the server shows exactly one of
+// the variants below.
 //
-// One template rather than five files because the body is rendered a block at
-// a time and the reader has to stay in document order — appending from a
-// single template keeps the indices the server addresses (`#ArticleBody[i]`)
-// in step with the blocks it parsed.
+// One template rather than a file per kind because the body is rendered a
+// block at a time and has to stay in document order — appending from a single
+// template keeps the indices the server addresses (`#ArticleBody[i]`) in step
+// with the blocks it parsed.
 //
 // Heights are deliberately left off the wrapping labels: a Label with no
 // Height wraps to fit its content, which is what a paragraph of unknown
@@ -12,12 +13,39 @@
 $C = "../Common.ui";
 $M = "MysticTheme.ui";
 
+// One cell of an icon or item gallery: the server shows the image or the item.
+@Cell = Group {
+  Anchor: (Width: 48, Height: 48, Right: 8);
+  Background: #0b1422(0.55);
+  LayoutMode: CenterMiddle;
+
+  AssetImage #CellIcon {
+    Anchor: (Width: 36, Height: 36);
+    AssetPath: "";
+    FallbackTexturePath: "UI/Custom/Pages/Memories/MissingIcon.png";
+    Visible: false;
+  }
+
+  ItemSlot #CellItem {
+    Anchor: (Width: 44, Height: 44);
+    ShowQualityBackground: true;
+    ShowQuantity: false;
+    Visible: false;
+  }
+};
+
 Group {
   LayoutMode: Top;
 
   Label #LineHeading {
-    Anchor: (Height: 24, Top: 8, Bottom: 4);
+    Anchor: (Height: 26, Top: 10, Bottom: 4);
     Style: $M.@HeadingGoldStyle;
+    Visible: false;
+  }
+
+  Label #LineSubheading {
+    Anchor: (Height: 22, Top: 6, Bottom: 2);
+    Style: $M.@SubheadingStyle;
     Visible: false;
   }
 
@@ -42,6 +70,25 @@ Group {
     }
   }
 
+  // A callout: gold rule down the left of a tinted box.
+  Group #LineQuote {
+    LayoutMode: Left;
+    Anchor: (Bottom: 8);
+    Background: #d9b572(0.08);
+    Visible: false;
+
+    Group {
+      Anchor: (Width: 3, Right: 10);
+      Background: #d9b572;
+    }
+
+    Label #LineQuoteText {
+      FlexWeight: 1;
+      Anchor: (Top: 6, Bottom: 6, Right: 8);
+      Style: $M.@BodyStyle;
+    }
+  }
+
   Group #LineRule {
     Anchor: (Height: 1, Top: 8, Bottom: 10);
     Background: $M.@LineSoft;
@@ -51,7 +98,103 @@ Group {
   // Common.ui fixes this button's height after the @Anchor spread, so the
   // anchor here only carries width and spacing.
   $C.@SmallSecondaryTextButton #LineLink {
-    @Anchor = (Width: 280, Bottom: 8);
+    @Anchor = (Width: 300, Bottom: 8);
     Visible: false;
+  }
+
+  // {{image:...}} — one icon with an optional caption beside it.
+  Group #LineImage {
+    LayoutMode: Left;
+    Anchor: (Height: 72, Bottom: 8);
+    Visible: false;
+
+    Group {
+      Anchor: (Width: 72, Height: 72, Right: 12);
+      Background: #0b1422(0.55);
+      LayoutMode: CenterMiddle;
+
+      AssetImage #LineImageIcon {
+        Anchor: (Width: 60, Height: 60);
+        AssetPath: "";
+        FallbackTexturePath: "UI/Custom/Pages/Memories/MissingIcon.png";
+      }
+    }
+
+    Label #LineImageCaption {
+      FlexWeight: 1;
+      Style: $M.@BodyMutedStyle;
+    }
+  }
+
+  // {{item:...}} — the item's slot, its in-game name and a caption.
+  Group #LineItem {
+    LayoutMode: Left;
+    Anchor: (Height: 56, Bottom: 8);
+    Visible: false;
+
+    ItemSlot #LineItemSlot {
+      Anchor: (Width: 52, Height: 52, Right: 12);
+      ShowQualityBackground: true;
+      ShowQuantity: false;
+    }
+
+    Group {
+      FlexWeight: 1;
+      LayoutMode: Top;
+
+      Label #LineItemName {
+        Anchor: (Height: 22, Top: 4);
+        Style: $M.@RowNameFitStyle;
+      }
+
+      Label #LineItemCaption {
+        Anchor: (Height: 18);
+        Style: $M.@RowMetaFitStyle;
+      }
+    }
+  }
+
+  // {{icons:...}} and {{items:...}} — up to eight in a row, then a caption.
+  Group #LineGallery {
+    LayoutMode: Top;
+    Anchor: (Bottom: 8);
+    Visible: false;
+
+    Group {
+      LayoutMode: Left;
+      Anchor: (Height: 48, Bottom: 4);
+
+      @Cell #Cell0 {}
+      @Cell #Cell1 {}
+      @Cell #Cell2 {}
+      @Cell #Cell3 {}
+      @Cell #Cell4 {}
+      @Cell #Cell5 {}
+      @Cell #Cell6 {}
+      @Cell #Cell7 {}
+    }
+
+    Label #LineGalleryCaption {
+      Anchor: (Height: 18);
+      Style: $M.@RowMetaFitStyle;
+    }
+  }
+
+  // {{page:...}} — the header over an embedded page's blocks.
+  Group #LineEmbed {
+    LayoutMode: Left;
+    Anchor: (Height: 26, Top: 6, Bottom: 6);
+    Background: #67a5da(0.10);
+    Visible: false;
+
+    Group {
+      Anchor: (Width: 3, Right: 10);
+      Background: #67a5da;
+    }
+
+    Label #LineEmbedTitle {
+      FlexWeight: 1;
+      Style: (...$M.@EyebrowBlueStyle, VerticalAlignment: Center);
+    }
   }
 }

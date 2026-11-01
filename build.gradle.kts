@@ -584,8 +584,9 @@ tasks.register("verifyVanillaIconPaths") {
                 }
             }
         }
+        val shipped = layout.projectDirectory.dir("src/main/resources/Common").asFile
         val missing = ZipFile(assetsZip).use { zip ->
-            referenced.filterKeys { zip.getEntry("Common/$it") == null }
+            referenced.filterKeys { zip.getEntry("Common/$it") == null && !File(shipped, it).isFile }
         }
         if (missing.isNotEmpty()) {
             throw GradleException(
@@ -593,7 +594,7 @@ tasks.register("verifyVanillaIconPaths") {
                     missing.entries.joinToString("\n  ") { (path, files) -> path + "  (" + files.joinToString() + ")" }
             )
         }
-        logger.lifecycle("verifyVanillaIconPaths: " + referenced.size + " icon path(s) found in " + assetsZip.name + ".")
+        logger.lifecycle("verifyVanillaIconPaths: " + referenced.size + " icon path(s) found in " + assetsZip.name + " or the mod.")
     }
 }
 tasks.named("check") { dependsOn("verifyVanillaIconPaths") }
@@ -784,6 +785,14 @@ tasks.register<JavaExec>("verifyShellShortcuts") {
     mainClass.set("org.hyzionstudios.mysticessentials.modules.shell.ShellShortcutsTest")
 }
 
+tasks.register<JavaExec>("verifyWikiMarkup") {
+    group = "verification"
+    description = "Checks the wiki markup's blocks, links, macros and search text."
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets.test.get().runtimeClasspath + configurations.compileClasspath.get()
+    mainClass.set("org.hyzionstudios.mysticessentials.modules.wiki.WikiMarkupTest")
+}
+
 tasks.register<JavaExec>("verifyAfkZoneGeometry") {
     group = "verification"
     description = "Checks AFK zones cover the whole blocks their corners were set in, everywhere."
@@ -809,6 +818,7 @@ tasks.named("check") {
         "verifyChatDelivery",
         "verifyAfkZoneGeometry",
         "verifyShellShortcuts",
+        "verifyWikiMarkup",
         "verifyLootBox",
         "verifyLootBoxSaga",
         "verifyLootBoxKeys",

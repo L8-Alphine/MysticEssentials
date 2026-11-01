@@ -33,21 +33,49 @@ the shell's own "Shortcuts" page lists the slots *that* player can actually use.
 A page can also carry its own `viewPermission`; readers without it do not see
 the page in the browser, the category counts, or by id.
 
+## Reading
+
+One window: search, categories and the page list on the left, the open page on
+the right with its icon, summary and category. Typing in the search box updates
+only the list, so the box keeps its focus. Links written inside the text appear
+as buttons under the page (up to four); a page link opens here, a `/command`
+runs as you once the window closes, and a web address is sent to your chat as
+a clickable line, since a game window cannot open a browser.
+
 ## Writing a page
 
-Press **New Page** in the browser, or **Edit** on any stored page. The markup is
-small on purpose — the people writing these pages are typing into a text box in
-game, not authoring with a preview pane:
+Press **New Page**, or **Edit** on any stored page. The editor shows the page
+rendered beside the text as you type (**Preview**), and an **Images** tab that
+searches every icon the server knows (its own, Hyzion's, the game's) and, once
+you type, every item: **click** one to add it to the body, **right-click** to
+make it the page's icon. The toolbar adds headings, lists, notes, rules, links,
+embeds and colours. The game tells the server nothing about the cursor, so the
+toolbar and pictures add **at the end** of the body.
 
 ```text
-## A heading
+## A heading                ### A smaller heading
 A paragraph. Blank lines separate paragraphs.
-- A bullet
----
-[[another-page]] on its own line becomes a button.
-Inline [[another-page|like this]] reads as a link and is
-collected into Related at the foot of the page.
+- A bullet                  > A note, in a gold-edged box
+---                         (a line across the page)
+&6Gold&r, <#67a5da>any colour</#67a5da>, <gradient:#d9b572:#67a5da>a gradient</gradient>
+[[another-page]] or [[another-page|a label]] on its own line: a button
+[Our Discord](https://discord.gg/...) or [Go to spawn](/spawn) on its own line: a button
+{{image:Hyzion Wiki|A caption}}       an icon: picker name, custom:name or a path
+{{item:Tool_Pickaxe_Copper|Your first pick}}
+{{icons:Hyzion Home, Hyzion Warp}}     up to eight icons in a row
+{{items:Plant_Fruit_Apple, Tool_Hatchet_Copper}}
+{{page:rules}}                        another page's text, shown here
 ```
+
+Links inside a paragraph are drawn blue and underlined and collected as buttons
+under the page: a line of text in this UI cannot hold a button of its own.
+An embedded page shows one level deep; an embed inside it becomes a link, so
+two pages that embed each other cannot loop. Anything a page names that does
+not exist — an icon, an item, a page — shows as a dim note saying so, which the
+preview puts in front of you while you write.
+
+Each stored page has an **icon** (the editor's Icon field): any picker name,
+`custom:<name>` or `item:<ItemId>`. Left empty it shows the wiki's book.
 
 The page id is taken from the title the first time you save (lowercased,
 hyphenated) and then **never changes** — renaming it would silently break every
@@ -60,7 +88,7 @@ pass through, because the people who can edit articles can already colour chat.
 
 ## Categories
 
-The browser's left rail lists categories in the order set by `categoryOrder`,
+The left column lists categories in the order set by `categoryOrder`,
 then anything else alphabetically — so a new category appears without a config
 edit. Selecting a category filters the list; **typing in the search box searches
 the whole wiki**, because a hit outside the selected category is still the

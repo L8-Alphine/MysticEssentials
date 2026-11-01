@@ -7,6 +7,7 @@ import java.util.List;
 import org.hyzionstudios.mysticessentials.api.Permissions;
 import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.modules.shell.MenuCatalog.MenuCard;
+import org.hyzionstudios.mysticessentials.platform.ui.HyzionIcons;
 import org.hyzionstudios.mysticessentials.platform.ui.MysticPage;
 
 import com.google.gson.JsonObject;
@@ -94,11 +95,13 @@ final class ShellPages {
                 ShortcutSlot slot) {
             String row = list + "[" + index + "]";
             cmd.append(list, SHORTCUT_ROW_UI);
-            boolean slotIcon = !slot.icon().isEmpty();
+            // A slot this player cannot use shows the padlock; its reason is on the row.
+            String icon = slot.available() ? slot.icon() : HyzionIcons.LOCK;
+            boolean slotIcon = !icon.isEmpty();
             cmd.set(row + " #SlotIcon.Visible", slotIcon);
             cmd.set(row + " #SlotGlyph.Visible", !slotIcon);
             if (slotIcon) {
-                cmd.set(row + " #SlotIcon.AssetPath", slot.icon());
+                cmd.set(row + " #SlotIcon.AssetPath", icon);
             } else {
                 cmd.set(row + " #SlotGlyph.TextSpans", uiText(row + " #SlotGlyph.TextSpans", slot.glyph()));
             }
@@ -113,7 +116,7 @@ final class ShellPages {
         }
 
         @Override
-        public void handleDataEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
+        protected void onEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
             JsonObject payload = parse(data);
             switch (string(payload, "action")) {
                 case "slot" -> {
@@ -219,7 +222,7 @@ final class ShellPages {
                 MenuCard card) {
             String row = list + "[" + index + "]";
             cmd.append(list, MENU_CARD_UI);
-            String icon = MenuCatalog.iconFor(card);
+            String icon = card.available() ? MenuCatalog.iconFor(card) : HyzionIcons.LOCK;
             cmd.set(row + " #CardIcon.Visible", !icon.isEmpty());
             cmd.set(row + " #CardGlyph.Visible", icon.isEmpty());
             if (!icon.isEmpty()) {
@@ -253,7 +256,7 @@ final class ShellPages {
         }
 
         @Override
-        public void handleDataEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
+        protected void onEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
             JsonObject payload = parse(data);
             switch (string(payload, "action")) {
                 case "section" -> reopen(ref, store,

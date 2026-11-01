@@ -372,7 +372,7 @@ public final class LootBoxPages {
         }
 
         @Override
-        public void handleDataEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
+        protected void onEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
             JsonObject payload = parse(data);
             switch (string(payload, "action")) {
                 case "preview" -> module.ui().openPreview(player, field(payload, "id"), null);
@@ -436,7 +436,7 @@ public final class LootBoxPages {
         }
 
         @Override
-        public void handleDataEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
+        protected void onEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
             if (!"open".equals(string(parse(data), "action"))) {
                 close(ref, store);
                 return;
@@ -486,7 +486,7 @@ public final class LootBoxPages {
         }
 
         @Override
-        public void handleDataEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
+        protected void onEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
             JsonObject payload = parse(data);
             if (!"confirm".equals(string(payload, "action"))) {
                 close(ref, store);
@@ -732,7 +732,7 @@ public final class LootBoxPages {
         }
 
         @Override
-        public void handleDataEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
+        protected void onEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
             if ("skip".equals(string(parse(data), "action"))) {
                 if (module.config().opening.allowSkip) {
                     land();
@@ -796,7 +796,7 @@ public final class LootBoxPages {
         }
 
         @Override
-        public void handleDataEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
+        protected void onEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
             if ("back".equals(string(parse(data), "action"))) {
                 module.ui().openCatalog(player);
                 return;
@@ -844,7 +844,7 @@ public final class LootBoxPages {
         }
 
         @Override
-        public void handleDataEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
+        protected void onEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
             JsonObject payload = parse(data);
             switch (string(payload, "action")) {
                 case "claim" -> module.ui().claim(player, field(payload, "id"));

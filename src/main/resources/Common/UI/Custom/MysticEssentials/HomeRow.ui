@@ -21,9 +21,12 @@ Button #Row {
     $M.@IconWell {
       @Anchor = (Right: 12);
 
-      Group #Swatch {
-        Anchor: (Width: 12, Height: 12);
-        Background: #d9b572;
+      // Vanilla icon (Common-rooted AssetPath), set by the server.
+      AssetImage #RowIcon {
+        Anchor: (Width: 22, Height: 22);
+        AssetPath: "";
+        FallbackTexturePath: "UI/Custom/Pages/Memories/MissingIcon.png";
+        Visible: false;
       }
     }
 

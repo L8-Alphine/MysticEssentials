@@ -3,6 +3,7 @@ package org.hyzionstudios.mysticessentials.modules.shell;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.hyzionstudios.mysticessentials.platform.ui.HyzionIcons;
 import org.hyzionstudios.mysticessentials.platform.ui.VanillaIcons;
 
 /**
@@ -180,9 +181,9 @@ public final class ShellConfig {
 
     /**
      * The icon a slot draws: its configured one, else the default for what it
-     * does, else none. Defaults come from vanilla's flat white category icons
-     * so the rail reads as one family; Party borrows the fist-bump emote,
-     * which only ships at 2x and is referenced by that exact file.
+     * does, else none. Defaults come from the shipped Hyzion family so the rail
+     * reads as one visual system. A configured vanilla, custom or raw asset
+     * path still wins over the default.
      */
     static String iconFor(Slot slot) {
         if (slot == null) {
@@ -199,17 +200,17 @@ public final class ShellConfig {
         String target = slot.target == null ? "" : slot.target.trim().toLowerCase(java.util.Locale.ROOT);
         return switch (ShortcutKind.parse(slot.kind)) {
             case CHANNEL -> switch (target) {
-                case "trade", "trading", "market" -> VanillaIcons.CONTAINER;
-                case "guild", "clan" -> VanillaIcons.SHIELDS;
-                case "party", "group" -> VanillaIcons.EMOTE_FIST_BUMP;
-                default -> VanillaIcons.SIGNS;
+                case "trade", "trading", "market" -> HyzionIcons.ECONOMY;
+                case "guild", "clan" -> HyzionIcons.GUILD;
+                case "party", "group" -> HyzionIcons.COMMUNITY;
+                default -> HyzionIcons.CHANNELS;
             };
-            case STORE -> VanillaIcons.ORE;
-            case WIKI -> VanillaIcons.RECIPE;
-            case WARPS -> VanillaIcons.PORTAL;
-            case SERVERS -> VanillaIcons.NATURAL;
-            case MENU -> VanillaIcons.TECHNICAL;
-            case COMMAND -> VanillaIcons.MISC;
+            case STORE -> HyzionIcons.SERVICES;
+            case WIKI -> HyzionIcons.WIKI;
+            case WARPS -> HyzionIcons.PORTAL;
+            case SERVERS -> HyzionIcons.SERVERS;
+            case MENU -> HyzionIcons.MENU;
+            case COMMAND -> HyzionIcons.MENU;
             case NONE -> "";
         };
     }

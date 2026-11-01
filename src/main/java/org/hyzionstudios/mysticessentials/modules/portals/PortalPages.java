@@ -142,7 +142,7 @@ final class PortalPages {
         }
 
         @Override
-        public void handleDataEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
+        protected void onEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
             if (!portals.canConfigure(player.getUuid())) {
                 close(ref, store);
                 return;

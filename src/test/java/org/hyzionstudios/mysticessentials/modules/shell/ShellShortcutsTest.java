@@ -67,8 +67,9 @@ public final class ShellShortcutsTest {
     private static void iconNamesResolve() {
         java.util.Set<String> names = new java.util.HashSet<>();
         java.util.Set<String> paths = new java.util.HashSet<>();
+        // The whole picker: Hyzion's family and the game's must not shadow each other.
         for (org.hyzionstudios.mysticessentials.platform.ui.VanillaIcons.Entry entry
-                : org.hyzionstudios.mysticessentials.platform.ui.VanillaIcons.PICKER) {
+                : org.hyzionstudios.mysticessentials.platform.ui.VanillaIcons.pickerWithCustom()) {
             require(names.add(entry.name().replace(" ", "").toLowerCase(java.util.Locale.ROOT)),
                     "picker name repeats: " + entry.name());
             require(paths.add(entry.path()), "picker path repeats: " + entry.path());

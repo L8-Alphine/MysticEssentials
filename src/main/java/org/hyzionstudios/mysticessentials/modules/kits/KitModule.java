@@ -401,7 +401,7 @@ public final class KitModule extends AbstractMysticModule {
         for (Map.Entry<String, KitConfig.Kit> entry : config.kits.entrySet()) {
             KitConfig.Kit kit = entry.getValue();
             String id = normalize(entry.getKey());
-            if (kit != null && canAccess(player, id, kit)) {
+            if (kit != null && (canAccess(player, id, kit) || config.showLockedKits)) {
                 visible.put(id, kit);
             }
         }

@@ -17,8 +17,8 @@ import org.hyzionstudios.mysticessentials.api.model.MailMessage;
 import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.core.message.MysticText;
 import org.hyzionstudios.mysticessentials.modules.mail.MailModule.ItemPick;
+import org.hyzionstudios.mysticessentials.platform.ui.HyzionIcons;
 import org.hyzionstudios.mysticessentials.platform.ui.MysticPage;
-import org.hyzionstudios.mysticessentials.platform.ui.VanillaIcons;
 
 import com.google.gson.JsonObject;
 import com.hypixel.hytale.component.Ref;
@@ -69,13 +69,13 @@ final class MailPages {
     /** The selectable areas of the Mail UI. */
     enum View {
         // Full-colour item renders: the flat icon set has no letters or bins.
-        INBOX("Inbox", VanillaIcons.LETTER),
-        COMPOSE("Compose", VanillaIcons.FEATHER),
-        SENT("Sent", VanillaIcons.SCROLL),
-        ARCHIVED("Archived", VanillaIcons.CHEST),
-        DELETED("Deleted", VanillaIcons.TRASH),
-        ANNOUNCEMENTS("Announcements", VanillaIcons.POSTER),
-        ATTACHMENTS("Attachments", VanillaIcons.PARCEL);
+        INBOX("Inbox", HyzionIcons.MAIL),
+        COMPOSE("Compose", HyzionIcons.COMPOSE),
+        SENT("Sent", HyzionIcons.SENT),
+        ARCHIVED("Archived", HyzionIcons.ARCHIVE),
+        DELETED("Deleted", HyzionIcons.TRASH),
+        ANNOUNCEMENTS("Announcements", HyzionIcons.ANNOUNCEMENT),
+        ATTACHMENTS("Attachments", HyzionIcons.ATTACHMENT);
 
         final String title;
         final String icon;
@@ -484,7 +484,7 @@ final class MailPages {
         // ----- Events --------------------------------------------------------
 
         @Override
-        public void handleDataEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
+        protected void onEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
             JsonObject payload = parse(data);
             switch (string(payload, "action")) {
                 case "view" -> {

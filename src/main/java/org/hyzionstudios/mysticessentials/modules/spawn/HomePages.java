@@ -10,6 +10,7 @@ import org.hyzionstudios.mysticessentials.api.model.Home;
 import org.hyzionstudios.mysticessentials.api.model.MysticLocation;
 import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.platform.Conversions;
+import org.hyzionstudios.mysticessentials.platform.ui.HyzionIcons;
 import org.hyzionstudios.mysticessentials.platform.ui.MysticPage;
 
 import com.google.gson.JsonObject;
@@ -59,6 +60,7 @@ final class HomePages {
                 Home home = homes.get(i);
                 String row = "#HomeList[" + i + "]";
                 cmd.append("#HomeList", HOME_ROW_UI);
+                setIcon(cmd, row + " #RowIcon", HyzionIcons.HOME);
                 cmd.set(row + " #Name.TextSpans", uiText(row + " #Name.TextSpans", home.getName()));
                 cmd.set(row + " #Meta.TextSpans", uiText(row + " #Meta.TextSpans", locationText(home.getLocation())));
                 cmd.set(row + " #Selected.Visible", home == selected);
@@ -88,7 +90,7 @@ final class HomePages {
         }
 
         @Override
-        public void handleDataEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
+        protected void onEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
             JsonObject payload = parse(data);
             String action = string(payload, "action");
             String homeName = field(payload, "home");

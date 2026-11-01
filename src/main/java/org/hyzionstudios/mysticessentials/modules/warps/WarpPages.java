@@ -10,6 +10,7 @@ import java.util.Map;
 import org.hyzionstudios.mysticessentials.api.model.MysticLocation;
 import org.hyzionstudios.mysticessentials.api.model.Warp;
 import org.hyzionstudios.mysticessentials.core.MysticCore;
+import org.hyzionstudios.mysticessentials.platform.ui.HyzionIcons;
 import org.hyzionstudios.mysticessentials.platform.ui.MysticPage;
 
 import com.google.gson.JsonObject;
@@ -86,7 +87,7 @@ final class WarpPages {
                 cmd.append("#WarpList", WARP_ROW_UI);
                 cmd.set(row + " #Name.TextSpans", uiText(row + " #Name.TextSpans", warp.getName()));
                 cmd.set(row + " #Meta.TextSpans", uiText(row + " #Meta.TextSpans", serverWarpMeta(warp)));
-                cmd.set(row + " #Swatch.Background", serverWarpColor(warp));
+                setIcon(cmd, row + " #RowIcon", serverWarpIcon(warp));
                 cmd.set(row + " #Selected.Visible", warp == selected);
                 event.addEventBinding(CustomUIEventBindingType.Activating, row,
                         new EventData().put("action", "select").put("warp", warp.getName()));
@@ -110,7 +111,7 @@ final class WarpPages {
         }
 
         @Override
-        public void handleDataEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
+        protected void onEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
             JsonObject payload = parse(data);
             String action = string(payload, "action");
             String warpName = field(payload, "warp");
@@ -211,7 +212,7 @@ final class WarpPages {
         }
 
         @Override
-        public void handleDataEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
+        protected void onEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
             JsonObject payload = parse(data);
             String action = string(payload, "action");
             switch (action) {
@@ -291,7 +292,7 @@ final class WarpPages {
                 cmd.append("#PwarpList", PLAYER_WARP_ROW_UI);
                 cmd.set(row + " #Name.TextSpans", uiText(row + " #Name.TextSpans", warp.getName()));
                 cmd.set(row + " #Meta.TextSpans", uiText(row + " #Meta.TextSpans", playerWarpMeta(warp)));
-                cmd.set(row + " #Swatch.Background", playerWarpColor(warp));
+                setIcon(cmd, row + " #RowIcon", HyzionIcons.WARP);
                 cmd.set(row + " #Selected.Visible", warp == selected);
                 event.addEventBinding(CustomUIEventBindingType.Activating, row,
                         new EventData().put("action", "select").put("warp", warp.getName()));
@@ -312,7 +313,7 @@ final class WarpPages {
         }
 
         @Override
-        public void handleDataEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
+        protected void onEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
             JsonObject payload = parse(data);
             String action = string(payload, "action");
             String warpName = field(payload, "warp");
@@ -374,7 +375,7 @@ final class WarpPages {
                 cmd.append("#OwnList", PLAYER_WARP_ROW_UI);
                 cmd.set(row + " #Name.TextSpans", uiText(row + " #Name.TextSpans", warp.getName()));
                 cmd.set(row + " #Meta.TextSpans", uiText(row + " #Meta.TextSpans", playerWarpMeta(warp)));
-                cmd.set(row + " #Swatch.Background", playerWarpColor(warp));
+                setIcon(cmd, row + " #RowIcon", HyzionIcons.WARP);
                 cmd.set(row + " #Selected.Visible", warp == selected);
                 event.addEventBinding(CustomUIEventBindingType.Activating, row,
                         new EventData().put("action", "select").put("warp", warp.getName()));
@@ -408,7 +409,7 @@ final class WarpPages {
         }
 
         @Override
-        public void handleDataEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
+        protected void onEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
             JsonObject payload = parse(data);
             String action = string(payload, "action");
             String warpName = field(payload, "warp");
@@ -507,19 +508,13 @@ final class WarpPages {
         return "by " + ownerText(warp) + " | " + cost;
     }
 
-    private static String serverWarpColor(Warp warp) {
-        if (warp.getCost() > 0) {
-            return "#FFAA00";
-        }
+    /** Who can see it, at a glance: open, permission-only (a key), or hidden (locked). */
+    private static String serverWarpIcon(Warp warp) {
         return switch (warp.getVisibility()) {
-            case PUBLIC -> "#55FF55";
-            case PERMISSION -> "#55FFFF";
-            case HIDDEN -> "#AAAAAA";
+            case PUBLIC -> HyzionIcons.WARP;
+            case PERMISSION -> HyzionIcons.KEY;
+            case HIDDEN -> HyzionIcons.LOCK;
         };
-    }
-
-    private static String playerWarpColor(Warp warp) {
-        return warp.getCost() > 0 ? "#FFAA00" : "#55FFFF";
     }
 
     /** Accepts an enum name or a dropdown index; {@code null} when unrecognised. */

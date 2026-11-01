@@ -21,6 +21,12 @@ public final class WikiArticle {
     public String summary = "";
     /** The page text. See {@code WikiMarkup} for the small markup it accepts. */
     public String body = "";
+    /**
+     * The page's picture in the list and its header: an icon reference
+     * ({@code Hyzion Wiki}, {@code Portal}, {@code custom:name}, a path) or
+     * {@code item:<ItemId>}. Empty draws the wiki's book.
+     */
+    public String icon = "";
     /** Extra words the search should match. */
     public List<String> tags = new ArrayList<>();
     /** Sort key within the category; lower sorts first. */

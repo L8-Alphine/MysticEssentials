@@ -17,6 +17,13 @@ The kit menu shows a preview of each kit's contents and its claim state (ready, 
 
 Set `firstJoinKit` to a kit name to grant it automatically the first time a player joins. Leave it blank to disable.
 
+## Locked kits
+
+A kit with `requirePermission` is listed with a **padlock** for players who lack
+`mysticessentials.kit.<id>`, so they can see what a rank unlocks. Set
+`showLockedKits` to `false` to hide such kits instead. Claiming still needs the
+permission either way.
+
 ## Anatomy of a kit
 
 Kits live in the `kits` map, keyed by a lowercase id (the id is what players type: `/kit starter`). Each kit combines items with optional gating:
@@ -30,6 +37,7 @@ Kits live in the `kits` map, keyed by a lowercase id (the id is what players typ
 | `requiredOnlineSeconds` | number | `0` | Total playtime a player must have before claiming; `0` = none |
 | `requirePermission` | boolean | `false` | When `true`, the kit also needs `mysticessentials.kit.<id>` |
 | `cost` | number | `0.0` | Economy cost per claim (needs VaultUnlocked) |
+| `icon` | string | `""` | The kit's picture in the Kits page. Empty: the kit's own items, shown in turn. `item:<ItemId>` shows one item. Anything else is an icon name (`Hyzion Armor`, `custom:<name>`, a path) |
 
 Each entry in `items` is `{ "itemId": "<HytaleItemId>", "quantity": <n> }`. Items that no longer resolve are skipped with a log line rather than failing the whole claim.
 

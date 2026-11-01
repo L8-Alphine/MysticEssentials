@@ -193,7 +193,7 @@ public final class WikiModule extends AbstractMysticModule implements WikiServic
 
     @Override
     public void open(PlayerRef player) {
-        core.platform().openPage(player, new WikiPages.BrowserPage(core, this, player));
+        core.platform().openPage(player, new WikiPages.ReaderPage(core, this, player, null, "", ""));
     }
 
     @Override
@@ -202,7 +202,7 @@ public final class WikiModule extends AbstractMysticModule implements WikiServic
             open(player);
             return;
         }
-        core.platform().openPage(player, new WikiPages.ArticlePage(core, this, player, key(articleId)));
+        core.platform().openPage(player, new WikiPages.ReaderPage(core, this, player, null, "", key(articleId)));
     }
 
     @Override
@@ -268,7 +268,7 @@ public final class WikiModule extends AbstractMysticModule implements WikiServic
      * @param stored whether it can be edited here
      */
     record WikiPage(String id, String title, String category, String summary, String body,
-            List<String> tags, int order, boolean stored, String footer) {
+            List<String> tags, int order, boolean stored, String footer, String icon) {
     }
 
     /** @return every page this player may read, ordered by category then order then title. */
@@ -320,7 +320,7 @@ public final class WikiModule extends AbstractMysticModule implements WikiServic
                 article.summary == null ? "" : article.summary,
                 article.body == null ? "" : article.body,
                 article.tags == null ? List.of() : List.copyOf(article.tags),
-                article.order, true, footer(article));
+                article.order, true, footer(article), article.icon == null ? "" : article.icon);
     }
 
     /**
@@ -335,7 +335,7 @@ public final class WikiModule extends AbstractMysticModule implements WikiServic
             String body = entry.body().apply(player);
             return new WikiPage(key(entry.id()), entry.title(), entry.category(), entry.summary(),
                     body == null ? "" : body, entry.tags(), entry.order(), false,
-                    "Provided by another mod");
+                    "Provided by another mod", "");
         } catch (Throwable t) {
             core.log(java.util.logging.Level.WARNING,
                     "Wiki entry '" + entry.id() + "' failed to render: " + t);
@@ -489,8 +489,8 @@ public final class WikiModule extends AbstractMysticModule implements WikiServic
                     }
                     // Not an id: treat the whole line as a search, which is
                     // what someone typing /wiki how do i claim land meant.
-                    core.platform().openPage(player, new WikiPages.BrowserPage(
-                            core, WikiModule.this, player, null, sender.argString()));
+                    core.platform().openPage(player, new WikiPages.ReaderPage(
+                            core, WikiModule.this, player, null, sender.argString(), ""));
                 }
             }
         }

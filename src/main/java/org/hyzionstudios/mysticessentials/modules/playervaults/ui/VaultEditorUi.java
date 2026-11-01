@@ -179,7 +179,7 @@ final class VaultEditorUi extends MysticPage {
     }
 
     @Override
-    public void handleDataEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
+    protected void onEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
         JsonObject payload = parse(data);
         switch (string(payload, "action")) {
             case "apply" -> {

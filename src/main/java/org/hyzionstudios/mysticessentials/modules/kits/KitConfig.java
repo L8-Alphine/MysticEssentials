@@ -19,6 +19,12 @@ public final class KitConfig {
     /** Kit granted automatically on first join; blank disables. */
     public String firstJoinKit = "starter";
 
+    /**
+     * List kits a player has no permission for, with a padlock, rather than
+     * hiding them. Claiming still needs the permission.
+     */
+    public boolean showLockedKits = true;
+
     public Map<String, Kit> kits = defaultKits();
 
     /**
@@ -46,6 +52,12 @@ public final class KitConfig {
         public double cost = 0.0;
         /** Optional description shown in /kit list. */
         public String description;
+        /**
+         * The kit's picture in the Kits page. Empty: the kit's own items, in
+         * turn. {@code item:<ItemId>} shows one item. Anything else is an icon:
+         * a picker name ({@code Chest}), {@code custom:<name>} or a path.
+         */
+        public String icon = "";
     }
 
     public static final class KitItem {

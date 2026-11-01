@@ -86,7 +86,7 @@ public final class ConfirmActionPage extends MysticPage {
     }
 
     @Override
-    public void handleDataEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
+    protected void onEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
         if (!"confirm".equals(string(parse(data), "action"))) {
             onCancel.run(ref, store);
             return;

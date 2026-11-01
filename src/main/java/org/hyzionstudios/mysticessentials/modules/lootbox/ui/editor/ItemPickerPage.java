@@ -149,7 +149,7 @@ public final class ItemPickerPage extends MysticPage {
     }
 
     @Override
-    public void handleDataEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
+    protected void onEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
         if (!allowed(ref, store)) {
             return;
         }

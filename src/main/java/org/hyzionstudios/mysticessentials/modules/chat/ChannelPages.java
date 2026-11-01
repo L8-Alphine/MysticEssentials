@@ -123,7 +123,7 @@ final class ChannelPages {
         }
 
         @Override
-        public void handleDataEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
+        protected void onEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
             JsonObject payload = parse(data);
             String action = string(payload, "action");
             String channel = field(payload, "channel");
@@ -219,7 +219,7 @@ final class ChannelPages {
         }
 
         @Override
-        public void handleDataEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
+        protected void onEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
             JsonObject payload = parse(data);
             String action = string(payload, "action");
             if (action.equals("create")) {
@@ -310,7 +310,7 @@ final class ChannelPages {
         }
 
         @Override
-        public void handleDataEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
+        protected void onEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
             JsonObject payload = parse(data);
             String action = string(payload, "action");
             switch (action) {
@@ -378,7 +378,7 @@ final class ChannelPages {
         }
 
         @Override
-        public void handleDataEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
+        protected void onEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
             String action = string(parse(data), "action");
             switch (action) {
                 case "full" -> reopen(ref, store, new ChannelMembersPage(core, channels, player, channelId, ""));
@@ -442,7 +442,7 @@ final class ChannelPages {
         }
 
         @Override
-        public void handleDataEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
+        protected void onEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
             JsonObject payload = parse(data);
             String action = string(payload, "action");
             switch (action) {
@@ -541,7 +541,7 @@ final class ChannelPages {
         }
 
         @Override
-        public void handleDataEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
+        protected void onEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
             JsonObject payload = parse(data);
             String action = string(payload, "action");
             if (action.equals("back")) {

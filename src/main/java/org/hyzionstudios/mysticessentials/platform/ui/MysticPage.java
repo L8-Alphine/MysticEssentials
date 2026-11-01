@@ -2,6 +2,9 @@ package org.hyzionstudios.mysticessentials.platform.ui;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.logging.Level;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -31,6 +34,15 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
  * a separate row-template {@code .ui} file is appended once per entry with
  * {@code cmd.append("#List", "MysticEssentials/Row.ui")}; the appended rows are
  * then addressed by index — {@code cmd.set("#List[0] #Name.TextSpans", ...)}.</p>
+ *
+ * <p><b>Every event gets an answer.</b> A binding made with
+ * {@code addEventBinding(type, selector, data)} locks the client's page behind
+ * "Loading..." until the server sends that page something. A handler that only
+ * chats, or whose next page fails to build, used to leave the player locked
+ * out. Subclasses therefore implement {@link #onEvent}; {@link #handleDataEvent}
+ * wraps it, logs anything it throws, and unlocks the page if the handler sent
+ * nothing — at once after a failure, and after {@link #ANSWER_GRACE_MS} otherwise,
+ * which leaves room for handlers that answer after async work.</p>
  */
 public abstract class MysticPage extends CustomUIPage {
 
@@ -56,6 +68,7 @@ public abstract class MysticPage extends CustomUIPage {
     private static final String GOLD_SOFT = "#E7CE9B";
     private static final String WARN = "#E8BC63";
     private static final String DANGER = "#E48786";
+    private static final String BLUE = "#8FC2EC";
     /** {@code @ColorButtonText} in the game's Common.ui. */
     private static final String BUTTON_TEXT = "#BFCDD5";
     private static final Pattern TEXT_TARGET =
@@ -249,6 +262,26 @@ public abstract class MysticPage extends CustomUIPage {
             Map.entry("KeysHint", TEXT_MUTED),
             Map.entry("RulesNote", TEXT_MUTED),
             Map.entry("Unread", "#E7CE9B"),
+            // Wiki body lines (the label styles are overridden by TextSpans colour)
+            Map.entry("LineHeading", GOLD_SOFT),
+            Map.entry("LineSubheading", TEXT_HI),
+            Map.entry("LineBulletText", TEXT_MUTED),
+            Map.entry("LineQuoteText", TEXT_BODY),
+            Map.entry("LineImageCaption", TEXT_MUTED),
+            Map.entry("LineItemName", TEXT_HI),
+            Map.entry("LineItemCaption", TEXT_MUTED),
+            Map.entry("LineGalleryCaption", TEXT_MUTED),
+            Map.entry("LineEmbedTitle", BLUE),
+            Map.entry("LineLink", BUTTON_TEXT),
+            Map.entry("WikiRowTitle", TEXT_HI),
+            Map.entry("WikiRowSummary", TEXT_MUTED),
+            Map.entry("WikiRowSource", TEXT_FAINT),
+            Map.entry("ArticleTitle", TEXT_HI),
+            Map.entry("ArticleSummary", TEXT_MUTED),
+            Map.entry("ArticleCategory", GOLD_SOFT),
+            Map.entry("ArticleFooter", TEXT_DIM),
+            Map.entry("EditorStatus", TEXT_MUTED),
+            Map.entry("ImageHint", TEXT_MUTED),
             // Server Browser
             Map.entry("BrowserContext", TEXT_DIM),
             Map.entry("BrowserSummary", TEXT_MUTED),
@@ -276,8 +309,19 @@ public abstract class MysticPage extends CustomUIPage {
      */
     public static final int MAX_LIST_ROWS = 150;
 
+    /**
+     * How long a handler that sent nothing synchronously gets to answer from
+     * async work before the page is unlocked anyway.
+     */
+    static final long ANSWER_GRACE_MS = 1200;
+
+    /** Set when the running handler answered: reopened, closed or updated a page. */
+    private static final ThreadLocal<Boolean> ANSWERED = new ThreadLocal<>();
+
     protected final MysticCore core;
     protected final PlayerRef player;
+    /** Updates sent to this page instance, so a late fallback can see an async answer. */
+    private final AtomicInteger updates = new AtomicInteger();
 
     protected MysticPage(MysticCore core, PlayerRef player, CustomPageLifetime lifetime) {
         super(player, lifetime);
@@ -328,6 +372,19 @@ public abstract class MysticPage extends CustomUIPage {
         }
     }
 
+    /**
+     * Shows a Common-rooted icon in the {@code AssetImage} at {@code selector},
+     * or hides it when {@code path} is empty.
+     */
+    protected static void setIcon(com.hypixel.hytale.server.core.ui.builder.UICommandBuilder cmd,
+            String selector, String path) {
+        boolean shown = path != null && !path.isBlank();
+        cmd.set(selector + ".Visible", shown);
+        if (shown) {
+            cmd.set(selector + ".AssetPath", path);
+        }
+    }
+
     /** @return at most {@link #MAX_LIST_ROWS} of {@code rows}, for drawing. */
     protected static <T> List<T> capRows(List<T> rows) {
         return rows.size() <= MAX_LIST_ROWS ? rows : rows.subList(0, MAX_LIST_ROWS);
@@ -345,25 +402,145 @@ public abstract class MysticPage extends CustomUIPage {
         return shown + " of " + total + " " + noun + " \u2014 search to narrow";
     }
 
-    /** Replaces the current page with {@code page} (must be called from {@code handleDataEvent}). */
-    protected static void reopen(Ref<EntityStore> ref, Store<EntityStore> store, CustomUIPage page) {
+    /**
+     * Handles one page event. Override this, not {@link #handleDataEvent}: the
+     * wrapper guarantees the client is never left on "Loading...".
+     */
+    protected void onEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
+    }
+
+    @Override
+    public final void handleDataEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
+        int before = updates.get();
+        ANSWERED.set(Boolean.FALSE);
+        boolean failed = false;
         try {
-            Player entity = store.getComponent(ref, Player.getComponentType());
-            if (entity != null) {
-                entity.getPageManager().openCustomPage(ref, store, page);
+            onEvent(ref, store, data);
+        } catch (Throwable t) {
+            failed = true;
+            if (core != null) {
+                core.log(Level.SEVERE, getClass().getSimpleName() + " failed to handle " + brief(data), t);
             }
-        } catch (Throwable ignored) {
-            // If the refresh fails the action still ran; the player can reopen the page.
+            player.sendMessage(Message.raw("That did not work. The server owner can see why in the log."));
+        } finally {
+            boolean answered = Boolean.TRUE.equals(ANSWERED.get());
+            ANSWERED.remove();
+            if (failed) {
+                unlockIfCurrent(ref, store);
+            } else if (!answered) {
+                unlockLater(ref, store, before);
+            }
         }
     }
 
-    /** Closes the currently open page (must be called from {@code handleDataEvent}). */
+    /** Sends an empty update now if this page is still the one on screen. */
+    private void unlockIfCurrent(Ref<EntityStore> ref, Store<EntityStore> store) {
+        try {
+            Player entity = store.getComponent(ref, Player.getComponentType());
+            if (entity != null && entity.getPageManager().getCustomPage() == this) {
+                sendUpdate();
+            }
+        } catch (Throwable ignored) {
+            // The player left; nothing to unlock.
+        }
+    }
+
+    /**
+     * Unlocks after the grace period unless something answered in the
+     * meantime: an update to this page, or another page (or none) taking its
+     * place.
+     */
+    private void unlockLater(Ref<EntityStore> ref, Store<EntityStore> store, int before) {
+        if (core == null) {
+            unlockIfCurrent(ref, store);
+            return;
+        }
+        try {
+            var world = store.getExternalData().getWorld();
+            core.scheduler().runLater(() -> world.execute(() -> {
+                if (ref.isValid() && updates.get() == before) {
+                    unlockIfCurrent(ref, store);
+                }
+            }), ANSWER_GRACE_MS, TimeUnit.MILLISECONDS);
+        } catch (Throwable t) {
+            unlockIfCurrent(ref, store);
+        }
+    }
+
+    @Override
+    protected void sendUpdate(com.hypixel.hytale.server.core.ui.builder.UICommandBuilder commandBuilder,
+            boolean clear) {
+        updates.incrementAndGet();
+        ANSWERED.set(Boolean.TRUE);
+        super.sendUpdate(commandBuilder, clear);
+    }
+
+    /**
+     * Sends an update that also binds events — for rows appended by the update,
+     * which would otherwise be dead. The engine's own form of this lives on
+     * {@code InteractiveCustomUIPage}; pages here are plain {@code CustomUIPage}s,
+     * so this writes the same packet. Call it from {@link #onEvent} (the world
+     * thread).
+     */
+    protected void sendUpdate(com.hypixel.hytale.server.core.ui.builder.UICommandBuilder commandBuilder,
+            com.hypixel.hytale.server.core.ui.builder.UIEventBuilder eventBuilder) {
+        updates.incrementAndGet();
+        ANSWERED.set(Boolean.TRUE);
+        Ref<EntityStore> ref = player.getReference();
+        if (ref == null) {
+            return;
+        }
+        Player entity = ref.getStore().getComponent(ref, Player.getComponentType());
+        if (entity == null) {
+            return;
+        }
+        entity.getPageManager().updateLegacyCustomPage(new com.hypixel.hytale.protocol.packets.interface_.CustomPage(
+                getClass().getName(), false, false, lifetime,
+                commandBuilder.getCommands(), eventBuilder.getEvents()));
+    }
+
+    private static String brief(String data) {
+        if (data == null) {
+            return "an empty event";
+        }
+        return data.length() <= 160 ? data : data.substring(0, 160) + "...";
+    }
+
+    /**
+     * Replaces the current page with {@code page} (call from {@link #onEvent}).
+     * If the new page cannot be built, the failure is logged and the old page
+     * is closed rather than left locked.
+     */
+    protected static void reopen(Ref<EntityStore> ref, Store<EntityStore> store, CustomUIPage page) {
+        Player entity = null;
+        try {
+            entity = store.getComponent(ref, Player.getComponentType());
+            if (entity != null) {
+                entity.getPageManager().openCustomPage(ref, store, page);
+                ANSWERED.set(Boolean.TRUE);
+            }
+        } catch (Throwable t) {
+            if (page instanceof MysticPage mystic && mystic.core != null) {
+                mystic.core.log(Level.SEVERE, "Could not open " + page.getClass().getSimpleName(), t);
+            }
+            if (entity != null) {
+                close(ref, store);
+                if (page instanceof MysticPage mystic) {
+                    mystic.player.sendMessage(Message.raw(
+                            "That page could not open. The server owner can see why in the log."));
+                }
+            }
+        }
+    }
+
+    /** Closes the currently open page (call from {@link #onEvent}). */
     protected static void close(Ref<EntityStore> ref, Store<EntityStore> store) {
         try {
             Player entity = store.getComponent(ref, Player.getComponentType());
             if (entity != null) {
                 entity.getPageManager().setPage(ref, store,
                         Page.None);
+                ANSWERED.set(Boolean.TRUE);
             }
         } catch (Throwable ignored) {
             // The player can close the page manually.

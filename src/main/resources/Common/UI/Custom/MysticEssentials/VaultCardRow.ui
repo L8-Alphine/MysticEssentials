@@ -29,6 +29,14 @@ Button #Row {
         ShowQualityBackground: true;
         ShowQuantity: false;
       }
+
+      // Shown instead of the item on a vault this player cannot open.
+      AssetImage #Lock {
+        Anchor: (Width: 26, Height: 26);
+        AssetPath: "";
+        FallbackTexturePath: "UI/Custom/Pages/Memories/MissingIcon.png";
+        Visible: false;
+      }
     }
 
     Group {

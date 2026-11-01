@@ -158,6 +158,11 @@ final class VaultListUi extends MysticPage {
             cmd.set(row + " #Name.TextSpans", uiText(row + " #Name.TextSpans", card.name));
             cmd.set(row + " #Number.TextSpans", uiText(row + " #Number.TextSpans", "#" + card.number));
             cmd.set(row + " #Icon.ItemId", iconItemId(card.vault));
+            cmd.set(row + " #Icon.Visible", card.accessible);
+            cmd.set(row + " #Lock.Visible", !card.accessible);
+            if (!card.accessible) {
+                cmd.set(row + " #Lock.AssetPath", org.hyzionstudios.mysticessentials.platform.ui.HyzionIcons.LOCK);
+            }
             cmd.set(row + " #Meta.TextSpans", uiText(row + " #Meta.TextSpans", card.used + " / " + card.capacity + " slots  |  " + card.rows + " rows"));
             cmd.set(row + " #Status.TextSpans", uiText(row + " #Status.TextSpans", statusText(card.accessible, card.overflow)));
             cmd.set(row + " #Swatch.Background", swatchColor(card.accessible, card.vault));
@@ -209,7 +214,7 @@ final class VaultListUi extends MysticPage {
     // ----- Events ---------------------------------------------------------------
 
     @Override
-    public void handleDataEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
+    protected void onEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
         var payload = parse(data);
         switch (string(payload, "action")) {
             case "tab" -> reopen(ref, store, with(string(payload, "tab"), query, sortKey));

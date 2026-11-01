@@ -107,8 +107,10 @@ final class RailEditorPage extends MysticPage {
 
         String chosen = nullToEmpty(draft.icon).isBlank() || "none".equalsIgnoreCase(draft.icon.trim())
                 ? "" : VanillaIcons.resolve(draft.icon);
-        for (int i = 0; i < VanillaIcons.PICKER.size(); i++) {
-            VanillaIcons.Entry entry = VanillaIcons.PICKER.get(i);
+        // The server's own icons (mods/MysticEssentials/icons) first, then the game's.
+        List<VanillaIcons.Entry> picker = capRows(VanillaIcons.pickerWithCustom());
+        for (int i = 0; i < picker.size(); i++) {
+            VanillaIcons.Entry entry = picker.get(i);
             String tile = "#IconGrid[" + i + "]";
             cmd.append("#IconGrid", ICON_TILE_UI);
             cmd.set(tile + " #TileIcon.AssetPath", entry.path());
@@ -120,8 +122,13 @@ final class RailEditorPage extends MysticPage {
         cmd.set("#EnabledButton.TextSpans", uiText("#EnabledButton.TextSpans",
                 draft.enabled ? "&aEnabled" : "&7Disabled"));
 
+        // Not locking, and answered with an update that touches only the hints.
+        // The page sets this dropdown's Value as it builds; if that raises
+        // ValueChanged before the client has acknowledged the page, the engine
+        // drops the event, and a locking binding would then sit on "Loading..."
+        // for good. Rebuilding here would set Value again and could loop.
         event.addEventBinding(CustomUIEventBindingType.ValueChanged, "#KindInput",
-                form(new EventData().put("action", "kind")));
+                new EventData().put("action", "kind").append("@kind", "#KindInput.Value"), false);
         event.addEventBinding(CustomUIEventBindingType.Activating, "#IconDefaultButton",
                 form(new EventData().put("action", "icon").put("icon", "")));
         event.addEventBinding(CustomUIEventBindingType.Activating, "#IconLetterButton",
@@ -190,7 +197,7 @@ final class RailEditorPage extends MysticPage {
     }
 
     @Override
-    public void handleDataEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
+    protected void onEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
         JsonObject payload = parse(data);
         if (!player.hasPermission(Permissions.SHELL_ADMIN)) {
             shell.tell(player, "You can no longer edit the shortcut rail.");
@@ -202,7 +209,13 @@ final class RailEditorPage extends MysticPage {
                 int index = (int) parseDouble(field(payload, "slot"), selected);
                 reopen(ref, store, new RailEditorPage(core, shell, player, clampSlot(index)));
             }
-            case "kind" -> reopen(ref, store, new RailEditorPage(core, shell, player, selected, withForm(payload)));
+            case "kind" -> {
+                ShortcutKind kind = ShortcutKind.parse(field(payload, "kind"));
+                UICommandBuilder hints = new UICommandBuilder();
+                hints.set("#KindHint.TextSpans", uiText("#KindHint.TextSpans", kindHint(kind)));
+                hints.set("#TargetHint.TextSpans", uiText("#TargetHint.TextSpans", targetHint(kind)));
+                sendUpdate(hints);
+            }
             case "icon" -> {
                 ShellConfig.Slot next = withForm(payload);
                 next.icon = field(payload, "icon");

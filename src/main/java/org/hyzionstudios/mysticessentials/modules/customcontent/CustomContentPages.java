@@ -154,11 +154,13 @@ final class CustomContentPages {
 
         private static void bind(UIEventBuilder event, String selector, CustomUIEventBindingType type,
                 EventData data) {
-            event.addEventBinding(type, selector, data);
+            // ValueChanged fires per keystroke (and possibly when the page sets a
+            // value); a locking binding would put "Loading..." over every one.
+            event.addEventBinding(type, selector, data, type != CustomUIEventBindingType.ValueChanged);
         }
 
         @Override
-        public void handleDataEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
+        protected void onEvent(Ref<EntityStore> ref, Store<EntityStore> store, String data) {
             JsonObject payload = parse(data);
             String action = string(payload, "action");
             saveVisibleFields(payload);
