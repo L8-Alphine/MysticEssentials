@@ -67,7 +67,7 @@ final class RailEditorPage extends MysticPage {
         cmd.set("#EditorContext.TextSpans", uiText("#EditorContext.TextSpans", "Changes apply to every player"));
         cmd.set("#EditorNote.TextSpans", uiText("#EditorNote.TextSpans",
                 "Save redraws every player's rail at once. Slot numbers are fixed: "
-                        + "Alt+N and /N always run slot N."));
+                        + "Alt+N and /N always run slot N, except an Alt digit another mod already uses."));
 
         for (int index = 1; index <= 9; index++) {
             renderSlotRow(cmd, event, index);

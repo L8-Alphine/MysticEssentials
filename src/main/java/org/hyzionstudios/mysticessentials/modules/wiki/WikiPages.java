@@ -2,7 +2,6 @@ package org.hyzionstudios.mysticessentials.modules.wiki;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -108,7 +107,7 @@ final class WikiPages {
             List<WikiPage> visible = new ArrayList<>();
             for (WikiPage page : all) {
                 boolean keep = query.isBlank()
-                        ? category == null || page.category().equalsIgnoreCase(category)
+                        ? category == null || WikiCategories.within(page.category(), category)
                         : WikiModule.matches(page, query);
                 if (keep) {
                     visible.add(page);
@@ -117,33 +116,38 @@ final class WikiPages {
             return visible;
         }
 
+        /**
+         * "All Pages", then the category tree: the top level always, and the
+         * sub-categories of every node on the way to the selected one.
+         */
         private void renderCategories(UICommandBuilder cmd, UIEventBuilder event, List<WikiPage> all,
                 List<String> categories) {
-            Map<String, Integer> counts = new LinkedHashMap<>();
-            counts.put("", all.size());
-            for (String name : categories) {
-                int count = 0;
-                for (WikiPage page : all) {
-                    if (page.category().equalsIgnoreCase(name)) {
-                        count++;
-                    }
-                }
-                counts.put(name, count);
+            List<String> pageCategories = new ArrayList<>(all.size());
+            for (WikiPage page : all) {
+                pageCategories.add(page.category());
             }
-            int index = 0;
-            for (Map.Entry<String, Integer> entry : counts.entrySet()) {
-                String row = "#CategoryList[" + index++ + "]";
-                cmd.append("#CategoryList", CATEGORY_ROW_UI);
-                boolean everything = entry.getKey().isEmpty();
-                cmd.set(row + " #CategoryName.TextSpans", uiText(row + " #CategoryName.TextSpans",
-                        everything ? "All Pages" : entry.getKey()));
-                cmd.set(row + " #CategoryCount.TextSpans",
-                        uiText(row + " #CategoryCount.TextSpans", String.valueOf(entry.getValue())));
-                cmd.set(row + " #CategorySelected.Visible",
-                        everything ? category == null : entry.getKey().equalsIgnoreCase(category));
-                event.addEventBinding(CustomUIEventBindingType.Activating, row,
-                        new EventData().put("action", "category").put("category", entry.getKey()));
+            categoryRow(cmd, event, 0, "", "All Pages", 0, all.size(), "", category == null);
+            int index = 1;
+            for (WikiCategories.Node node : WikiCategories.rows(categories, pageCategories, category)) {
+                String arrow = !node.hasChildren() ? "" : node.open() ? "–" : "+";
+                categoryRow(cmd, event, index++, node.path(), node.name(), node.depth(), node.count(), arrow,
+                        node.selected());
             }
+        }
+
+        private void categoryRow(UICommandBuilder cmd, UIEventBuilder event, int index, String path, String name,
+                int depth, int count, String arrow, boolean selected) {
+            String row = "#CategoryList[" + index + "]";
+            cmd.append("#CategoryList", CATEGORY_ROW_UI);
+            for (int level = 1; level <= Math.min(depth, WikiCategories.MAX_INDENT); level++) {
+                cmd.set(row + " #Indent" + level + ".Visible", true);
+            }
+            cmd.set(row + " #CategoryArrow.TextSpans", uiText(row + " #CategoryArrow.TextSpans", arrow));
+            cmd.set(row + " #CategoryName.TextSpans", uiText(row + " #CategoryName.TextSpans", name));
+            cmd.set(row + " #CategoryCount.TextSpans", uiText(row + " #CategoryCount.TextSpans", String.valueOf(count)));
+            cmd.set(row + " #CategorySelected.Visible", selected);
+            event.addEventBinding(CustomUIEventBindingType.Activating, row,
+                    new EventData().put("action", "category").put("category", path));
         }
 
         private void renderList(UICommandBuilder cmd, UIEventBuilder event, List<WikiPage> visible, String openId) {
@@ -155,7 +159,7 @@ final class WikiPages {
                 WikiRenderer.pageIcon(cmd, row + " #WikiRowIcon", row + " #WikiRowItem", page.icon());
                 cmd.set(row + " #WikiRowTitle.TextSpans", uiText(row + " #WikiRowTitle.TextSpans", page.title()));
                 cmd.set(row + " #WikiRowSummary.TextSpans", uiText(row + " #WikiRowSummary.TextSpans",
-                        page.summary().isBlank() ? page.category() : page.summary()));
+                        page.summary().isBlank() ? WikiCategories.display(page.category()) : page.summary()));
                 cmd.set(row + " #WikiRowSource.TextSpans",
                         uiText(row + " #WikiRowSource.TextSpans", page.stored() ? "" : "Mod"));
                 cmd.set(row + " #WikiRowSelected.Visible", page.id().equals(openId));
@@ -182,7 +186,8 @@ final class WikiPages {
             WikiRenderer.pageIcon(cmd, "#ArticleIcon", "#ArticleItem", page.icon());
             cmd.set("#ArticleTitle.TextSpans", uiText("#ArticleTitle.TextSpans", page.title()));
             cmd.set("#ArticleSummary.TextSpans", uiText("#ArticleSummary.TextSpans", page.summary()));
-            cmd.set("#ArticleCategory.TextSpans", uiText("#ArticleCategory.TextSpans", page.category()));
+            cmd.set("#ArticleCategory.TextSpans", uiText("#ArticleCategory.TextSpans",
+                    WikiCategories.display(page.category())));
             cmd.set("#ArticleFooter.TextSpans", uiText("#ArticleFooter.TextSpans", page.footer()));
 
             // A very long article is one very large packet; draw the first
@@ -596,7 +601,7 @@ final class WikiPages {
             WikiArticle article = wiki.stored(id).orElseGet(WikiArticle::new);
             article.id = id;
             article.title = title;
-            article.category = blankTo(field(payload, "category").trim(), "General");
+            article.category = WikiCategories.normalize(field(payload, "category"));
             article.summary = field(payload, "summary").trim();
             article.icon = field(payload, "icon").trim();
             article.viewPermission = field(payload, "permission").trim();
@@ -624,10 +629,6 @@ final class WikiPages {
                     .replaceAll("[^a-z0-9]+", "-")
                     .replaceAll("(^-+)|(-+$)", "");
             return slug.length() > 64 ? slug.substring(0, 64) : slug;
-        }
-
-        private static String blankTo(String value, String fallback) {
-            return value == null || value.isBlank() ? fallback : value;
         }
     }
 }

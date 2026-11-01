@@ -52,8 +52,24 @@ public final class WikiModule extends AbstractMysticModule implements WikiServic
     /** Stored articles by id. Guarded by this module's monitor. */
     private Map<String, WikiArticle> articles = new LinkedHashMap<>();
 
-    /** Pages other mods registered, in registration order. */
-    private final Map<String, WikiEntry> entries = new LinkedHashMap<>();
+    /**
+     * Pages other mods registered, in registration order. Synchronized: mods
+     * register from their own threads while world threads read; iterate only
+     * over {@link #entrySnapshot()}.
+     */
+    private final Map<String, WikiEntry> entries = java.util.Collections.synchronizedMap(new LinkedHashMap<>());
+
+    /**
+     * An icon and footer for an entry the wiki contributes itself (the
+     * installed-mods pages). The public {@link WikiEntry} has neither, and
+     * changing that record would break every mod already built against it.
+     */
+    record EntryLook(String icon, String footer) {
+    }
+
+    private final Map<String, EntryLook> looks = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private ModWikiPages modPages;
 
     private WikiConfig config = new WikiConfig();
 
@@ -71,7 +87,9 @@ public final class WikiModule extends AbstractMysticModule implements WikiServic
             }
         }
         registerCommand(new WikiCommand());
-        log("Enabled: " + articles.size() + " stored articles");
+        modPages = new ModWikiPages(core, this);
+        int mods = modPages.publish();
+        log("Enabled: " + articles.size() + " stored articles, pages for " + mods + " installed mods");
     }
 
     @Override
@@ -83,12 +101,16 @@ public final class WikiModule extends AbstractMysticModule implements WikiServic
             // made in game was already saved as it was made.
             articles = load();
         }
+        if (modPages != null) {
+            modPages.publish();
+        }
     }
 
     @Override
     public void onDisable() {
         save();
         entries.clear();
+        looks.clear();
     }
 
     WikiConfig config() {
@@ -168,8 +190,16 @@ public final class WikiModule extends AbstractMysticModule implements WikiServic
         return true;
     }
 
+    /** Registers an entry of the wiki's own, with the icon and footer it shows. */
+    void registerEntry(WikiEntry entry, String icon, String footer) {
+        if (registerEntry(entry)) {
+            looks.put(key(entry.id()), new EntryLook(icon == null ? "" : icon, footer == null ? "" : footer));
+        }
+    }
+
     @Override
     public boolean unregisterEntry(String id) {
+        looks.remove(key(id));
         return id != null && entries.remove(key(id)) != null;
     }
 
@@ -179,14 +209,23 @@ public final class WikiModule extends AbstractMysticModule implements WikiServic
             return 0;
         }
         String head = key(prefix).endsWith(":") ? key(prefix) : key(prefix) + ":";
-        int before = entries.size();
-        entries.keySet().removeIf(id -> id.startsWith(head));
-        return before - entries.size();
+        looks.keySet().removeIf(id -> id.startsWith(head));
+        synchronized (entries) {
+            int before = entries.size();
+            entries.keySet().removeIf(id -> id.startsWith(head));
+            return before - entries.size();
+        }
     }
 
     @Override
     public List<WikiEntry> entries() {
-        return List.copyOf(entries.values());
+        return entrySnapshot();
+    }
+
+    private List<WikiEntry> entrySnapshot() {
+        synchronized (entries) {
+            return List.copyOf(entries.values());
+        }
     }
 
     // ----- WikiService: reading ----------------------------------------------
@@ -221,31 +260,25 @@ public final class WikiModule extends AbstractMysticModule implements WikiServic
      */
     List<String> categoriesOf(List<WikiPage> pages) {
         List<String> configured = config.categoryOrder == null ? List.of() : config.categoryOrder;
-        List<String> ordered = new ArrayList<>();
-        TreeSet<String> rest = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
         TreeSet<String> present = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
         for (WikiPage page : pages) {
-            present.add(page.category());
-            if (!containsIgnoreCase(configured, page.category())) {
-                rest.add(page.category());
-            }
+            // A parent with no pages of its own is still a category: it holds the rest.
+            present.addAll(WikiCategories.lineage(page.category()));
         }
+        List<String> ordered = new ArrayList<>();
+        TreeSet<String> placed = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
         for (String category : configured) {
-            if (present.contains(category)) {
-                ordered.add(category);
+            String path = category == null ? null : present.floor(WikiCategories.normalize(category));
+            if (path != null && path.equalsIgnoreCase(WikiCategories.normalize(category)) && placed.add(path)) {
+                ordered.add(path);
             }
         }
-        ordered.addAll(rest);
+        for (String path : present) {
+            if (placed.add(path)) {
+                ordered.add(path);
+            }
+        }
         return ordered;
-    }
-
-    private static boolean containsIgnoreCase(List<String> values, String needle) {
-        for (String value : values) {
-            if (value != null && value.equalsIgnoreCase(needle)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     @Override
@@ -283,7 +316,7 @@ public final class WikiModule extends AbstractMysticModule implements WikiServic
             }
         }
         if (config.includeModEntries) {
-            for (WikiEntry entry : entries.values()) {
+            for (WikiEntry entry : entrySnapshot()) {
                 WikiPage page = toPage(player, entry);
                 if (page != null) {
                     pages.add(page);
@@ -316,7 +349,7 @@ public final class WikiModule extends AbstractMysticModule implements WikiServic
     }
 
     private WikiPage toPage(WikiArticle article) {
-        return new WikiPage(article.id, article.displayTitle(), article.displayCategory(),
+        return new WikiPage(article.id, article.displayTitle(), WikiCategories.normalize(article.displayCategory()),
                 article.summary == null ? "" : article.summary,
                 article.body == null ? "" : article.body,
                 article.tags == null ? List.of() : List.copyOf(article.tags),
@@ -333,9 +366,10 @@ public final class WikiModule extends AbstractMysticModule implements WikiServic
                 return null;
             }
             String body = entry.body().apply(player);
-            return new WikiPage(key(entry.id()), entry.title(), entry.category(), entry.summary(),
-                    body == null ? "" : body, entry.tags(), entry.order(), false,
-                    "Provided by another mod", "");
+            EntryLook look = looks.get(key(entry.id()));
+            return new WikiPage(key(entry.id()), entry.title(), WikiCategories.normalize(entry.category()),
+                    entry.summary(), body == null ? "" : body, entry.tags(), entry.order(), false,
+                    look == null ? "Provided by another mod" : look.footer(), look == null ? "" : look.icon());
         } catch (Throwable t) {
             core.log(java.util.logging.Level.WARNING,
                     "Wiki entry '" + entry.id() + "' failed to render: " + t);

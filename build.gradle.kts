@@ -826,6 +826,22 @@ tasks.register<JavaExec>("verifyWikiMarkup") {
     mainClass.set("org.hyzionstudios.mysticessentials.modules.wiki.WikiMarkupTest")
 }
 
+tasks.register<JavaExec>("verifyModWiki") {
+    group = "verification"
+    description = "Checks nested wiki categories and the pages written for other installed mods."
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets.test.get().runtimeClasspath + configurations.compileClasspath.get()
+    mainClass.set("org.hyzionstudios.mysticessentials.modules.wiki.ModWikiTest")
+}
+
+tasks.register<JavaExec>("verifyModHotkeys") {
+    group = "verification"
+    description = "Checks the rail leaves an ALT digit to Endgame & QoL exactly as its own config says."
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets.test.get().runtimeClasspath + configurations.compileClasspath.get()
+    mainClass.set("org.hyzionstudios.mysticessentials.modules.shell.ModHotkeysTest")
+}
+
 tasks.register<JavaExec>("verifyAfkZoneGeometry") {
     group = "verification"
     description = "Checks AFK zones cover the whole blocks their corners were set in, everywhere."
@@ -852,6 +868,8 @@ tasks.named("check") {
         "verifyAfkZoneGeometry",
         "verifyShellShortcuts",
         "verifyWikiMarkup",
+        "verifyModWiki",
+        "verifyModHotkeys",
         "verifyIconPipeline",
         "verifyPatchMarkup",
         "verifyLootBox",

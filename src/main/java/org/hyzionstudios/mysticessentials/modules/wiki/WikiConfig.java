@@ -36,4 +36,30 @@ public final class WikiConfig {
      * does not bring it back.
      */
     public boolean seedStarterArticle = true;
+
+    /** Pages for the other mods installed on this server. */
+    public Mods mods = new Mods();
+
+    /**
+     * Every installed mod gets a category under {@link #category} with an
+     * overview page: what it is, the in-game guide it has of its own (with a
+     * button that opens it), the commands it adds that the reader may use,
+     * and its version. Mods are found by plugin id and read live, so a mod
+     * update changes the page without a config edit.
+     */
+    public static final class Mods {
+        public boolean enabled = true;
+        /** The parent category. Each mod is a sub-category of it: {@code Mods/Mermaids}. */
+        public String category = "Mods";
+        /**
+         * Also show the documentation a mod ships in its asset pack
+         * ({@code Common/Docs}), as pages arranged the way its authors
+         * arranged them, sub-topics as sub-categories.
+         */
+        public boolean importDocs = true;
+        /** List the commands each mod adds, only those the reader can run. */
+        public boolean listCommands = true;
+        /** Plugin ids ({@code Group:Name}, as in the mod's manifest) to leave out. */
+        public List<String> hidden = new ArrayList<>();
+    }
 }

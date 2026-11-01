@@ -69,7 +69,7 @@ $C.@Container {
 
           $C.@TextField #CategoryInput {
             @Anchor = (Height: 32);
-            PlaceholderText: "Getting Started";
+            PlaceholderText: "Guides/Combat (use / to nest)";
           }
         }
       }

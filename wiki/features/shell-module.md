@@ -67,6 +67,34 @@ it cannot be clicked. Every way of running a slot goes through one method,
 The rail's footer reads `Alt+#` when the chord is live and `/1 – /9` when it is
 off, so it never advertises a shortcut the server has switched off.
 
+### Sharing Alt with other mods (Endgame & QoL)
+
+Another mod that reads ALT+digit the same way sees the same key press. Endgame
+& QoL does this for its Journal (ALT+2 by default). If both acted, one press
+would open two pages that race for the screen, and each mod's hotbar restore
+would look to the other like a new chord.
+
+So the shell **leaves a digit to the mod that already uses it**. Mods are found
+by plugin id, never by version, and the digit comes from that mod's own config
+(Endgame: `Misc.JournalHotkeyEnabled` and `Misc.JournalHotkeyDigit` in
+`mods/Config_Endgame&QoL/EndgameConfig.json`). The console says which digit
+was left at startup. For that digit:
+
+- ALT+2 opens Endgame's Journal; slot 2 still runs from `/2`, the rail
+  editor and the Shortcuts page, which shows `/2` as its key.
+- Endgame's restore of your hotbar is ignored, so it cannot set off another
+  shortcut.
+- After any other ALT shortcut, putting you back on slot 2 waits until Alt is
+  released, so the restore is not read as Endgame's chord.
+
+**To give ALT+2 to the rail instead**, turn Endgame's hotkey off
+(`"JournalHotkeyEnabled": false`) or move it (`"JournalHotkeyDigit"`) in
+Endgame's config, then restart or `/mystic reload`. The Journal stays one
+command away with `/eg journal`, and you can put that on a rail slot.
+
+**To turn one of the rail's own Alt digits off**, list it in
+`keys.disabledAltSlots`, e.g. `[2, 9]`.
+
 ## Commands
 
 | Command | What it does | Permission |
@@ -165,7 +193,8 @@ so a card that went unavailable while the menu was open cannot be used.
     "separatorsAfter": [4, 6]
   },
   "keys": {
-    "altShortcuts": true
+    "altShortcuts": true,
+    "disabledAltSlots": []
   },
   "menu": {
     "enabled": true,
@@ -217,7 +246,9 @@ so a card that went unavailable while the menu was open cannot be used.
   "12 / 100"; `permission` locks the card; `comingSoon` shows it without a
   Connect button. `showNetwork` adds roster servers you did not list.
 - `glyph` is one or two characters, shown only when a slot has no icon.
-- `keys.altShortcuts` turns ALT+1–9 on or off.
+- `keys.altShortcuts` turns ALT+1–9 on or off. `keys.disabledAltSlots` turns
+  single digits off; a digit another installed mod uses is left to it without
+  being listed (see "Sharing Alt with other mods").
 
 ### Icons
 

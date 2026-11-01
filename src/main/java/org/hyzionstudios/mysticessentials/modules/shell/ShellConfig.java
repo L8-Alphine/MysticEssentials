@@ -71,6 +71,15 @@ public final class ShellConfig {
          * if your players walk with Alt held and switch items while doing it.
          */
         public boolean altShortcuts = true;
+        /**
+         * ALT+these digits do nothing here; {@code /N}, the rail and the
+         * Shortcuts page still run the slot. A digit another installed mod
+         * already binds — Endgame &amp; QoL's Journal, ALT+2 by default — is
+         * left to that mod without being listed here. To take such a digit
+         * back, turn the other mod's hotkey off in its own config (Endgame:
+         * {@code Misc.JournalHotkeyEnabled}) and reload.
+         */
+        public List<Integer> disabledAltSlots = new ArrayList<>();
     }
 
     /** The {@code /menu} shell. */

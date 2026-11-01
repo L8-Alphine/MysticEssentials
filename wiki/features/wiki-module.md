@@ -103,6 +103,51 @@ edit. Selecting a category filters the list; **typing in the search box searches
 the whole wiki**, because a hit outside the selected category is still the
 answer that was asked for.
 
+**Categories nest.** A category is a path: `Guides/Combat` files a page under
+Combat, inside Guides. The column always shows the top level and opens every
+category on the way to the one you pick, with `+` on a closed category that
+has sub-categories and `–` on an open one. Picking a category lists every page
+under it, sub-categories included, and the counts include them too. A parent
+needs no pages of its own. `categoryOrder` takes paths as well.
+
+## Installed mods
+
+Every other mod on the server gets a category under **Mods**
+(`Mods/Endgame & QoL`, `Mods/Mermaids`, ...) with an overview page:
+
+- **What it is**, from its manifest's description.
+- **Its own guide**, for mods that have one. The wiki sends players there
+  instead of copying it, with a button that runs the command that opens it.
+  The button only shows while that command is registered and the reader may
+  use it. Known today:
+
+  | Mod | Its guide | Button |
+  | --- | --- | --- |
+  | Endgame & QoL | In-game wiki and Journal | `/eg wiki`, `/eg journal` |
+  | Mermaids | Mermaids menu, codex | `/mermaids`, `/mermaids codex` |
+  | Simple Enchantments | Walkthrough in the enchanting window | `/enchanting` |
+  | Alec's Tamework! | Companion Guide, in a command flute's menu | none (no command) |
+  | Major Dungeons | Lore, read at a Lore Lectern | none; shows the Lectern item |
+
+- **Commands** the mod registered, each with its aliases, description and
+  subcommands, listed only when the reader has permission. This is read live,
+  so a mod update changes it without a config edit.
+- **About**: version, authors, website.
+
+**A mod's own documentation** shows up too. A mod that ships docs in its asset
+pack (`Common/Docs/<Group>_<Id>.json` plus Markdown files, the layout Mermaids
+uses) has them shown as pages in its category, arranged the way its authors
+arranged them. A topic with sub-topics becomes a sub-category, e.g.
+`Mods/Mermaids/Mermaids for Server Owners` holding Commands, Config,
+Permissions and Compatibilities. Headings, lists, tables, quotes and web links
+carry over. A link to another topic opens that page. A link that would run a
+command shows as plain text. The other mod's colour codes and tags are shown
+as written, not applied. Files are capped at 64 KB each and 40 topics per mod,
+and are read as UTF-8 or, failing that, Windows-1252.
+
+Mods are matched by plugin id, never by version. Mod pages are read-only (the
+mod owns them) and are rebuilt on every `/mystic reload`.
+
 ## Configuration
 
 `mods/MysticEssentials/modules/wiki/config.json`:
@@ -113,9 +158,19 @@ answer that was asked for.
   "subtitle": "How this server works.",
   "categoryOrder": ["Getting Started", "Rules", "Commands", "Economy", "Guides"],
   "includeModEntries": true,
-  "seedStarterArticle": true
+  "seedStarterArticle": true,
+  "mods": {
+    "enabled": true,
+    "category": "Mods",
+    "importDocs": true,
+    "listCommands": true,
+    "hidden": []
+  }
 }
 ```
+
+`mods.hidden` takes plugin ids as the mod's manifest writes them
+(`Group:Name`, e.g. `"Ziggfreed:RpgStations"`).
 
 Articles live in `data/modules/wiki/articles.json`, not in the config: they are
 content, they change constantly once staff start writing, and a config file

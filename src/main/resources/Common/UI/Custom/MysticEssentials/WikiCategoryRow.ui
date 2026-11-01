@@ -1,4 +1,6 @@
-// Category item in the wiki browser's left rail.
+// Category item in the wiki browser's left rail. Categories nest
+// ("Mods/Endgame & QoL"): the indents show a row's depth and #CategoryArrow
+// whether it has sub-categories, "+" closed and "–" open.
 $M = "MysticTheme.ui";
 
 Button #Row {
@@ -13,7 +15,27 @@ Button #Row {
   Group {
     Anchor: (Full: 0);
     LayoutMode: Left;
-    Padding: (Left: 12, Right: 10);
+    Padding: (Left: 10, Right: 10);
+
+    Group #Indent1 {
+      Anchor: (Width: 14);
+      Visible: false;
+    }
+
+    Group #Indent2 {
+      Anchor: (Width: 14);
+      Visible: false;
+    }
+
+    Group #Indent3 {
+      Anchor: (Width: 14);
+      Visible: false;
+    }
+
+    Label #CategoryArrow {
+      Anchor: (Width: 16);
+      Style: (...$M.@RowSideGoldStyle, FontSize: 14, RenderBold: true, HorizontalAlignment: Start);
+    }
 
     Label #CategoryName {
       FlexWeight: 1;

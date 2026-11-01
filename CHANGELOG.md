@@ -1,5 +1,30 @@
 # Mystic Essentials Changelog
 
+## Unreleased — Alt+2 and Endgame & QoL, nested wiki categories, pages for installed mods
+
+Server-side checks only (build, `check`, a dev-server boot); not yet seen in a game client.
+
+- **Alt+2 no longer fights Endgame & QoL.** Endgame reads ALT+2 the same way
+  the rail reads ALT+1–9, so one press opened two pages, and each mod's hotbar
+  restore set the other off. The rail now leaves a digit to a mod that already
+  uses it, found by plugin id and read from that mod's own config (Endgame:
+  `Misc.JournalHotkeyEnabled` / `JournalHotkeyDigit`). It also ignores
+  Endgame's restore, and waits for Alt to be released before putting a player
+  back on Endgame's digit. Slot 2 still runs from `/2` and the Shortcuts page.
+  Turning Endgame's hotkey off gives ALT+2 back to the rail on the next reload.
+  New `keys.disabledAltSlots` turns single digits off.
+- **Wiki categories nest**: a category is a path (`Guides/Combat`), drawn as a
+  tree that opens towards the selected category. Picking one lists everything
+  under it.
+- **Every installed mod has a wiki category** under `Mods/` with an overview:
+  description, version, authors, the commands it adds (only those the reader
+  can run, read live), and, for mods with a guide of their own (Endgame's wiki
+  and Journal, the Mermaids menu, Simple Enchantments' walkthrough, Tamework's
+  Companion Guide, Major Dungeons' Lore Lectern), where to find it, with a
+  button that runs its command. Mods that ship Markdown docs (`Common/Docs`,
+  as Mermaids does) have them shown as pages, with sub-topics as
+  sub-categories. Configure under `mods` in the wiki config.
+
 ## Unreleased — Patch note icons, working bullets
 
 Server-side checks only (build, `check`); not yet seen in a game client.

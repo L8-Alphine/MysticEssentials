@@ -83,6 +83,10 @@ public final class ShellModule extends AbstractMysticModule implements ShellServ
      */
     private AltShortcuts altShortcuts;
     private volatile boolean altActive;
+    /** ALT digits as bits (bit N is ALT+N): turned off by the server, and owned by another mod. */
+    private volatile int altOff;
+    private volatile int altYielded;
+    private volatile List<ModHotkeys.Hotkey> foreignHotkeys = List.of();
     private MenuCatalog catalog;
     private ServerDirectory servers;
     private EcosystemRegistry ecosystem;
@@ -175,6 +179,7 @@ public final class ShellModule extends AbstractMysticModule implements ShellServ
         normalize();
         ecosystem = new EcosystemRegistry(config.menu.hiddenModules);
         altActive = config.keys.altShortcuts && altShortcuts != null;
+        refreshAltDigits();
         rendered.clear();
         stopRefresh();
         startRefresh();
@@ -262,6 +267,9 @@ public final class ShellModule extends AbstractMysticModule implements ShellServ
         if (config.browser.servers == null) {
             config.browser.servers = new ArrayList<>();
         }
+        if (config.keys.disabledAltSlots == null) {
+            config.keys.disabledAltSlots = new ArrayList<>();
+        }
     }
 
     /** Registers the ALT chord systems once, then follows the config switch. */
@@ -277,11 +285,50 @@ public final class ShellModule extends AbstractMysticModule implements ShellServ
             }
         }
         altActive = config.keys.altShortcuts && altShortcuts != null;
+        refreshAltDigits();
+    }
+
+    /**
+     * Re-reads which ALT digits are ours: the server's own list, then every
+     * digit an installed mod binds, read from that mod's config so turning its
+     * hotkey off gives the digit back on the next reload.
+     */
+    private void refreshAltDigits() {
+        int off = 0;
+        for (Integer digit : config.keys.disabledAltSlots) {
+            if (digit != null && digit >= 1 && digit <= 9) {
+                off |= 1 << digit;
+            }
+        }
+        List<ModHotkeys.Hotkey> found = ModHotkeys.detect();
+        int yielded = 0;
+        for (ModHotkeys.Hotkey hotkey : found) {
+            yielded |= 1 << hotkey.digit();
+        }
+        altOff = off;
+        altYielded = yielded;
+        foreignHotkeys = List.copyOf(found);
+        if (altActive) {
+            for (ModHotkeys.Hotkey hotkey : found) {
+                log("Alt+" + hotkey.digit() + " is left to " + hotkey.mod() + " (its " + hotkey.action()
+                        + "); /" + hotkey.digit() + " and the rail still run slot " + hotkey.digit() + ".");
+            }
+        }
     }
 
     /** Whether ALT+1-9 should act right now. Read on world threads every tick. */
     boolean altShortcutsActive() {
         return altActive;
+    }
+
+    /** Whether ALT+{@code digit} runs the rail slot, rather than being off or another mod's. */
+    boolean altDigitOurs(int digit) {
+        return ((altOff | altYielded) & (1 << digit)) == 0;
+    }
+
+    /** Whether another installed mod owns ALT+{@code digit}. */
+    boolean altDigitYielded(int digit) {
+        return digit >= 1 && digit <= 9 && (altYielded & (1 << digit)) != 0;
     }
 
     // ----- Accessors used by the rail, pages and catalog ---------------------
@@ -321,7 +368,7 @@ public final class ShellModule extends AbstractMysticModule implements ShellServ
 
     /** The key a row shows for one slot. */
     String keyLabel(int index) {
-        return altActive ? "Alt+" + index : "/" + index;
+        return altActive && altDigitOurs(index) ? "Alt+" + index : "/" + index;
     }
 
     /** The same point, as a sentence for a page. */
@@ -330,9 +377,15 @@ public final class ShellModule extends AbstractMysticModule implements ShellServ
         if (configured != null && !configured.isBlank()) {
             return "Use " + configured.trim() + " to reach a slot.";
         }
-        return altActive
-                ? "Hold Alt and press 1 to 9, type /1 to /9 in chat, or press a row here."
-                : "Type /1 to /9 in chat, or press a row here.";
+        if (!altActive) {
+            return "Type /1 to /9 in chat, or press a row here.";
+        }
+        StringBuilder hint = new StringBuilder("Hold Alt and press 1 to 9, type /1 to /9 in chat, or press a row here.");
+        for (ModHotkeys.Hotkey hotkey : foreignHotkeys) {
+            hint.append(" Alt+").append(hotkey.digit()).append(" opens ").append(hotkey.mod())
+                    .append("'s ").append(hotkey.action()).append(" instead.");
+        }
+        return hint.toString();
     }
 
     /** One line on the ecosystem, for the menu's footer. */
