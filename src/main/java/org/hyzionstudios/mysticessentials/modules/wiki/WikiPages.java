@@ -12,6 +12,7 @@ import org.hyzionstudios.mysticessentials.core.MysticCore;
 import org.hyzionstudios.mysticessentials.modules.wiki.WikiModule.WikiPage;
 import org.hyzionstudios.mysticessentials.platform.ui.ItemCatalog;
 import org.hyzionstudios.mysticessentials.platform.ui.MysticPage;
+import org.hyzionstudios.mysticessentials.platform.ui.TextureIndex;
 import org.hyzionstudios.mysticessentials.platform.ui.VanillaIcons;
 
 import com.google.gson.JsonObject;
@@ -298,14 +299,17 @@ final class WikiPages {
 
         /** Preview refreshes no more often than this while typing. */
         static final long PREVIEW_DELAY_MS = 300;
-        /** Image search results per kind. */
-        static final int MAX_RESULTS = 60;
+        /** Image search results shown at once; a search narrows the rest. */
+        static final int MAX_RESULTS = 120;
 
         private final WikiModule wiki;
         private final String articleId;
         /** The latest body the client sent; the debounced preview draws it. */
         private String pendingBody;
         private boolean previewScheduled;
+        /** The image search's filter and text; both live only while the window is open. */
+        private TextureIndex.Source source = TextureIndex.Source.ICONS;
+        private String query = "";
 
         EditorPage(MysticCore core, WikiModule wiki, PlayerRef player, String articleId) {
             super(core, player, CustomPageLifetime.CanDismiss);
@@ -334,7 +338,7 @@ final class WikiPages {
                     : "Editing " + articleId + ". Toolbar and pictures add to the end of the body."));
             tabs(cmd, true);
             drawPreview(cmd, body);
-            drawResults(cmd, event, "");
+            drawResults(cmd, event);
 
             cmd.set("#DeleteButton.Visible", existing);
             if (existing) {
@@ -365,6 +369,10 @@ final class WikiPages {
                     new EventData().put("action", "tab").put("tab", "preview").append("@body", "#BodyInput.Value"));
             event.addEventBinding(CustomUIEventBindingType.Activating, "#ImagesTab",
                     new EventData().put("action", "tab").put("tab", "images"));
+            for (TextureIndex.Source option : TextureIndex.Source.values()) {
+                event.addEventBinding(CustomUIEventBindingType.Activating, sourceTab(option),
+                        new EventData().put("action", "source").put("source", option.name()));
+            }
             event.addEventBinding(CustomUIEventBindingType.Activating, "#RefreshPreview",
                     new EventData().put("action", "refresh").append("@body", "#BodyInput.Value"));
             // Every field travels with Save: anything not sent now is lost.
@@ -414,45 +422,73 @@ final class WikiPages {
         }
 
         /**
-         * The image search: every icon whose name matches (the server's own,
-         * Hyzion's, then the game's) and, once something is typed, matching
-         * items. Click adds it to the body; right-click makes it the page icon.
+         * The image search. Icons: the server's own, Hyzion's, the game's
+         * named picks and its other icons. Items: every item, as a slot. Models:
+         * model renders, then the textures models, blocks and effects use. All:
+         * every PNG the client has. Click adds it to the body; right-click makes
+         * it the page's icon; hover shows its name or path.
          */
-        private void drawResults(UICommandBuilder cmd, UIEventBuilder event, String query) {
-            String needle = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
-            int icons = 0;
-            for (VanillaIcons.Entry entry : VanillaIcons.pickerWithCustom()) {
-                if (icons >= MAX_RESULTS) {
-                    break;
-                }
-                if (!needle.isEmpty() && !entry.name().toLowerCase(Locale.ROOT).contains(needle)) {
-                    continue;
-                }
-                String tile = "#IconResults[" + icons++ + "]";
-                cmd.append("#IconResults", ICON_TILE_UI);
-                cmd.set(tile + " #TileIcon.AssetPath", entry.path());
-                event.addEventBinding(CustomUIEventBindingType.Activating, tile, new EventData()
-                        .put("action", "insert").put("snippet", "\n{{image:" + entry.name() + "}}\n")
-                        .append("@body", "#BodyInput.Value"));
-                event.addEventBinding(CustomUIEventBindingType.RightClicking, tile,
-                        new EventData().put("action", "icon").put("icon", entry.name()));
+        private void drawResults(UICommandBuilder cmd, UIEventBuilder event) {
+            for (TextureIndex.Source option : TextureIndex.Source.values()) {
+                String label = option.name().charAt(0) + option.name().substring(1).toLowerCase(Locale.ROOT);
+                cmd.set(sourceTab(option) + ".TextSpans", uiText(sourceTab(option) + ".TextSpans",
+                        option == source ? "&a> " + label : "&7" + label));
             }
-            int items = 0;
-            if (!needle.isEmpty()) {
-                for (String itemId : ItemCatalog.search(needle, MAX_RESULTS)) {
-                    String tile = "#ItemResults[" + items++ + "]";
-                    cmd.append("#ItemResults", ITEM_TILE_UI);
+            String needle = query.trim();
+            int shown = 0;
+            if (source == TextureIndex.Source.ITEMS) {
+                List<String> items = needle.isEmpty() ? List.of() : ItemCatalog.search(needle, MAX_RESULTS);
+                for (String itemId : items) {
+                    String tile = "#Results[" + shown++ + "]";
+                    cmd.append("#Results", ITEM_TILE_UI);
                     cmd.set(tile + " #TileItem.ItemId", itemId);
-                    event.addEventBinding(CustomUIEventBindingType.Activating, tile, new EventData()
-                            .put("action", "insert").put("snippet", "\n{{item:" + itemId + "}}\n")
-                            .append("@body", "#BodyInput.Value"));
-                    event.addEventBinding(CustomUIEventBindingType.RightClicking, tile,
-                            new EventData().put("action", "icon").put("icon", "item:" + itemId));
+                    cmd.set(tile + ".TooltipText", itemId);
+                    bindPick(event, tile, "\n{{item:" + itemId + "}}\n", "item:" + itemId);
+                }
+            } else {
+                for (VanillaIcons.Entry entry : TextureIndex.search(source, needle, MAX_RESULTS)) {
+                    String tile = "#Results[" + shown++ + "]";
+                    cmd.append("#Results", ICON_TILE_UI);
+                    cmd.set(tile + " #TileIcon.AssetPath", entry.path());
+                    cmd.set(tile + ".TooltipText", entry.name());
+                    bindPick(event, tile, "\n{{image:" + entry.name() + "}}\n", entry.name());
                 }
             }
-            cmd.set("#ImageHint.TextSpans", uiText("#ImageHint.TextSpans", needle.isEmpty()
-                    ? "Type to search items too. Click to add, right-click for the page icon."
-                    : icons + " icons, " + items + " items. Click to add, right-click for the page icon."));
+            String hint;
+            if (source == TextureIndex.Source.ITEMS && needle.isEmpty()) {
+                hint = "Type an item's name or id. Click to add, right-click for the page icon.";
+            } else if (shown == 0) {
+                hint = "Nothing matches. Try part of a name: chest, sword, kweebec.";
+            } else {
+                hint = (shown >= MAX_RESULTS ? "First " + shown + " matches; type to narrow. " : shown + " found. ")
+                        + "Click to add, right-click for the page icon, hover for the name.";
+            }
+            cmd.set("#ImageHint.TextSpans", uiText("#ImageHint.TextSpans", hint));
+        }
+
+        private static void bindPick(UIEventBuilder event, String tile, String snippet, String icon) {
+            event.addEventBinding(CustomUIEventBindingType.Activating, tile, new EventData()
+                    .put("action", "insert").put("snippet", snippet).append("@body", "#BodyInput.Value"));
+            event.addEventBinding(CustomUIEventBindingType.RightClicking, tile,
+                    new EventData().put("action", "icon").put("icon", icon));
+        }
+
+        private static String sourceTab(TextureIndex.Source option) {
+            return switch (option) {
+                case ICONS -> "#SourceIcons";
+                case ITEMS -> "#SourceItems";
+                case MODELS -> "#SourceModels";
+                case ALL -> "#SourceAll";
+            };
+        }
+
+        /** Redraws the results grid with fresh bindings, leaving the rest of the window alone. */
+        private void refreshResults() {
+            UICommandBuilder cmd = new UICommandBuilder();
+            UIEventBuilder event = new UIEventBuilder();
+            cmd.clear("#Results");
+            drawResults(cmd, event);
+            sendUpdate(cmd, event);
         }
 
         @Override
@@ -486,12 +522,12 @@ final class WikiPages {
                     sendUpdate(cmd);
                 }
                 case "images" -> {
-                    UICommandBuilder cmd = new UICommandBuilder();
-                    UIEventBuilder event = new UIEventBuilder();
-                    cmd.clear("#IconResults");
-                    cmd.clear("#ItemResults");
-                    drawResults(cmd, event, field(payload, "query"));
-                    sendUpdate(cmd, event);
+                    query = field(payload, "query");
+                    refreshResults();
+                }
+                case "source" -> {
+                    source = TextureIndex.Source.parse(string(payload, "source"));
+                    refreshResults();
                 }
                 case "tab" -> {
                     boolean preview = "preview".equals(string(payload, "tab"));

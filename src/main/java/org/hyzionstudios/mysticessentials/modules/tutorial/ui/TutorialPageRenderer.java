@@ -136,7 +136,7 @@ public final class TutorialPageRenderer extends MysticPage {
     }
 
     @Override
-    public void onDismiss(Ref<EntityStore> ref, Store<EntityStore> store) {
+    protected void onClosed(Ref<EntityStore> ref, Store<EntityStore> store) {
         core.getEventBus().publish(new TutorialEvents.PageClose(player.getUuid(),
                 player.getUsername(), tutorialContext, page.id));
     }

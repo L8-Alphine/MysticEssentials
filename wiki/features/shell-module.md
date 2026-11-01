@@ -231,11 +231,20 @@ kits, wiki pages):
 | The server's | `custom:<name>` | Any PNG you put in `mods/MysticEssentials/icons/` |
 
 Server icons: drop `castle.png` into `mods/MysticEssentials/icons/` and use
-`custom:castle`. Names are letters, digits, `-` and `_`; files over 1 MB or that
-are not PNGs are skipped and logged. They load at startup and on
-`/mystic reload` (only new or changed files are sent, so a reload does not
-re-send everything to everyone online). 64×64 matches the shipped set; anything
-from 32 to 128 square works.
+`custom:castle`; subfolders become part of the name (`icons/models/dragon.png`
+is `custom:models/dragon`). Names are letters, digits, `-` and `_`.
+
+**The folder is yours.** The mod only reads it — it never creates, rewrites or
+deletes anything there. Each PNG is optimized automatically into the mod's own
+cache (`data/cache/icons/`), and that copy is what players download: anything
+larger than 128 px is scaled down (premultiplied, so edges stay clean), metadata
+is stripped and the image recompressed; a file that is already small and lean is
+sent as it is. A file is only re-optimized when it changes. Sources up to 32 MB
+are accepted; anything that is not a PNG is skipped and logged.
+
+New or changed files are picked up within 15 seconds, no reload needed (an idle
+check only looks at names, sizes and times). Only new or changed icons are sent
+to players already online.
 
 Anything a player cannot use shows the **padlock** instead of its icon: menu
 cards, Shortcuts rows, locked server cards, kits and vaults.

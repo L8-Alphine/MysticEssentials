@@ -177,9 +177,9 @@ final class KitPages {
         }
 
         @Override
-        public void onDismiss(Ref<EntityStore> ref, Store<EntityStore> store) {
+        protected void onClosed(Ref<EntityStore> ref, Store<EntityStore> store) {
             stopCycling();
-            super.onDismiss(ref, store);
+            super.onClosed(ref, store);
         }
 
         @Override

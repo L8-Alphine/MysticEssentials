@@ -179,7 +179,7 @@ public final class ItemPickerPage extends MysticPage {
     }
 
     @Override
-    public void onDismiss(Ref<EntityStore> ref, Store<EntityStore> store) {
+    protected void onClosed(Ref<EntityStore> ref, Store<EntityStore> store) {
         // Opening any page dismisses this one first, so only a dismissal that is
         // not a hand-over (Escape) cancels the choice.
         if (!handedOver) {

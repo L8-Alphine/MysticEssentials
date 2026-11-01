@@ -44,11 +44,20 @@ a clickable line, since a game window cannot open a browser.
 
 ## Writing a page
 
-Press **New Page**, or **Edit** on any stored page. The editor shows the page
-rendered beside the text as you type (**Preview**), and an **Images** tab that
-searches every icon the server knows (its own, Hyzion's, the game's) and, once
-you type, every item: **click** one to add it to the body, **right-click** to
-make it the page's icon. The toolbar adds headings, lists, notes, rules, links,
+Press **New Page**, or **Edit** on any stored page. The editor (1440×860) shows
+the page rendered beside the text as you type (**Preview**), and an **Images**
+tab that searches every picture the client has:
+
+| Filter | What it searches |
+| --- | --- |
+| Icons | The server's own (`custom:`), Hyzion's, the game's named icons and its other icons |
+| Items | Every item, drawn as an item slot — adds `{{item:…}}` |
+| Models | The game's model renders, then the textures models, blocks, NPCs and effects are painted with |
+| All | Every PNG the client has (about twelve thousand) |
+
+**Click** a result to add it to the body, **right-click** to make it the page's
+icon, and hover to see its name or path. A path works anywhere an icon name
+does, so `{{image:Icons/ModelsGenerated/Kweebec.png}}` is fine. The toolbar adds headings, lists, notes, rules, links,
 embeds and colours. The game tells the server nothing about the cursor, so the
 toolbar and pictures add **at the end** of the body.
 

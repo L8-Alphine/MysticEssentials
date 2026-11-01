@@ -115,7 +115,7 @@ public final class LayoutPage extends MysticPage {
     }
 
     @Override
-    public void onDismiss(Ref<EntityStore> ref, Store<EntityStore> store) {
+    protected void onClosed(Ref<EntityStore> ref, Store<EntityStore> store) {
         runtime.untrackPage(this);
     }
 

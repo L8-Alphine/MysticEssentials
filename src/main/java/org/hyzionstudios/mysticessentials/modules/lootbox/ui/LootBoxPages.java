@@ -744,7 +744,7 @@ public final class LootBoxPages {
         }
 
         @Override
-        public void onDismiss(Ref<EntityStore> ref, Store<EntityStore> store) {
+        protected void onClosed(Ref<EntityStore> ref, Store<EntityStore> store) {
             stop();
         }
 

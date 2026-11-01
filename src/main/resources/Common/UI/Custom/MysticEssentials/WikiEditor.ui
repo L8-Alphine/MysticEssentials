@@ -1,4 +1,6 @@
 // Server Wiki — editor. Write on the left, see it on the right as you type.
+// Larger than any vanilla page on purpose: an author needs the body, the
+// toolbar and the rendered page side by side at once.
 //
 // The right pane has two tabs: Preview (the page rendered exactly as readers
 // will see it, refreshed as the body changes) and Images (search the game's
@@ -16,7 +18,7 @@ $M = "MysticTheme.ui";
 $C.@PageOverlay {}
 
 $C.@Container {
-  Anchor: (Width: 1050, Height: 700);
+  Anchor: (Width: 1440, Height: 860);
 
   #Title {
     Group {
@@ -35,7 +37,7 @@ $C.@Container {
 
     // ---- Writing -------------------------------------------------------------
     Group {
-      Anchor: (Width: 500);
+      Anchor: (Width: 640);
       LayoutMode: Top;
 
       Group {
@@ -147,37 +149,44 @@ $C.@Container {
 
         $C.@SmallSecondaryTextButton #InsertHeading {
           @Text = "H2";
-          @Anchor = (Width: 46, Right: 4);
+          @Anchor = (Width: 60, Right: 4);
+          Padding: (Horizontal: 6);
         }
 
         $C.@SmallSecondaryTextButton #InsertSubheading {
           @Text = "H3";
-          @Anchor = (Width: 46, Right: 4);
+          @Anchor = (Width: 60, Right: 4);
+          Padding: (Horizontal: 6);
         }
 
         $C.@SmallSecondaryTextButton #InsertBullet {
           @Text = "List";
-          @Anchor = (Width: 56, Right: 4);
+          @Anchor = (Width: 74, Right: 4);
+          Padding: (Horizontal: 6);
         }
 
         $C.@SmallSecondaryTextButton #InsertQuote {
           @Text = "Note";
-          @Anchor = (Width: 58, Right: 4);
+          @Anchor = (Width: 74, Right: 4);
+          Padding: (Horizontal: 6);
         }
 
         $C.@SmallSecondaryTextButton #InsertRule {
           @Text = "Line";
-          @Anchor = (Width: 56, Right: 4);
+          @Anchor = (Width: 74, Right: 4);
+          Padding: (Horizontal: 6);
         }
 
         $C.@SmallSecondaryTextButton #InsertLink {
           @Text = "Link";
-          @Anchor = (Width: 56, Right: 4);
+          @Anchor = (Width: 74, Right: 4);
+          Padding: (Horizontal: 6);
         }
 
         $C.@SmallSecondaryTextButton #InsertEmbed {
           @Text = "Embed";
-          @Anchor = (Width: 66);
+          @Anchor = (Width: 88);
+          Padding: (Horizontal: 6);
         }
       }
 
@@ -186,39 +195,45 @@ $C.@Container {
         Anchor: (Height: 32, Bottom: 6);
 
         Label {
-          Anchor: (Width: 52);
+          Anchor: (Width: 62);
           Style: $M.@KeyStyle;
           Text: "Colour";
         }
 
         $C.@SmallSecondaryTextButton #ColourGold {
           @Text = "Gold";
-          @Anchor = (Width: 60, Right: 4);
+          @Anchor = (Width: 78, Right: 4);
+          Padding: (Horizontal: 6);
         }
 
         $C.@SmallSecondaryTextButton #ColourBlue {
           @Text = "Blue";
-          @Anchor = (Width: 60, Right: 4);
+          @Anchor = (Width: 78, Right: 4);
+          Padding: (Horizontal: 6);
         }
 
         $C.@SmallSecondaryTextButton #ColourGreen {
           @Text = "Green";
-          @Anchor = (Width: 64, Right: 4);
+          @Anchor = (Width: 88, Right: 4);
+          Padding: (Horizontal: 6);
         }
 
         $C.@SmallSecondaryTextButton #ColourRed {
           @Text = "Red";
-          @Anchor = (Width: 56, Right: 4);
+          @Anchor = (Width: 70, Right: 4);
+          Padding: (Horizontal: 6);
         }
 
         $C.@SmallSecondaryTextButton #ColourGrey {
           @Text = "Grey";
-          @Anchor = (Width: 60, Right: 4);
+          @Anchor = (Width: 78, Right: 4);
+          Padding: (Horizontal: 6);
         }
 
         $C.@SmallSecondaryTextButton #ColourReset {
           @Text = "Plain";
-          @Anchor = (Width: 62);
+          @Anchor = (Width: 82);
+          Padding: (Horizontal: 6);
         }
       }
 
@@ -315,7 +330,33 @@ $C.@Container {
 
         $C.@TextField #ImageSearch {
           @Anchor = (Height: 32, Bottom: 6);
-          PlaceholderText: "Search icons and items: chest, portal, pickaxe...";
+          PlaceholderText: "Search every icon, item, model and texture: chest, portal, kweebec...";
+        }
+
+        // What to search. Items are drawn as item slots; the rest are images.
+        Group {
+          LayoutMode: Left;
+          Anchor: (Height: 32, Bottom: 6);
+
+          $M.@Tab #SourceIcons {
+            @Text = "Icons";
+            @Anchor = (Width: 110, Right: 6);
+          }
+
+          $M.@Tab #SourceItems {
+            @Text = "Items";
+            @Anchor = (Width: 110, Right: 6);
+          }
+
+          $M.@Tab #SourceModels {
+            @Text = "Models";
+            @Anchor = (Width: 110, Right: 6);
+          }
+
+          $M.@Tab #SourceAll {
+            @Text = "All";
+            @Anchor = (Width: 110);
+          }
         }
 
         Label #ImageHint {
@@ -323,39 +364,15 @@ $C.@Container {
           Style: $M.@HintStyle;
         }
 
-        $M.@Section {
-          @Text = "Icons";
-          @Anchor = (Bottom: 6);
-        }
-
         $M.@Well {
-          FlexWeight: 3;
+          FlexWeight: 1;
 
           Group {
             FlexWeight: 1;
             LayoutMode: TopScrolling;
             ScrollbarStyle: $C.@DefaultScrollbarStyle;
 
-            Group #IconResults {
-              LayoutMode: LeftCenterWrap;
-            }
-          }
-        }
-
-        $M.@Section {
-          @Text = "Items";
-          @Anchor = (Top: 8, Bottom: 6);
-        }
-
-        $M.@Well {
-          FlexWeight: 2;
-
-          Group {
-            FlexWeight: 1;
-            LayoutMode: TopScrolling;
-            ScrollbarStyle: $C.@DefaultScrollbarStyle;
-
-            Group #ItemResults {
+            Group #Results {
               LayoutMode: LeftCenterWrap;
             }
           }

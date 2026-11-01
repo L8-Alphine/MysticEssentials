@@ -2,6 +2,8 @@ package org.hyzionstudios.mysticessentials.platform.ui;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
@@ -43,6 +45,16 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
  * wraps it, logs anything it throws, and unlocks the page if the handler sent
  * nothing — at once after a failure, and after {@link #ANSWER_GRACE_MS} otherwise,
  * which leaves room for handlers that answer after async work.</p>
+ *
+ * <p><b>Closing never strands the next page.</b> When the server closes a page
+ * the client answers with a Dismiss for it. If another page was opened in the
+ * meantime — a menu card closes the menu, then runs a command that opens Mail —
+ * that late Dismiss lands on the new page: the engine forgets it while the
+ * player still sees it, and their next click is dropped behind "Loading...".
+ * So {@link #close} waits {@link #CLOSE_GRACE_MS} and only closes if nothing
+ * replaced the page, and a page dismissed moments after a server close it did
+ * not cause re-registers itself instead of being forgotten. Subclasses use
+ * {@link #onClosed}, not {@code onDismiss}.</p>
  */
 public abstract class MysticPage extends CustomUIPage {
 
@@ -314,6 +326,12 @@ public abstract class MysticPage extends CustomUIPage {
      * async work before the page is unlocked anyway.
      */
     static final long ANSWER_GRACE_MS = 1200;
+    /** How long {@link #close} waits for a following page before closing. */
+    static final long CLOSE_GRACE_MS = 150;
+    /** A Dismiss this soon after a page opened, following a server close, belongs to the closed page. */
+    static final long STALE_DISMISS_MS = 1000;
+    /** When the server last closed a page for each player, to recognise the client's late Dismiss. */
+    private static final Map<UUID, Long> SERVER_CLOSED_AT = new ConcurrentHashMap<>();
 
     /** Set when the running handler answered: reopened, closed or updated a page. */
     private static final ThreadLocal<Boolean> ANSWERED = new ThreadLocal<>();
@@ -322,6 +340,8 @@ public abstract class MysticPage extends CustomUIPage {
     protected final PlayerRef player;
     /** Updates sent to this page instance, so a late fallback can see an async answer. */
     private final AtomicInteger updates = new AtomicInteger();
+    /** Pages are built and opened straight after they are made. */
+    private final long openedAt = System.currentTimeMillis();
 
     protected MysticPage(MysticCore core, PlayerRef player, CustomPageLifetime lifetime) {
         super(player, lifetime);
@@ -533,17 +553,95 @@ public abstract class MysticPage extends CustomUIPage {
         }
     }
 
-    /** Closes the currently open page (call from {@link #onEvent}). */
+    /**
+     * Closes the currently open page (call from {@link #onEvent}) — unless
+     * another page replaces it within {@link #CLOSE_GRACE_MS}, as when a card
+     * closes the menu and then runs a command that opens its own page. Closing
+     * first there would send a close whose Dismiss strands the new page.
+     */
     protected static void close(Ref<EntityStore> ref, Store<EntityStore> store) {
         try {
             Player entity = store.getComponent(ref, Player.getComponentType());
-            if (entity != null) {
-                entity.getPageManager().setPage(ref, store,
-                        Page.None);
-                ANSWERED.set(Boolean.TRUE);
+            if (entity == null) {
+                return;
+            }
+            ANSWERED.set(Boolean.TRUE);
+            CustomUIPage closing = entity.getPageManager().getCustomPage();
+            Runnable shut = () -> {
+                if (!ref.isValid()) {
+                    return;
+                }
+                Player now = store.getComponent(ref, Player.getComponentType());
+                if (now == null || now.getPageManager().getCustomPage() != closing) {
+                    return; // replaced by the next page, or already gone
+                }
+                if (closing instanceof MysticPage mystic) {
+                    SERVER_CLOSED_AT.put(mystic.player.getUuid(), System.currentTimeMillis());
+                }
+                now.getPageManager().setPage(ref, store, Page.None);
+            };
+            if (closing instanceof MysticPage mystic && mystic.core != null) {
+                var world = store.getExternalData().getWorld();
+                mystic.core.scheduler().runLater(() -> world.execute(shut), CLOSE_GRACE_MS, TimeUnit.MILLISECONDS);
+            } else {
+                shut.run();
             }
         } catch (Throwable ignored) {
             // The player can close the page manually.
+        }
+    }
+
+    /**
+     * Called when this page goes away: closed by the player, closed by the
+     * server, or replaced by another page. Override this, not {@code onDismiss}.
+     */
+    protected void onClosed(Ref<EntityStore> ref, Store<EntityStore> store) {
+    }
+
+    @Override
+    public final void onDismiss(Ref<EntityStore> ref, Store<EntityStore> store) {
+        if (isStaleDismiss(ref, store)) {
+            reclaim(ref, store);
+            return;
+        }
+        onClosed(ref, store);
+    }
+
+    /**
+     * A Dismiss from the client (the engine still holds this page, unlike a
+     * server teardown) arriving just after this page opened, which itself
+     * followed a server close: it is the closed page's Dismiss arriving late.
+     */
+    private boolean isStaleDismiss(Ref<EntityStore> ref, Store<EntityStore> store) {
+        try {
+            Player entity = store.getComponent(ref, Player.getComponentType());
+            if (entity == null || entity.getPageManager().getCustomPage() != this) {
+                return false;
+            }
+            Long closedAt = SERVER_CLOSED_AT.get(player.getUuid());
+            return closedAt != null && openedAt >= closedAt
+                    && System.currentTimeMillis() - openedAt < STALE_DISMISS_MS;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /** Registers this page again once the engine has finished forgetting it. */
+    private void reclaim(Ref<EntityStore> ref, Store<EntityStore> store) {
+        SERVER_CLOSED_AT.remove(player.getUuid());
+        try {
+            var world = store.getExternalData().getWorld();
+            world.execute(() -> {
+                if (!ref.isValid()) {
+                    return;
+                }
+                Player entity = store.getComponent(ref, Player.getComponentType());
+                if (entity != null && entity.getPageManager().getCustomPage() == null) {
+                    entity.getPageManager().openCustomPage(ref, store, this);
+                }
+            });
+        } catch (Throwable ignored) {
+            // The player can open the page again.
         }
     }
 

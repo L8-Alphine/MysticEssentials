@@ -160,7 +160,10 @@ public final class MysticCore implements MysticEssentialsAPI {
         scheduler.start();
         // Before any player can join, so every client gets them with the rest of
         // the common assets.
-        org.hyzionstudios.mysticessentials.platform.ui.CustomIcons.load(this, paths.iconsDir());
+        org.hyzionstudios.mysticessentials.platform.ui.CustomIcons.load(this, paths.iconsDir(), paths.cacheDir().resolve("icons"));
+        // New or changed PNGs in the folder appear without a reload.
+        scheduler.runRepeating(() -> org.hyzionstudios.mysticessentials.platform.ui.CustomIcons.refreshIfChanged(
+                this, paths.iconsDir(), paths.cacheDir().resolve("icons")), 15, 15, java.util.concurrent.TimeUnit.SECONDS);
 
         // Storage + Redis.
         storageService = new StorageServiceImpl(this);
@@ -563,7 +566,7 @@ public final class MysticCore implements MysticEssentialsAPI {
      */
     public void reloadSharedServices() {
         // File reads: off whichever thread ran the reload command.
-        scheduler.runLater(() -> org.hyzionstudios.mysticessentials.platform.ui.CustomIcons.load(this, paths.iconsDir()),
+        scheduler.runLater(() -> org.hyzionstudios.mysticessentials.platform.ui.CustomIcons.load(this, paths.iconsDir(), paths.cacheDir().resolve("icons")),
                 0, java.util.concurrent.TimeUnit.MILLISECONDS);
         // An unreadable file keeps the running settings instead of resetting them.
         if (itemInspectionService != null) {

@@ -785,6 +785,14 @@ tasks.register<JavaExec>("verifyShellShortcuts") {
     mainClass.set("org.hyzionstudios.mysticessentials.modules.shell.ShellShortcutsTest")
 }
 
+tasks.register<JavaExec>("verifyIconPipeline") {
+    group = "verification"
+    description = "Checks server icons are capped, recompressed, edge-bled and named as documented."
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets.test.get().runtimeClasspath + configurations.compileClasspath.get()
+    mainClass.set("org.hyzionstudios.mysticessentials.platform.ui.IconPipelineTest")
+}
+
 tasks.register<JavaExec>("verifyWikiMarkup") {
     group = "verification"
     description = "Checks the wiki markup's blocks, links, macros and search text."
@@ -819,6 +827,7 @@ tasks.named("check") {
         "verifyAfkZoneGeometry",
         "verifyShellShortcuts",
         "verifyWikiMarkup",
+        "verifyIconPipeline",
         "verifyLootBox",
         "verifyLootBoxSaga",
         "verifyLootBoxKeys",

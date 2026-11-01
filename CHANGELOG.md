@@ -1,5 +1,26 @@
 # Mystic Essentials Changelog
 
+## Unreleased — The real "Loading..." fix, a bigger wiki editor, every texture
+
+Server-side checks only (build, `check`); not yet seen in a game client.
+
+- **Pages opened from the menu no longer lock on their first click.** Closing a
+  page makes the client answer with a Dismiss; when a card closed the menu and
+  then opened Mail, that late Dismiss landed on Mail, the engine forgot Mail
+  while the player still saw it, and the next click went nowhere. `close()` now
+  waits 150 ms and only closes if no page replaced it, and a page that receives
+  such a stray Dismiss re-registers itself. This covers every close-then-open
+  path (menu cards, Shortcuts rows, the wiki's Main Menu button, vaults,
+  inventory restore, crate preview). Pages override `onClosed`, not `onDismiss`.
+- **Wiki editor at 1440×860**, toolbar labels no longer cut off.
+- **Images tab searches every texture the client has** — icons, items, model
+  renders, model/block/NPC/particle textures, the mod's and the server's — with
+  Icons / Items / Models / All filters and the name or path on hover.
+- **Server PNGs are optimized automatically**: capped at 128 px, stripped and
+  recompressed into the mod's cache; the server owner's folder is only read.
+  Subfolders work (`custom:models/dragon`), sources up to 32 MB, and new files
+  are picked up within 15 seconds without a reload.
+
 ## Unreleased — No more stuck "Loading...", Hyzion icons, a new wiki
 
 Server-side checks only (build, `check`); not yet seen in a game client.

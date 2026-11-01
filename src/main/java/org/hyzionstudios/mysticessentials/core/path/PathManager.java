@@ -88,7 +88,7 @@ public final class PathManager {
         return dataDir().resolve("cache");
     }
 
-    /** PNGs the server adds as icons ({@code custom:<name>}). */
+    /** The server owner's PNGs ({@code custom:<name>}). Only ever read by the mod. */
     public Path iconsDir() {
         return root.resolve("icons");
     }
