@@ -844,7 +844,7 @@ tasks.register<JavaExec>("verifyModHotkeys") {
 
 tasks.register<JavaExec>("verifyAfkZoneGeometry") {
     group = "verification"
-    description = "Checks AFK zones cover the whole blocks their corners were set in, everywhere."
+    description = "Checks AFK zones match the inclusive 3D block box shown by their corner preview."
     dependsOn(tasks.testClasses)
     classpath = sourceSets.test.get().runtimeClasspath + configurations.compileClasspath.get()
     mainClass.set("org.hyzionstudios.mysticessentials.modules.afk.AfkZoneGeometryTest")

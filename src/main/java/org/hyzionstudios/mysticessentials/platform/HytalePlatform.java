@@ -696,6 +696,18 @@ public final class HytalePlatform {
     public CompletableFuture<Optional<MysticLocation>> findStandingSpot(String worldName, int blockX, int blockZ,
             int requiredHeadroom, Set<Integer> blockedBlockIds, Set<Integer> blockedFluidIds,
             int preferredFeetY, int maxVerticalDistance) {
+        int range = Math.max(0, maxVerticalDistance);
+        return findStandingSpot(worldName, blockX, blockZ, requiredHeadroom, blockedBlockIds,
+                blockedFluidIds, preferredFeetY, preferredFeetY - range, preferredFeetY + range);
+    }
+
+    /**
+     * Finds the nearest safe standing spot while considering only feet positions
+     * from {@code minFeetY} through {@code maxFeetY}, inclusive.
+     */
+    public CompletableFuture<Optional<MysticLocation>> findStandingSpot(String worldName, int blockX, int blockZ,
+            int requiredHeadroom, Set<Integer> blockedBlockIds, Set<Integer> blockedFluidIds,
+            int preferredFeetY, int minFeetY, int maxFeetY) {
         CompletableFuture<Optional<MysticLocation>> outcome = new CompletableFuture<>();
         World world = world(worldName).orElse(null);
         if (world == null) {
@@ -708,7 +720,7 @@ public final class HytalePlatform {
                     .thenAcceptAsync(chunkRef -> completeStandingSpot(outcome, world,
                             worldChunk(world, chunkRef), blockX, blockZ,
                             requiredHeadroom, blockedBlockIds, blockedFluidIds, preferredFeetY,
-                            maxVerticalDistance), world)
+                            minFeetY, maxFeetY), world)
                     .exceptionally(error -> {
                         outcome.complete(Optional.empty());
                         return null;
@@ -721,22 +733,26 @@ public final class HytalePlatform {
 
     private void completeStandingSpot(CompletableFuture<Optional<MysticLocation>> outcome, World world,
             WorldChunk chunk, int blockX, int blockZ, int requiredHeadroom, Set<Integer> blockedBlockIds,
-            Set<Integer> blockedFluidIds, int preferredFeetY, int maxVerticalDistance) {
+            Set<Integer> blockedFluidIds, int preferredFeetY, int minFeetY, int maxFeetY) {
         try {
             if (chunk == null) {
                 outcome.complete(Optional.empty());
                 return;
             }
             int headroom = Math.max(1, requiredHeadroom);
-            int range = Math.max(0, maxVerticalDistance);
-            int top = Math.min(ChunkUtil.HEIGHT - headroom, preferredFeetY + range);
-            int bottom = Math.max(ChunkUtil.MIN_Y + 1, preferredFeetY - range);
+            int top = Math.min(ChunkUtil.HEIGHT - headroom, Math.max(minFeetY, maxFeetY));
+            int bottom = Math.max(ChunkUtil.MIN_Y + 1, Math.min(minFeetY, maxFeetY));
+            if (bottom > top) {
+                outcome.complete(Optional.empty());
+                return;
+            }
+            int preferred = Math.max(bottom, Math.min(preferredFeetY, top));
             int bestFeetY = Integer.MIN_VALUE;
             int bestDistance = Integer.MAX_VALUE;
             for (int feetY = top; feetY >= bottom; feetY--) {
                 // Scanning downwards: once the gap to the preferred height is
                 // wider than the best candidate so far, nothing lower can beat it.
-                if (feetY < preferredFeetY && preferredFeetY - feetY > bestDistance) {
+                if (feetY < preferred && preferred - feetY > bestDistance) {
                     break;
                 }
                 int floorY = feetY - 1;
@@ -759,7 +775,7 @@ public final class HytalePlatform {
                 if (!clear) {
                     continue;
                 }
-                int distance = Math.abs(feetY - preferredFeetY);
+                int distance = Math.abs(feetY - preferred);
                 if (distance < bestDistance) {
                     bestDistance = distance;
                     bestFeetY = feetY;

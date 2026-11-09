@@ -1,5 +1,15 @@
 # Mystic Essentials Changelog
 
+## Unreleased — AFK zones match their 3D selection
+
+Server-side checks only (build, `verifyAfkZoneGeometry`); not yet seen in a game client.
+
+- **AFK zones are true cuboids again.** `/afkzone pos1` and `pos2` now bound X,
+  Y and Z exactly as the whole-block preview shows, instead of applying the X/Z
+  footprint through the entire world height.
+- Safe zone teleports only consider landing positions inside the selected Y
+  bounds, and zone sizes are reported as X×Y×Z.
+
 ## Unreleased — Alt+2 and Endgame & QoL, nested wiki categories, pages for installed mods
 
 Server-side checks only (build, `check`, a dev-server boot); not yet seen in a game client.

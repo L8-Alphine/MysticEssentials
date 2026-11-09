@@ -27,18 +27,20 @@ Rewards are an optional, permission-gated way to pay players for idle time — c
 | `rewards.maxSessionReward` | `500.0` | Per-session cap; `0` disables |
 | `rewards.maxDailyReward` | `2000.0` | Daily cap (per player per UTC day, kept in the player profile so a restart does not reset it); `0` disables |
 | `rewards.requireInZone` | `false` | Require standing in the reward zone |
-| `rewards.zones` | `[]` | Named reward-zone X/Z footprints |
+| `rewards.zones` | `[]` | Named reward-zone X/Y/Z cuboids |
 | `rewards.defaultZone` | unset | Default auto-AFK teleport destination |
 | `rewards.stayAfkWhileMovingInZone` | `true` | Keep players AFK while they move inside a reward zone |
 | `rewards.teleportToZoneOnAfk` | `true` | Offer/choose a safe zone landing and restore the saved location on return |
 | `rewards.noRewardWithinCombatSeconds` | `15` | Combat lockout before rewards resume |
 
-Zones cover the X/Z footprint between their corners at every height. Safe
-teleport scans random columns near the corner reference height for a solid,
-non-blocked floor, enough air above it, and no blocked fluid. It prefers the
-closest safe point rather than the topmost block, so roofed and underground AFK
-rooms land players on their interior floor. If no safe position is found within
-the configured attempts, the player stays where they are.
+Zones cover every whole block in the inclusive X/Y/Z cuboid between their
+corners. A player is inside only when all three coordinates are inside that
+cuboid. Safe teleport scans random columns within the selected Y bounds for a
+solid, non-blocked floor, enough air above it, and no blocked fluid. It prefers
+the safe point closest to the cuboid midpoint rather than the topmost block, so
+roofed and underground AFK rooms land players on their interior floor. If no
+safe position is found within the configured attempts, the player stays where
+they are.
 
 `rewards.safeTeleport` controls `enabled`, `attempts` (12),
 `requiredHeadroom` (2), `verticalSearchRange` (24), `blockedBlocks`, and
@@ -50,7 +52,7 @@ work. The session/daily caps and combat lockout bound farming. Staff with
 
 | Command | What it does |
 | --- | --- |
-| `/afkzone pos1`, `/afkzone pos2` | Save the two X/Z corners at your current positions |
+| `/afkzone pos1`, `/afkzone pos2` | Save the two X/Y/Z corners at your current positions |
 | `/afkzone create <name>` | Create a zone from those corners |
 | `/afkzone delete <name>` | Delete a zone |
 | `/afkzone permission <name> <node\|->` | Require a permission for the zone, or clear it with `-` |

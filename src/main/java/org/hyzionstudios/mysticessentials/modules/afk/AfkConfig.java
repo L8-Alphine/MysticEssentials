@@ -26,12 +26,7 @@ public final class AfkConfig {
 
     public Rewards rewards = new Rewards();
 
-    /**
-     * A named reward zone: the X/Z footprint spanned by two corners in one
-     * world, at any height (see {@link #contains}). The corner Y values are kept
-     * only as the world reference and the fallback floor used when
-     * {@link Rewards.SafeTeleport} is disabled.
-     */
+    /** A named cuboid reward zone spanning two corners in one world. */
     public static final class Zone {
         public String name;
         public MysticLocation cornerA;
@@ -50,21 +45,17 @@ public final class AfkConfig {
             this.cornerB = cornerB;
         }
 
-        /**
-         * A zone is its X/Z footprint at any height — corners are captured at
-         * the admin's foot level while walking the perimeter, so their Y values
-         * only ever described where that admin happened to stand, not the height
-         * of the area. Testing Y made players standing on higher ground inside
-         * the footprint read as outside the zone.
-         */
+        /** Tests the whole blocks between both corners, inclusive on all three axes. */
         public boolean contains(MysticLocation pos) {
             if (pos == null || cornerA == null || cornerB == null
                     || pos.getWorld() == null || !pos.getWorld().equals(cornerA.getWorld())) {
                 return false;
             }
             int x = (int) Math.floor(pos.getX());
+            int y = (int) Math.floor(pos.getY());
             int z = (int) Math.floor(pos.getZ());
             return x >= minBlock(cornerA.getX(), cornerB.getX()) && x <= maxBlock(cornerA.getX(), cornerB.getX())
+                    && y >= minBlock(cornerA.getY(), cornerB.getY()) && y <= maxBlock(cornerA.getY(), cornerB.getY())
                     && z >= minBlock(cornerA.getZ(), cornerB.getZ()) && z <= maxBlock(cornerA.getZ(), cornerB.getZ());
         }
 
@@ -167,14 +158,11 @@ public final class AfkConfig {
         public int noRewardWithinCombatSeconds = 15;
 
         /**
-         * Safety rules for the zone teleport. A random column inside the zone's
-         * footprint is scanned for the spot where the player can stand closest
-         * to the zone's corner height: a solid floor block that is not blocked,
-         * {@link #requiredHeadroom} air blocks above it, and no blocked fluid in
-         * the floor or body. The corner Y is a reference height only, never the
-         * landing Y — corners are captured at foot level while walking, so on
-         * uneven ground they sit below the surface and would drop players
-         * inside terrain.
+         * Safety rules for the zone teleport. A random X/Z column inside the
+         * zone is scanned, within the selected Y bounds, for the spot where the
+         * player can stand closest to the cuboid's midpoint: a solid floor block
+         * that is not blocked, {@link #requiredHeadroom} air blocks above it,
+         * and no blocked fluid in the floor or body.
          */
         public static final class SafeTeleport {
             /** Probe the terrain; when disabled players land on the zone floor Y instead. */
@@ -184,11 +172,9 @@ public final class AfkConfig {
             /** Air blocks required above the floor for the player's body. */
             public int requiredHeadroom = 2;
             /**
-             * How far above/below the zone's corner height a landing spot may
-             * sit. The column scan keeps the candidate closest to that height,
-             * so a roofed or cave zone lands players on its floor instead of on
-             * top of the structure, while uneven ground inside the footprint
-             * still resolves. Raise it for zones spanning tall terrain.
+             * How far above/below the zone's midpoint a landing spot may sit.
+             * The scan is also clamped to the zone's selected Y bounds. Raise
+             * this for zones taller than twice the configured range.
              */
             public int verticalSearchRange = 24;
             /**

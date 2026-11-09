@@ -16,9 +16,9 @@ public final class AfkZoneGeometryTest {
     public static void main(String[] args) {
         edgeBlocksYouStoodOnAreInside();
         cornerOrderDoesNotMatter();
-        aSingleBlockZoneIsOneByOne();
+        aSingleBlockZoneIsOneByOneByOne();
         anotherWorldIsNeverInside();
-        heightIsNotPartOfTheZone();
+        heightIsPartOfTheZone();
         samplesStayInsideAndReachBothEdges();
         System.out.println("AfkZoneGeometryTest: all checks passed.");
     }
@@ -33,16 +33,22 @@ public final class AfkZoneGeometryTest {
         require(!zone.contains(at(111.0, 103)), "x=111 is past the last block");
         require(!zone.contains(at(99.99, 103)), "x=99.99 is before the first block");
         require(!zone.contains(at(105, 106.0)), "z=106 is past the last block");
-        requireEqual("11x6", AfkModule.formatSize(zone), "blocks 100..110 by 100..105");
+        require(zone.contains(at(105, 70.99, 103)), "y=70.99 is in the top selected block");
+        require(!zone.contains(at(105, 71.0, 103)), "y=71 is above the selected cuboid");
+        requireEqual("11x7x6", AfkModule.formatSize(zone), "blocks 100..110 by 64..70 by 100..105");
     }
 
     private static void cornerOrderDoesNotMatter() {
-        AfkConfig.Zone forward = zone(100.7, 100.2, 110.3, 105.9);
-        AfkConfig.Zone reversed = zone(110.3, 105.9, 100.7, 100.2);
+        AfkConfig.Zone forward = zone(100.7, 64.8, 100.2, 110.3, 70.2, 105.9);
+        AfkConfig.Zone reversed = zone(110.3, 70.2, 105.9, 100.7, 64.8, 100.2);
         requireEqual(AfkModule.formatSize(forward), AfkModule.formatSize(reversed), "size by corner order");
         for (double x = 99; x <= 112; x += 0.25) {
             require(forward.contains(at(x, 103)) == reversed.contains(at(x, 103)),
                     "containment at x=" + x + " depends on corner order");
+        }
+        for (double y = 63; y <= 72; y += 0.25) {
+            require(forward.contains(at(105, y, 103)) == reversed.contains(at(105, y, 103)),
+                    "containment at y=" + y + " depends on corner order");
         }
     }
 
@@ -51,13 +57,14 @@ public final class AfkZoneGeometryTest {
      * which spans -4.0 up to (not including) -3.0. Truncating instead of flooring
      * would put them in block -3 -- the classic off-by-one west and north of 0.
      */
-    private static void aSingleBlockZoneIsOneByOne() {
-        AfkConfig.Zone zone = zone(5.2, -3.4, 5.9, -3.1);
-        requireEqual("1x1", AfkModule.formatSize(zone), "both corners in one block");
-        require(zone.contains(at(5.0, -4.0)), "the block's near edge");
-        require(zone.contains(at(5.99, -3.01)), "the block's far edge");
-        require(!zone.contains(at(5.5, -3.0)), "z=-3.0 is block -3, the next one north");
-        require(!zone.contains(at(6.0, -3.5)), "x=6 is the next block east");
+    private static void aSingleBlockZoneIsOneByOneByOne() {
+        AfkConfig.Zone zone = zone(5.2, 64.2, -3.4, 5.9, 64.9, -3.1);
+        requireEqual("1x1x1", AfkModule.formatSize(zone), "both corners in one block");
+        require(zone.contains(at(5.0, 64.0, -4.0)), "the block's near edge");
+        require(zone.contains(at(5.99, 64.99, -3.01)), "the block's far edge");
+        require(!zone.contains(at(5.5, 64.5, -3.0)), "z=-3.0 is block -3, the next one north");
+        require(!zone.contains(at(6.0, 64.5, -3.5)), "x=6 is the next block east");
+        require(!zone.contains(at(5.5, 65.0, -3.5)), "y=65 is the block above");
     }
 
     private static void anotherWorldIsNeverInside() {
@@ -65,11 +72,13 @@ public final class AfkZoneGeometryTest {
         require(!zone.contains(new MysticLocation("nether", 5, 64, 5, 0f, 0f)), "a different world");
     }
 
-    /** Documented behaviour, unchanged: corner Y only records where the admin stood. */
-    private static void heightIsNotPartOfTheZone() {
+    /** The selected Y blocks bound the zone just like its X and Z blocks. */
+    private static void heightIsPartOfTheZone() {
         AfkConfig.Zone zone = zone(0, 0, 10, 10);
-        require(zone.contains(new MysticLocation(WORLD, 5, -40, 5, 0f, 0f)), "far below the corners");
-        require(zone.contains(new MysticLocation(WORLD, 5, 300, 5, 0f, 0f)), "far above the corners");
+        require(zone.contains(new MysticLocation(WORLD, 5, 64, 5, 0f, 0f)), "bottom selected block");
+        require(zone.contains(new MysticLocation(WORLD, 5, 70.99, 5, 0f, 0f)), "top selected block");
+        require(!zone.contains(new MysticLocation(WORLD, 5, 63.99, 5, 0f, 0f)), "below the cuboid");
+        require(!zone.contains(new MysticLocation(WORLD, 5, 71, 5, 0f, 0f)), "above the cuboid");
     }
 
     /** Every landing column the sampler picks must be inside, and both edges must be reachable. */
@@ -90,12 +99,20 @@ public final class AfkZoneGeometryTest {
     // ----- Helpers -------------------------------------------------------------------
 
     private static AfkConfig.Zone zone(double ax, double az, double bx, double bz) {
-        return new AfkConfig.Zone("test", new MysticLocation(WORLD, ax, 64, az, 0f, 0f),
-                new MysticLocation(WORLD, bx, 70, bz, 0f, 0f));
+        return zone(ax, 64, az, bx, 70, bz);
+    }
+
+    private static AfkConfig.Zone zone(double ax, double ay, double az, double bx, double by, double bz) {
+        return new AfkConfig.Zone("test", new MysticLocation(WORLD, ax, ay, az, 0f, 0f),
+                new MysticLocation(WORLD, bx, by, bz, 0f, 0f));
     }
 
     private static MysticLocation at(double x, double z) {
         return new MysticLocation(WORLD, x, 64, z, 0f, 0f);
+    }
+
+    private static MysticLocation at(double x, double y, double z) {
+        return new MysticLocation(WORLD, x, y, z, 0f, 0f);
     }
 
     private static void require(boolean condition, String message) {

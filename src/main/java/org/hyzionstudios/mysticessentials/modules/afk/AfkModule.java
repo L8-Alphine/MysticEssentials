@@ -716,15 +716,12 @@ public final class AfkModule extends AbstractMysticModule implements AfkService 
 
     /**
      * Picks the spot a player is dropped on inside {@code zone}: random columns
-     * of the zone's footprint are scanned for the standable spot nearest the
-     * zone's reference height — solid floor block, headroom of air above it, and
-     * neither a blocked block id under the feet nor a blocked fluid id in the
-     * floor or body. The corner Y values only set that reference height, never
-     * the landing Y: corners are captured at foot level while walking, so on
-     * uneven ground the lowest one sits several blocks below the surface and
-     * would bury the player. Scanning for the nearest spot rather than the
-     * topmost keeps roofed and underground zones working — the room's floor
-     * wins over the roof above it.
+     * of the cuboid are scanned for the standable spot nearest the zone's Y
+     * midpoint — solid floor block, headroom of air above it, and neither a
+     * blocked block id under the feet nor a blocked fluid id in the floor or
+     * body. The scan never considers a feet position outside the selected Y
+     * bounds. Picking the nearest spot rather than the topmost keeps roofed and
+     * underground zones working — the room's floor wins over the roof above it.
      *
      * @return the landing spot, or empty when no column passed in
      *         {@code attempts} tries (the caller then leaves the player put).
@@ -746,9 +743,15 @@ public final class AfkModule extends AbstractMysticModule implements AfkService 
         }
         int blockX = randomBlock(zone.cornerA.getX(), zone.cornerB.getX());
         int blockZ = randomBlock(zone.cornerA.getZ(), zone.cornerB.getZ());
+        int preferredFeetY = referenceFeetY(zone);
+        int verticalRange = Math.max(1, safety.verticalSearchRange);
+        int minFeetY = Math.max(AfkConfig.Zone.minBlock(zone.cornerA.getY(), zone.cornerB.getY()),
+                preferredFeetY - verticalRange);
+        int maxFeetY = Math.min(AfkConfig.Zone.maxBlock(zone.cornerA.getY(), zone.cornerB.getY()),
+                preferredFeetY + verticalRange);
         return core.platform().findStandingSpot(zone.cornerA.getWorld(), blockX, blockZ,
                         Math.max(1, safety.requiredHeadroom), blockedBlockIds, blockedFluidIds,
-                        referenceFeetY(zone), Math.max(1, safety.verticalSearchRange))
+                        preferredFeetY, minFeetY, maxFeetY)
                 .exceptionally(error -> Optional.empty())
                 .thenCompose(found -> found.isPresent()
                         ? CompletableFuture.completedFuture(found)
@@ -799,19 +802,20 @@ public final class AfkModule extends AbstractMysticModule implements AfkService 
     }
 
     /**
-     * The height the column scan measures candidates against: the midpoint of
-     * the two corner foot levels, i.e. roughly the ground the admin walked when
-     * marking the zone out.
+     * The block height the column scan measures candidates against: the midpoint
+     * of the cuboid's inclusive Y bounds.
      */
     private static int referenceFeetY(AfkConfig.Zone zone) {
-        return (int) Math.round((zone.cornerA.getY() + zone.cornerB.getY()) / 2.0);
+        int min = AfkConfig.Zone.minBlock(zone.cornerA.getY(), zone.cornerB.getY());
+        int max = AfkConfig.Zone.maxBlock(zone.cornerA.getY(), zone.cornerB.getY());
+        return min + (max - min) / 2;
     }
 
-    /** Pre-scan behaviour, kept for {@code safeTeleport.enabled = false}: the lowest corner Y. */
+    /** Pre-scan behaviour, kept for {@code safeTeleport.enabled = false}: the lowest selected Y block. */
     private static MysticLocation randomPointIn(AfkConfig.Zone zone) {
         double x = randomBlock(zone.cornerA.getX(), zone.cornerB.getX()) + 0.5;
         double z = randomBlock(zone.cornerA.getZ(), zone.cornerB.getZ()) + 0.5;
-        double y = Math.min(zone.cornerA.getY(), zone.cornerB.getY());
+        double y = AfkConfig.Zone.minBlock(zone.cornerA.getY(), zone.cornerB.getY());
         return new MysticLocation(zone.cornerA.getWorld(), x, y + 0.1, z, 0f, 0f);
     }
 
@@ -953,13 +957,15 @@ public final class AfkModule extends AbstractMysticModule implements AfkService 
         return (int) Math.floor(value);
     }
 
-    /** The zone's X/Z footprint — its height is not part of the zone (see {@code Zone.contains}). */
+    /** The inclusive block dimensions of the zone's X/Y/Z cuboid. */
     static String formatSize(AfkConfig.Zone zone) {
         int dx = AfkConfig.Zone.maxBlock(zone.cornerA.getX(), zone.cornerB.getX())
                 - AfkConfig.Zone.minBlock(zone.cornerA.getX(), zone.cornerB.getX()) + 1;
+        int dy = AfkConfig.Zone.maxBlock(zone.cornerA.getY(), zone.cornerB.getY())
+                - AfkConfig.Zone.minBlock(zone.cornerA.getY(), zone.cornerB.getY()) + 1;
         int dz = AfkConfig.Zone.maxBlock(zone.cornerA.getZ(), zone.cornerB.getZ())
                 - AfkConfig.Zone.minBlock(zone.cornerA.getZ(), zone.cornerB.getZ()) + 1;
-        return dx + "x" + dz;
+        return dx + "x" + dy + "x" + dz;
     }
 
     private static String formatDuration(long millis, boolean roundUp) {

@@ -751,23 +751,24 @@ Notable per-module settings:
   (`stayAfkWhileMovingInZone`), so AFK pools that push players around keep
   working. Set `requireInZone: true` to pay rewards only inside zones.
 
-  A zone is the **X/Z footprint** spanned by its two corners, at any height —
-  the corner Y values are not part of the zone. Corners are captured at the
-  admin's foot level while walking the perimeter, so on uneven ground a Y-bounded
-  zone read players standing on higher parts as outside it.
+  A zone is the inclusive **X/Y/Z cuboid** spanned by its two corners, matching
+  the whole-block selection preview. A player is inside only when their current
+  X, Y and Z blocks all fall between the `pos1` and `pos2` blocks. Set one corner
+  at the bottom and the other at the top of the volume you want to cover.
 
   When zones exist and `teleportToZoneOnAfk` is on (default), `/afk` saves the
   player's location and teleports them to a random spot inside a permitted zone
-  (same-world zones preferred). A random column of the footprint is scanned for
-  the spot closest to the zone's corner height where the player can stand: a
-  solid floor block, `requiredHeadroom` (default 2) air blocks above it, no
+  (same-world zones preferred). A random column of the cuboid is scanned, only
+  within its selected Y bounds, for the spot closest to its midpoint where the
+  player can stand: a solid floor block, `requiredHeadroom` (default 2) air
+  blocks above it, no
   blocked block id as the floor, and no blocked fluid id in the floor or body.
   Picking the nearest spot rather than the topmost one keeps roofed and
   underground zones working — players land on the room's floor instead of on top
   of its roof. Configure under `rewards.safeTeleport`: `enabled`, `attempts`
   (columns tried, default 12), `requiredHeadroom`, `verticalSearchRange` (blocks
-  above/below the corner height a landing spot may sit, default 24, raise it for
-  zones spanning tall terrain), `blockedBlocks` (block asset ids, default
+  above/below the cuboid midpoint to scan, default 24 and always clamped to the
+  cuboid), `blockedBlocks` (block asset ids, default
   `Fluid_Lava`, `Trap_Spike`, `Plant_Cactus`), and `blockedFluids` (fluid asset
   ids, default the lava/fire/poison/tar set — water and slime are left allowed so
   AFK pools work). Ids the server does not know are logged once and ignored. If
